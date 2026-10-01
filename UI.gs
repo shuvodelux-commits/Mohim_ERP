@@ -37,8 +37,9 @@ const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard',     icon: 'dashboard', bn: 'আজকের অবস্থা', sidebarGroup: 0, sidebarOrder: 10 },
   {
     key: 'pos', label: 'POS', icon: 'pos', bn: 'ক্যাশ কাউন্টার', sidebarGroup: 0, sidebarOrder: 20, landingKey: 'posv2',
+    // POS V2 is the only user-facing POS route. The shared operational
+    // runtime still lives in pos.html; Classic is intentionally not exposed.
     children: [
-      { key: 'pos', label: 'Classic POS', bn: 'বর্তমান ডিজাইন' },
       { key: 'posv2', label: 'POS V2', bn: 'SherHisab ডিজাইন', permKey: 'pos' }
     ]
   },
