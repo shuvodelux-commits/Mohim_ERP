@@ -32,7 +32,7 @@
     var body=document.getElementById('draftSalesBody'); if(!body)return;
     body.innerHTML=rows.map(function(r){
       return '<tr data-draft-id="'+escapeHtml(r.draftId)+'">'+
-        '<td data-label="Draft No"><strong class="mono">'+escapeHtml(r.draftNo)+'</strong></td>'+
+        '<td data-label="Draft No"><strong>'+escapeHtml(r.draftNo)+'</strong></td>'+
         '<td data-label="Updated">'+escapeHtml(String(r.updatedAt||''))+'</td>'+
         '<td data-label="Customer">'+escapeHtml(r.customerName||'Not selected')+'</td>'+
         '<td data-label="Phone">'+escapeHtml(r.customerPhone||'')+'</td>'+
