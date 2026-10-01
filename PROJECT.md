@@ -434,6 +434,26 @@ Complete Sale
 
 The sale server validates the entire cart before the first write.
 
+### Keyboard fast entry
+
+Classic POS and POS V2 share the same cart keyboard flow from `pos.html`:
+
+```text
+Enter on POS page background
+        ↓
+focus Add Product
+        ↓
+type/search + Enter selected product
+        ↓
+focus Quantity
+        ↓
+Enter
+        ↓
+finish line + focus next Add Product
+```
+
+The page-level Enter shortcut is intentionally ignored while focus is already inside an input, textarea, select, button/link, editable control, or while a modal/confirmation overlay is open. This preserves normal form and dialog keyboard behavior.
+
 ### Purchase Price Visibility
 
 Lets trusted counter staff see what an item cost while agreeing a price,
