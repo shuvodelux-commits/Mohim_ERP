@@ -181,7 +181,10 @@ function partyLedgerSourceDateMap_(kind, rawAsc) {
 function partyLedgerBuildDisplayIndex_(kind, partyId, includeCorrections) {
   const raw = partyLedgerBuildAscendingIndex_(kind, partyId);
   if (includeCorrections) return raw;
-  return partyLedgerProjectClean_(kind, raw, partyLedgerSourceDateMap_(kind, raw));
+  const clean = partyLedgerProjectClean_(kind, raw, partyLedgerSourceDateMap_(kind, raw));
+  return kind === 'supplier'
+    ? partyLedgerProjectSupplierPurchases_(partyId, clean)
+    : clean;
 }
 
 function partyLedgerProjectClean_(kind, rawAsc, sourceDateMap) {
@@ -249,6 +252,135 @@ function partyLedgerProjectClean_(kind, rawAsc, sourceDateMap) {
     throw new Error('Clean ledger projection does not reconcile with the accounting ledger.');
   }
   return clean;
+}
+
+/**
+ * Read only the Purchase columns required to render a complete Supplier
+ * Ledger invoice row. This keeps the workspace narrow/read-only while making
+ * fully-paid purchases visible even though createPurchase historically wrote
+ * SUPPLIER_LEDGER only when the purchase had an unpaid balance.
+ */
+function partyLedgerSupplierPurchaseIndex_(supplierId) {
+  const sid = String(supplierId || '');
+  if (!sid) return [];
+
+  const sheetKey = 'PURCHASES';
+  const sheet = getSheet_(sheetKey);
+  const headers = getSheetHeaders_(sheetKey).slice();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+
+  const needed = [
+    'Purchase ID', 'Date', 'Supplier ID', 'Supplier Name',
+    'Grand Total', 'Paid Amount', 'Due Amount', 'Payment Status',
+    'Created At', 'Is Deleted'
+  ];
+  const colByHeader = {};
+  headers.forEach(function (h, i) { colByHeader[h] = i + 1; });
+  needed.forEach(function (h) {
+    if (!colByHeader[h]) throw new Error(sheetKey + ' missing required header: ' + h);
+  });
+
+  const a1s = needed.map(function (h) {
+    const col = partyLedgerColumnA1_(colByHeader[h]);
+    return col + '2:' + col + lastRow;
+  });
+  const ranges = sheet.getRangeList(a1s).getRanges();
+  const cols = ranges.map(function (range) { return range.getValues(); });
+  const out = [];
+
+  for (let i = 0; i < lastRow - 1; i++) {
+    const row = { _rowIndex: i + 2 };
+    needed.forEach(function (h, c) {
+      row[h] = serializeCellValue_(cols[c][i][0]);
+    });
+    if (String(row['Supplier ID'] || '') !== sid || isDeleted_(row)) continue;
+    out.push(row);
+  }
+  return out;
+}
+
+/**
+ * Business-facing Supplier Ledger projection.
+ *
+ * The accounting ledger stores only the unpaid purchase obligation, because
+ * direct purchase payments move through Cash/Bank rather than a supplier
+ * payment row. For display, replace the canonical clean Purchase obligation
+ * with the authoritative Purchase invoice:
+ *
+ *   Debit  = Grand Total
+ *   Credit = amount paid directly on that purchase
+ *
+ * The net effect remains exactly Due Amount, so Current Due, later supplier
+ * payments, purchase-return credits and settlement logic are unchanged.
+ * Historical correction rows stay untouched when their shape is anomalous;
+ * we never hide inconsistent accounting evidence.
+ */
+function partyLedgerProjectSupplierPurchases_(supplierId, cleanAsc) {
+  const sid = String(supplierId || '');
+  const rows = (cleanAsc || []).map(function (row) { return Object.assign({}, row); });
+  if (!sid) return partyLedgerRebalanceDisplayRows_(rows);
+
+  const positionsByRef = {};
+  rows.forEach(function (row, index) {
+    const ref = String(row['Reference'] || '');
+    if (!ref || !partyLedgerIsCorrectionChainRow_('supplier', row)) return;
+    if (!positionsByRef[ref]) positionsByRef[ref] = [];
+    positionsByRef[ref].push(index);
+  });
+
+  partyLedgerSupplierPurchaseIndex_(sid).forEach(function (purchase) {
+    const purchaseId = String(purchase['Purchase ID'] || '');
+    if (!purchaseId) return;
+
+    const positions = positionsByRef[purchaseId] || [];
+    // partyLedgerProjectClean_ leaves anomalous correction chains raw on
+    // purpose. Do not replace or conceal those rows.
+    if (positions.length > 1) return;
+    if (positions.length === 1 && String(rows[positions[0]]['Type'] || '') !== 'Purchase') return;
+
+    const grandTotal = roundMoney_(Number(purchase['Grand Total']) || 0);
+    const paidAmount = roundMoney_(Number(purchase['Paid Amount']) || 0);
+    const dueAmount = roundMoney_(Number(purchase['Due Amount']) || 0);
+    const projectedDue = roundMoney_(grandTotal - paidAmount);
+
+    // Fail closed on inconsistent source arithmetic instead of displaying an
+    // attractive invoice row that would disagree with accounting.
+    if (Math.abs(roundMoney_(projectedDue - dueAmount)) > 0.004) return;
+
+    let anchor = null;
+    if (positions.length === 1) {
+      anchor = rows[positions[0]];
+      const anchorNet = roundMoney_((Number(anchor['Debit']) || 0) - (Number(anchor['Credit']) || 0));
+      if (Math.abs(roundMoney_(anchorNet - dueAmount)) > 0.004) return;
+    } else if (Math.abs(dueAmount) > 0.004) {
+      // A non-zero payable must already have accounting evidence. This helper
+      // is a display projection, not a repair engine, so never invent balance.
+      return;
+    }
+
+    const synthetic = Object.assign({}, anchor || {});
+    synthetic._synthetic = true;
+    synthetic._rowIndex = anchor ? (Number(anchor._rowIndex) || 1) : (Number(purchase._rowIndex) || 1);
+    synthetic['Ledger ID'] = 'SOURCE|supplier|' + purchaseId;
+    synthetic['Date'] = safeDateOnly_(purchase['Date']);
+    synthetic['Supplier ID'] = sid;
+    synthetic['Supplier Name'] = purchase['Supplier Name'] || (anchor ? anchor['Supplier Name'] : '');
+    synthetic['Type'] = 'Purchase';
+    synthetic['Reference'] = purchaseId;
+    synthetic['Debit'] = grandTotal;
+    synthetic['Credit'] = paidAmount > 0.004 ? paidAmount : '';
+    synthetic['Notes'] = '';
+    synthetic['Created At'] = purchase['Created At'] || (anchor ? anchor['Created At'] : '');
+
+    if (positions.length === 1) {
+      rows[positions[0]] = synthetic;
+    } else {
+      rows.push(synthetic);
+    }
+  });
+
+  return partyLedgerRebalanceDisplayRows_(rows);
 }
 
 /** Returns active party rows oldest->newest, with authoritative _displayBalance. */
