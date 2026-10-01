@@ -1,0 +1,532 @@
+<div class="party-ledger-workspace" id="supplierLedgerWorkspace">
+  <div class="party-ledger-toolbar card">
+    <div class="party-ledger-selector-wrap">
+      <label for="supplierLedgerSelector">Supplier</label>
+      <div class="counter-combobox party-ledger-combobox">
+        <input id="supplierLedgerSelector" type="search" data-search-clear="on" autocomplete="off" spellcheck="false" placeholder="Search supplier by name or phone...">
+        <div id="supplierLedgerPartyResults" class="counter-combo-results party-ledger-party-results" role="listbox" hidden></div>
+      </div>
+    </div>
+    <div class="party-ledger-toolbar-actions">
+      <button class="btn btn-primary" id="supplierLedgerMakePaymentBtn" type="button" disabled>Make Payment</button>
+      <button class="btn" id="supplierLedgerPrintBtn" type="button" disabled>Print Ledger</button>
+    </div>
+  </div>
+
+  <div class="party-ledger-empty card" id="supplierLedgerSelectEmpty">Select a supplier to view ledger.</div>
+
+  <div id="supplierLedgerSelected" hidden>
+    <div class="party-ledger-party-card card">
+      <div class="party-ledger-party-copy">
+        <h3 id="supplierLedgerPartyName"></h3>
+        <div class="party-ledger-party-meta" id="supplierLedgerPartyMeta"></div>
+        <div class="party-ledger-status" id="supplierLedgerPartyStatus"></div>
+      </div>
+      <div class="party-ledger-balance-box">
+        <span>Current Payable</span>
+        <strong id="supplierLedgerBalance">0</strong>
+      </div>
+    </div>
+
+    <div class="party-ledger-list-card card">
+      <div class="party-ledger-list-head">
+        <div>
+          <h3>Transactions</h3>
+          <span class="bn-hint" style="display:inline;">সর্বশেষ লেনদেন আগে</span>
+        </div>
+        <div class="party-ledger-list-controls">
+          <label class="party-ledger-corrections-toggle" id="supplierLedgerCorrectionsWrap" hidden>
+            <input id="supplierLedgerCorrectionsToggle" type="checkbox"> Show corrections
+          </label>
+          <label class="party-ledger-page-size">Show
+            <select id="supplierLedgerPageSize">
+              <option value="50" selected>50</option>
+              <option value="100">100</option>
+              <option value="200">200</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div class="table-scroll party-ledger-table-scroll">
+        <table class="mobile-card-table party-ledger-table">
+          <thead><tr><th>Date</th><th>Type</th><th>Reference</th><th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th><th></th></tr></thead>
+          <tbody id="supplierLedgerBody"></tbody>
+        </table>
+      </div>
+      <div class="empty-state" id="supplierLedgerEmpty" hidden>No transactions yet.</div>
+      <div class="party-ledger-pagination">
+        <button class="btn" id="supplierLedgerPrevBtn" type="button" disabled>&larr; Previous</button>
+        <span id="supplierLedgerPageLabel">Page 1</span>
+        <button class="btn" id="supplierLedgerNextBtn" type="button" disabled>Next &rarr;</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Make Payment -->
+<div class="modal-overlay" id="supplierLedgerPayModal" hidden>
+  <div class="modal party-ledger-action-modal">
+    <div class="modal-header"><div><h3>Make Payment</h3><span class="bn-hint">সাপ্লায়ার পেমেন্ট</span></div><button class="modal-close" type="button" onclick="closeModal('supplierLedgerPayModal')">&#10005;</button></div>
+    <div class="modal-body">
+      <div class="party-ledger-modal-balance"><span>Current Payable</span><strong id="supplierLedgerPayCurrentDue">0</strong></div>
+      <div class="form-grid party-ledger-payment-grid">
+        <div><label>Payment Amount *</label><input id="supplierLedgerPayAmount" type="number" min="0" step="0.01"></div>
+        <div><label>Discount Received</label><input id="supplierLedgerPayDiscount" type="number" min="0" step="0.01" value="0"></div>
+        <div class="full" id="supplierLedgerPayDiscountReasonRow" hidden><label>Discount Reason *</label><input id="supplierLedgerPayDiscountReason" type="text"></div>
+        <div><label>Payment Method</label><select id="supplierLedgerPayMethod"><option value="Cash">Cash</option><option value="Bank">Bank</option><option value="Mobile Banking">Mobile Banking</option></select></div>
+        <div id="supplierLedgerPayBankRow" hidden><label id="supplierLedgerPayBankLabel">Bank Account *</label><select id="supplierLedgerPayBank"><option value="">Select bank account...</option></select></div>
+        <div><label>Payment Date</label><input id="supplierLedgerPayDate" type="date"></div>
+        <div class="full" id="supplierLedgerPayBackdatedRow" hidden><label>Reason for Backdating *</label><input id="supplierLedgerPayBackdatedReason" type="text"></div>
+        <div class="full"><label>Note</label><input id="supplierLedgerPayNote" type="text"></div>
+      </div>
+      <button type="button" class="btn party-ledger-settle-btn" id="supplierLedgerSettleFullBtn">Settle Full Balance</button>
+      <div class="party-ledger-settlement-summary">
+        <div><span>Total Settled</span><strong id="supplierLedgerPayTotalSettled">0</strong></div>
+        <div><span>Balance After</span><strong id="supplierLedgerPayBalanceAfter">0</strong></div>
+      </div>
+      <div class="field-error" id="supplierLedgerPayError"></div>
+    </div>
+    <div class="modal-footer"><button class="btn" type="button" onclick="closeModal('supplierLedgerPayModal')">Cancel</button><button class="btn btn-primary" id="supplierLedgerPaySaveBtn" type="button">Make Payment</button></div>
+  </div>
+</div>
+
+<!-- Edit Supplier Payment -->
+<div class="modal-overlay" id="supplierLedgerEditModal" hidden>
+  <div class="modal party-ledger-action-modal">
+    <div class="modal-header"><h3>Edit Payment</h3><button class="modal-close" type="button" onclick="closeModal('supplierLedgerEditModal')">&#10005;</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div><label>Date *</label><input id="supplierLedgerEditDate" type="date"></div>
+        <div><label>Payment Amount *</label><input id="supplierLedgerEditAmount" type="number" min="0" step="0.01"></div>
+        <div><label>Discount Received</label><input id="supplierLedgerEditDiscount" type="number" min="0" step="0.01"></div>
+        <div class="full"><label>Discount Reason</label><input id="supplierLedgerEditDiscountReason" type="text"></div>
+        <div><label>Payment Method</label><select id="supplierLedgerEditMethod"><option value="Cash">Cash</option><option value="Bank">Bank</option><option value="Mobile Banking">Mobile Banking</option><option value="Other">Other</option></select></div>
+        <div id="supplierLedgerEditBankRow" hidden><label id="supplierLedgerEditBankLabel">Bank Account *</label><select id="supplierLedgerEditBank"><option value="">Select bank account...</option></select></div>
+        <div class="full"><label>Note</label><input id="supplierLedgerEditNote" type="text"></div>
+      </div>
+      <div class="field-error" id="supplierLedgerEditError"></div>
+    </div>
+    <div class="modal-footer"><button class="btn" type="button" onclick="closeModal('supplierLedgerEditModal')">Cancel</button><button class="btn btn-primary" id="supplierLedgerEditSaveBtn" type="button">Save Changes</button></div>
+  </div>
+</div>
+
+<!-- Print Ledger -->
+<div class="modal-overlay" id="supplierLedgerPrintModal" hidden>
+  <div class="modal party-ledger-print-modal">
+    <div class="modal-header"><h3>Print Supplier Ledger</h3><button class="modal-close" type="button" onclick="closeModal('supplierLedgerPrintModal')">&#10005;</button></div>
+    <div class="modal-body">
+      <div class="party-ledger-print-party" id="supplierLedgerPrintParty"></div>
+      <div class="form-grid">
+        <div><label>From Date</label><input id="supplierLedgerPrintFrom" type="date"></div>
+        <div><label>To Date</label><input id="supplierLedgerPrintTo" type="date"></div>
+      </div>
+      <div class="field-error" id="supplierLedgerPrintError"></div>
+    </div>
+    <div class="modal-footer"><button class="btn" type="button" onclick="closeModal('supplierLedgerPrintModal')">Cancel</button><button class="btn btn-primary" id="supplierLedgerPrintConfirmBtn" type="button">Preview / Print</button></div>
+  </div>
+</div>
+
+<script>
+  var supplierLedgerState = {
+    partyId: '', pageSize: 50, pageNumber: 1, cursor: '', cursorStack: [],
+    parties: [], bankAccounts: [], party: null, rows: [], page: null,
+    currencySymbol: '', editingLedgerId: '', partyCombo: null, _loaded: false,
+    showCorrections: false, canViewCorrections: false
+  };
+
+  function supplierLedgerCan_(moduleKey, action) {
+    if (userPermissions === null) return true;
+    var mod = userPermissions && userPermissions[moduleKey];
+    if (!mod) return false;
+    if (action === 'delete') return !!mod.delete && mod.delete !== 'disabled';
+    return !!mod[action];
+  }
+
+  function supplierLedgerCanDiscount_() {
+    if (userPermissions === null) return true;
+    return !!(userPermissions && userPermissions.settlementDiscount && userPermissions.settlementDiscount.edit);
+  }
+
+  function supplierLedgerCanOpeningEdit_() {
+    if (userPermissions === null) return true;
+    return !!(userPermissions && userPermissions.openingBalance && userPermissions.openingBalance.edit) && supplierLedgerCan_('suppliers', 'edit');
+  }
+
+  function supplierLedgerToday_() {
+    var d = new Date();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + m + '-' + day;
+  }
+
+  function supplierLedgerPartyDisplay_(party) {
+    if (!party) return '';
+    return party.name + (party.phone ? ' (' + party.phone + ')' : '');
+  }
+
+  function supplierLedgerResetPaging_() {
+    supplierLedgerState.cursor = '';
+    supplierLedgerState.cursorStack = [];
+    supplierLedgerState.pageNumber = 1;
+  }
+
+  function supplierLedgerSelectParty_(supplierId) {
+    closeRowActionMenu_();
+    supplierLedgerState.partyId = String(supplierId || '');
+    supplierLedgerState.showCorrections = false;
+    var correctionsToggle = document.getElementById('supplierLedgerCorrectionsToggle'); if (correctionsToggle) correctionsToggle.checked = false;
+    supplierLedgerResetPaging_();
+    supplierLedgerClearPaymentForms_();
+    return supplierLedgerLoad();
+  }
+
+  function supplierLedgerEnsurePartyCombo_() {
+    if (supplierLedgerState.partyCombo) return supplierLedgerState.partyCombo;
+    if (typeof createPartySearchCombobox_ !== 'function') return null;
+    supplierLedgerState.partyCombo = createPartySearchCombobox_({
+      input: document.getElementById('supplierLedgerSelector'),
+      results: document.getElementById('supplierLedgerPartyResults'),
+      getItems: function () { return supplierLedgerState.parties || []; },
+      displayText: supplierLedgerPartyDisplay_,
+      emptyText: 'No matching suppliers',
+      limit: 20,
+      onSelect: function (party) { supplierLedgerSelectParty_(party.id); },
+      onClear: function () { if (supplierLedgerState.partyId) supplierLedgerSelectParty_(''); }
+    });
+    return supplierLedgerState.partyCombo;
+  }
+
+  function supplierLedgerOnPageEnter_(pendingSupplierId) {
+    supplierLedgerEnsurePartyCombo_();
+    supplierLedgerState.partyId = String(pendingSupplierId || '');
+    supplierLedgerState.showCorrections = false;
+    var correctionsToggle = document.getElementById('supplierLedgerCorrectionsToggle'); if (correctionsToggle) correctionsToggle.checked = false;
+    supplierLedgerResetPaging_();
+    supplierLedgerClearPaymentForms_();
+    return supplierLedgerLoad();
+  }
+
+  function supplierLedgerLoad() {
+    return withLoader(serverCall('getSupplierLedgerWorkspaceBootstrap', authToken, supplierLedgerState.partyId, supplierLedgerState.pageSize, supplierLedgerState.showCorrections)).then(function (data) {
+      supplierLedgerState._loaded = true;
+      supplierLedgerState.parties = data.parties || [];
+      supplierLedgerState.bankAccounts = data.bankAccounts || [];
+      supplierLedgerState.currencySymbol = data.currencySymbol || '';
+      supplierLedgerState.canViewCorrections = !!data.canViewCorrections;
+      if (!supplierLedgerState.canViewCorrections) supplierLedgerState.showCorrections = false;
+      supplierLedgerState.party = data.party || null;
+      supplierLedgerState.rows = (data.page && data.page.rows) || [];
+      supplierLedgerState.page = (data.page && data.page.page) || {pageSize: supplierLedgerState.pageSize, hasOlder:false, olderCursor:'', hasNewer:false};
+      supplierLedgerRender_();
+      return data;
+    }).catch(function (err) {
+      showToast(err.message, 'error');
+      throw err;
+    });
+  }
+
+  function supplierLedgerLoadPage_(cursor) {
+    return withLoader(serverCall('getSupplierLedgerPage', authToken, supplierLedgerState.partyId, supplierLedgerState.pageSize, cursor || '', supplierLedgerState.showCorrections)).then(function (data) {
+      supplierLedgerState.rows = data.rows || [];
+      supplierLedgerState.page = data.page || {};
+      supplierLedgerRenderRows_();
+      supplierLedgerRenderPagination_();
+      return data;
+    }).catch(function (err) {
+      showToast(err.message, 'error');
+      throw err;
+    });
+  }
+
+  function supplierLedgerRender_() {
+    var party = supplierLedgerState.party;
+    document.getElementById('supplierLedgerSelectEmpty').hidden = !!party;
+    document.getElementById('supplierLedgerSelected').hidden = !party;
+    if (!party) {
+      if (supplierLedgerState.partyCombo) supplierLedgerState.partyCombo.setSelected(null);
+      document.getElementById('supplierLedgerMakePaymentBtn').disabled = true;
+      document.getElementById('supplierLedgerPrintBtn').disabled = true;
+      return;
+    }
+    if (supplierLedgerState.partyCombo) supplierLedgerState.partyCombo.setSelected(party);
+    document.getElementById('supplierLedgerPartyName').textContent = party.name || '';
+    document.getElementById('supplierLedgerPartyMeta').textContent = [party.phone, party.address].filter(Boolean).join(' · ');
+    var statusEl = document.getElementById('supplierLedgerPartyStatus');
+    statusEl.textContent = party.status && party.status !== 'Active' ? party.status : '';
+    statusEl.hidden = !statusEl.textContent;
+    var balance = Number(party.balance) || 0;
+    document.getElementById('supplierLedgerBalance').textContent = balance < 0 ? ('Credit ' + formatMoney(Math.abs(balance))) : formatMoney(balance);
+    document.getElementById('supplierLedgerMakePaymentBtn').disabled = !party.canPay || !supplierLedgerCan_('suppliers', 'edit');
+    document.getElementById('supplierLedgerPrintBtn').disabled = supplierLedgerState.rows.length === 0 && !(supplierLedgerState.page && supplierLedgerState.page.hasOlder);
+    document.getElementById('supplierLedgerPageSize').value = String(supplierLedgerState.pageSize);
+    var correctionWrap = document.getElementById('supplierLedgerCorrectionsWrap');
+    var correctionToggle = document.getElementById('supplierLedgerCorrectionsToggle');
+    if (correctionWrap) correctionWrap.hidden = !supplierLedgerState.canViewCorrections;
+    if (correctionToggle) correctionToggle.checked = !!supplierLedgerState.showCorrections;
+    supplierLedgerRenderRows_();
+    supplierLedgerRenderPagination_();
+  }
+
+  function supplierLedgerActionAllowed_(row, action) {
+    if (row.sourceModule === 'supplierPayment') {
+      return action === 'edit' ? supplierLedgerCan_('suppliers', 'edit') : action === 'delete' ? supplierLedgerCan_('suppliers', 'delete') : false;
+    }
+    if (row.sourceModule === 'purchase') {
+      if (action === 'view') return supplierLedgerCan_('purchase', 'view');
+      if (action === 'edit') return supplierLedgerCan_('purchase', 'edit');
+      if (action === 'return') return supplierLedgerCan_('purchase', 'add');
+      if (action === 'delete') return supplierLedgerCan_('purchase', 'delete');
+    }
+    if (row.sourceModule === 'purchaseReturn') return action === 'view' && supplierLedgerCan_('purchase', 'view');
+    if (row.sourceModule === 'supplierOpeningBalance') return action === 'edit' && supplierLedgerCanOpeningEdit_();
+    return false;
+  }
+
+  function supplierLedgerActionLabel_(action) {
+    return {view:'View', edit:'Edit', return:'Purchase Return', delete:'Delete'}[action] || action;
+  }
+
+  function supplierLedgerRenderRows_() {
+    var body = document.getElementById('supplierLedgerBody');
+    body.innerHTML = '';
+    supplierLedgerState.rows.forEach(function (row, index) {
+      var credit = row['Credit'] ? formatMoney(row['Credit']) : '';
+      var discount = Number(row['Discount Amount']) || 0;
+      var payment = (row['Payment Amount'] === '' || row['Payment Amount'] == null) ? (Number(row['Credit']) || 0) : (Number(row['Payment Amount']) || 0);
+      if (row.sourceModule === 'supplierPayment' && discount > 0) {
+        credit += '<div class="party-ledger-row-note">Payment ' + escapeHtml(formatMoney(payment)) + ' + Discount ' + escapeHtml(formatMoney(discount)) + '</div>';
+      }
+      var actions = (row.availableActions || []).filter(function (action) { return supplierLedgerActionAllowed_(row, action); });
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td data-label="Date">' + escapeHtml(String(row['Date'] || '').slice(0,10)) + '</td>' +
+        '<td data-label="Type">' + escapeHtml(row['Type'] || '') + '</td>' +
+        '<td class="mono" data-label="Reference">' + escapeHtml(row['Reference'] || '') + '</td>' +
+        '<td class="num mono" data-label="Debit">' + (row['Debit'] ? escapeHtml(formatMoney(row['Debit'])) : '') + '</td>' +
+        '<td class="num mono" data-label="Credit">' + credit + '</td>' +
+        '<td class="num mono" data-label="Balance">' + escapeHtml(formatMoney(Number(row['Balance']) || 0)) + '</td>' +
+        '<td>' + (actions.length ? '<button class="btn" type="button" data-supplier-ledger-action-index="' + index + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button>' : '') + '</td>';
+      body.appendChild(tr);
+    });
+    document.getElementById('supplierLedgerEmpty').hidden = supplierLedgerState.rows.length > 0;
+    enhanceMobileCardTables_(document.getElementById('supplierLedgerWorkspace'));
+  }
+
+  function supplierLedgerRenderPagination_() {
+    var page = supplierLedgerState.page || {};
+    document.getElementById('supplierLedgerPageLabel').textContent = 'Page ' + supplierLedgerState.pageNumber;
+    document.getElementById('supplierLedgerPrevBtn').disabled = supplierLedgerState.cursorStack.length === 0;
+    document.getElementById('supplierLedgerNextBtn').disabled = !page.hasOlder || !page.olderCursor;
+  }
+
+
+  document.getElementById('supplierLedgerCorrectionsToggle').addEventListener('change', function () {
+    if (!supplierLedgerState.canViewCorrections) { this.checked = false; return; }
+    supplierLedgerState.showCorrections = !!this.checked;
+    supplierLedgerResetPaging_();
+    supplierLedgerLoadPage_('');
+  });
+
+  document.getElementById('supplierLedgerPageSize').addEventListener('change', function () {
+    supplierLedgerState.pageSize = Number(this.value) || 50;
+    supplierLedgerResetPaging_();
+    supplierLedgerLoadPage_('');
+  });
+
+  document.getElementById('supplierLedgerNextBtn').addEventListener('click', function () {
+    var olderCursor = supplierLedgerState.page && supplierLedgerState.page.olderCursor;
+    if (!olderCursor) return;
+    supplierLedgerState.cursorStack.push(supplierLedgerState.cursor);
+    supplierLedgerState.cursor = olderCursor;
+    supplierLedgerState.pageNumber += 1;
+    supplierLedgerLoadPage_(supplierLedgerState.cursor);
+  });
+
+  document.getElementById('supplierLedgerPrevBtn').addEventListener('click', function () {
+    if (!supplierLedgerState.cursorStack.length) return;
+    supplierLedgerState.cursor = supplierLedgerState.cursorStack.pop() || '';
+    supplierLedgerState.pageNumber = Math.max(1, supplierLedgerState.pageNumber - 1);
+    supplierLedgerLoadPage_(supplierLedgerState.cursor);
+  });
+
+  document.getElementById('supplierLedgerBody').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-supplier-ledger-action-index]');
+    if (!btn) return;
+    var row = supplierLedgerState.rows[Number(btn.dataset.supplierLedgerActionIndex)];
+    if (!row) return;
+    var actions = (row.availableActions || []).filter(function (action) { return supplierLedgerActionAllowed_(row, action); });
+    var items = actions.map(function (action) { return {action:action, label:supplierLedgerActionLabel_(action), danger:action === 'delete'}; });
+    openRowActionMenu_(btn, items, function (action) {
+      if (row.sourceModule === 'supplierPayment') {
+        if (action === 'edit') supplierLedgerOpenPaymentEdit_(row.sourceId);
+        if (action === 'delete') supplierLedgerDeletePayment_(row.sourceId);
+        return;
+      }
+      partyLedgerRouteSourceAction_('supplier', row, action, supplierLedgerRefreshNewest_);
+    });
+  });
+
+  function supplierLedgerClearPaymentForms_() {
+    var ids = ['supplierLedgerPayAmount','supplierLedgerPayDiscountReason','supplierLedgerPayBackdatedReason','supplierLedgerPayNote'];
+    ids.forEach(function (id) { var el=document.getElementById(id); if (el) el.value=''; });
+    var discount=document.getElementById('supplierLedgerPayDiscount'); if (discount) discount.value='0';
+  }
+
+  function supplierLedgerFillBank_(selectId, method) {
+    fillBankAccountSelect_(document.getElementById(selectId), supplierLedgerState.bankAccounts, method);
+  }
+
+  function supplierLedgerPaymentRecalc_() {
+    var due = supplierLedgerState.party ? Number(supplierLedgerState.party.balance) || 0 : 0;
+    var payment = Number(document.getElementById('supplierLedgerPayAmount').value) || 0;
+    var discount = Number(document.getElementById('supplierLedgerPayDiscount').value) || 0;
+    var total = Math.round((payment + discount) * 100) / 100;
+    var after = Math.round((due - total) * 100) / 100;
+    document.getElementById('supplierLedgerPayTotalSettled').textContent = formatMoney(total);
+    document.getElementById('supplierLedgerPayBalanceAfter').textContent = after < 0 ? ('Credit ' + formatMoney(Math.abs(after))) : formatMoney(after);
+    document.getElementById('supplierLedgerPayDiscountReasonRow').hidden = discount <= 0;
+    var canDiscount = supplierLedgerCanDiscount_() && due > 0;
+    document.getElementById('supplierLedgerPayDiscount').disabled = !canDiscount;
+    document.getElementById('supplierLedgerSettleFullBtn').disabled = !canDiscount || payment <= 0 || payment > due;
+  }
+
+  function supplierLedgerOpenPayment_() {
+    if (!supplierLedgerState.party || !supplierLedgerState.party.canPay) return;
+    supplierLedgerClearPaymentForms_();
+    document.getElementById('supplierLedgerPayCurrentDue').textContent = formatMoney(Number(supplierLedgerState.party.balance) || 0);
+    document.getElementById('supplierLedgerPayMethod').value = 'Cash';
+    document.getElementById('supplierLedgerPayBankRow').hidden = true;
+    supplierLedgerFillBank_('supplierLedgerPayBank', 'Cash');
+    document.getElementById('supplierLedgerPayDate').value = supplierLedgerToday_();
+    document.getElementById('supplierLedgerPayBackdatedRow').hidden = true;
+    document.getElementById('supplierLedgerPayError').style.display = 'none';
+    supplierLedgerPaymentRecalc_();
+    openModal('supplierLedgerPayModal');
+  }
+
+  document.getElementById('supplierLedgerMakePaymentBtn').addEventListener('click', supplierLedgerOpenPayment_);
+  document.getElementById('supplierLedgerPayAmount').addEventListener('input', supplierLedgerPaymentRecalc_);
+  document.getElementById('supplierLedgerPayDiscount').addEventListener('input', supplierLedgerPaymentRecalc_);
+  document.getElementById('supplierLedgerPayMethod').addEventListener('change', function () {
+    var need = paymentMethodNeedsAccount_(this.value);
+    document.getElementById('supplierLedgerPayBankRow').hidden = !need;
+    document.getElementById('supplierLedgerPayBankLabel').textContent = this.value === 'Mobile Banking' ? 'Mobile Banking Account *' : 'Bank Account *';
+    supplierLedgerFillBank_('supplierLedgerPayBank', this.value);
+  });
+  document.getElementById('supplierLedgerPayDate').addEventListener('change', function () {
+    document.getElementById('supplierLedgerPayBackdatedRow').hidden = !(this.value && this.value < supplierLedgerToday_());
+  });
+  document.getElementById('supplierLedgerSettleFullBtn').addEventListener('click', function () {
+    var due = supplierLedgerState.party ? Number(supplierLedgerState.party.balance) || 0 : 0;
+    var payment = Number(document.getElementById('supplierLedgerPayAmount').value) || 0;
+    if (!supplierLedgerCanDiscount_() || payment <= 0 || due <= 0 || payment > due) return;
+    document.getElementById('supplierLedgerPayDiscount').value = (Math.round((due - payment) * 100) / 100).toFixed(2);
+    supplierLedgerPaymentRecalc_();
+    if (Number(document.getElementById('supplierLedgerPayDiscount').value) > 0) document.getElementById('supplierLedgerPayDiscountReason').focus();
+  });
+
+  document.getElementById('supplierLedgerPaySaveBtn').addEventListener('click', function () {
+    var errEl = document.getElementById('supplierLedgerPayError'); errEl.style.display='none';
+    var amount = document.getElementById('supplierLedgerPayAmount').value;
+    var discount = Number(document.getElementById('supplierLedgerPayDiscount').value) || 0;
+    var discountReason = document.getElementById('supplierLedgerPayDiscountReason').value.trim();
+    var method = document.getElementById('supplierLedgerPayMethod').value;
+    var bankId = document.getElementById('supplierLedgerPayBank').value;
+    var payDate = document.getElementById('supplierLedgerPayDate').value || supplierLedgerToday_();
+    var backdatedReason = document.getElementById('supplierLedgerPayBackdatedReason').value.trim();
+    var due = supplierLedgerState.party ? Number(supplierLedgerState.party.balance) || 0 : 0;
+    if ((Number(amount) || 0) <= 0) { errEl.textContent='Enter a valid payment amount.'; errEl.style.display='block'; return; }
+    if (payDate < supplierLedgerToday_() && !backdatedReason) { errEl.textContent='A reason is required when dating a payment in the past.'; errEl.style.display='block'; return; }
+    if (discount > 0 && !discountReason) { errEl.textContent='Discount Reason is required.'; errEl.style.display='block'; return; }
+    if (discount > 0 && ((Number(amount) || 0) + discount) - due > 0.004) { errEl.textContent='Payment plus discount cannot exceed the current due.'; errEl.style.display='block'; return; }
+    if (paymentMethodNeedsAccount_(method) && !bankId) { errEl.textContent='Choose a bank account.'; errEl.style.display='block'; return; }
+    var partyName = supplierLedgerState.party ? (supplierLedgerState.party.name || supplierLedgerState.party['Supplier Name'] || 'Supplier') : 'Supplier';
+    var supplierId = supplierLedgerState.partyId;
+    var payNote = document.getElementById('supplierLedgerPayNote').value.trim();
+    runConfirmedAction({type:'financial',title:'Pay Supplier?',message:partyName + '-কে পেমেন্ট করছেন।',details:settlementConfirmDetails_({partyLabel:'Supplier',partyName:partyName,directionLabel:'Pay',amount:Number(amount)||0,discount:discount,discountLabel:'Discount Received',method:method,accountName:paymentMethodNeedsAccount_(method)?selectedOptionText_('supplierLedgerPayBank'):'',date:payDate}),confirmLabel:'Pay ' + formatMoney(Number(amount)||0),loadingLabel:'Paying...',trigger:document.getElementById('supplierLedgerPaySaveBtn')}, function () {
+      return withLoader(serverCall('paySupplier', authToken, supplierId, amount, method, bankId, payNote, payDate, backdatedReason, discount, discountReason)).then(function () { closeModal('supplierLedgerPayModal'); showToast('Supplier payment recorded', 'success'); supplierLedgerRefreshNewest_(); reloadPage_('suppliers'); reloadPage_('daybook'); reloadPage_('dashboard'); });
+    }).catch(function (err) { errEl.textContent=err.message; errEl.style.display='block'; });
+  });
+
+  function supplierLedgerOpenPaymentEdit_(ledgerId) {
+    withLoader(serverCall('getSupplierPaymentForEdit', authToken, ledgerId)).then(function (data) {
+      var p = data || {};
+      supplierLedgerState.editingLedgerId = ledgerId;
+      document.getElementById('supplierLedgerEditDate').value = p.date || '';
+      document.getElementById('supplierLedgerEditAmount').value = p.amount;
+      document.getElementById('supplierLedgerEditDiscount').value = p.discountAmount || 0;
+      document.getElementById('supplierLedgerEditDiscountReason').value = p.discountReason || '';
+      document.getElementById('supplierLedgerEditDiscount').disabled = !supplierLedgerCanDiscount_();
+      document.getElementById('supplierLedgerEditDiscountReason').disabled = !supplierLedgerCanDiscount_();
+      document.getElementById('supplierLedgerEditMethod').value = p.method || 'Cash';
+      document.getElementById('supplierLedgerEditBankRow').hidden = !paymentMethodNeedsAccount_(p.method);
+      document.getElementById('supplierLedgerEditBankLabel').textContent = p.method === 'Mobile Banking' ? 'Mobile Banking Account *' : 'Bank Account *';
+      supplierLedgerFillBank_('supplierLedgerEditBank', p.method || 'Cash');
+      document.getElementById('supplierLedgerEditBank').value = p.bankAccountId || '';
+      document.getElementById('supplierLedgerEditNote').value = p.notes || '';
+      document.getElementById('supplierLedgerEditError').style.display='none';
+      openModal('supplierLedgerEditModal');
+    }).catch(function (err) { showToast(err.message,'error'); });
+  }
+
+  document.getElementById('supplierLedgerEditMethod').addEventListener('change', function () {
+    document.getElementById('supplierLedgerEditBankRow').hidden = !paymentMethodNeedsAccount_(this.value);
+    document.getElementById('supplierLedgerEditBankLabel').textContent = this.value === 'Mobile Banking' ? 'Mobile Banking Account *' : 'Bank Account *';
+    supplierLedgerFillBank_('supplierLedgerEditBank', this.value);
+  });
+
+  document.getElementById('supplierLedgerEditSaveBtn').addEventListener('click', function () {
+    var errEl=document.getElementById('supplierLedgerEditError'); errEl.style.display='none';
+    var payload={
+      date:document.getElementById('supplierLedgerEditDate').value,
+      amount:document.getElementById('supplierLedgerEditAmount').value,
+      discountAmount:document.getElementById('supplierLedgerEditDiscount').value,
+      discountReason:document.getElementById('supplierLedgerEditDiscountReason').value.trim(),
+      method:document.getElementById('supplierLedgerEditMethod').value,
+      bankAccountId:document.getElementById('supplierLedgerEditBank').value,
+      notes:document.getElementById('supplierLedgerEditNote').value.trim()
+    };
+    var partyName = supplierLedgerState.party ? (supplierLedgerState.party.name || 'Supplier') : 'Supplier';
+    var paymentLedgerId = supplierLedgerState.editingLedgerId;
+    runConfirmedAction({type:'financial',title:'Update Supplier Payment?',message:'This will update supplier payable and Cash/Bank accounting.',details:settlementConfirmDetails_({partyLabel:'Supplier',partyName:partyName,directionLabel:'New Amount',amount:Number(payload.amount)||0,discount:Number(payload.discountAmount)||0,discountLabel:'Discount Received',method:payload.method,accountName:paymentMethodNeedsAccount_(payload.method)?selectedOptionText_('supplierLedgerEditBank'):'',date:payload.date}),confirmLabel:'Update Payment',loadingLabel:'Updating...',trigger:document.getElementById('supplierLedgerEditSaveBtn')}, function () {
+      return withLoader(serverCall('updateSupplierPayment', authToken, paymentLedgerId, payload)).then(function () { closeModal('supplierLedgerEditModal'); showToast('Supplier payment updated','success'); supplierLedgerRefreshNewest_(); reloadPage_('suppliers'); reloadPage_('daybook'); reloadPage_('dashboard'); });
+    }).catch(function (err) { errEl.textContent=err.message; errEl.style.display='block'; });
+  });
+
+  function supplierLedgerDeletePayment_(ledgerId) {
+    confirmDelete({
+      title:'Delete supplier payment',
+      summary:'<p>This will reverse the payment and restore the supplier payable.</p>',
+      fn:'deleteSupplierPayment', args:[ledgerId], reloadPages:['suppliers','supplierLedger','daybook','dashboard'],
+      onDone:supplierLedgerRefreshNewest_
+    });
+  }
+
+  function supplierLedgerRefreshNewest_() {
+    supplierLedgerResetPaging_();
+    return supplierLedgerLoad();
+  }
+
+  document.getElementById('supplierLedgerPrintBtn').addEventListener('click', function () {
+    if (!supplierLedgerState.party) return;
+    var today=supplierLedgerToday_();
+    document.getElementById('supplierLedgerPrintParty').textContent=supplierLedgerState.party.name || '';
+    document.getElementById('supplierLedgerPrintFrom').value=today.slice(0,8)+'01';
+    document.getElementById('supplierLedgerPrintTo').value=today;
+    document.getElementById('supplierLedgerPrintError').style.display='none';
+    openModal('supplierLedgerPrintModal');
+  });
+
+  document.getElementById('supplierLedgerPrintConfirmBtn').addEventListener('click', function () {
+    var errEl=document.getElementById('supplierLedgerPrintError'); errEl.style.display='none';
+    var from=document.getElementById('supplierLedgerPrintFrom').value;
+    var to=document.getElementById('supplierLedgerPrintTo').value;
+    if (!from || !to) { errEl.textContent='Choose both From and To dates.'; errEl.style.display='block'; return; }
+    if (from > to) { errEl.textContent='From date cannot be after To date.'; errEl.style.display='block'; return; }
+    if (to > supplierLedgerToday_()) { errEl.textContent='To date cannot be after today.'; errEl.style.display='block'; return; }
+    withLoader(serverCall('getSupplierLedgerStatement', authToken, supplierLedgerState.partyId, from, to)).then(function (statement) {
+      closeModal('supplierLedgerPrintModal');
+      partyLedgerPrintStatement_(statement);
+    }).catch(function (err) { errEl.textContent=err.message; errEl.style.display='block'; });
+  });
+</script>

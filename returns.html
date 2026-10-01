@@ -1,0 +1,670 @@
+<!-- ================= New Return ================= -->
+<div class="card" id="rtSearchCard" style="margin-bottom:16px;">
+  <div class="toolbar" style="margin-bottom:12px;">
+    <button class="btn btn-primary" id="rtInvoiceSearchModeBtn">Find Invoice</button>
+    <button class="btn" id="rtCustomerSearchModeBtn">Find Customer</button>
+  </div>
+
+  <div id="rtInvoiceSearchPanel">
+    <label>Find Invoice by Invoice Number or Customer Phone</label>
+    <div style="display:flex; gap:8px;">
+      <input id="rtSearchInput" type="text" placeholder="e.g. INV-000012 or 01911-100001" style="flex:1;">
+      <button class="btn btn-primary" id="rtFindBtn">Find Invoice</button>
+      <button class="btn" id="rtClearBtn">Clear</button>
+    </div>
+    <div id="rtSearchResults" style="margin-top:12px;"></div>
+    <div class="empty-state" id="rtSearchEmpty" hidden>Invoice not found.</div>
+  </div>
+
+  <div id="rtCustomerSearchPanel" hidden>
+    <label>Find Customer by Name, Phone or Customer ID</label>
+    <div style="display:flex; gap:8px;">
+      <input id="rtCustomerSearchInput" type="text" placeholder="e.g. Rahim, 01711-..., or CUS-000123" style="flex:1;">
+      <button class="btn btn-primary" id="rtFindCustomerBtn">Find Customer</button>
+      <button class="btn" id="rtCustomerClearBtn">Clear</button>
+    </div>
+    <div id="rtCustomerSearchResults" style="margin-top:12px;"></div>
+    <div class="empty-state" id="rtCustomerSearchEmpty" hidden>Customer not found.</div>
+
+    <div id="rtSelectedCustomerCard" class="card" hidden style="margin-top:14px; padding:12px;">
+      <div class="form-grid">
+        <div><label>Customer</label><div id="rtSelectedCustomerName"></div></div>
+        <div><label>Phone</label><div id="rtSelectedCustomerPhone"></div></div>
+        <div><label>Customer ID</label><div class="mono" id="rtSelectedCustomerId"></div></div>
+        <div><label>Current Due</label><div class="mono" id="rtSelectedCustomerDue"></div></div>
+        <div class="full"><label>Address</label><div id="rtSelectedCustomerAddress"></div></div>
+      </div>
+    </div>
+
+    <div id="rtCustomerInvoiceList" style="margin-top:12px;"></div>
+    <div id="rtBatchSelectionBar" class="toolbar" hidden style="margin-top:10px;">
+      <span id="rtSelectedCount" class="stat-label">0 selected</span>
+      <button class="btn btn-primary" id="rtOpenSelectedBtn" disabled>Open Selected Invoices</button>
+    </div>
+  </div>
+</div>
+
+<div id="rtInvoiceArea" hidden>
+  <div class="card" style="margin-bottom:16px;">
+    <div class="form-grid">
+      <div><label>Invoice</label><div class="mono" id="rtInvId"></div></div>
+      <div><label>Date</label><div id="rtInvDate"></div></div>
+      <div><label>Customer</label><div id="rtInvCustomer"></div></div>
+      <div><label>Phone</label><div id="rtInvPhone"></div></div>
+      <div class="full"><label>Address</label><div id="rtInvAddress"></div></div>
+    </div>
+    <div class="return-invoice-summary" style="display:flex; gap:24px; flex-wrap:wrap; margin-top:14px; border-top:1px solid var(--color-border); padding-top:12px;">
+      <div><div class="stat-label">Original Total</div><div class="mono" id="rtInvGrandTotal"></div></div>
+      <div><div class="stat-label">Paid</div><div class="mono" id="rtInvPaid"></div></div>
+      <div><div class="stat-label">Cash Refund Available</div><div class="mono" id="rtCashRefundAvailable"></div></div>
+      <div><div class="stat-label">Due</div><div class="mono" id="rtInvDue"></div></div>
+      <div><div class="stat-label">Previously Returned</div><div class="mono" id="rtInvPrevReturned"></div></div>
+      <div><div class="stat-label">Net Sale</div><div class="mono" id="rtInvNetSale"></div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 style="font-size:14px; margin-bottom:10px;">Return Cart <span class="bn-hint" style="display:inline;">— ফেরত দেওয়া মাল</span></h3>
+    <table class="mobile-card-table mobile-return-cart-table">
+      <thead>
+        <tr><th>Product</th><th class="num">Sold</th><th class="num">Returned</th><th class="num">Available</th><th class="num">Return Qty</th><th class="num">Return Price</th><th class="num">Line Total</th></tr>
+      </thead>
+      <tbody id="rtCartBody"></tbody>
+    </table>
+
+    <div class="form-grid" style="margin-top:18px;">
+      <div>
+        <label>Refund Method *</label>
+        <select id="rtRefundMethod">
+          <option value="Cash">Cash Refund</option>
+          <option value="Store Credit">Adjust to Customer Due (Store Credit)</option>
+        </select>
+        <div id="rtRefundHint" class="stat-label" style="margin-top:6px;"></div>
+      </div>
+      <div><label>Return Reason</label><input id="rtReason" type="text" placeholder="Optional"></div>
+      <div class="full"><label>Note</label><input id="rtNote" type="text" placeholder="Optional"></div>
+      <div><label>Return Date</label><input id="rtDate" type="date"></div>
+      <div id="rtBackdatedReasonRow" class="full" style="display:none;"><label>Reason for Backdating *</label><input id="rtBackdatedReason" type="text" placeholder="Why is this dated in the past?"></div>
+    </div>
+
+    <div style="max-width:320px; margin-left:auto; margin-top:14px;">
+      <div class="totals-row grand"><span>Total Return Amount</span><span class="v" id="rtTotalReturn">0</span></div>
+    </div>
+
+    <div class="field-error" id="rtFormError"></div>
+    <div style="text-align:right; margin-top:14px;">
+      <button class="btn" id="rtCancelBtn">Cancel</button>
+      <button class="btn btn-primary btn-lg" id="rtCompleteBtn">Complete Return</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  var rtState = {
+    invoice: null,
+    currencySymbol: '',
+    editingReturnId: null,
+    editQtyByProduct: {},
+    searchMode: 'invoice',
+    searchMatches: [],
+    customerSearchMatches: [],
+    selectedReturnCustomer: null,
+    customerInvoices: [],
+    selectedInvoiceIds: [],
+    selectedInvoiceCustomerId: '',
+    batchInvoices: [],
+    batchMode: false
+  };
+
+  document.getElementById('rtInvoiceSearchModeBtn').addEventListener('click', function () { rtSetSearchMode_('invoice'); });
+  document.getElementById('rtCustomerSearchModeBtn').addEventListener('click', function () { rtSetSearchMode_('customer'); });
+  document.getElementById('rtFindBtn').addEventListener('click', rtSearch_);
+  document.getElementById('rtSearchInput').addEventListener('keydown', function (e) { if (e.key === 'Enter') rtSearch_(); });
+  document.getElementById('rtFindCustomerBtn').addEventListener('click', rtSearchCustomers_);
+  document.getElementById('rtCustomerSearchInput').addEventListener('keydown', function (e) { if (e.key === 'Enter') rtSearchCustomers_(); });
+  document.getElementById('rtClearBtn').addEventListener('click', rtReset_);
+  document.getElementById('rtCustomerClearBtn').addEventListener('click', function () { rtReset_(); rtSetSearchMode_('customer'); });
+  document.getElementById('rtOpenSelectedBtn').addEventListener('click', rtOpenSelectedInvoices_);
+
+  function rtSetSearchMode_(mode) {
+    rtState.searchMode = mode === 'customer' ? 'customer' : 'invoice';
+    var customerMode = rtState.searchMode === 'customer';
+    document.getElementById('rtInvoiceSearchPanel').hidden = customerMode;
+    document.getElementById('rtCustomerSearchPanel').hidden = !customerMode;
+    document.getElementById('rtInvoiceSearchModeBtn').classList.toggle('btn-primary', !customerMode);
+    document.getElementById('rtCustomerSearchModeBtn').classList.toggle('btn-primary', customerMode);
+  }
+
+  function rtSearch_() {
+    var q = document.getElementById('rtSearchInput').value.trim();
+    if (!q) return;
+    withLoader(serverCall('searchInvoicesForReturn', authToken, q)).then(function (matches) {
+      rtState.searchMatches = matches || [];
+      document.getElementById('rtSearchEmpty').hidden = rtState.searchMatches.length > 0;
+      if (!rtState.searchMatches.length) { rtRenderSearchResults_(); return; }
+      if (rtState.searchMatches.length === 1 && !rtState.searchMatches[0].duplicateInvoiceId &&
+          rtState.searchMatches[0].invoiceId.toLowerCase() === q.toLowerCase()) {
+        returnsLoadInvoiceById_(rtState.searchMatches[0].invoiceId);
+        return;
+      }
+      rtRenderSearchResults_();
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  function rtRenderSearchResults_() {
+    var box = document.getElementById('rtSearchResults');
+    box.innerHTML = '';
+    if (!rtState.searchMatches.length) return;
+
+    var table = document.createElement('table');
+    table.innerHTML = '<thead><tr><th>Invoice</th><th>Date</th><th>Customer</th><th class="num">Total</th><th>Status</th><th></th></tr></thead>';
+    var tbody = document.createElement('tbody');
+    rtState.searchMatches.forEach(function (m) {
+      var tr = document.createElement('tr');
+      var integrityBadge = m.duplicateInvoiceId ? ' <span class="badge badge-danger">Duplicate ID</span>' : '';
+      tr.innerHTML =
+        '<td class="mono">' + escapeHtml(m.invoiceId) + integrityBadge + '</td>' +
+        '<td>' + escapeHtml(m.date) + '</td>' +
+        '<td>' + escapeHtml(m.customerName) + '</td>' +
+        '<td class="num mono">' + formatMoney(m.grandTotal) + '</td>' +
+        '<td>' + escapeHtml(m.paymentStatus) + '</td>' +
+        '<td><button class="btn" data-id="' + escapeHtml(m.invoiceId) + '" ' + (m.duplicateInvoiceId ? 'disabled aria-disabled="true"' : '') + '>Load</button></td>';
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    box.appendChild(table);
+    box.querySelectorAll('button[data-id]').forEach(function (button) {
+      button.addEventListener('click', function () { returnsLoadInvoiceById_(button.dataset.id); });
+    });
+  }
+
+  function rtSearchCustomers_() {
+    var q = document.getElementById('rtCustomerSearchInput').value.trim();
+    if (!q) return;
+    withLoader(serverCall('searchCustomersForReturn', authToken, q)).then(function (matches) {
+      rtState.customerSearchMatches = matches || [];
+      document.getElementById('rtCustomerSearchEmpty').hidden = rtState.customerSearchMatches.length > 0;
+      rtRenderCustomerSearchResults_();
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  function rtRenderCustomerSearchResults_() {
+    var box = document.getElementById('rtCustomerSearchResults');
+    box.innerHTML = '';
+    if (!rtState.customerSearchMatches.length) return;
+    var table = document.createElement('table');
+    table.innerHTML = '<thead><tr><th>Customer ID</th><th>Customer</th><th>Phone</th><th>Address</th><th class="num">Current Due</th><th>Status</th><th></th></tr></thead>';
+    var tbody = document.createElement('tbody');
+    rtState.customerSearchMatches.forEach(function (c) {
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td class="mono">' + escapeHtml(c.customerId) + '</td>' +
+        '<td>' + escapeHtml(c.customerName || '') + '</td>' +
+        '<td>' + escapeHtml(c.phone || '') + '</td>' +
+        '<td>' + escapeHtml(c.address || '') + '</td>' +
+        '<td class="num mono">' + formatMoney(c.currentDue || 0) + '</td>' +
+        '<td>' + escapeHtml(c.status || '') + '</td>' +
+        '<td><button class="btn btn-primary" data-return-customer-id="' + escapeHtml(c.customerId) + '">View Invoices</button></td>';
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    box.appendChild(table);
+    box.querySelectorAll('button[data-return-customer-id]').forEach(function (button) {
+      button.addEventListener('click', function () { rtLoadCustomerInvoices_(button.dataset.returnCustomerId); });
+    });
+  }
+
+  function rtLoadCustomerInvoices_(customerId) {
+    return withLoader(serverCall('getCustomerInvoicesForReturn', authToken, customerId)).then(function (data) {
+      rtState.selectedReturnCustomer = data.customer;
+      rtState.customerInvoices = data.invoices || [];
+      rtState.selectedInvoiceIds = [];
+      rtState.selectedInvoiceCustomerId = data.customer.customerId;
+      document.getElementById('rtSelectedCustomerName').textContent = data.customer.customerName || '—';
+      document.getElementById('rtSelectedCustomerPhone').textContent = data.customer.phone || '—';
+      document.getElementById('rtSelectedCustomerId').textContent = data.customer.customerId || '—';
+      document.getElementById('rtSelectedCustomerDue').textContent = formatMoney(data.customer.currentDue || 0);
+      document.getElementById('rtSelectedCustomerAddress').textContent = data.customer.address || '—';
+      document.getElementById('rtSelectedCustomerCard').hidden = false;
+      rtRenderCustomerInvoices_();
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  function rtRenderCustomerInvoices_() {
+    var box = document.getElementById('rtCustomerInvoiceList');
+    box.innerHTML = '';
+    if (!rtState.customerInvoices.length) {
+      box.innerHTML = '<div class="empty-state">No invoices found for this customer.</div>';
+      rtUpdateBatchSelectionBar_();
+      return;
+    }
+    var table = document.createElement('table');
+    table.innerHTML = '<thead><tr><th>Select</th><th>Invoice</th><th>Date</th><th class="num">Total</th><th class="num">Paid</th><th class="num">Due</th><th>Payment</th><th>Return</th><th></th></tr></thead>';
+    var tbody = document.createElement('tbody');
+    rtState.customerInvoices.forEach(function (inv) {
+      var selected = rtState.selectedInvoiceIds.indexOf(inv.invoiceId) !== -1;
+      var selectable = inv.selectable !== false && !inv.duplicateInvoiceId;
+      var tr = document.createElement('tr');
+      var integrityBadge = inv.duplicateInvoiceId ? ' <span class="badge badge-danger">Duplicate ID</span>' : '';
+      tr.innerHTML =
+        '<td><input type="checkbox" data-customer-invoice-select-id="' + escapeHtml(inv.invoiceId) + '" ' + (selected ? 'checked ' : '') + (selectable ? '' : 'disabled ') + '></td>' +
+        '<td class="mono">' + escapeHtml(inv.invoiceId) + integrityBadge + '</td>' +
+        '<td>' + escapeHtml(inv.date) + '</td>' +
+        '<td class="num mono">' + formatMoney(inv.grandTotal || 0) + '</td>' +
+        '<td class="num mono">' + formatMoney(inv.paidAmount || 0) + '</td>' +
+        '<td class="num mono">' + formatMoney(inv.dueAmount || 0) + '</td>' +
+        '<td>' + escapeHtml(inv.paymentStatus || '') + '</td>' +
+        '<td>' + escapeHtml(inv.returnStatus || '') + '</td>' +
+        '<td><button class="btn" data-customer-invoice-load-id="' + escapeHtml(inv.invoiceId) + '" ' + (inv.duplicateInvoiceId ? 'disabled' : '') + '>Load</button></td>';
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    box.appendChild(table);
+    box.querySelectorAll('input[data-customer-invoice-select-id]').forEach(function (checkbox) {
+      checkbox.addEventListener('change', function () { rtToggleCustomerInvoiceSelection_(checkbox.dataset.customerInvoiceSelectId, checkbox.checked); });
+    });
+    box.querySelectorAll('button[data-customer-invoice-load-id]').forEach(function (button) {
+      button.addEventListener('click', function () { returnsLoadInvoiceById_(button.dataset.customerInvoiceLoadId); });
+    });
+    rtUpdateBatchSelectionBar_();
+  }
+
+  function rtToggleCustomerInvoiceSelection_(invoiceId, checked) {
+    if (checked) {
+      if (rtState.selectedInvoiceIds.indexOf(invoiceId) === -1) rtState.selectedInvoiceIds.push(invoiceId);
+    } else {
+      rtState.selectedInvoiceIds = rtState.selectedInvoiceIds.filter(function (id) { return id !== invoiceId; });
+    }
+    rtRenderCustomerInvoices_();
+  }
+
+  function rtUpdateBatchSelectionBar_() {
+    var bar = document.getElementById('rtBatchSelectionBar');
+    var count = rtState.selectedInvoiceIds.length;
+    document.getElementById('rtSelectedCount').textContent = count + ' selected';
+    var openButton = document.getElementById('rtOpenSelectedBtn');
+    openButton.disabled = count < 1;
+    openButton.textContent = count === 1 ? 'Open Selected Invoice' : 'Open Selected Invoices';
+    bar.hidden = count === 0;
+  }
+
+  function rtReset_() {
+    rtState.invoice = null;
+    rtState.editingReturnId = null;
+    rtState.editQtyByProduct = {};
+    rtState.searchMatches = [];
+    rtState.customerSearchMatches = [];
+    rtState.selectedReturnCustomer = null;
+    rtState.customerInvoices = [];
+    rtState.selectedInvoiceIds = [];
+    rtState.selectedInvoiceCustomerId = '';
+    rtState.batchInvoices = [];
+    rtState.batchMode = false;
+    document.getElementById('rtSearchCard').hidden = false;
+    document.getElementById('rtCompleteBtn').textContent = 'Complete Return';
+    document.getElementById('rtSearchInput').value = '';
+    document.getElementById('rtCustomerSearchInput').value = '';
+    document.getElementById('rtSearchResults').innerHTML = '';
+    document.getElementById('rtCustomerSearchResults').innerHTML = '';
+    document.getElementById('rtCustomerInvoiceList').innerHTML = '';
+    document.getElementById('rtSearchEmpty').hidden = true;
+    document.getElementById('rtCustomerSearchEmpty').hidden = true;
+    document.getElementById('rtSelectedCustomerCard').hidden = true;
+    document.getElementById('rtInvoiceArea').hidden = true;
+    document.getElementById('rtDate').value = rtToday_();
+    document.getElementById('rtBackdatedReason').value = '';
+    document.getElementById('rtBackdatedReasonRow').style.display = 'none';
+    var refundSelect = document.getElementById('rtRefundMethod');
+    var cashOption = refundSelect.querySelector('option[value="Cash"]');
+    if (cashOption) cashOption.disabled = false;
+    refundSelect.value = 'Cash';
+    document.getElementById('rtRefundHint').textContent = '';
+    rtUpdateBatchSelectionBar_();
+    rtSetSearchMode_('invoice');
+  }
+
+  function returnsLoadInvoiceById_(invoiceId) {
+    if (!document.getElementById('rtDate').value) document.getElementById('rtDate').value = rtToday_();
+    return withLoader(serverCall('getInvoiceForReturn', authToken, invoiceId)).then(function (inv) {
+      rtState.batchMode = false;
+      rtState.batchInvoices = [];
+      rtState.invoice = inv;
+      rtState.selectedInvoiceIds = [];
+      rtRenderInvoiceSummary_();
+      rtRenderCart_();
+      document.getElementById('rtInvoiceArea').hidden = false;
+      document.getElementById('rtCompleteBtn').textContent = 'Complete Return';
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  function rtOpenSelectedInvoices_() {
+    if (rtState.selectedInvoiceIds.length < 1) return;
+    if (rtState.selectedInvoiceIds.length === 1) {
+      return returnsLoadInvoiceById_(rtState.selectedInvoiceIds[0]);
+    }
+    var calls = rtState.selectedInvoiceIds.map(function (invoiceId) {
+      return serverCall('getInvoiceForReturn', authToken, invoiceId);
+    });
+    return withLoader(Promise.all(calls)).then(function (invoices) {
+      var customerId = invoices[0] && invoices[0].customerId;
+      if (!customerId || invoices.some(function (inv) { return inv.customerId !== customerId; })) {
+        throw new Error('All selected invoices must belong to the same customer account.');
+      }
+      rtState.batchMode = true;
+      rtState.invoice = null;
+      rtState.batchInvoices = invoices;
+      rtRenderInvoiceSummary_();
+      rtRenderCart_();
+      document.getElementById('rtInvoiceArea').hidden = false;
+      document.getElementById('rtCompleteBtn').textContent = 'Complete Batch Return';
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  function rtSumInvoices_(field) {
+    return rtState.batchInvoices.reduce(function (sum, inv) { return sum + (Number(inv[field]) || 0); }, 0);
+  }
+
+  function rtRenderInvoiceSummary_() {
+    var inv = rtState.batchMode ? rtState.batchInvoices[0] : rtState.invoice;
+    if (!inv) return;
+    if (rtState.batchMode) {
+      document.getElementById('rtInvId').textContent = rtState.batchInvoices.length + ' invoices';
+      document.getElementById('rtInvDate').textContent = rtState.batchInvoices.map(function (x) { return x.date; }).join(', ');
+      document.getElementById('rtInvCustomer').textContent = inv.customerName || '—';
+      document.getElementById('rtInvPhone').textContent = inv.customerPhone || '—';
+      document.getElementById('rtInvAddress').textContent = inv.customerAddress || '—';
+      document.getElementById('rtInvGrandTotal').textContent = formatMoney(rtSumInvoices_('grandTotal'));
+      document.getElementById('rtInvPaid').textContent = formatMoney(rtSumInvoices_('paidAmount'));
+      document.getElementById('rtCashRefundAvailable').textContent = formatMoney(rtSumInvoices_('cashRefundAvailable')) + ' total (checked per invoice)';
+      document.getElementById('rtInvDue').textContent = formatMoney(rtSumInvoices_('dueAmount'));
+      document.getElementById('rtInvPrevReturned').textContent = formatMoney(rtSumInvoices_('previouslyReturnedAmount'));
+      document.getElementById('rtInvNetSale').textContent = formatMoney(rtSumInvoices_('netSale'));
+    } else {
+      document.getElementById('rtInvId').textContent = inv.invoiceId;
+      document.getElementById('rtInvDate').textContent = inv.date;
+      document.getElementById('rtInvCustomer').textContent = inv.customerName || 'Walk-in Customer';
+      document.getElementById('rtInvPhone').textContent = inv.customerPhone || '—';
+      document.getElementById('rtInvAddress').textContent = inv.customerAddress || '—';
+      document.getElementById('rtInvGrandTotal').textContent = formatMoney(inv.grandTotal);
+      document.getElementById('rtInvPaid').textContent = formatMoney(inv.paidAmount);
+      document.getElementById('rtCashRefundAvailable').textContent = formatMoney(inv.cashRefundAvailable || 0);
+      document.getElementById('rtInvDue').textContent = formatMoney(inv.dueAmount);
+      document.getElementById('rtInvPrevReturned').textContent = formatMoney(inv.previouslyReturnedAmount);
+      document.getElementById('rtInvNetSale').textContent = formatMoney(inv.netSale);
+    }
+  }
+
+  function rtInitItem_(item) {
+    var existingQty = rtState.batchMode ? 0 : Number(rtState.editQtyByProduct[String(item.productId)] || 0);
+    item._editMaxQty = Number(item.availableQty || 0) + existingQty;
+    item._returnQty = existingQty;
+    if (item._returnPrice === undefined) item._returnPrice = Number(item.unitPrice) || 0;
+  }
+
+  function rtRenderItemRow_(item, i, bi) {
+    rtInitItem_(item);
+    var tr = document.createElement('tr');
+    var disabled = item._editMaxQty <= 0;
+    var otherReturnedQty = Math.max(0, Number(item.previouslyReturnedQty || 0) - item._returnQty);
+    var keyAttrs = bi === null ? ' data-i="' + i + '"' : ' data-bi="' + bi + '" data-i="' + i + '"';
+    var lineId = bi === null ? ('rtLineTotal' + i) : ('rtLineTotalB' + bi + 'I' + i);
+    tr.innerHTML =
+      '<td class="return-product-cell">' + escapeHtml(item.name) + '</td>' +
+      '<td class="num mono" data-label="Sold">' + item.soldQty + '</td>' +
+      '<td class="num mono" data-label="Returned">' + (rtState.editingReturnId ? otherReturnedQty : item.previouslyReturnedQty) + '</td>' +
+      '<td class="num mono" data-label="Available">' + item._editMaxQty + '</td>' +
+      '<td class="num return-qty-cell" data-label="Return Qty"><input type="number" min="0" max="' + item._editMaxQty + '" value="' + item._returnQty + '" ' + (disabled ? 'disabled' : '') + keyAttrs + ' data-f="qty"></td>' +
+      '<td class="num return-price-cell" data-label="Return Price"><input type="number" min="0" max="' + (Number(item.unitPrice) || 0) + '" step="0.01" value="' + item._returnPrice + '" ' + (disabled ? 'disabled' : '') + keyAttrs + ' data-f="price" aria-label="Return Price"></td>' +
+      '<td class="num mono return-line-total" data-label="Line Total" id="' + lineId + '">' + formatMoney(item._returnQty * (Number(item._returnPrice) || 0)) + '</td>';
+    return tr;
+  }
+
+  function rtRenderCart_() {
+    var body = document.getElementById('rtCartBody');
+    body.innerHTML = '';
+    if (rtState.batchMode) {
+      rtState.batchInvoices.forEach(function (inv, bi) {
+        var group = document.createElement('tr');
+        group.className = 'return-batch-invoice-row';
+        group.innerHTML = '<td colspan="7"><strong>' + escapeHtml(inv.invoiceId) + '</strong> — ' + escapeHtml(inv.date) +
+          ' · Cash refundable ' + formatMoney(inv.cashRefundAvailable || 0) + '</td>';
+        body.appendChild(group);
+        inv.items.forEach(function (item, i) { body.appendChild(rtRenderItemRow_(item, i, bi)); });
+      });
+    } else if (rtState.invoice) {
+      rtState.invoice.items.forEach(function (item, i) { body.appendChild(rtRenderItemRow_(item, i, null)); });
+    }
+    rtRecalcTotal_();
+  }
+
+  document.getElementById('rtCartBody').addEventListener('input', function (e) {
+    if (e.target.tagName !== 'INPUT' || (e.target.dataset.f !== 'qty' && e.target.dataset.f !== 'price')) return;
+    var i = Number(e.target.dataset.i);
+    var hasBatchIndex = e.target.dataset.bi !== undefined;
+    var bi = hasBatchIndex ? Number(e.target.dataset.bi) : null;
+    var item = hasBatchIndex ? rtState.batchInvoices[bi].items[i] : rtState.invoice.items[i];
+    if (e.target.dataset.f === 'qty') {
+      var q = Number(e.target.value);
+      item._returnQty = (isNaN(q) || q < 0) ? 0 : Math.min(q, item._editMaxQty === undefined ? item.availableQty : item._editMaxQty);
+    } else {
+      var requestedPrice = Number(e.target.value);
+      var maxPrice = Number(item.unitPrice) || 0;
+      if (isNaN(requestedPrice) || requestedPrice < 0) requestedPrice = 0;
+      item._returnPrice = Math.min(requestedPrice, maxPrice);
+      if (Number(e.target.value) !== item._returnPrice) e.target.value = item._returnPrice;
+    }
+    var lineId = hasBatchIndex ? ('rtLineTotalB' + bi + 'I' + i) : ('rtLineTotal' + i);
+    document.getElementById(lineId).textContent = formatMoney((Number(item._returnQty) || 0) * (Number(item._returnPrice) || 0));
+    rtRecalcTotal_();
+  });
+
+  function rtBatchInvoiceTotal_(inv) {
+    return (inv && inv.items || []).reduce(function (sum, item) {
+      return sum + (Number(item._returnQty) || 0) * (Number(item._returnPrice) || 0);
+    }, 0);
+  }
+
+  function rtReturnTotal_() {
+    if (rtState.batchMode) {
+      return rtState.batchInvoices.reduce(function (sum, inv) { return sum + rtBatchInvoiceTotal_(inv); }, 0);
+    }
+    if (!rtState.invoice || !rtState.invoice.items) return 0;
+    return rtState.invoice.items.reduce(function (sum, item) {
+      return sum + (Number(item._returnQty) || 0) * (Number(item._returnPrice) || 0);
+    }, 0);
+  }
+
+  function rtApplyRefundAvailability_() {
+    var refundSelect = document.getElementById('rtRefundMethod');
+    var cashOption = refundSelect.querySelector('option[value="Cash"]');
+    var hint = document.getElementById('rtRefundHint');
+    if (rtState.batchMode) {
+      var allNoCash = rtState.batchInvoices.every(function (inv) { return (Number(inv.cashRefundAvailable) || 0) <= 0; });
+      cashOption.disabled = allNoCash;
+      if (allNoCash && refundSelect.value === 'Cash') refundSelect.value = 'Store Credit';
+      var shortfall = rtState.batchInvoices.filter(function (inv) {
+        return rtBatchInvoiceTotal_(inv) > (Number(inv.cashRefundAvailable) || 0) + 0.005;
+      })[0];
+      if (refundSelect.value === 'Cash' && shortfall) {
+        hint.textContent = shortfall.invoiceId + ': cash refund available is ' + formatMoney(shortfall.cashRefundAvailable || 0) + '. Cash is checked separately for each invoice.';
+      } else {
+        hint.textContent = 'Cash refund eligibility is checked separately for every selected invoice.';
+      }
+      return;
+    }
+    var cashRefundAvailable = Number(rtState.invoice && rtState.invoice.cashRefundAvailable) || 0;
+    var total = rtReturnTotal_();
+    cashOption.disabled = cashRefundAvailable <= 0;
+    if (cashRefundAvailable <= 0 && refundSelect.value === 'Cash') refundSelect.value = 'Store Credit';
+    if (cashRefundAvailable <= 0) {
+      hint.textContent = 'No cash was collected on this invoice. The return will reduce customer due / create store credit.';
+    } else if (refundSelect.value === 'Cash' && total > cashRefundAvailable + 0.005) {
+      hint.textContent = 'Cash refund available: ' + formatMoney(cashRefundAvailable) + '. Choose Adjust to Customer Due / Store Credit for a larger return.';
+    } else {
+      hint.textContent = 'Cash refund available: ' + formatMoney(cashRefundAvailable) + '.';
+    }
+  }
+
+  function rtRecalcTotal_() {
+    document.getElementById('rtTotalReturn').textContent = formatMoney(rtReturnTotal_());
+    rtApplyRefundAvailability_();
+  }
+
+  function rtToday_() {
+    var d = new Date();
+    var m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + m + '-' + day;
+  }
+
+  document.getElementById('rtDate').addEventListener('change', function () {
+    var val = document.getElementById('rtDate').value;
+    document.getElementById('rtBackdatedReasonRow').style.display = (val && val < rtToday_()) ? '' : 'none';
+  });
+  document.getElementById('rtRefundMethod').addEventListener('change', rtApplyRefundAvailability_);
+  document.getElementById('rtCancelBtn').addEventListener('click', rtReset_);
+
+  function rtSelectedBatchPayload_() {
+    return rtState.batchInvoices.map(function (inv) {
+      return {
+        invoiceId: inv.invoiceId,
+        items: inv.items.filter(function (item) { return (Number(item._returnQty) || 0) > 0; }).map(function (item) {
+          return { productId: item.productId, name: item.name, qty: Number(item._returnQty) || 0, price: Number(item._returnPrice) || 0 };
+        })
+      };
+    }).filter(function (child) { return child.items.length > 0; });
+  }
+
+  document.getElementById('rtCompleteBtn').addEventListener('click', function () {
+    var errEl = document.getElementById('rtFormError');
+    errEl.style.display = 'none';
+    var rtDate = document.getElementById('rtDate').value || rtToday_();
+    var rtBackdatedReason = document.getElementById('rtBackdatedReason').value.trim();
+    if (rtDate < rtToday_() && !rtBackdatedReason) {
+      errEl.textContent = 'A reason is required when dating a return in the past.';
+      errEl.style.display = 'block';
+      return;
+    }
+
+    if (rtState.batchMode) {
+      var invoiceReturns = rtSelectedBatchPayload_();
+      if (invoiceReturns.length < 2) {
+        errEl.textContent = 'Enter return quantities on at least two selected invoices for a batch return.';
+        errEl.style.display = 'block';
+        return;
+      }
+      var latestInvoiceDate = rtState.batchInvoices.reduce(function (latest, inv) { return inv.date > latest ? inv.date : latest; }, '');
+      if (latestInvoiceDate && rtDate < latestInvoiceDate) {
+        errEl.textContent = 'Return date cannot be before selected invoice date ' + latestInvoiceDate + '.';
+        errEl.style.display = 'block';
+        return;
+      }
+      var method = document.getElementById('rtRefundMethod').value;
+      if (method === 'Cash') {
+        var shortfall = rtState.batchInvoices.filter(function (inv) {
+          return rtBatchInvoiceTotal_(inv) > (Number(inv.cashRefundAvailable) || 0) + 0.005;
+        })[0];
+        if (shortfall) {
+          errEl.textContent = shortfall.invoiceId + ': cash refund available is ' + formatMoney(shortfall.cashRefundAvailable || 0) + '. Use Store Credit for a larger return.';
+          errEl.style.display = 'block';
+          return;
+        }
+      }
+      var payload = {
+        invoiceReturns: invoiceReturns,
+        refundMethod: method,
+        reason: document.getElementById('rtReason').value.trim(),
+        notes: document.getElementById('rtNote').value.trim(),
+        date: rtDate,
+        backdatedReason: rtBackdatedReason
+      };
+      var total = rtReturnTotal_();
+      var itemCount = invoiceReturns.reduce(function (sum, child) { return sum + child.items.length; }, 0);
+      runConfirmedAction({
+        type: 'financial',
+        title: 'Complete Batch Sales Return?',
+        message: 'Each invoice will create its own return record while this action groups them as one batch.',
+        details: [
+          { label: 'Invoices', value: String(invoiceReturns.length), emphasis: true },
+          { label: 'Customer', value: rtState.batchInvoices[0].customerName || '—' },
+          { label: 'Return Amount', value: formatMoney(total), emphasis: true },
+          { label: 'Items Returning', value: String(itemCount) },
+          { label: 'Refund Method', value: method },
+          { label: 'Date', value: rtDate }
+        ],
+        confirmLabel: 'Complete Batch Return',
+        loadingLabel: 'Completing...',
+        trigger: document.getElementById('rtCompleteBtn')
+      }, function () {
+        return withLoader(serverCall('completeReturnBatch', authToken, payload)).then(function (res) {
+          showToast('Batch ' + res.batchId + ' completed — ' + res.returnIds.length + ' returns, ' + formatMoney(res.totalReturnAmount), 'success');
+          rtReset_();
+        });
+      }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+      return;
+    }
+
+    var items = rtState.invoice.items.filter(function (item) { return (item._returnQty || 0) > 0; }).map(function (item) {
+      return { productId: item.productId, name: item.name, qty: item._returnQty, price: Number(item._returnPrice) || 0 };
+    });
+    if (!items.length) {
+      errEl.textContent = 'Enter a return quantity for at least one product.';
+      errEl.style.display = 'block';
+      return;
+    }
+    if (rtState.invoice.date && rtDate < rtState.invoice.date) {
+      errEl.textContent = 'Return date cannot be before invoice date ' + rtState.invoice.date + '.';
+      errEl.style.display = 'block';
+      return;
+    }
+    var payloadSingle = {
+      invoiceId: rtState.invoice.invoiceId,
+      items: items,
+      refundMethod: document.getElementById('rtRefundMethod').value,
+      reason: document.getElementById('rtReason').value.trim(),
+      notes: document.getElementById('rtNote').value.trim(),
+      date: rtDate,
+      backdatedReason: rtBackdatedReason
+    };
+    var salesReturnTotal = rtReturnTotal_();
+    var cashRefundAvailable = Number(rtState.invoice.cashRefundAvailable) || 0;
+    if (payloadSingle.refundMethod === 'Cash' && salesReturnTotal > cashRefundAvailable + 0.005) {
+      errEl.textContent = 'Cash refund available is ' + formatMoney(cashRefundAvailable) + '. Choose Adjust to Customer Due / Store Credit for the remaining return value.';
+      errEl.style.display = 'block';
+      return;
+    }
+    runConfirmedAction({
+      type: 'financial',
+      title: 'Complete Sales Return?',
+      message: 'This will change stock and customer accounting.',
+      details: [
+        { label: 'Invoice', value: rtState.invoice.invoiceId, emphasis: true },
+        { label: 'Customer', value: rtState.invoice.customerName || 'Walk-in Customer' },
+        { label: 'Return Amount', value: formatMoney(salesReturnTotal), emphasis: true },
+        { label: 'In words', value: banglaAmountInWords_(salesReturnTotal) },
+        { label: 'Items Returning', value: String(items.length) },
+        { label: 'Refund Method', value: payloadSingle.refundMethod },
+        { label: 'Reason', value: payloadSingle.reason },
+        { label: 'Date', value: payloadSingle.date }
+      ],
+      confirmLabel: 'Complete Return',
+      loadingLabel: 'Completing...',
+      trigger: document.getElementById('rtCompleteBtn')
+    }, function () {
+      return withLoader(serverCall('completeReturn', authToken, payloadSingle)).then(function (res) {
+        showToast('Return ' + res.returnId + ' completed — ' + formatMoney(res.totalReturnAmount) + ' refunded', 'success');
+        rtReset_();
+      });
+    }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+  });
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var origGoToPage = goToPage;
+    goToPage = function (key) {
+      origGoToPage(key);
+      if (key === 'returns' && !rtState._loaded) {
+        rtState._loaded = true;
+        if (!document.getElementById('rtDate').value) document.getElementById('rtDate').value = rtToday_();
+      }
+    };
+  });
+</script>

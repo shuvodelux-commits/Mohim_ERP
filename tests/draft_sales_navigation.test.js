@@ -1,0 +1,16 @@
+const fs=require('fs'),path=require('path'),assert=require('assert');
+const root=path.resolve(__dirname,'..');
+const read=n=>fs.readFileSync(path.join(root,n),'utf8');
+const ui=read('UI.gs'), js=read('javascript.html'), index=read('index.html');
+const page=()=>read('draftSales.html');
+assert.match(ui,/key:\s*['"]draftSales['"][\s\S]*label:\s*['"]Draft Invoices['"]/);
+assert.match(ui,/draftSales[\s\S]*actionPermAny[\s\S]*module:\s*['"]pos['"][\s\S]*action:\s*['"]add['"][\s\S]*module:\s*['"]sales['"][\s\S]*action:\s*['"]edit['"]/);
+const permBlock=(ui.match(/const PERMISSION_MODULES\s*=\s*\[[\s\S]*?\n\];/)||[''])[0];
+assert(permBlock && !/key:\s*['"]draftSales['"]/.test(permBlock));
+assert.match(js,/function subNavVisible_[\s\S]*child\.actionPermAny/);
+assert.match(js,/draftSales:\s*['"]draftSalesLoad['"]/);
+assert.match(index,/id="page-draftSales"[\s\S]*include\('draftSales'\)/);
+const html=page();
+for(const label of ['Draft No','Updated','Customer','Phone','Amount','Created By','Actions']) assert.match(html,new RegExp(label));
+assert.doesNotMatch(html,/>\s*Post\s*</i);
+console.log('PASS draft navigation/list contract');

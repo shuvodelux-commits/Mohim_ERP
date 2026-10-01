@@ -1,0 +1,1276 @@
+<div class="toolbar">
+  <input class="search-input" id="vlSearch" type="text" placeholder="Search by name or phone...">
+  <div class="toolbar-spacer"></div>
+  <button class="btn btn-primary" id="vlAddBtn">+ Add Vendor</button>
+</div>
+
+<div class="card" style="padding:0;">
+  <div class="table-scroll">
+    <table class="mobile-card-table">
+      <thead><tr><th>Vendor</th><th>Phone</th><th class="num">Payable (You Owe)</th><th class="num">Receivable (They Owe)</th><th>Status</th><th></th></tr></thead>
+      <tbody id="vlTableBody"></tbody>
+    </table>
+  </div>
+  <div class="empty-state" id="vlEmpty" hidden>No vendors yet.</div>
+</div>
+
+<!-- Add Vendor modal -->
+<div class="modal-overlay" id="vlAddModal" hidden>
+  <div class="modal">
+    <div class="modal-header">
+      <div><h3 id="vlVendorModalTitle">Add Vendor</h3><span class="bn-hint">ভেন্ডরের তথ্য</span></div>
+      <button class="modal-close" onclick="closeModal('vlAddModal')">&#10005;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="full"><label>Vendor Name *</label><input id="vlName" type="text"></div>
+        <div><label>Phone</label><input id="vlPhone" type="text"></div>
+        <div class="full"><label>Address</label><input id="vlAddress" type="text"></div>
+      </div>
+      <div class="field-error" id="vlAddFormError"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('vlAddModal')">Cancel</button>
+      <button class="btn btn-primary" id="vlAddSaveBtn">Save Vendor</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Payment (ledger row) modal -->
+<div class="modal-overlay" id="vlPayEditModal" hidden>
+  <div class="modal">
+    <div class="modal-header"><h3>Edit Payment</h3><button class="modal-close" onclick="closeModal('vlPayEditModal')">&#10005;</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div><label>Date *</label><input id="vlPayEditDate" type="date"></div>
+        <div><label>Amount *</label><input id="vlPayEditAmount" type="number" min="0" step="0.01"></div>
+        <div>
+          <label>Payment Method</label>
+          <select id="vlPayEditMethod">
+            <option value="Cash">Cash</option><option value="Bank">Bank</option>
+            <option value="Mobile Banking">Mobile Banking</option><option value="Other">Other</option>
+          </select>
+        </div>
+        <div id="vlPayEditBankAccountRow" style="display:none;">
+          <label id="vlPayEditBankAccountLabel">Bank Account *</label>
+          <select id="vlPayEditBankAccount"><option value="">Select bank account...</option></select>
+        </div>
+        <div class="full"><label>Note</label><input id="vlPayEditNote" type="text"></div>
+      </div>
+      <div class="field-error" id="vlPayEditFormError"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('vlPayEditModal')">Cancel</button>
+      <button class="btn btn-primary" id="vlPayEditSaveBtn">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Return modal -->
+<div class="modal-overlay" id="vlRetEditModal" hidden>
+  <div class="modal">
+    <div class="modal-header"><h3>Edit Return</h3><button class="modal-close" onclick="closeModal('vlRetEditModal')">&#10005;</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div><label>Date *</label><input id="vlRetEditDate" type="date"></div>
+        <div><label>Quantity *</label><input id="vlRetEditQty" type="number" min="0" step="1"></div>
+        <div><label>Unit Cost *</label><input id="vlRetEditUnitCost" type="number" min="0" step="0.01"></div>
+        <div class="full"><label>Note</label><input id="vlRetEditNote" type="text"></div>
+      </div>
+      <div class="field-error" id="vlRetEditFormError"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('vlRetEditModal')">Cancel</button>
+      <button class="btn btn-primary" id="vlRetEditSaveBtn">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Sourcing modal -->
+<div class="modal-overlay" id="vlSrcEditModal" hidden>
+  <div class="modal">
+    <div class="modal-header"><h3>Edit Sourcing Transaction</h3><button class="modal-close" onclick="closeModal('vlSrcEditModal')">&#10005;</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div><label>Date *</label><input id="vlSrcEditDate" type="date"></div>
+        <div><label>Quantity *</label><input id="vlSrcEditQty" type="number" min="0" step="1"></div>
+        <div><label>Unit Cost *</label><input id="vlSrcEditUnitCost" type="number" min="0" step="0.01"></div>
+      </div>
+      <div class="field-error" id="vlSrcEditFormError"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('vlSrcEditModal')">Cancel</button>
+      <button class="btn btn-primary" id="vlSrcEditSaveBtn">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Issue modal -->
+<div class="modal-overlay" id="vlIssueEditModal" hidden>
+  <div class="modal">
+    <div class="modal-header"><h3>Edit Issue Transaction</h3><button class="modal-close" onclick="closeModal('vlIssueEditModal')">&#10005;</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div><label>Date *</label><input id="vlIssueEditDate" type="date"></div>
+        <div><label>Quantity *</label><input id="vlIssueEditQty" type="number" min="0" step="1"></div>
+        <div><label>Unit Value *</label><input id="vlIssueEditUnitValue" type="number" min="0" step="0.01"></div>
+        <div class="full"><label>Note</label><input id="vlIssueEditNote" type="text"></div>
+      </div>
+      <div class="field-error" id="vlIssueEditFormError"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('vlIssueEditModal')">Cancel</button>
+      <button class="btn btn-primary" id="vlIssueEditSaveBtn">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Vendor Memo modal -->
+<div class="modal-overlay" id="vlMemoEditModal" hidden>
+  <div class="modal" style="max-width:760px;">
+    <div class="modal-header">
+      <div><h3>Edit Vendor Memo <span id="vlMemoEditId" class="mono"></span></h3><span class="bn-hint">Edit quantity and unit value for all products in this memo</span></div>
+      <button class="modal-close" onclick="closeModal('vlMemoEditModal')">&#10005;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid" style="margin-bottom:12px;">
+        <div><label>Date *</label><input id="vlMemoEditDate" type="date"></div>
+        <div class="full"><label>Memo Note</label><input id="vlMemoEditNote" type="text"></div>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Product</th><th class="num">Qty</th><th class="num">Already Returned</th><th class="num">Unit Value</th><th class="num">Total</th></tr></thead>
+          <tbody id="vlMemoEditItemsBody"></tbody>
+          <tfoot><tr><th colspan="4" style="text-align:right;">Memo Total</th><th class="num mono" id="vlMemoEditTotal">0</th></tr></tfoot>
+        </table>
+      </div>
+      <div id="vlMemoEditBackdatedReasonRow" style="display:none; margin-top:10px;"><label>Reason for Backdating *</label><input id="vlMemoEditBackdatedReason" type="text" placeholder="Why is this dated in the past?"></div>
+      <div class="field-error" id="vlMemoEditFormError"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('vlMemoEditModal')">Cancel</button>
+      <button class="btn btn-primary" id="vlMemoEditSaveBtn">Save Memo Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Receipt modal -->
+<div class="modal-overlay" id="vlRecvEditModal" hidden>
+  <div class="modal">
+    <div class="modal-header"><h3>Edit Receipt</h3><button class="modal-close" onclick="closeModal('vlRecvEditModal')">&#10005;</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div><label>Date *</label><input id="vlRecvEditDate" type="date"></div>
+        <div><label>Amount *</label><input id="vlRecvEditAmount" type="number" min="0" step="0.01"></div>
+        <div>
+          <label>Payment Method</label>
+          <select id="vlRecvEditMethod">
+            <option value="Cash">Cash</option><option value="Bank">Bank</option>
+            <option value="Mobile Banking">Mobile Banking</option><option value="Other">Other</option>
+          </select>
+        </div>
+        <div id="vlRecvEditBankAccountRow" style="display:none;">
+          <label id="vlRecvEditBankAccountLabel">Bank Account *</label>
+          <select id="vlRecvEditBankAccount"><option value="">Select bank account...</option></select>
+        </div>
+        <div class="full"><label>Note</label><input id="vlRecvEditNote" type="text"></div>
+      </div>
+      <div class="field-error" id="vlRecvEditFormError"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('vlRecvEditModal')">Cancel</button>
+      <button class="btn btn-primary" id="vlRecvEditSaveBtn">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Return Received modal -->
+<div class="modal-overlay" id="vlRecvProdEditModal" hidden>
+  <div class="modal">
+    <div class="modal-header"><h3>Edit Return Received</h3><button class="modal-close" onclick="closeModal('vlRecvProdEditModal')">&#10005;</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div><label>Date *</label><input id="vlRecvProdEditDate" type="date"></div>
+        <div><label>Quantity *</label><input id="vlRecvProdEditQty" type="number" min="0" step="1"></div>
+        <div><label>Unit Value *</label><input id="vlRecvProdEditUnitValue" type="number" min="0" step="0.01"></div>
+        <div class="full"><label>Note</label><input id="vlRecvProdEditNote" type="text"></div>
+      </div>
+      <div class="field-error" id="vlRecvProdEditFormError"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('vlRecvProdEditModal')">Cancel</button>
+      <button class="btn btn-primary" id="vlRecvProdEditSaveBtn">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  var vlState = {
+    vendors: [], currencySymbol: '', bankAccounts: [], products: [],
+    ledger: [], openSourcing: [], openIssues: [], giveItems: [], detailId: null,
+    editingVendorId: null, editingMemoId: null, editingMemoItems: [],
+    editingPayId: null, editingRetId: null, editingSrcId: null,
+    editingIssueId: null, editingRecvId: null, editingRecvProdId: null
+  };
+
+  function vlLoad() {
+    return withLoader(serverCall('getVendorsBootstrap', authToken)).then(function (data) {
+      vlState.vendors = data.vendors;
+      vlState.currencySymbol = data.currencySymbol;
+      vlState.bankAccounts = data.bankAccounts;
+      vlState.products = data.products;
+      smartIndexProducts_(vlState.products);
+      fillBankAccountSelect_(document.getElementById('vlPayBankAccount'), vlState.bankAccounts, document.getElementById('vlPayMethod').value);
+      fillBankAccountSelect_(document.getElementById('vlRecvBankAccount'), vlState.bankAccounts, document.getElementById('vlRecvMethod').value);
+      vlRender();
+      vlFillWorkspaceVendorSelect_();
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  function vlFillWorkspaceVendorSelect_(query, preferredId) {
+    var sel = document.getElementById('vlWorkspaceVendor');
+    if (!sel) return;
+    var current = preferredId || sel.value || vlState.detailId || '';
+    var q = String(query == null ? document.getElementById('vlWorkspaceSearch').value : query).trim().toLowerCase();
+    sel.innerHTML = '<option value="">Select vendor...</option>';
+    vlState.vendors.filter(function (v) {
+      return !q || String(v.name).toLowerCase().indexOf(q) !== -1 || phoneSearchMatches_(v.phone, q);
+    }).forEach(function (v) {
+      var opt = document.createElement('option');
+      opt.value = v.id;
+      opt.textContent = v.name + (v.phone ? ' — ' + v.phone : '') + (v.status === 'Inactive' ? ' (Inactive)' : '');
+      sel.appendChild(opt);
+    });
+    if (current && Array.prototype.some.call(sel.options, function (o) { return o.value === current; })) sel.value = current;
+  }
+
+  function vlWorkspaceClear_() {
+    vlState.detailId = null;
+    document.getElementById('vlWorkspaceContent').hidden = true;
+    document.getElementById('vlWorkspaceEmpty').hidden = false;
+    var sel = document.getElementById('vlWorkspaceVendor');
+    if (sel) sel.value = '';
+  }
+
+  function vlWorkspaceLoad_() {
+    var current = vlState.detailId;
+    return vlLoad().then(function () {
+      if (current && vlState.vendors.some(function (v) { return v.id === current; })) return vlOpenDetail_(current);
+      vlWorkspaceClear_();
+    });
+  }
+
+  function vlOpenWorkspace_(id) {
+    goToPage('vendorWorkspace');
+    document.getElementById('vlWorkspaceSearch').value = '';
+    var load = vlState._loaded ? Promise.resolve() : (vlState._loaded = true, vlLoad());
+    return Promise.resolve(load).then(function () {
+      vlFillWorkspaceVendorSelect_('', id);
+      document.getElementById('vlWorkspaceVendor').value = id;
+      return vlOpenDetail_(id);
+    });
+  }
+
+  function vlRender() {
+    var q = (document.getElementById('vlSearch').value || '').toLowerCase();
+    var rows = vlState.vendors.filter(function (v) {
+      return !q || String(v.name).toLowerCase().indexOf(q) !== -1 || phoneSearchMatches_(v.phone, q);
+    });
+    var body = document.getElementById('vlTableBody');
+    body.innerHTML = '';
+    rows.forEach(function (v) {
+      var due = Number(v.currentDue) || 0;
+      var dueCell = due > 0
+        ? '<span class="badge badge-danger">' + formatMoney(due) + '</span>'
+        : (due < 0 ? '<span class="badge badge-success">Credit ' + formatMoney(Math.abs(due)) + '</span>' : formatMoney(0));
+      var receivable = Number(v.currentReceivable) || 0;
+      var receivableCell = receivable > 0
+        ? '<span class="badge badge-success">' + formatMoney(receivable) + '</span>'
+        : (receivable < 0 ? '<span class="badge badge-danger">Owed ' + formatMoney(Math.abs(receivable)) + '</span>' : formatMoney(0));
+      var statusBadge = v.status === 'Active' ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-danger">Inactive</span>';
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td>' + escapeHtml(v.name) + '</td>' +
+        '<td>' + escapeHtml(v.phone || '') + '</td>' +
+        '<td class="num mono">' + dueCell + '</td>' +
+        '<td class="num mono">' + receivableCell + '</td>' +
+        '<td>' + statusBadge + '</td>' +
+        '<td style="white-space:nowrap;">' +
+          '<button class="btn" data-act="menu" data-id="' + v.id + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button>' +
+        '</td>';
+      body.appendChild(tr);
+    });
+    document.getElementById('vlEmpty').hidden = rows.length > 0;
+  }
+
+  document.getElementById('vlSearch').addEventListener('input', vlRender);
+
+  function vlOpenVendorModal_(vendor) {
+    vlState.editingVendorId = vendor ? vendor.id : null;
+    document.getElementById('vlVendorModalTitle').textContent = vendor ? 'Edit Vendor' : 'Add Vendor';
+    document.getElementById('vlAddSaveBtn').textContent = vendor ? 'Update Vendor' : 'Save Vendor';
+    document.getElementById('vlName').value = vendor ? (vendor.name || '') : '';
+    document.getElementById('vlPhone').value = vendor ? (vendor.phone || '') : '';
+    document.getElementById('vlAddress').value = vendor ? (vendor.address || '') : '';
+    document.getElementById('vlAddFormError').style.display = 'none';
+    openModal('vlAddModal');
+  }
+
+  document.getElementById('vlAddBtn').addEventListener('click', function () {
+    vlOpenVendorModal_(null);
+  });
+
+  document.getElementById('vlAddSaveBtn').addEventListener('click', function () {
+    var payload = {
+      name: document.getElementById('vlName').value.trim(),
+      phone: document.getElementById('vlPhone').value.trim(),
+      address: document.getElementById('vlAddress').value.trim()
+    };
+    var errEl = document.getElementById('vlAddFormError');
+    errEl.style.display = 'none';
+    var editingId = vlState.editingVendorId;
+    var call = editingId ? serverCall('updateVendor', authToken, editingId, payload) : serverCall('addVendor', authToken, payload);
+    withLoader(call).then(function () {
+      closeModal('vlAddModal');
+      showToast(editingId ? 'Vendor updated' : 'Vendor saved', 'success');
+      vlState.editingVendorId = null;
+      return vlLoad().then(function () {
+        if (editingId && vlState.detailId === editingId) return vlOpenDetail_(editingId);
+      });
+    }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+  });
+
+  function vlDeleteVendor_(vendor) {
+    confirmDelete({
+      title: 'Delete vendor',
+      summary: '<p><b>' + escapeHtml(vendor.name || vendor.id) + '</b></p><p>Historical vendor transactions will be preserved.</p>',
+      fn: 'deleteVendor', args: [vendor.id], reloadPages: ['vendors'],
+      onDone: function () {
+        if (vlState.detailId === vendor.id) vlWorkspaceClear_();
+        vlLoad();
+      }
+    });
+  }
+
+  document.getElementById('vlTableBody').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-act]');
+    if (!btn || btn.dataset.act !== 'menu') return;
+    var id = btn.dataset.id;
+    var vendor = vlState.vendors.filter(function (v) { return v.id === id; })[0];
+    if (!vendor) return;
+    openRowActionMenu_(btn, [
+      { action: 'workspace', label: 'Workspace' },
+      { action: 'editVendor', label: 'Edit Vendor' },
+      { action: 'toggle', label: vendor.status === 'Active' ? 'Deactivate' : 'Activate' },
+      { divider: true },
+      { action: 'delete', label: 'Delete', danger: true }
+    ], function (action) {
+      if (action === 'workspace') vlOpenWorkspace_(id);
+      if (action === 'editVendor') vlOpenVendorModal_(vendor);
+      if (action === 'delete') vlDeleteVendor_(vendor);
+      if (action === 'toggle') {
+        var next = vendor.status === 'Active' ? 'Inactive' : 'Active';
+        runConfirmedAction({
+          type: 'state-change',
+          title: (next === 'Inactive' ? 'Deactivate' : 'Activate') + ' Vendor?',
+          message: next === 'Inactive' ? 'This vendor will no longer be available for new vendor transactions.' : 'This vendor will be available for new vendor transactions.',
+          details: [
+            { label: 'Vendor', value: vendor.name, emphasis: true },
+            { label: 'New Status', value: next }
+          ],
+          confirmLabel: next === 'Inactive' ? 'Deactivate' : 'Activate',
+          loadingLabel: 'Updating...',
+          trigger: btn
+        }, function () {
+          return withLoader(serverCall('setVendorStatus', authToken, id, next)).then(function () {
+            showToast('Vendor updated', 'success');
+            vlLoad();
+            if (vlState.detailId === id) vlOpenDetail_(id);
+          });
+        }).catch(function (err) { showToast(err.message, 'error'); });
+      }
+    });
+  });
+
+  document.getElementById('vlWorkspaceSearch').addEventListener('input', function () {
+    vlFillWorkspaceVendorSelect_(this.value);
+  });
+  document.getElementById('vlWorkspaceVendor').addEventListener('change', function () {
+    if (!this.value) { vlWorkspaceClear_(); return; }
+    vlOpenDetail_(this.value);
+  });
+  document.getElementById('vlWorkspaceEditVendorBtn').addEventListener('click', function () {
+    var vendor = vlState.vendors.filter(function (v) { return v.id === vlState.detailId; })[0];
+    if (vendor) vlOpenVendorModal_(vendor);
+  });
+
+  document.getElementById('vlPayMethod').addEventListener('change', function () {
+    document.getElementById('vlPayBankAccount').style.display = paymentMethodNeedsAccount_(this.value) ? '' : 'none';
+    fillBankAccountSelect_(document.getElementById('vlPayBankAccount'), vlState.bankAccounts, this.value);
+  });
+  document.getElementById('vlRecvMethod').addEventListener('change', function () {
+    document.getElementById('vlRecvBankAccount').style.display = paymentMethodNeedsAccount_(this.value) ? '' : 'none';
+    fillBankAccountSelect_(document.getElementById('vlRecvBankAccount'), vlState.bankAccounts, this.value);
+  });
+
+  function vlToday_() {
+    var d = new Date();
+    var m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + m + '-' + day;
+  }
+
+
+  function vlCurrentVendorName_() {
+    var vendor = vlState.vendors.filter(function (v) { return v.id === vlState.detailId; })[0];
+    return vendor ? vendor.name : (document.getElementById('vlDetailName').textContent || '').split(' — ')[0];
+  }
+
+  document.getElementById('vlPayDate').addEventListener('change', function () {
+    var val = document.getElementById('vlPayDate').value;
+    document.getElementById('vlPayBackdatedReasonRow').style.display = (val && val < vlToday_()) ? '' : 'none';
+  });
+
+  document.getElementById('vlPaySaveBtn').addEventListener('click', function () {
+    var amount = document.getElementById('vlPayAmount').value;
+    var method = document.getElementById('vlPayMethod').value;
+    var bankAccountId = document.getElementById('vlPayBankAccount').value;
+    var note = document.getElementById('vlPayNote').value.trim();
+    var errEl = document.getElementById('vlPayError');
+    errEl.style.display = 'none';
+    var payDate = document.getElementById('vlPayDate').value || vlToday_();
+    var backdatedReason = document.getElementById('vlPayBackdatedReason').value.trim();
+    if (payDate < vlToday_() && !backdatedReason) { errEl.textContent = 'A reason is required when dating a payment in the past.'; errEl.style.display = 'block'; return; }
+    var payAmount = Number(amount) || 0;
+    var vendorId = vlState.detailId;
+    runConfirmedAction({
+      type: 'financial',
+      title: 'Pay Vendor?',
+      message: 'Review the vendor payment before money leaves the selected account.',
+      details: [
+        { label: 'Vendor', value: vlCurrentVendorName_(), emphasis: true },
+        { label: 'Amount', value: formatMoney(payAmount), emphasis: true },
+        { label: 'In words', value: banglaAmountInWords_(payAmount) },
+        { label: 'Method', value: method },
+        { label: 'Account', value: bankAccountId ? selectedOptionText_('vlPayBankAccount') : '' },
+        { label: 'Date', value: payDate }
+      ],
+      confirmLabel: 'Pay ' + formatMoney(payAmount),
+      loadingLabel: 'Paying...',
+      trigger: document.getElementById('vlPaySaveBtn')
+    }, function () {
+      return withLoader(serverCall('payVendor', authToken, vendorId, amount, method, bankAccountId, note, payDate, backdatedReason)).then(function () {
+        showToast('Payment recorded', 'success');
+        vlLoad();
+        vlOpenDetail_(vendorId);
+      });
+    }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+  });
+
+  document.getElementById('vlRetDate').addEventListener('change', function () {
+    var val = document.getElementById('vlRetDate').value;
+    document.getElementById('vlRetBackdatedReasonRow').style.display = (val && val < vlToday_()) ? '' : 'none';
+  });
+
+  document.getElementById('vlRetSourcing').addEventListener('change', function () {
+    var val = this.value;
+    var s = vlState.openSourcing.filter(function (o) { return o.sourcingId === val; })[0];
+    if (!s) return;
+    document.getElementById('vlRetQty').value = s.remainingQty;
+    document.getElementById('vlRetQty').max = s.remainingQty;
+    document.getElementById('vlRetUnitCost').value = s.unitCost;
+  });
+
+  function vlFillSourcingSelect_() {
+    var sel = document.getElementById('vlRetSourcing');
+    sel.innerHTML = '';
+    if (!vlState.openSourcing.length) {
+      document.getElementById('vlRetEmpty').hidden = false;
+      document.getElementById('vlRetSaveBtn').disabled = true;
+      sel.innerHTML = '<option value="">No open transactions</option>';
+      document.getElementById('vlRetQty').value = '';
+      document.getElementById('vlRetUnitCost').value = '';
+      return;
+    }
+    document.getElementById('vlRetEmpty').hidden = true;
+    document.getElementById('vlRetSaveBtn').disabled = false;
+    vlState.openSourcing.forEach(function (s) {
+      var opt = document.createElement('option');
+      opt.value = s.sourcingId;
+      opt.textContent = s.invoiceId + ' — ' + s.productName + ' (Remaining ' + s.remainingQty + ')';
+      sel.appendChild(opt);
+    });
+    sel.dispatchEvent(new Event('change'));
+  }
+
+  document.getElementById('vlRetSaveBtn').addEventListener('click', function () {
+    var sourcingId = document.getElementById('vlRetSourcing').value;
+    var errEl = document.getElementById('vlRetError');
+    errEl.style.display = 'none';
+    if (!sourcingId) { errEl.textContent = 'Choose a sourcing transaction to settle.'; errEl.style.display = 'block'; return; }
+    var retDate = document.getElementById('vlRetDate').value || vlToday_();
+    var backdatedReason = document.getElementById('vlRetBackdatedReason').value.trim();
+    if (retDate < vlToday_() && !backdatedReason) { errEl.textContent = 'A reason is required when dating this in the past.'; errEl.style.display = 'block'; return; }
+    var payload = {
+      vendorId: vlState.detailId, sourcingId: sourcingId,
+      quantity: document.getElementById('vlRetQty').value,
+      unitCost: document.getElementById('vlRetUnitCost').value,
+      notes: document.getElementById('vlRetNote').value.trim(),
+      date: retDate, backdatedReason: backdatedReason
+    };
+    runConfirmedAction({
+      type: 'financial',
+      title: 'Return Products to Vendor?',
+      message: 'This will change vendor inventory and accounting using the existing vendor workflow.',
+      details: [
+        { label: 'Vendor', value: vlCurrentVendorName_(), emphasis: true },
+        { label: 'Product', value: selectedOptionText_('vlRetSourcing') },
+        { label: 'Quantity', value: String(payload.quantity), emphasis: true },
+        { label: 'Unit Cost', value: formatMoney(Number(payload.unitCost) || 0) },
+        { label: 'Date', value: payload.date }
+      ],
+      confirmLabel: 'Return Products',
+      loadingLabel: 'Returning...',
+      trigger: document.getElementById('vlRetSaveBtn')
+    }, function () {
+      return withLoader(serverCall('returnProductsToVendor', authToken, payload)).then(function () {
+        showToast('Return recorded', 'success');
+        vlLoad();
+        vlOpenDetail_(payload.vendorId);
+      });
+    }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+  });
+
+  function vlSelectedGiveProduct_() {
+    var productId = document.getElementById('vlGiveProduct').value;
+    return vlState.products.filter(function (p) { return p.id === productId; })[0] || null;
+  }
+
+  function vlPopulateGiveUnitValue_() {
+    var product = vlSelectedGiveProduct_();
+    var input = document.getElementById('vlGiveUnitValue');
+    if (!input) return;
+    input.value = product ? (Number(product.purchasePrice) || 0) : '';
+  }
+
+  function vlFillProductSelect_() {
+    var sel = document.getElementById('vlGiveProduct');
+    var searchEl = document.getElementById('vlGiveProductSearch');
+    var current = sel.value;
+    var rows = smartSearchProducts_(vlState.products, searchEl ? searchEl.value : '', 80);
+    sel.innerHTML = '';
+    rows.forEach(function (p) {
+      var opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.name + (p.brand ? ' · ' + p.brand : '') + ' (Stock: ' + p.currentStock + ', Purchase: ' + formatMoney(Number(p.purchasePrice) || 0) + ')';
+      sel.appendChild(opt);
+    });
+    if (rows.some(function (p) { return p.id === current; })) sel.value = current;
+    vlPopulateGiveUnitValue_();
+  }
+
+  function vlRecalcGiveMemoTotal_() {
+    var total = vlState.giveItems.reduce(function (sum, item) {
+      return sum + ((Number(item.quantity) || 0) * (Number(item.unitValue) || 0));
+    }, 0);
+    document.getElementById('vlGiveMemoTotal').textContent = formatMoney(total);
+    return total;
+  }
+
+  function vlRenderGiveItems_() {
+    var body = document.getElementById('vlGiveItemsBody');
+    var wrap = document.getElementById('vlGiveItemsWrap');
+    var totalEl = document.getElementById('vlGiveMemoTotal');
+    if (!body || !wrap || !totalEl) return;
+    body.innerHTML = '';
+    vlState.giveItems.forEach(function (item, index) {
+      var lineTotal = (Number(item.quantity) || 0) * (Number(item.unitValue) || 0);
+      var product = vlState.products.filter(function (p) { return p.id === item.productId; })[0];
+      var maxStock = product ? (Number(product.currentStock) || 0) : '';
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + escapeHtml(item.productName) + '</td>' +
+        '<td class="num"><input type="number" min="0" step="1" ' + (maxStock !== '' ? 'max="' + maxStock + '" ' : '') + 'data-vl-give-field="quantity" data-vl-give-index="' + index + '" value="' + escapeHtml(String(item.quantity)) + '" style="width:90px; text-align:right;"></td>' +
+        '<td class="num"><input type="number" min="0" step="0.01" data-vl-give-field="unitValue" data-vl-give-index="' + index + '" value="' + escapeHtml(String(item.unitValue)) + '" style="width:110px; text-align:right;"></td>' +
+        '<td class="num mono" data-vl-give-line-total="' + index + '">' + escapeHtml(formatMoney(lineTotal)) + '</td>' +
+        '<td><button type="button" class="btn btn-sm" data-vl-give-remove="' + index + '">Remove</button></td>';
+      body.appendChild(tr);
+    });
+    vlRecalcGiveMemoTotal_();
+    wrap.hidden = vlState.giveItems.length === 0;
+  }
+
+  document.getElementById('vlGiveProductSearch').addEventListener('input', vlFillProductSelect_);
+  document.getElementById('vlGiveProduct').addEventListener('change', vlPopulateGiveUnitValue_);
+
+  document.getElementById('vlGiveAddBtn').addEventListener('click', function () {
+    var errEl = document.getElementById('vlGiveError');
+    errEl.style.display = 'none';
+    var product = vlSelectedGiveProduct_();
+    if (!product) { errEl.textContent = 'Choose a product.'; errEl.style.display = 'block'; return; }
+    var qty = Number(document.getElementById('vlGiveQty').value);
+    var unitValue = Number(document.getElementById('vlGiveUnitValue').value);
+    if (!Number.isFinite(qty) || qty <= 0) { errEl.textContent = 'Enter a valid quantity.'; errEl.style.display = 'block'; return; }
+    if (qty > (Number(product.currentStock) || 0)) { errEl.textContent = 'Only ' + product.currentStock + ' unit(s) of ' + product.name + ' are available.'; errEl.style.display = 'block'; return; }
+    if (!Number.isFinite(unitValue) || unitValue < 0) { errEl.textContent = 'Enter a valid unit value.'; errEl.style.display = 'block'; return; }
+    if (vlState.giveItems.some(function (item) { return item.productId === product.id; })) {
+      errEl.textContent = product.name + ' is already in this memo. Edit its quantity or unit value directly in the table.';
+      errEl.style.display = 'block';
+      return;
+    }
+    vlState.giveItems.push({
+      productId: product.id,
+      productName: product.name,
+      quantity: qty,
+      unitValue: unitValue
+    });
+    document.getElementById('vlGiveQty').value = '';
+    vlRenderGiveItems_();
+  });
+
+  document.getElementById('vlGiveItemsBody').addEventListener('input', function (e) {
+    var input = e.target.closest('input[data-vl-give-field]');
+    if (!input) return;
+    var index = Number(input.getAttribute('data-vl-give-index'));
+    var field = input.getAttribute('data-vl-give-field');
+    if (!Number.isInteger(index) || index < 0 || index >= vlState.giveItems.length) return;
+    var value = Number(input.value);
+    vlState.giveItems[index][field] = value;
+    var item = vlState.giveItems[index];
+    var totalCell = document.querySelector('[data-vl-give-line-total="' + index + '"]');
+    if (totalCell) totalCell.textContent = formatMoney((Number(item.quantity) || 0) * (Number(item.unitValue) || 0));
+    vlRecalcGiveMemoTotal_();
+  });
+
+  document.getElementById('vlGiveItemsBody').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-vl-give-remove]');
+    if (!btn) return;
+    var index = Number(btn.getAttribute('data-vl-give-remove'));
+    if (!Number.isInteger(index) || index < 0 || index >= vlState.giveItems.length) return;
+    vlState.giveItems.splice(index, 1);
+    vlRenderGiveItems_();
+  });
+
+  document.getElementById('vlGiveDate').addEventListener('change', function () {
+    var val = document.getElementById('vlGiveDate').value;
+    document.getElementById('vlGiveBackdatedReasonRow').style.display = (val && val < vlToday_()) ? '' : 'none';
+  });
+
+  document.getElementById('vlGiveSaveBtn').addEventListener('click', function () {
+    var errEl = document.getElementById('vlGiveError');
+    errEl.style.display = 'none';
+    if (!vlState.giveItems.length) { errEl.textContent = 'Add at least one product to the memo.'; errEl.style.display = 'block'; return; }
+    for (var gi = 0; gi < vlState.giveItems.length; gi++) {
+      var giveItem = vlState.giveItems[gi];
+      var giveProduct = vlState.products.filter(function (p) { return p.id === giveItem.productId; })[0];
+      var giveQty = Number(giveItem.quantity), giveValue = Number(giveItem.unitValue);
+      if (!Number.isFinite(giveQty) || giveQty <= 0) { errEl.textContent = 'Enter a valid quantity for ' + giveItem.productName + '.'; errEl.style.display = 'block'; return; }
+      if (giveProduct && giveQty > (Number(giveProduct.currentStock) || 0)) { errEl.textContent = 'Only ' + giveProduct.currentStock + ' unit(s) of ' + giveItem.productName + ' are available.'; errEl.style.display = 'block'; return; }
+      if (!Number.isFinite(giveValue) || giveValue < 0) { errEl.textContent = 'Enter a valid unit value for ' + giveItem.productName + '.'; errEl.style.display = 'block'; return; }
+    }
+    var giveDate = document.getElementById('vlGiveDate').value || vlToday_();
+    var backdatedReason = document.getElementById('vlGiveBackdatedReason').value.trim();
+    if (giveDate < vlToday_() && !backdatedReason) { errEl.textContent = 'A reason is required when dating this in the past.'; errEl.style.display = 'block'; return; }
+    var payload = {
+      vendorId: vlState.detailId,
+      items: vlState.giveItems.map(function (item) {
+        return { productId: item.productId, quantity: item.quantity, unitValue: item.unitValue };
+      }),
+      notes: document.getElementById('vlGiveNote').value.trim(),
+      date: giveDate,
+      backdatedReason: backdatedReason
+    };
+    var totalUnits = vlState.giveItems.reduce(function (sum, item) { return sum + (Number(item.quantity) || 0); }, 0);
+    var memoValue = vlState.giveItems.reduce(function (sum, item) { return sum + ((Number(item.quantity) || 0) * (Number(item.unitValue) || 0)); }, 0);
+    var productSummary = vlState.giveItems.map(function (item) { return item.productName + ' × ' + item.quantity; }).join(', ');
+    runConfirmedAction({
+      type: 'financial',
+      title: 'Give Products to Vendor?',
+      message: 'This will save ' + vlState.giveItems.length + ' product line(s) together as one vendor memo.',
+      details: [
+        { label: 'Vendor', value: vlCurrentVendorName_(), emphasis: true },
+        { label: 'Products', value: productSummary },
+        { label: 'Total Quantity', value: String(totalUnits), emphasis: true },
+        { label: 'Memo Value', value: formatMoney(memoValue), emphasis: true },
+        { label: 'Date', value: payload.date }
+      ],
+      confirmLabel: 'Save Vendor Memo',
+      loadingLabel: 'Saving...',
+      trigger: document.getElementById('vlGiveSaveBtn')
+    }, function () {
+      return withLoader(serverCall('giveProductsToVendor', authToken, payload)).then(function (data) {
+        showToast('Vendor memo ' + (data.memoId || '') + ' saved', 'success');
+        vlState.giveItems = [];
+        vlRenderGiveItems_();
+        vlLoad();
+        vlOpenDetail_(payload.vendorId);
+      });
+    }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+  });
+
+  document.getElementById('vlRecvDate').addEventListener('change', function () {
+    var val = document.getElementById('vlRecvDate').value;
+    document.getElementById('vlRecvBackdatedReasonRow').style.display = (val && val < vlToday_()) ? '' : 'none';
+  });
+
+  document.getElementById('vlRecvSaveBtn').addEventListener('click', function () {
+    var amount = document.getElementById('vlRecvAmount').value;
+    var method = document.getElementById('vlRecvMethod').value;
+    var bankAccountId = document.getElementById('vlRecvBankAccount').value;
+    var note = document.getElementById('vlRecvNote').value.trim();
+    var errEl = document.getElementById('vlRecvError');
+    errEl.style.display = 'none';
+    var recvDate = document.getElementById('vlRecvDate').value || vlToday_();
+    var backdatedReason = document.getElementById('vlRecvBackdatedReason').value.trim();
+    if (recvDate < vlToday_() && !backdatedReason) { errEl.textContent = 'A reason is required when dating this in the past.'; errEl.style.display = 'block'; return; }
+    var receiveAmount = Number(amount) || 0;
+    var vendorId = vlState.detailId;
+    runConfirmedAction({
+      type: 'financial',
+      title: 'Receive Vendor Payment?',
+      message: 'Review the vendor receipt before money enters the selected account.',
+      details: [
+        { label: 'Vendor', value: vlCurrentVendorName_(), emphasis: true },
+        { label: 'Amount', value: formatMoney(receiveAmount), emphasis: true },
+        { label: 'In words', value: banglaAmountInWords_(receiveAmount) },
+        { label: 'Method', value: method },
+        { label: 'Account', value: bankAccountId ? selectedOptionText_('vlRecvBankAccount') : '' },
+        { label: 'Date', value: recvDate }
+      ],
+      confirmLabel: 'Receive ' + formatMoney(receiveAmount),
+      loadingLabel: 'Receiving...',
+      trigger: document.getElementById('vlRecvSaveBtn')
+    }, function () {
+      return withLoader(serverCall('receiveVendorPayment', authToken, vendorId, amount, method, bankAccountId, note, recvDate, backdatedReason)).then(function () {
+        showToast('Payment received', 'success');
+        vlLoad();
+        vlOpenDetail_(vendorId);
+      });
+    }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+  });
+
+  document.getElementById('vlRecvProdDate').addEventListener('change', function () {
+    var val = document.getElementById('vlRecvProdDate').value;
+    document.getElementById('vlRecvProdBackdatedReasonRow').style.display = (val && val < vlToday_()) ? '' : 'none';
+  });
+
+  document.getElementById('vlRecvProdIssue').addEventListener('change', function () {
+    var val = this.value;
+    var s = vlState.openIssues.filter(function (o) { return o.issueId === val; })[0];
+    if (!s) return;
+    document.getElementById('vlRecvProdQty').value = s.remainingQty;
+    document.getElementById('vlRecvProdQty').max = s.remainingQty;
+    document.getElementById('vlRecvProdUnitValue').value = s.unitValue;
+  });
+
+  function vlFillIssueSelect_() {
+    var sel = document.getElementById('vlRecvProdIssue');
+    sel.innerHTML = '';
+    if (!vlState.openIssues.length) {
+      document.getElementById('vlRecvProdEmpty').hidden = false;
+      document.getElementById('vlRecvProdSaveBtn').disabled = true;
+      sel.innerHTML = '<option value="">No open transactions</option>';
+      document.getElementById('vlRecvProdQty').value = '';
+      document.getElementById('vlRecvProdUnitValue').value = '';
+      return;
+    }
+    document.getElementById('vlRecvProdEmpty').hidden = true;
+    document.getElementById('vlRecvProdSaveBtn').disabled = false;
+    vlState.openIssues.forEach(function (s) {
+      var opt = document.createElement('option');
+      opt.value = s.issueId;
+      opt.textContent = (s.memoId ? s.memoId + ' — ' : '') + s.productName + ' (Remaining ' + s.remainingQty + ')';
+      sel.appendChild(opt);
+    });
+    sel.dispatchEvent(new Event('change'));
+  }
+
+  document.getElementById('vlRecvProdSaveBtn').addEventListener('click', function () {
+    var issueId = document.getElementById('vlRecvProdIssue').value;
+    var errEl = document.getElementById('vlRecvProdError');
+    errEl.style.display = 'none';
+    if (!issueId) { errEl.textContent = 'Choose an issue transaction to settle.'; errEl.style.display = 'block'; return; }
+    var recvDate = document.getElementById('vlRecvProdDate').value || vlToday_();
+    var backdatedReason = document.getElementById('vlRecvProdBackdatedReason').value.trim();
+    if (recvDate < vlToday_() && !backdatedReason) { errEl.textContent = 'A reason is required when dating this in the past.'; errEl.style.display = 'block'; return; }
+    var payload = {
+      vendorId: vlState.detailId, issueId: issueId,
+      quantity: document.getElementById('vlRecvProdQty').value,
+      unitValue: document.getElementById('vlRecvProdUnitValue').value,
+      notes: document.getElementById('vlRecvProdNote').value.trim(),
+      date: recvDate, backdatedReason: backdatedReason
+    };
+    runConfirmedAction({
+      type: 'financial',
+      title: 'Receive Products from Vendor?',
+      message: 'This will return the selected quantity into inventory and update the vendor workflow.',
+      details: [
+        { label: 'Vendor', value: vlCurrentVendorName_(), emphasis: true },
+        { label: 'Product', value: selectedOptionText_('vlRecvProdIssue') },
+        { label: 'Quantity', value: String(payload.quantity), emphasis: true },
+        { label: 'Unit Value', value: formatMoney(Number(payload.unitValue) || 0) },
+        { label: 'Date', value: payload.date }
+      ],
+      confirmLabel: 'Receive Products',
+      loadingLabel: 'Receiving...',
+      trigger: document.getElementById('vlRecvProdSaveBtn')
+    }, function () {
+      return withLoader(serverCall('receiveProductsFromVendor', authToken, payload)).then(function () {
+        showToast('Products received from vendor', 'success');
+        vlLoad();
+        vlOpenDetail_(payload.vendorId);
+      });
+    }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+  });
+
+  function vlOpenDetail_(id) {
+    vlState.detailId = id;
+    return withLoader(serverCall('getVendorDetail', authToken, id)).then(function (data) {
+      document.getElementById('vlWorkspaceEmpty').hidden = true;
+      document.getElementById('vlWorkspaceContent').hidden = false;
+      vlFillWorkspaceVendorSelect_('', id);
+      document.getElementById('vlWorkspaceVendor').value = id;
+      document.getElementById('vlDetailName').textContent = data.vendor.name + ' — ' + (data.vendor.phone || '');
+      document.getElementById('vlDetailAddress').textContent = data.vendor.address || '';
+      var detailDue = Number(data.vendor.currentDue) || 0;
+      document.getElementById('vlDetailDue').textContent = detailDue < 0 ? ('Credit ' + formatMoney(Math.abs(detailDue))) : formatMoney(detailDue);
+      var detailReceivable = Number(data.vendor.currentReceivable) || 0;
+      document.getElementById('vlDetailReceivable').textContent = detailReceivable < 0 ? ('Owed ' + formatMoney(Math.abs(detailReceivable))) : formatMoney(detailReceivable);
+
+      document.getElementById('vlPayAmount').value = '';
+      document.getElementById('vlPayMethod').value = 'Cash';
+      document.getElementById('vlPayBankAccount').style.display = 'none';
+      document.getElementById('vlPayNote').value = '';
+      document.getElementById('vlPayDate').value = vlToday_();
+      document.getElementById('vlPayBackdatedReason').value = '';
+      document.getElementById('vlPayBackdatedReasonRow').style.display = 'none';
+      document.getElementById('vlPayError').style.display = 'none';
+
+      document.getElementById('vlRetNote').value = '';
+      document.getElementById('vlRetDate').value = vlToday_();
+      document.getElementById('vlRetBackdatedReason').value = '';
+      document.getElementById('vlRetBackdatedReasonRow').style.display = 'none';
+      document.getElementById('vlRetError').style.display = 'none';
+
+      vlState.giveItems = [];
+      vlRenderGiveItems_();
+      document.getElementById('vlGiveProductSearch').value = '';
+      document.getElementById('vlGiveQty').value = '';
+      document.getElementById('vlGiveUnitValue').value = '';
+      document.getElementById('vlGiveNote').value = '';
+      document.getElementById('vlGiveDate').value = vlToday_();
+      document.getElementById('vlGiveBackdatedReason').value = '';
+      document.getElementById('vlGiveBackdatedReasonRow').style.display = 'none';
+      document.getElementById('vlGiveError').style.display = 'none';
+      vlFillProductSelect_();
+
+      document.getElementById('vlRecvAmount').value = '';
+      document.getElementById('vlRecvMethod').value = 'Cash';
+      document.getElementById('vlRecvBankAccount').style.display = 'none';
+      document.getElementById('vlRecvNote').value = '';
+      document.getElementById('vlRecvDate').value = vlToday_();
+      document.getElementById('vlRecvBackdatedReason').value = '';
+      document.getElementById('vlRecvBackdatedReasonRow').style.display = 'none';
+      document.getElementById('vlRecvError').style.display = 'none';
+
+      document.getElementById('vlRecvProdNote').value = '';
+      document.getElementById('vlRecvProdDate').value = vlToday_();
+      document.getElementById('vlRecvProdBackdatedReason').value = '';
+      document.getElementById('vlRecvProdBackdatedReasonRow').style.display = 'none';
+      document.getElementById('vlRecvProdError').style.display = 'none';
+
+      vlState.openSourcing = data.openSourcing;
+      vlFillSourcingSelect_();
+      vlState.openIssues = data.openIssues;
+      vlFillIssueSelect_();
+
+      vlState.ledger = data.ledger;
+      var body = document.getElementById('vlLedgerBody');
+      body.innerHTML = '';
+      data.ledger.forEach(function (l) {
+        var type = l['Type'];
+        // Payment/Receipt rows are keyed by their own Ledger ID (no
+        // separate detail sheet); Return/Sourcing/Issue/Return Received
+        // rows are keyed by Reference, which holds the linked detail
+        // record's own ID.
+        var editId = type === 'Issue' ? (l['Memo ID'] || l['Reference']) : ((type === 'Payment' || type === 'Receipt') ? l['Ledger ID'] : l['Reference']);
+        var displayReference = type === 'Issue' ? (l['Memo ID'] || l['Reference']) : l['Reference'];
+        var balanceType = l['Balance Type'] || 'Payable';
+        var balanceTypeBadge = balanceType === 'Receivable'
+          ? '<span class="badge badge-success">Receivable</span>'
+          : '<span class="badge badge-danger">Payable</span>';
+        var nativeHandlers = vendorNativeTxnHandlers_(type);
+        var ledgerActions = !nativeHandlers
+          ? '<span class="badge">Read-only</span>'
+          : '<button class="btn" data-act="menuTxn" data-type="' + type + '" data-id="' + editId + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button>';
+        var tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td>' + escapeHtml(formatDateShort_(l['Date'])) + '</td>' +
+          '<td>' + escapeHtml(type) + '</td>' +
+          '<td>' + balanceTypeBadge + '</td>' +
+          '<td class="mono">' + escapeHtml(displayReference || '') + '</td>' +
+          '<td class="num mono">' + (l['Debit'] ? formatMoney(l['Debit']) : '') + '</td>' +
+          '<td class="num mono">' + (l['Credit'] ? formatMoney(l['Credit']) : '') + '</td>' +
+          '<td class="num mono">' + formatMoney(l['Balance']) + '</td>' +
+          '<td>' + escapeHtml(l['Notes'] || '') + '</td>' +
+          '<td style="white-space:nowrap;">' + ledgerActions + '</td>';
+        body.appendChild(tr);
+      });
+      document.getElementById('vlLedgerEmpty').hidden = data.ledger.length > 0;
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  function formatDateShort_(val) {
+    var d = new Date(val);
+    if (isNaN(d.getTime())) return String(val);
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+
+  function vendorNativeTxnHandlers_(type) {
+    var map = {
+      'Payment': { get: 'getVendorPaymentForEdit', update: 'updateVendorPayment', del: 'deleteVendorPayment' },
+      'Return': { get: 'getVendorReturnForEdit', update: 'updateVendorReturn', del: 'deleteVendorReturn' },
+      'Sourcing': { get: 'getVendorSourcingForEdit', update: 'updateVendorSourcing', del: 'deleteVendorSourcing' },
+      'Issue': { get: 'getVendorIssueForEdit', update: 'updateVendorIssue', del: 'deleteVendorIssue' },
+      'Receipt': { get: 'getVendorReceiptForEdit', update: 'updateVendorReceipt', del: 'deleteVendorReceipt' },
+      'Return Received': { get: 'getVendorReturnReceivedForEdit', update: 'updateVendorReturnReceived', del: 'deleteVendorReturnReceived' }
+    };
+    return map[type] || null;
+  }
+
+  function vlRenderMemoEditItems_() {
+    var body = document.getElementById('vlMemoEditItemsBody');
+    var total = 0;
+    body.innerHTML = '';
+    vlState.editingMemoItems.forEach(function (item, index) {
+      var lineTotal = (Number(item.quantity) || 0) * (Number(item.unitValue) || 0);
+      total += lineTotal;
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + escapeHtml(item.productName) + '</td>' +
+        '<td class="num"><input type="number" min="' + Math.max(1, Number(item.returnedQty) || 0) + '" step="1" data-vl-memo-field="quantity" data-vl-memo-index="' + index + '" value="' + escapeHtml(String(item.quantity)) + '" style="width:90px; text-align:right;"></td>' +
+        '<td class="num mono">' + escapeHtml(String(Number(item.returnedQty) || 0)) + '</td>' +
+        '<td class="num"><input type="number" min="0" step="0.01" data-vl-memo-field="unitValue" data-vl-memo-index="' + index + '" value="' + escapeHtml(String(item.unitValue)) + '" style="width:110px; text-align:right;"></td>' +
+        '<td class="num mono" data-vl-memo-line-total="' + index + '">' + escapeHtml(formatMoney(lineTotal)) + '</td>';
+      body.appendChild(tr);
+    });
+    document.getElementById('vlMemoEditTotal').textContent = formatMoney(total);
+  }
+
+  function vlOpenMemoEdit_(memoId) {
+    withLoader(serverCall('getVendorIssueMemoForEdit', authToken, memoId)).then(function (data) {
+      vlState.editingMemoId = data.memoId;
+      vlState.editingMemoItems = (data.items || []).map(function (item) {
+        return {
+          issueId: item.issueId, productId: item.productId, productName: item.productName,
+          quantity: Number(item.quantity) || 0, unitValue: Number(item.unitValue) || 0,
+          returnedQty: Number(item.returnedQty) || 0
+        };
+      });
+      document.getElementById('vlMemoEditId').textContent = data.memoId || '';
+      document.getElementById('vlMemoEditDate').value = data.date || '';
+      document.getElementById('vlMemoEditNote').value = data.notes || '';
+      document.getElementById('vlMemoEditBackdatedReason').value = '';
+      document.getElementById('vlMemoEditBackdatedReasonRow').style.display = (data.date && data.date < vlToday_()) ? '' : 'none';
+      document.getElementById('vlMemoEditFormError').style.display = 'none';
+      vlRenderMemoEditItems_();
+      openModal('vlMemoEditModal');
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  document.getElementById('vlMemoEditItemsBody').addEventListener('input', function (e) {
+    var input = e.target.closest('input[data-vl-memo-field]');
+    if (!input) return;
+    var index = Number(input.getAttribute('data-vl-memo-index'));
+    var field = input.getAttribute('data-vl-memo-field');
+    if (!Number.isInteger(index) || index < 0 || index >= vlState.editingMemoItems.length) return;
+    vlState.editingMemoItems[index][field] = Number(input.value);
+    var item = vlState.editingMemoItems[index];
+    var line = document.querySelector('[data-vl-memo-line-total="' + index + '"]');
+    if (line) line.textContent = formatMoney((Number(item.quantity) || 0) * (Number(item.unitValue) || 0));
+    document.getElementById('vlMemoEditTotal').textContent = formatMoney(vlState.editingMemoItems.reduce(function (sum, row) {
+      return sum + ((Number(row.quantity) || 0) * (Number(row.unitValue) || 0));
+    }, 0));
+  });
+
+  document.getElementById('vlMemoEditDate').addEventListener('change', function () {
+    var val = this.value;
+    document.getElementById('vlMemoEditBackdatedReasonRow').style.display = (val && val < vlToday_()) ? '' : 'none';
+  });
+
+  document.getElementById('vlMemoEditSaveBtn').addEventListener('click', function () {
+    var errEl = document.getElementById('vlMemoEditFormError');
+    errEl.style.display = 'none';
+    if (!vlState.editingMemoId || !vlState.editingMemoItems.length) return;
+    for (var i = 0; i < vlState.editingMemoItems.length; i++) {
+      var item = vlState.editingMemoItems[i];
+      var qty = Number(item.quantity), unitValue = Number(item.unitValue), returned = Number(item.returnedQty) || 0;
+      if (!Number.isFinite(qty) || qty <= 0) { errEl.textContent = 'Enter a valid quantity for ' + item.productName + '.'; errEl.style.display = 'block'; return; }
+      if (qty < returned) { errEl.textContent = item.productName + ' cannot be reduced below ' + returned + ' because that quantity has already been received back.'; errEl.style.display = 'block'; return; }
+      if (!Number.isFinite(unitValue) || unitValue < 0) { errEl.textContent = 'Enter a valid unit value for ' + item.productName + '.'; errEl.style.display = 'block'; return; }
+    }
+    var date = document.getElementById('vlMemoEditDate').value || vlToday_();
+    var backdatedReason = document.getElementById('vlMemoEditBackdatedReason').value.trim();
+    if (date < vlToday_() && !backdatedReason) { errEl.textContent = 'A reason is required when dating this in the past.'; errEl.style.display = 'block'; return; }
+    var payload = {
+      date: date,
+      notes: document.getElementById('vlMemoEditNote').value.trim(),
+      backdatedReason: backdatedReason,
+      items: vlState.editingMemoItems.map(function (item) {
+        return { issueId: item.issueId, quantity: item.quantity, unitValue: item.unitValue };
+      })
+    };
+    var memoId = vlState.editingMemoId;
+    var memoTotal = vlState.editingMemoItems.reduce(function (sum, item) { return sum + ((Number(item.quantity) || 0) * (Number(item.unitValue) || 0)); }, 0);
+    runConfirmedAction({
+      type: 'financial',
+      title: 'Update Vendor Memo ' + memoId + '?',
+      message: 'All product lines in this memo will be updated together using the existing vendor stock and receivable rules.',
+      details: [
+        { label: 'Vendor', value: vlCurrentVendorName_(), emphasis: true },
+        { label: 'Products', value: String(vlState.editingMemoItems.length) },
+        { label: 'Memo Value', value: formatMoney(memoTotal), emphasis: true },
+        { label: 'Date', value: date }
+      ],
+      confirmLabel: 'Update Memo', loadingLabel: 'Updating...', trigger: document.getElementById('vlMemoEditSaveBtn')
+    }, function () {
+      return withLoader(serverCall('updateVendorIssueMemo', authToken, memoId, payload)).then(function () {
+        closeModal('vlMemoEditModal');
+        showToast('Vendor memo updated', 'success');
+        vlState.editingMemoId = null;
+        vlState.editingMemoItems = [];
+        return vlLoad().then(function () { return vlOpenDetail_(vlState.detailId); });
+      });
+    }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+  });
+
+  document.getElementById('vlLedgerBody').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-act="menuTxn"]');
+    if (!btn) return;
+    var type = btn.dataset.type, id = btn.dataset.id;
+    openRowActionMenu_(btn, [
+      { action: 'edit', label: type === 'Issue' ? 'Edit Memo' : 'Edit' },
+      { divider: true },
+      { action: 'delete', label: type === 'Issue' ? 'Delete Memo' : 'Delete', danger: true }
+    ], function (action) {
+      if (action === 'edit') vlLedOpenEdit_(type, id);
+      if (action === 'delete') vlLedDelete_(type, id);
+    });
+  });
+
+  function vlLedOpenEdit_(type, id) {
+    if (type === 'Issue') { vlOpenMemoEdit_(id); return; }
+    var handlers = vendorNativeTxnHandlers_(type);
+    if (!handlers) { showToast('This ledger row is read-only.', 'info'); return; }
+    withLoader(serverCall(handlers.get, authToken, id)).then(function (data) {
+      var p = data || {};
+      if (type === 'Payment') {
+        vlState.editingPayId = id;
+        document.getElementById('vlPayEditDate').value = p.date || '';
+        document.getElementById('vlPayEditAmount').value = p.amount;
+        document.getElementById('vlPayEditMethod').value = p.method || 'Cash';
+        document.getElementById('vlPayEditBankAccountRow').style.display = paymentMethodNeedsAccount_(p.method) ? '' : 'none';
+        document.getElementById('vlPayEditBankAccountLabel').textContent = (p.method === 'Mobile Banking' ? 'Mobile Banking Account *' : 'Bank Account *');
+        fillBankAccountSelect_(document.getElementById('vlPayEditBankAccount'), vlState.bankAccounts, p.method);
+        document.getElementById('vlPayEditBankAccount').value = p.bankAccountId || '';
+        document.getElementById('vlPayEditNote').value = p.notes || '';
+        document.getElementById('vlPayEditFormError').style.display = 'none';
+        openModal('vlPayEditModal');
+      } else if (type === 'Return') {
+        vlState.editingRetId = id;
+        document.getElementById('vlRetEditDate').value = p.date || '';
+        document.getElementById('vlRetEditQty').value = p.quantity;
+        document.getElementById('vlRetEditUnitCost').value = p.unitCost;
+        document.getElementById('vlRetEditNote').value = p.notes || '';
+        document.getElementById('vlRetEditFormError').style.display = 'none';
+        openModal('vlRetEditModal');
+      } else if (type === 'Sourcing') {
+        vlState.editingSrcId = id;
+        document.getElementById('vlSrcEditDate').value = p.date || '';
+        document.getElementById('vlSrcEditQty').value = p.quantity;
+        document.getElementById('vlSrcEditUnitCost').value = p.unitCost;
+        document.getElementById('vlSrcEditFormError').style.display = 'none';
+        openModal('vlSrcEditModal');
+      } else if (type === 'Issue') {
+        vlState.editingIssueId = id;
+        document.getElementById('vlIssueEditDate').value = p.date || '';
+        document.getElementById('vlIssueEditQty').value = p.quantity;
+        document.getElementById('vlIssueEditUnitValue').value = p.unitValue;
+        document.getElementById('vlIssueEditNote').value = p.notes || '';
+        document.getElementById('vlIssueEditFormError').style.display = 'none';
+        openModal('vlIssueEditModal');
+      } else if (type === 'Receipt') {
+        vlState.editingRecvId = id;
+        document.getElementById('vlRecvEditDate').value = p.date || '';
+        document.getElementById('vlRecvEditAmount').value = p.amount;
+        document.getElementById('vlRecvEditMethod').value = p.method || 'Cash';
+        document.getElementById('vlRecvEditBankAccountRow').style.display = paymentMethodNeedsAccount_(p.method) ? '' : 'none';
+        document.getElementById('vlRecvEditBankAccountLabel').textContent = (p.method === 'Mobile Banking' ? 'Mobile Banking Account *' : 'Bank Account *');
+        fillBankAccountSelect_(document.getElementById('vlRecvEditBankAccount'), vlState.bankAccounts, p.method);
+        document.getElementById('vlRecvEditBankAccount').value = p.bankAccountId || '';
+        document.getElementById('vlRecvEditNote').value = p.notes || '';
+        document.getElementById('vlRecvEditFormError').style.display = 'none';
+        openModal('vlRecvEditModal');
+      } else if (type === 'Return Received') {
+        vlState.editingRecvProdId = id;
+        document.getElementById('vlRecvProdEditDate').value = p.date || '';
+        document.getElementById('vlRecvProdEditQty').value = p.quantity;
+        document.getElementById('vlRecvProdEditUnitValue').value = p.unitValue;
+        document.getElementById('vlRecvProdEditNote').value = p.notes || '';
+        document.getElementById('vlRecvProdEditFormError').style.display = 'none';
+        openModal('vlRecvProdEditModal');
+      }
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  document.getElementById('vlPayEditMethod').addEventListener('change', function () {
+    document.getElementById('vlPayEditBankAccountRow').style.display = paymentMethodNeedsAccount_(this.value) ? '' : 'none';
+    document.getElementById('vlPayEditBankAccountLabel').textContent = (this.value === 'Mobile Banking' ? 'Mobile Banking Account *' : 'Bank Account *');
+    fillBankAccountSelect_(document.getElementById('vlPayEditBankAccount'), vlState.bankAccounts, this.value);
+  });
+
+  function vlSaveNative_(type, id, payload, modalId, errEl) {
+    var handlers = vendorNativeTxnHandlers_(type);
+    if (!handlers) return Promise.reject(new Error('This ledger row is read-only.'));
+    var details = [
+      { label: 'Vendor', value: vlCurrentVendorName_(), emphasis: true },
+      { label: 'Transaction', value: type },
+      { label: 'Date', value: payload.date || '' }
+    ];
+    if (payload.amount !== undefined) {
+      var amount = Number(payload.amount) || 0;
+      details.push({ label: 'Amount', value: formatMoney(amount), emphasis: true });
+      details.push({ label: 'In words', value: banglaAmountInWords_(amount) });
+      details.push({ label: 'Method', value: payload.method || '' });
+    }
+    if (payload.quantity !== undefined) details.push({ label: 'Quantity', value: String(payload.quantity), emphasis: true });
+    return runConfirmedAction({
+      type: 'financial',
+      title: 'Update Vendor ' + type + '?',
+      message: 'This will update the posted vendor transaction using the existing Vendor module rules.',
+      details: details,
+      confirmLabel: 'Update ' + type,
+      loadingLabel: 'Updating...',
+      trigger: document.activeElement
+    }, function () {
+      return withLoader(serverCall(handlers.update, authToken, id, payload)).then(function () {
+        closeModal(modalId);
+        showToast(type + ' updated', 'success');
+        return vlLoad().then(function () { return vlOpenDetail_(vlState.detailId); });
+      });
+    }).catch(function (err) {
+      errEl.textContent = err.message;
+      errEl.style.display = 'block';
+    });
+  }
+
+  document.getElementById('vlPayEditSaveBtn').addEventListener('click', function () {
+    var errEl = document.getElementById('vlPayEditFormError');
+    errEl.style.display = 'none';
+    var payload = {
+      date: document.getElementById('vlPayEditDate').value,
+      amount: document.getElementById('vlPayEditAmount').value,
+      method: document.getElementById('vlPayEditMethod').value,
+      bankAccountId: document.getElementById('vlPayEditBankAccount').value,
+      notes: document.getElementById('vlPayEditNote').value.trim()
+    };
+    vlSaveNative_('Payment', vlState.editingPayId, payload, 'vlPayEditModal', errEl);
+  });
+
+  document.getElementById('vlRetEditSaveBtn').addEventListener('click', function () {
+    var errEl = document.getElementById('vlRetEditFormError');
+    errEl.style.display = 'none';
+    var payload = {
+      date: document.getElementById('vlRetEditDate').value,
+      quantity: document.getElementById('vlRetEditQty').value,
+      unitCost: document.getElementById('vlRetEditUnitCost').value,
+      notes: document.getElementById('vlRetEditNote').value.trim()
+    };
+    vlSaveNative_('Return', vlState.editingRetId, payload, 'vlRetEditModal', errEl);
+  });
+
+  document.getElementById('vlSrcEditSaveBtn').addEventListener('click', function () {
+    var errEl = document.getElementById('vlSrcEditFormError');
+    errEl.style.display = 'none';
+    var payload = {
+      date: document.getElementById('vlSrcEditDate').value,
+      quantity: document.getElementById('vlSrcEditQty').value,
+      unitCost: document.getElementById('vlSrcEditUnitCost').value
+    };
+    vlSaveNative_('Sourcing', vlState.editingSrcId, payload, 'vlSrcEditModal', errEl);
+  });
+
+  document.getElementById('vlIssueEditSaveBtn').addEventListener('click', function () {
+    var errEl = document.getElementById('vlIssueEditFormError');
+    errEl.style.display = 'none';
+    var payload = {
+      date: document.getElementById('vlIssueEditDate').value,
+      quantity: document.getElementById('vlIssueEditQty').value,
+      unitValue: document.getElementById('vlIssueEditUnitValue').value,
+      notes: document.getElementById('vlIssueEditNote').value.trim()
+    };
+    vlSaveNative_('Issue', vlState.editingIssueId, payload, 'vlIssueEditModal', errEl);
+  });
+
+  document.getElementById('vlRecvEditMethod').addEventListener('change', function () {
+    document.getElementById('vlRecvEditBankAccountRow').style.display = paymentMethodNeedsAccount_(this.value) ? '' : 'none';
+    document.getElementById('vlRecvEditBankAccountLabel').textContent = (this.value === 'Mobile Banking' ? 'Mobile Banking Account *' : 'Bank Account *');
+    fillBankAccountSelect_(document.getElementById('vlRecvEditBankAccount'), vlState.bankAccounts, this.value);
+  });
+
+  document.getElementById('vlRecvEditSaveBtn').addEventListener('click', function () {
+    var errEl = document.getElementById('vlRecvEditFormError');
+    errEl.style.display = 'none';
+    var payload = {
+      date: document.getElementById('vlRecvEditDate').value,
+      amount: document.getElementById('vlRecvEditAmount').value,
+      method: document.getElementById('vlRecvEditMethod').value,
+      bankAccountId: document.getElementById('vlRecvEditBankAccount').value,
+      notes: document.getElementById('vlRecvEditNote').value.trim()
+    };
+    vlSaveNative_('Receipt', vlState.editingRecvId, payload, 'vlRecvEditModal', errEl);
+  });
+
+  document.getElementById('vlRecvProdEditSaveBtn').addEventListener('click', function () {
+    var errEl = document.getElementById('vlRecvProdEditFormError');
+    errEl.style.display = 'none';
+    var payload = {
+      date: document.getElementById('vlRecvProdEditDate').value,
+      quantity: document.getElementById('vlRecvProdEditQty').value,
+      unitValue: document.getElementById('vlRecvProdEditUnitValue').value,
+      notes: document.getElementById('vlRecvProdEditNote').value.trim()
+    };
+    vlSaveNative_('Return Received', vlState.editingRecvProdId, payload, 'vlRecvProdEditModal', errEl);
+  });
+
+  function vlLedDelete_(type, id) {
+    if (type === 'Issue') {
+      confirmDelete({
+        title: 'Delete vendor memo ' + id,
+        summary: '<p>This will reverse every product line in this memo, restore the issued stock, and reverse the vendor receivable.</p>',
+        fn: 'deleteVendorIssueMemo', args: [id], reloadPages: ['vendors', 'vendorWorkspace', 'daybook', 'dashboard'],
+        onDone: function () { vlLoad().then(function () { return vlOpenDetail_(vlState.detailId); }); }
+      });
+      return;
+    }
+    var handlers = vendorNativeTxnHandlers_(type);
+    if (!handlers) { showToast('This ledger row is read-only.', 'info'); return; }
+    confirmDelete({
+      title: 'Delete vendor ' + type.toLowerCase(),
+      summary: '<p>This will reverse the transaction using the original Vendor module rules.</p>',
+      fn: handlers.del, args: [id], reloadPages: ['vendors', 'vendorWorkspace', 'daybook', 'dashboard'],
+      onDone: function () { vlLoad().then(function () { return vlOpenDetail_(vlState.detailId); }); }
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var origGoToPage = goToPage;
+    goToPage = function (key) {
+      origGoToPage(key);
+      if ((key === 'vendors' || key === 'vendorWorkspace') && !vlState._loaded) {
+        vlState._loaded = true;
+        vlLoad().then(function () { if (key === 'vendorWorkspace' && !vlState.detailId) vlWorkspaceClear_(); });
+      } else if (key === 'vendorWorkspace') {
+        vlFillWorkspaceVendorSelect_();
+        if (!vlState.detailId) vlWorkspaceClear_();
+      }
+    };
+  });
+</script>

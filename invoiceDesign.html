@@ -1,0 +1,387 @@
+<div class="card">
+  <h3 style="font-size:14px; margin-bottom:12px;">Shop Identity (shown on the invoice) <span class="bn-hint" style="display:inline;">— দোকানের নাম ও ঠিকানা</span></h3>
+  <div class="form-grid">
+    <div class="full"><label>Shop Name (Bangla) *</label><input id="ivShopNameBangla" type="text" placeholder="e.g., শের মোহাম্মাদ স্যানিটারি হাউস"></div>
+    <div><label>Proprietor Name (প্রোপাইটর)</label><input id="ivProprietorName" type="text"></div>
+    <div><label>Proprietor Paragraph</label><textarea id="ivProprietorParagraph" style="min-height:50px; resize:vertical;" placeholder="Optional paragraph shown below proprietor name"></textarea></div>
+    <div><label>Invoice Title</label><input id="ivInvoiceTitle" type="text" placeholder="চালান"></div>
+    <div class="full"><label>Business Description</label><textarea id="ivShopDescription" style="min-height:50px; resize:vertical;"></textarea></div>
+    <div class="full"><label>Shop Address</label><input id="ivAddress" type="text"></div>
+    <div><label>Phone 1</label><input id="ivPhone1" type="text"></div>
+    <div><label>Phone 2</label><input id="ivPhone2" type="text"></div>
+  </div>
+  <div class="field-error" id="ivFormError"></div>
+</div>
+
+<div class="card" style="margin-top:18px;">
+  <h3 style="font-size:14px; margin-bottom:4px;">Logo <span class="bn-hint" style="display:inline;">— দোকানের লোগো</span></h3>
+  <p style="font-size:12px; color:var(--color-text-muted); margin-bottom:12px;">
+    PNG, JPEG, WEBP or GIF, under 1.5MB. Stored in Google Drive; only the file reference is kept in Settings.
+  </p>
+  <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+    <div id="ivLogoPreviewWrap" style="width:90px; height:90px; border:1px dashed var(--color-border); border-radius:var(--radius-sm); display:flex; align-items:center; justify-content:center; overflow:hidden; background:var(--color-bg);">
+      <img id="ivLogoPreview" hidden style="max-width:100%; max-height:100%; object-fit:contain;">
+      <span id="ivLogoPlaceholder" style="font-size:11px; color:var(--color-text-muted);">No logo</span>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      <input id="ivLogoFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+      <div style="display:flex; gap:8px;">
+        <button class="btn" id="ivLogoUploadBtn">Upload / Replace</button>
+        <button class="btn btn-danger" id="ivLogoRemoveBtn">Remove Logo</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:18px;">
+  <h3 style="font-size:14px; margin-bottom:12px;">Bismillah <span class="bn-hint" style="display:inline;">— বিসমিল্লাহ দেখান কিনা</span></h3>
+  <label style="display:flex; align-items:center; gap:8px; font-weight:500; margin-bottom:10px;">
+    <input id="ivShowBismillah" type="checkbox" style="width:16px; height:16px;"> Show Bismillah on invoices
+  </label>
+  <div><label>Bismillah Text</label><textarea id="ivBismillahText" dir="auto" style="min-height:44px; resize:vertical;" placeholder="بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيْمِ"></textarea></div>
+</div>
+
+<div class="card" style="margin-top:18px;">
+  <h3 style="font-size:14px; margin-bottom:4px;">Mobile Financial Services <span class="bn-hint" style="display:inline;">— বিকাশ, নগদ নম্বর</span></h3>
+  <p style="font-size:12px; color:var(--color-text-muted); margin-bottom:10px;">e.g. বিকাশ, নগদ, রকেট — shown as payment options on the invoice.</p>
+  <div id="ivMfsRows"></div>
+  <button class="btn" id="ivMfsAddBtn" style="margin-top:8px;">+ Add Number</button>
+</div>
+
+<div class="card" style="margin-top:18px;">
+  <h3 style="font-size:14px; margin-bottom:4px;">Terms &amp; Conditions <span class="bn-hint" style="display:inline;">— শর্তাবলী</span></h3>
+  <p style="font-size:12px; color:var(--color-text-muted); margin-bottom:10px;">One line per term. Hidden entirely on the invoice if empty.</p>
+  <div id="ivTermsRows"></div>
+  <button class="btn" id="ivTermsAddBtn" style="margin-top:8px;">+ Add Term</button>
+</div>
+
+<div class="card" style="margin-top:18px;">
+  <h3 style="font-size:14px; margin-bottom:12px;">Footer &amp; Payment Terms <span class="bn-hint" style="display:inline;">— নিচের লেখা ও শর্ত</span></h3>
+  <div class="form-grid">
+    <div class="full"><label>Footer Text</label><textarea id="ivFooter" style="min-height:50px; resize:vertical;" placeholder="ধন্যবাদ — আপনার আস্থা আমাদের অগ্রযাত্রার শক্তি"></textarea></div>
+    <div><label>Payment Terms (days)</label><input id="ivPaymentTermsDays" type="number" min="0" step="1" placeholder="e.g. 14"></div>
+    <div><label>Payment Terms Label</label><input id="ivPaymentTermsText" type="text" placeholder="e.g. ১৪ দিনের মধ্যে"></div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:18px;">
+  <h3 style="font-size:14px; margin-bottom:12px;">Paper &amp; Visibility <span class="bn-hint" style="display:inline;">— কাগজের মাপ</span></h3>
+  <div class="form-grid">
+    <div>
+      <label>Thermal Paper Size</label>
+      <select id="ivReceiptSize">
+        <option value="58mm">58mm</option>
+        <option value="80mm">80mm</option>
+      </select>
+    </div>
+    <div style="display:flex; align-items:flex-end;">
+      <label style="display:flex; align-items:center; gap:8px; font-weight:500;">
+        <input id="ivShowSignature" type="checkbox" style="width:16px; height:16px;"> Show signature lines
+      </label>
+    </div>
+  </div>
+</div>
+
+<div style="display:flex; gap:10px; margin-top:16px;">
+  <button class="btn btn-primary" id="ivSaveBtn">Save Invoice Design</button>
+  <button class="btn" id="ivPreviewBtn">Preview Sample Invoice</button>
+</div>
+
+<script>
+  var ivState = { settings: {}, mfs: [], terms: [], logoDataUri: '', _loaded: false };
+
+  function ivLoad() {
+    return withLoader(serverCall('getInvoiceDesignBootstrap', authToken)).then(function (data) {
+      ivState.settings = data.settings || {};
+      ivState.logoDataUri = data.logoDataUri || '';
+      ivState.mfs = ivParseJsonArray_(ivState.settings['Invoice Payment Methods']);
+      ivState.terms = ivParseJsonArray_(ivState.settings['Invoice Terms']);
+      ivPopulateForm_();
+      ivRenderMfsRows_();
+      ivRenderTermsRows_();
+      ivRenderLogoPreview_(ivState.logoDataUri);
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  function ivParseJsonArray_(raw) {
+    try {
+      var parsed = JSON.parse(raw || '[]');
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) { return []; }
+  }
+
+  function ivPopulateForm_() {
+    var s = ivState.settings;
+    document.getElementById('ivShopNameBangla').value = s['Shop Name Bangla'] || '';
+    document.getElementById('ivProprietorName').value = s['Invoice Proprietor Name'] || '';
+    document.getElementById('ivProprietorParagraph').value = s['Invoice Proprietor Paragraph'] || '';
+    document.getElementById('ivInvoiceTitle').value = s['Invoice Title'] || 'চালান';
+    document.getElementById('ivShopDescription').value = s['Shop Description'] || '';
+    document.getElementById('ivAddress').value = s['Address'] || '';
+    document.getElementById('ivPhone1').value = s['Phone 1'] || '';
+    document.getElementById('ivPhone2').value = s['Phone 2'] || '';
+    document.getElementById('ivShowBismillah').checked = ivSettingOn_(s['Invoice Show Bismillah']);
+    document.getElementById('ivBismillahText').value = s['Invoice Bismillah Text'] || '';
+    document.getElementById('ivFooter').value = s['Invoice Footer'] || '';
+    document.getElementById('ivPaymentTermsDays').value = s['Invoice Payment Terms Days'] || 0;
+    document.getElementById('ivPaymentTermsText').value = s['Invoice Payment Terms Text'] || '';
+    document.getElementById('ivReceiptSize').value = s['Receipt Size'] || '80mm';
+    document.getElementById('ivShowSignature').checked = ivSettingOn_(s['Invoice Show Signature']);
+  }
+
+  /**
+   * On-by-default settings boolean — the client-side mirror of
+   * isSettingEnabled_(value, true) in Utils.gs.
+   *
+   * These are saved as the strings 'true'/'false', but Google Sheets
+   * auto-types the cell, so they arrive here as real booleans just as
+   * often. The old `!== 'false'` test read boolean FALSE as ON, which is
+   * why unticking either box never stuck. Unset still means on, so an
+   * installation that never wrote the key is unaffected.
+   */
+  function ivSettingOn_(value) {
+    if (value === true) return true;
+    if (value === false) return false;
+    var s = String(value === null || value === undefined ? '' : value).trim().toLowerCase();
+    if (s === 'true') return true;
+    if (s === 'false') return false;
+    return true;
+  }
+
+  // ---------------- Row builders (MFS numbers, Terms) ----------------
+  function ivRenderMfsRows_() {
+    var host = document.getElementById('ivMfsRows');
+    host.innerHTML = ivState.mfs.map(function (row, idx) {
+      return '<div class="cart-row" style="grid-template-columns:1fr 1fr 28px; margin-bottom:8px;" data-idx="' + idx + '">' +
+        '<input class="ivMfsLabel" type="text" placeholder="লেবেল, e.g. বিকাশ" value="' + escapeHtml(row.label || '') + '">' +
+        '<input class="ivMfsValue" type="text" placeholder="নম্বর, e.g. 01711-234567" value="' + escapeHtml(row.value || '') + '">' +
+        '<button class="cart-remove" data-idx="' + idx + '" title="Remove">&#10005;</button>' +
+      '</div>';
+    }).join('') || '<div class="empty-state" style="padding:10px;">No numbers added.</div>';
+  }
+
+  function ivRenderTermsRows_() {
+    var host = document.getElementById('ivTermsRows');
+    host.innerHTML = ivState.terms.map(function (row, idx) {
+      return '<div class="cart-row" style="grid-template-columns:1fr 28px; margin-bottom:8px;" data-idx="' + idx + '">' +
+        '<input class="ivTermText" type="text" placeholder="শর্ত লিখুন" value="' + escapeHtml(row.text || '') + '">' +
+        '<button class="cart-remove" data-idx="' + idx + '" title="Remove">&#10005;</button>' +
+      '</div>';
+    }).join('') || '<div class="empty-state" style="padding:10px;">No terms added.</div>';
+  }
+
+  /**
+   * Reads the live input values back into ivState before every save/preview
+   * — the row DOM is the source of truth while editing. Must select only
+   * the direct-child row wrapper (> [data-idx]), not any [data-idx] —
+   * the .cart-remove button inside each row also carries a data-idx (its
+   * own row index, for the splice in the click handlers below), so a plain
+   * descendant selector matched the button too and `.querySelector('.ivMfsLabel')`
+   * on a button returned null.
+   */
+  function ivSyncRowsFromDom_() {
+    ivState.mfs = Array.prototype.map.call(document.querySelectorAll('#ivMfsRows > [data-idx]'), function (row) {
+      return {
+        label: row.querySelector('.ivMfsLabel').value.trim(),
+        value: row.querySelector('.ivMfsValue').value.trim()
+      };
+    }).filter(function (r) { return r.label || r.value; });
+
+    ivState.terms = Array.prototype.map.call(document.querySelectorAll('#ivTermsRows > [data-idx]'), function (row) {
+      return { text: row.querySelector('.ivTermText').value.trim() };
+    }).filter(function (r) { return r.text; });
+  }
+
+  document.getElementById('ivMfsAddBtn').addEventListener('click', function () {
+    ivSyncRowsFromDom_();
+    ivState.mfs.push({ label: '', value: '' });
+    ivRenderMfsRows_();
+  });
+  document.getElementById('ivMfsRows').addEventListener('click', function (e) {
+    var btn = e.target.closest('.cart-remove');
+    if (!btn) return;
+    ivSyncRowsFromDom_();
+    ivState.mfs.splice(Number(btn.dataset.idx), 1);
+    ivRenderMfsRows_();
+  });
+
+  document.getElementById('ivTermsAddBtn').addEventListener('click', function () {
+    ivSyncRowsFromDom_();
+    ivState.terms.push({ text: '' });
+    ivRenderTermsRows_();
+  });
+  document.getElementById('ivTermsRows').addEventListener('click', function (e) {
+    var btn = e.target.closest('.cart-remove');
+    if (!btn) return;
+    ivSyncRowsFromDom_();
+    ivState.terms.splice(Number(btn.dataset.idx), 1);
+    ivRenderTermsRows_();
+  });
+
+  // ---------------- Logo upload ----------------
+  function ivRenderLogoPreview_(dataUri) {
+    var img = document.getElementById('ivLogoPreview');
+    var placeholder = document.getElementById('ivLogoPlaceholder');
+    if (dataUri) {
+      img.src = dataUri;
+      img.hidden = false;
+      placeholder.hidden = true;
+    } else {
+      img.hidden = true;
+      img.src = '';
+      placeholder.hidden = false;
+    }
+  }
+
+  var IV_LOGO_ALLOWED_MIME = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+  var IV_LOGO_MAX_BYTES = 1.5 * 1024 * 1024;
+
+  document.getElementById('ivLogoUploadBtn').addEventListener('click', function () {
+    var input = document.getElementById('ivLogoFile');
+    var file = input.files && input.files[0];
+    if (!file) { showToast('Choose an image file first.', 'error'); return; }
+    if (IV_LOGO_ALLOWED_MIME.indexOf(file.type) === -1) {
+      showToast('Logo must be a PNG, JPEG, WEBP or GIF image.', 'error');
+      return;
+    }
+    if (file.size > IV_LOGO_MAX_BYTES) {
+      showToast('Logo is too large — please use an image under 1.5MB.', 'error');
+      return;
+    }
+    var reader = new FileReader();
+    reader.onload = function () {
+      var base64 = String(reader.result).split(',')[1] || '';
+      withLoader(serverCall('uploadInvoiceLogo', authToken, base64, file.type)).then(function (result) {
+        ivState.logoDataUri = result.dataUri;
+        ivRenderLogoPreview_(ivState.logoDataUri);
+        input.value = '';
+        showToast('Logo uploaded.', 'success');
+      }).catch(function (err) { showToast(err.message, 'error'); });
+    };
+    reader.onerror = function () { showToast('Could not read the selected file.', 'error'); };
+    reader.readAsDataURL(file);
+  });
+
+  document.getElementById('ivLogoRemoveBtn').addEventListener('click', function () {
+    if (!ivState.logoDataUri) { showToast('No logo to remove.', 'error'); return; }
+    runConfirmedAction({
+      type: 'danger',
+      title: 'Remove Invoice Logo?',
+      message: 'The current invoice logo will be removed from future invoice rendering.',
+      details: [{ label: 'Setting', value: 'Invoice Logo', emphasis: true }],
+      confirmLabel: 'Remove Logo',
+      loadingLabel: 'Removing...',
+      trigger: document.getElementById('ivLogoRemoveBtn')
+    }, function () {
+      return withLoader(serverCall('removeInvoiceLogo', authToken)).then(function () {
+        ivState.logoDataUri = '';
+        ivRenderLogoPreview_('');
+        showToast('Logo removed.', 'success');
+      });
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  });
+
+  // ---------------- Save ----------------
+  function ivCollectPayload_() {
+    ivSyncRowsFromDom_();
+    return {
+      'Shop Name Bangla': document.getElementById('ivShopNameBangla').value.trim(),
+      'Invoice Proprietor Name': document.getElementById('ivProprietorName').value.trim(),
+      'Invoice Proprietor Paragraph': document.getElementById('ivProprietorParagraph').value.trim(),
+      'Invoice Title': document.getElementById('ivInvoiceTitle').value.trim(),
+      'Shop Description': document.getElementById('ivShopDescription').value.trim(),
+      'Address': document.getElementById('ivAddress').value.trim(),
+      'Phone 1': document.getElementById('ivPhone1').value.trim(),
+      'Phone 2': document.getElementById('ivPhone2').value.trim(),
+      'Invoice Show Bismillah': document.getElementById('ivShowBismillah').checked ? 'true' : 'false',
+      'Invoice Bismillah Text': document.getElementById('ivBismillahText').value.trim(),
+      'Invoice Payment Methods': JSON.stringify(ivState.mfs),
+      'Invoice Terms': JSON.stringify(ivState.terms),
+      'Invoice Footer': document.getElementById('ivFooter').value.trim(),
+      'Invoice Payment Terms Days': document.getElementById('ivPaymentTermsDays').value,
+      'Invoice Payment Terms Text': document.getElementById('ivPaymentTermsText').value.trim(),
+      'Receipt Size': document.getElementById('ivReceiptSize').value,
+      'Invoice Show Signature': document.getElementById('ivShowSignature').checked ? 'true' : 'false'
+    };
+  }
+
+  function ivSave_() {
+    var errEl = document.getElementById('ivFormError');
+    errEl.style.display = 'none';
+    errEl.textContent = '';
+
+    var shopNameBangla = document.getElementById('ivShopNameBangla').value.trim();
+    if (!shopNameBangla) {
+      errEl.textContent = 'Shop Name (Bangla) is required — it is the only shop name shown on invoices.';
+      errEl.style.display = 'block';
+      return;
+    }
+
+    withLoader(serverCall('updateSettings', authToken, ivCollectPayload_())).then(function () {
+      showToast('Invoice design saved.', 'success');
+      ivLoad();
+    }).catch(function (err) {
+      errEl.textContent = err.message;
+      errEl.style.display = 'block';
+    });
+  }
+  document.getElementById('ivSaveBtn').addEventListener('click', ivSave_);
+
+  // ---------------- Preview ----------------
+  /** Builds a sample invoice from dummy sale data + the form's current (possibly unsaved) values, so admins can see a change before saving. */
+  function ivPreview_() {
+    ivSyncRowsFromDom_();
+    var sampleItems = [
+      { productId: 'PRD-000001', name: 'সিমেন্ট (৫০ কেজি)', qty: 5, unit: 'bag', unitPrice: 560, lineTotal: 2800 },
+      { productId: 'PRD-000002', name: 'রড ৬০ গ্রেড (১২মিমি)', qty: 12, unit: 'pcs', unitPrice: 95, lineTotal: 1140 },
+      { productId: 'PRD-000003', name: 'পিভিসি পাইপ ১ ইঞ্চি', qty: 20, unit: 'pcs', unitPrice: 45, lineTotal: 900 }
+    ];
+    var subtotal = sampleItems.reduce(function (s, i) { return s + i.lineTotal; }, 0);
+    var discount = 100;
+    var grandTotal = subtotal - discount;
+    var paid = grandTotal;
+
+    var sampleInv = {
+      invoiceId: 'INV-000123', date: new Date().toISOString().slice(0, 10), time: '', dueDate: '',
+      customerName: 'রহিম উদ্দিন', customerPhone: '01711-000000', customerAddress: 'মিরপুর, ঢাকা', customerId: '',
+      items: sampleItems,
+      subtotal: subtotal, discount: discount, grandTotal: grandTotal,
+      paidAmount: paid, dueAmount: grandTotal - paid,
+      paymentType: 'Full', paymentStatus: 'Paid', paymentMethod: 'Cash', bankAccountName: '',
+      shop: {
+        name: ivState.settings['Shop Name'] || '',
+        nameBangla: document.getElementById('ivShopNameBangla').value.trim(),
+        proprietorName: document.getElementById('ivProprietorName').value.trim(),
+        proprietorParagraph: document.getElementById('ivProprietorParagraph').value.trim(),
+        invoiceTitle: document.getElementById('ivInvoiceTitle').value.trim() || 'চালান',
+        description: document.getElementById('ivShopDescription').value.trim(),
+        address: document.getElementById('ivAddress').value.trim(),
+        phone1: document.getElementById('ivPhone1').value.trim(),
+        phone2: document.getElementById('ivPhone2').value.trim(),
+        logoDataUri: ivState.logoDataUri,
+        showBismillah: document.getElementById('ivShowBismillah').checked,
+        bismillahText: document.getElementById('ivBismillahText').value.trim(),
+        showSignature: document.getElementById('ivShowSignature').checked,
+        paymentMethods: JSON.stringify(ivState.mfs),
+        terms: JSON.stringify(ivState.terms),
+        paymentTermsText: document.getElementById('ivPaymentTermsText').value.trim(),
+        currencySymbol: ivState.settings['Currency Symbol'] || '৳',
+        footer: document.getElementById('ivFooter').value.trim(),
+        receiptSize: document.getElementById('ivReceiptSize').value
+      }
+    };
+
+    document.getElementById('invoicePaper').innerHTML = renderInvoiceHtml_(sampleInv);
+    openModal('invoiceModal');
+  }
+  document.getElementById('ivPreviewBtn').addEventListener('click', ivPreview_);
+
+  // Load once the Invoice Design page is first shown — same lazy pattern as every other settings-group page.
+  document.addEventListener('DOMContentLoaded', function () {
+    var origGoToPage = goToPage;
+    goToPage = function (key) {
+      origGoToPage(key);
+      if (key === 'invoiceDesign' && !ivState._loaded) { ivState._loaded = true; ivLoad(); }
+    };
+  });
+</script>

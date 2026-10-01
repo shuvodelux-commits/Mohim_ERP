@@ -1,0 +1,588 @@
+<!--
+  reports.html
+  Replaces the "Coming in Phase 5" placeholder. Five reports behind the
+  same .tabs / .tab-btn / .tab-panel pattern purchase.html already uses,
+  all scoped to #page-reports so nothing leaks into other modules.
+
+  Only new CSS is the print block at the bottom, scoped to body.printing —
+  no shared selector is touched.
+-->
+
+<div class="toolbar">
+  <label style="font-size:12px; color:var(--color-text-muted);">From</label>
+  <input id="rptFrom" type="date" style="width:auto;">
+  <label style="font-size:12px; color:var(--color-text-muted);">To</label>
+  <input id="rptTo" type="date" style="width:auto;">
+  <button class="btn btn-primary" id="rptRunBtn">Run</button>
+  <div class="toolbar-spacer"></div>
+  <button class="btn" id="rptTodayBtn">Today</button>
+  <button class="btn" id="rptMonthBtn">This Month</button>
+  <button class="btn" id="rptPrintBtn">Print</button>
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" data-tab="rptSales"><span class="tab-label">Sales</span><span class="bn-hint">বিক্রির রিপোর্ট</span></button>
+  <button class="tab-btn" data-tab="rptPurchase"><span class="tab-label">Purchase</span><span class="bn-hint">কেনার রিপোর্ট</span></button>
+  <button class="tab-btn" data-tab="rptStock"><span class="tab-label">Stock &amp; Valuation</span><span class="bn-hint">মালের হিসাব</span></button>
+  <button class="tab-btn" data-tab="rptCashBank"><span class="tab-label">Cash &amp; Bank</span><span class="bn-hint">ক্যাশ ও ব্যাংক</span></button>
+  <button class="tab-btn" data-tab="rptProfit"><span class="tab-label">Profit</span><span class="bn-hint">লাভের হিসাব</span></button>
+  <button class="tab-btn" data-tab="rptBalanceSheet"><span class="tab-label">Balance Sheet</span><span class="bn-hint">সম্পদ ও দেনার হিসাব</span></button>
+</div>
+
+<div id="rptPrintHeader" hidden>
+  <h2 id="rptPrintShop" style="margin:0;"></h2>
+  <div id="rptPrintMeta" style="font-size:12px; color:var(--color-text-muted); margin-bottom:14px;"></div>
+</div>
+
+<!-- ---------------------------------------------------------- Sales -->
+<div class="tab-panel" id="rptSales">
+  <div class="stat-grid">
+    <div class="stat-card"><div class="stat-label">Invoices</div><div class="stat-value" id="rsInvoices">--</div></div>
+    <div class="stat-card"><div class="stat-label">Gross Sales</div><div class="stat-value" id="rsGross">--</div></div>
+    <div class="stat-card"><div class="stat-label">Returns</div><div class="stat-value" id="rsReturned">--</div></div>
+    <div class="stat-card"><div class="stat-label">Net Sales</div><div class="stat-value" id="rsNet">--</div></div>
+    <div class="stat-card"><div class="stat-label">Collected</div><div class="stat-value" id="rsPaid">--</div></div>
+    <div class="stat-card"><div class="stat-label">Outstanding Due</div><div class="stat-value" id="rsDue">--</div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:20px;">
+    <h3 style="font-size:14px; margin-bottom:10px;">Day by Day <span class="bn-hint" style="display:inline;">— দিনের হিসাব</span></h3>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Date</th><th class="num">Invoices</th><th class="num">Gross</th><th class="num">Returns</th><th class="num">Net</th></tr></thead>
+        <tbody id="rsDayBody"></tbody>
+      </table>
+    </div>
+    <div class="empty-state" id="rsDayEmpty" hidden>No sales in this date range.</div>
+  </div>
+
+  <div class="card" style="margin-bottom:20px;">
+    <h3 style="font-size:14px; margin-bottom:10px;">By Payment Type <span class="bn-hint" style="display:inline;">— কীভাবে টাকা পাওয়া গেছে</span></h3>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Payment Type</th><th class="num">Invoices</th><th class="num">Gross</th><th class="num">Net</th></tr></thead>
+        <tbody id="rsPayBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 style="font-size:14px; margin-bottom:10px;">Top Customers <span class="bn-hint" style="display:inline;">— বেশি কেনা কাস্টমার</span></h3>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Customer</th><th class="num">Invoices</th><th class="num">Net</th></tr></thead>
+        <tbody id="rsCustBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ------------------------------------------------------- Purchase -->
+<div class="tab-panel" id="rptPurchase" hidden>
+  <div class="stat-grid">
+    <div class="stat-card"><div class="stat-label">Purchases</div><div class="stat-value" id="rpCount">--</div></div>
+    <div class="stat-card"><div class="stat-label">Gross Purchases</div><div class="stat-value" id="rpGross">--</div></div>
+    <div class="stat-card"><div class="stat-label">Returns</div><div class="stat-value" id="rpReturned">--</div></div>
+    <div class="stat-card"><div class="stat-label">Net Purchases</div><div class="stat-value" id="rpNet">--</div></div>
+    <div class="stat-card"><div class="stat-label">Paid</div><div class="stat-value" id="rpPaid">--</div></div>
+    <div class="stat-card"><div class="stat-label">Outstanding Due</div><div class="stat-value" id="rpDue">--</div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:20px;">
+    <h3 style="font-size:14px; margin-bottom:10px;">Day by Day <span class="bn-hint" style="display:inline;">— দিনের হিসাব</span></h3>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Date</th><th class="num">Purchases</th><th class="num">Gross</th><th class="num">Returns</th><th class="num">Net</th></tr></thead>
+        <tbody id="rpDayBody"></tbody>
+      </table>
+    </div>
+    <div class="empty-state" id="rpDayEmpty" hidden>No purchases in this date range.</div>
+  </div>
+
+  <div class="card">
+    <h3 style="font-size:14px; margin-bottom:10px;">Top Suppliers <span class="bn-hint" style="display:inline;">— বেশি কেনা হয় যাদের থেকে</span></h3>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Supplier</th><th class="num">Purchases</th><th class="num">Net</th><th class="num">Due</th></tr></thead>
+        <tbody id="rpSupBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ---------------------------------------------------------- Stock -->
+<div class="tab-panel" id="rptStock" hidden>
+  <p style="font-size:12px; color:var(--color-text-muted); margin:0 0 12px;">
+    A snapshot of right now &mdash; stock levels have no history to filter on, so the date range above doesn't apply to this tab.
+  </p>
+
+  <div class="stat-grid">
+    <div class="stat-card"><div class="stat-label">Active Products</div><div class="stat-value" id="rkActive">--</div></div>
+    <div class="stat-card"><div class="stat-label">Inventory Value (cost)</div><div class="stat-value" id="rkValue">--</div></div>
+    <div class="stat-card"><div class="stat-label">Retail Value</div><div class="stat-value" id="rkRetail">--</div></div>
+    <div class="stat-card"><div class="stat-label">Potential Margin</div><div class="stat-value" id="rkMargin">--</div></div>
+    <div class="stat-card"><div class="stat-label">Low Stock</div><div class="stat-value" id="rkLow">--</div></div>
+    <div class="stat-card"><div class="stat-label">Out of Stock</div><div class="stat-value" id="rkOut">--</div></div>
+  </div>
+
+  <div class="card" id="rkMismatchCard" style="margin-bottom:20px; border-left:3px solid var(--color-danger);" hidden>
+    <h3 style="font-size:14px; margin-bottom:6px;">Stock / lot ledger mismatch <span class="bn-hint" style="display:inline;">— মালের হিসাব মিলছে না</span></h3>
+    <p style="font-size:12px; margin:0 0 10px; color:var(--color-text-muted);">
+      <span id="rkMismatchCount"></span> product(s) where Current Stock and the sum of remaining lot quantities disagree.
+      Current Stock is the fast-read cache; the lot ledger is the ledger. They should always match &mdash; a gap usually
+      means stock was written by a path that skipped the lot ledger.
+    </p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Product</th><th class="num">Current Stock</th><th class="num">Lot Total</th><th class="num">Difference</th></tr></thead>
+        <tbody id="rkMismatchBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:20px;">
+    <h3 style="font-size:14px; margin-bottom:10px;">By Category <span class="bn-hint" style="display:inline;">— ধরন অনুযায়ী মাল</span></h3>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Category</th><th class="num">Products</th><th class="num">Units</th><th class="num">Value</th></tr></thead>
+        <tbody id="rkCatBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 style="font-size:14px; margin-bottom:10px;">Products by Value <span class="bn-hint" style="display:inline;">— দামি মালের তালিকা</span></h3>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Product</th><th>Category</th><th class="num">Stock</th><th class="num">Min</th><th class="num">Cost</th><th class="num">Value</th><th>Status</th></tr></thead>
+        <tbody id="rkProdBody"></tbody>
+      </table>
+    </div>
+    <div class="empty-state" id="rkProdEmpty" hidden>No products yet.</div>
+  </div>
+</div>
+
+<!-- ----------------------------------------------------- Cash & Bank -->
+<div class="tab-panel" id="rptCashBank" hidden>
+  <div class="stat-grid">
+    <div class="stat-card"><div class="stat-label">Cash Opening</div><div class="stat-value" id="rcOpening">--</div></div>
+    <div class="stat-card"><div class="stat-label">Cash In</div><div class="stat-value" id="rcIn">--</div></div>
+    <div class="stat-card"><div class="stat-label">Cash Out</div><div class="stat-value" id="rcOut">--</div></div>
+    <div class="stat-card"><div class="stat-label">Cash Closing</div><div class="stat-value" id="rcClosing">--</div></div>
+    <div class="stat-card"><div class="stat-label">Combined Opening</div><div class="stat-value" id="rcCombOpen">--</div></div>
+    <div class="stat-card"><div class="stat-label">Combined Closing</div><div class="stat-value" id="rcCombClose">--</div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:20px;">
+    <h3 style="font-size:14px; margin-bottom:10px;">Cash Movement by Type <span class="bn-hint" style="display:inline;">— ক্যাশের ধরন অনুযায়ী হিসাব</span></h3>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Type</th><th class="num">Entries</th><th class="num">In</th><th class="num">Out</th><th class="num">Net</th></tr></thead>
+        <tbody id="rcTypeBody"></tbody>
+      </table>
+    </div>
+    <div class="empty-state" id="rcTypeEmpty" hidden>No cash movement in this date range.</div>
+  </div>
+
+  <div class="card">
+    <h3 style="font-size:14px; margin-bottom:10px;">Bank Accounts <span class="bn-hint" style="display:inline;">— ব্যাংক হিসাবের তালিকা</span></h3>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Account</th><th>Bank</th><th class="num">Opening</th><th class="num">In</th><th class="num">Out</th><th class="num">Closing</th></tr></thead>
+        <tbody id="rcBankBody"></tbody>
+      </table>
+    </div>
+    <div class="empty-state" id="rcBankEmpty" hidden>No active bank accounts.</div>
+  </div>
+</div>
+
+<!-- --------------------------------------------------------- Profit -->
+<div class="tab-panel" id="rptProfit" hidden>
+  <div class="card" id="rfCoverageCard" style="margin-bottom:20px; border-left:3px solid var(--color-warning, #b7791f);" hidden>
+    <h3 style="font-size:14px; margin-bottom:6px;">Profit is overstated for this range <span class="bn-hint" style="display:inline;">— লাভ পুরোপুরি সঠিক নয়</span></h3>
+    <p style="font-size:12px; margin:0 0 8px; color:var(--color-text-muted);">
+      <strong id="rfMissingCount"></strong> of <strong id="rfTotalCount"></strong> invoices in this range have no lot data,
+      so they contribute revenue but zero cost. These are almost always sales made before the FIFO lot system existed.
+      Everything below is optimistic by roughly the cost of those invoices.
+    </p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Invoice</th><th>Date</th><th class="num">Grand Total</th></tr></thead>
+        <tbody id="rfMissingBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card"><div class="stat-label">Net Revenue</div><div class="stat-value" id="rfRevenue">--</div></div>
+    <div class="stat-card"><div class="stat-label">Cost of Goods Sold</div><div class="stat-value" id="rfCogs">--</div></div>
+    <div class="stat-card"><div class="stat-label">Gross Profit</div><div class="stat-value" id="rfGross">--</div></div>
+    <div class="stat-card"><div class="stat-label">Gross Margin</div><div class="stat-value" id="rfGrossPct">--</div></div>
+    <div class="stat-card"><div class="stat-label">Expenses</div><div class="stat-value" id="rfExpenses">--</div></div>
+    <div class="stat-card"><div class="stat-label">Customer Discount Given</div><div class="stat-value" id="rfCustSettleDiscount">--</div></div>
+    <div class="stat-card"><div class="stat-label">Supplier Discount Received</div><div class="stat-value" id="rfSupSettleDiscount">--</div></div>
+    <div class="stat-card"><div class="stat-label">Net Profit</div><div class="stat-value" id="rfNet">--</div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:20px;">
+    <h3 style="font-size:14px; margin-bottom:10px;">Most Profitable Products <span class="bn-hint" style="display:inline;">— বেশি লাভের মাল</span></h3>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Product</th><th class="num">Sold</th><th class="num">Returned</th><th class="num">Revenue</th><th class="num">Cost</th><th class="num">Profit</th></tr></thead>
+        <tbody id="rfTopBody"></tbody>
+      </table>
+    </div>
+    <div class="empty-state" id="rfTopEmpty" hidden>No sales in this date range.</div>
+  </div>
+
+  <div class="card" id="rfLossCard" style="margin-bottom:20px;" hidden>
+    <h3 style="font-size:14px; margin-bottom:10px;">Sold at a Loss <span class="bn-hint" style="display:inline;">— লোকসানে বিক্রি হয়েছে</span></h3>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Product</th><th class="num">Sold</th><th class="num">Revenue</th><th class="num">Cost</th><th class="num">Loss</th></tr></thead>
+        <tbody id="rfLossBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 style="font-size:14px; margin-bottom:10px;">Expenses by Category <span class="bn-hint" style="display:inline;">— ধরন অনুযায়ী খরচ</span></h3>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Category</th><th class="num">Entries</th><th class="num">Amount</th></tr></thead>
+        <tbody id="rfExpBody"></tbody>
+      </table>
+    </div>
+    <div class="empty-state" id="rfExpEmpty" hidden>No expenses in this date range.</div>
+  </div>
+</div>
+
+<!-- ---------------------------------------------------- Balance Sheet -->
+<div class="tab-panel" id="rptBalanceSheet" hidden>
+  <p style="font-size:12px; color:var(--color-text-muted); margin:0 0 12px;">
+    A snapshot as of <strong id="rbAsOf">--</strong> &mdash; these are live balances, not period activity, so the date range
+    above doesn't apply here. Scoped to what Business Finance tracks: it will not necessarily balance like a full
+    accounting balance sheet, since customer/supplier dues and retained profit aren't included.
+  </p>
+
+  <div class="card" style="margin-bottom:20px;">
+    <h3 style="font-size:14px; margin-bottom:10px;">Assets <span class="bn-hint" style="display:inline;">— সম্পদ</span></h3>
+    <div class="totals-row"><span>Cash</span><span class="v" id="rbCash">--</span></div>
+    <div class="totals-row"><span>Bank</span><span class="v" id="rbBank">--</span></div>
+    <div class="totals-row"><span>Mobile Banking</span><span class="v" id="rbMobileBanking">--</span></div>
+    <div class="totals-row"><span>Inventory</span><span class="v" id="rbInventory">--</span></div>
+    <div class="totals-row grand"><span>Total Assets</span><span class="v" id="rbTotalAssets">--</span></div>
+  </div>
+
+  <div class="card" style="margin-bottom:20px;">
+    <h3 style="font-size:14px; margin-bottom:10px;">Liabilities <span class="bn-hint" style="display:inline;">— দেনা</span></h3>
+    <div class="totals-row"><span>Outstanding Loan</span><span class="v" id="rbLoan">--</span></div>
+    <div class="totals-row grand"><span>Total Liabilities</span><span class="v" id="rbTotalLiabilities">--</span></div>
+  </div>
+
+  <div class="card">
+    <h3 style="font-size:14px; margin-bottom:10px;">Owner Equity <span class="bn-hint" style="display:inline;">— মালিকের মূলধন</span></h3>
+    <div class="totals-row"><span>Owner Capital</span><span class="v" id="rbCapital">--</span></div>
+    <div class="totals-row grand"><span>Total Owner Equity</span><span class="v" id="rbTotalEquity">--</span></div>
+  </div>
+</div>
+
+<style>
+  /* Print: hide the app shell and everything except the active report.
+     Scoped to body.printing, which is added only for the duration of the
+     print call, so no shared selector is affected. */
+  body.printing .sidebar,
+  body.printing .topbar,
+  body.printing #toast,
+  body.printing #loader,
+  body.printing #page-reports .toolbar,
+  body.printing #page-reports .tabs { display: none !important; }
+  body.printing .page:not(#page-reports) { display: none !important; }
+  body.printing #page-reports .tab-panel[hidden] { display: none !important; }
+  body.printing .content { padding: 0 !important; }
+  body.printing .card { break-inside: avoid; box-shadow: none; border: 1px solid #ddd; }
+  body.printing .table-scroll { overflow: visible !important; max-height: none !important; }
+  @media print {
+    @page { margin: 12mm; }
+  }
+</style>
+
+<script>
+  var rptState = { currency: '', shopName: '', loaded: {}, activeTab: 'rptSales' };
+
+  function rptMoney_(v) {
+    var n = Number(v) || 0;
+    return rptState.currency + n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  }
+  function rptPct_(v) { return (Number(v) || 0).toFixed(1) + '%'; }
+  function rptSet_(id, text) { document.getElementById(id).textContent = text; }
+  function rptFilters_() {
+    return { from: document.getElementById('rptFrom').value, to: document.getElementById('rptTo').value };
+  }
+  function rptFill_(bodyId, rows, rowHtml, emptyId) {
+    var body = document.getElementById(bodyId);
+    body.innerHTML = '';
+    (rows || []).forEach(function (r) {
+      var tr = document.createElement('tr');
+      tr.innerHTML = rowHtml(r);
+      body.appendChild(tr);
+    });
+    if (emptyId) document.getElementById(emptyId).hidden = (rows || []).length > 0;
+  }
+
+  // ------------------------------------------------------------ loaders
+  function rptLoadSales() {
+    return withLoader(serverCall('getSalesReport', authToken, rptFilters_())).then(function (d) {
+      rptSet_('rsInvoices', d.totals.invoices);
+      rptSet_('rsGross', rptMoney_(d.totals.grossSales));
+      rptSet_('rsReturned', rptMoney_(d.totals.returned));
+      rptSet_('rsNet', rptMoney_(d.totals.netSales));
+      rptSet_('rsPaid', rptMoney_(d.totals.paid));
+      rptSet_('rsDue', rptMoney_(d.totals.due));
+      rptFill_('rsDayBody', d.byDay, function (r) {
+        return '<td>' + escapeHtml(r.label) + '</td><td class="num mono">' + r.invoices + '</td>' +
+               '<td class="num mono">' + rptMoney_(r.gross) + '</td><td class="num mono">' + rptMoney_(r.returned) + '</td>' +
+               '<td class="num mono">' + rptMoney_(r.net) + '</td>';
+      }, 'rsDayEmpty');
+      rptFill_('rsPayBody', d.byPaymentType, function (r) {
+        return '<td>' + escapeHtml(r.label) + '</td><td class="num mono">' + r.invoices + '</td>' +
+               '<td class="num mono">' + rptMoney_(r.gross) + '</td><td class="num mono">' + rptMoney_(r.net) + '</td>';
+      });
+      rptFill_('rsCustBody', d.topCustomers, function (r) {
+        return '<td>' + escapeHtml(r.label) + '</td><td class="num mono">' + r.invoices + '</td>' +
+               '<td class="num mono">' + rptMoney_(r.net) + '</td>';
+      });
+    });
+  }
+
+  function rptLoadPurchase() {
+    return withLoader(serverCall('getPurchaseReport', authToken, rptFilters_())).then(function (d) {
+      rptSet_('rpCount', d.totals.purchases);
+      rptSet_('rpGross', rptMoney_(d.totals.grossPurchases));
+      rptSet_('rpReturned', rptMoney_(d.totals.returned));
+      rptSet_('rpNet', rptMoney_(d.totals.netPurchases));
+      rptSet_('rpPaid', rptMoney_(d.totals.paid));
+      rptSet_('rpDue', rptMoney_(d.totals.due));
+      rptFill_('rpDayBody', d.byDay, function (r) {
+        return '<td>' + escapeHtml(r.label) + '</td><td class="num mono">' + r.purchases + '</td>' +
+               '<td class="num mono">' + rptMoney_(r.gross) + '</td><td class="num mono">' + rptMoney_(r.returned) + '</td>' +
+               '<td class="num mono">' + rptMoney_(r.net) + '</td>';
+      }, 'rpDayEmpty');
+      rptFill_('rpSupBody', d.topSuppliers, function (r) {
+        return '<td>' + escapeHtml(r.label) + '</td><td class="num mono">' + r.purchases + '</td>' +
+               '<td class="num mono">' + rptMoney_(r.net) + '</td><td class="num mono">' + rptMoney_(r.due) + '</td>';
+      });
+    });
+  }
+
+  function rptLoadStock() {
+    return withLoader(serverCall('getStockReport', authToken)).then(function (d) {
+      rptSet_('rkActive', d.totals.activeProducts);
+      rptSet_('rkValue', rptMoney_(d.totals.inventoryValue));
+      rptSet_('rkRetail', rptMoney_(d.totals.retailValue));
+      rptSet_('rkMargin', rptMoney_(d.totals.potentialMargin));
+      rptSet_('rkLow', d.totals.lowStockCount);
+      rptSet_('rkOut', d.totals.outOfStockCount);
+
+      var mismatches = d.products.filter(function (p) { return p.lotMismatch; });
+      document.getElementById('rkMismatchCard').hidden = mismatches.length === 0;
+      rptSet_('rkMismatchCount', d.totals.mismatchCount);
+      rptFill_('rkMismatchBody', mismatches, function (p) {
+        return '<td>' + escapeHtml(p.name) + '</td><td class="num mono">' + p.stock + '</td>' +
+               '<td class="num mono">' + p.lotQuantity + '</td>' +
+               '<td class="num mono">' + (p.stock - p.lotQuantity) + '</td>';
+      });
+
+      rptFill_('rkCatBody', d.byCategory, function (r) {
+        return '<td>' + escapeHtml(r.label) + '</td><td class="num mono">' + r.products + '</td>' +
+               '<td class="num mono">' + r.stock + '</td><td class="num mono">' + rptMoney_(r.value) + '</td>';
+      });
+      rptFill_('rkProdBody', d.products, function (p) {
+        var badge = p.status === 'Inactive'
+          ? '<span class="badge badge-danger">Inactive</span>'
+          : (p.stock <= 0 ? '<span class="badge badge-danger">Out</span>'
+            : (p.stock <= p.minStock ? '<span class="badge badge-warning">Low</span>'
+              : '<span class="badge badge-success">OK</span>'));
+        return '<td>' + escapeHtml(p.name) + '</td><td>' + escapeHtml(p.category) + '</td>' +
+               '<td class="num mono">' + p.stock + '</td><td class="num mono">' + p.minStock + '</td>' +
+               '<td class="num mono">' + rptMoney_(p.purchasePrice) + '</td>' +
+               '<td class="num mono">' + rptMoney_(p.lotValue) + '</td><td>' + badge + '</td>';
+      }, 'rkProdEmpty');
+    });
+  }
+
+  function rptLoadCashBank() {
+    return withLoader(serverCall('getCashBankReport', authToken, rptFilters_())).then(function (d) {
+      rptSet_('rcOpening', rptMoney_(d.cash.opening));
+      rptSet_('rcIn', rptMoney_(d.cash.inflow));
+      rptSet_('rcOut', rptMoney_(d.cash.outflow));
+      rptSet_('rcClosing', rptMoney_(d.cash.closing));
+      rptSet_('rcCombOpen', rptMoney_(d.combined.opening));
+      rptSet_('rcCombClose', rptMoney_(d.combined.closing));
+      rptFill_('rcTypeBody', d.cash.byType, function (r) {
+        return '<td>' + escapeHtml(r.label) + '</td><td class="num mono">' + r.entries + '</td>' +
+               '<td class="num mono">' + rptMoney_(r.inflow) + '</td><td class="num mono">' + rptMoney_(r.outflow) + '</td>' +
+               '<td class="num mono">' + rptMoney_(r.net) + '</td>';
+      }, 'rcTypeEmpty');
+      rptFill_('rcBankBody', d.banks, function (b) {
+        return '<td>' + escapeHtml(b.name) + '</td><td>' + escapeHtml(b.bankName) + '</td>' +
+               '<td class="num mono">' + rptMoney_(b.opening) + '</td><td class="num mono">' + rptMoney_(b.inflow) + '</td>' +
+               '<td class="num mono">' + rptMoney_(b.outflow) + '</td><td class="num mono">' + rptMoney_(b.closing) + '</td>';
+      }, 'rcBankEmpty');
+    });
+  }
+
+  function rptLoadProfit() {
+    return withLoader(serverCall('getProfitReport', authToken, rptFilters_())).then(function (d) {
+      rptSet_('rfRevenue', rptMoney_(d.totals.netRevenue));
+      rptSet_('rfCogs', rptMoney_(d.totals.cogs));
+      rptSet_('rfGross', rptMoney_(d.totals.grossProfit));
+      rptSet_('rfGrossPct', rptPct_(d.totals.grossMarginPercent));
+      rptSet_('rfExpenses', rptMoney_(d.totals.expenses));
+      rptSet_('rfCustSettleDiscount', rptMoney_(d.totals.customerSettlementDiscount || 0));
+      rptSet_('rfSupSettleDiscount', rptMoney_(d.totals.supplierSettlementDiscountReceived || 0));
+      rptSet_('rfNet', rptMoney_(d.totals.netProfit));
+
+      var gap = d.coverage.invoicesMissingLotData > 0;
+      document.getElementById('rfCoverageCard').hidden = !gap;
+      if (gap) {
+        rptSet_('rfMissingCount', d.coverage.invoicesMissingLotData);
+        rptSet_('rfTotalCount', d.coverage.invoicesInRange);
+        rptFill_('rfMissingBody', d.coverage.missingSample, function (m) {
+          return '<td class="mono">' + escapeHtml(m.invoiceId) + '</td><td>' + escapeHtml(m.date) + '</td>' +
+                 '<td class="num mono">' + rptMoney_(m.grandTotal) + '</td>';
+        });
+      }
+
+      rptFill_('rfTopBody', d.topProducts, function (p) {
+        return '<td>' + escapeHtml(p.label) + '</td><td class="num mono">' + p.qtySold + '</td>' +
+               '<td class="num mono">' + p.qtyReturned + '</td>' +
+               '<td class="num mono">' + rptMoney_(p.revenue) + '</td><td class="num mono">' + rptMoney_(p.cost) + '</td>' +
+               '<td class="num mono">' + rptMoney_(p.profit) + '</td>';
+      }, 'rfTopEmpty');
+
+      document.getElementById('rfLossCard').hidden = (d.lossMakers || []).length === 0;
+      rptFill_('rfLossBody', d.lossMakers, function (p) {
+        return '<td>' + escapeHtml(p.label) + '</td><td class="num mono">' + p.qtySold + '</td>' +
+               '<td class="num mono">' + rptMoney_(p.revenue) + '</td><td class="num mono">' + rptMoney_(p.cost) + '</td>' +
+               '<td class="num mono">' + rptMoney_(p.profit) + '</td>';
+      });
+
+      rptFill_('rfExpBody', d.expenseByCategory, function (r) {
+        return '<td>' + escapeHtml(r.label) + '</td><td class="num mono">' + r.entries + '</td>' +
+               '<td class="num mono">' + rptMoney_(r.amount) + '</td>';
+      }, 'rfExpEmpty');
+    });
+  }
+
+  function rptLoadBalanceSheet() {
+    return withLoader(serverCall('getBalanceSheetReport', authToken)).then(function (d) {
+      rptSet_('rbAsOf', d.asOf);
+      rptSet_('rbCash', rptMoney_(d.assets.cash));
+      rptSet_('rbBank', rptMoney_(d.assets.bank));
+      rptSet_('rbMobileBanking', rptMoney_(d.assets.mobileBanking));
+      rptSet_('rbInventory', rptMoney_(d.assets.inventory));
+      rptSet_('rbTotalAssets', rptMoney_(d.assets.total));
+      rptSet_('rbLoan', rptMoney_(d.liabilities.outstandingLoan));
+      rptSet_('rbTotalLiabilities', rptMoney_(d.liabilities.total));
+      rptSet_('rbCapital', rptMoney_(d.equity.ownerCapital));
+      rptSet_('rbTotalEquity', rptMoney_(d.equity.total));
+    });
+  }
+
+  var RPT_LOADERS = {
+    rptSales: rptLoadSales,
+    rptPurchase: rptLoadPurchase,
+    rptStock: rptLoadStock,
+    rptCashBank: rptLoadCashBank,
+    rptProfit: rptLoadProfit,
+    rptBalanceSheet: rptLoadBalanceSheet
+  };
+
+  /** Loads the active tab only — running all five on every date change would be five full passes over the sheets. */
+  function rptRunActive_(force) {
+    var tab = rptState.activeTab;
+    if (!force && rptState.loaded[tab]) return Promise.resolve();
+    return RPT_LOADERS[tab]().then(function () {
+      rptState.loaded[tab] = true;
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  function rptBootstrap_() {
+    return withLoader(serverCall('getReportsBootstrap', authToken)).then(function (d) {
+      rptState.currency = d.currencySymbol || '';
+      rptState.shopName = d.shopName || '';
+      if (!document.getElementById('rptFrom').value) document.getElementById('rptFrom').value = d.defaultFrom;
+      if (!document.getElementById('rptTo').value) document.getElementById('rptTo').value = d.defaultTo;
+      rptState._booted = true;
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  // ------------------------------------------------------------ wiring
+  document.querySelectorAll('#page-reports .tab-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('#page-reports .tab-btn').forEach(function (b) {
+        b.classList.toggle('active', b === btn);
+      });
+      document.querySelectorAll('#page-reports .tab-panel').forEach(function (p) {
+        p.hidden = p.id !== btn.dataset.tab;
+      });
+      rptState.activeTab = btn.dataset.tab;
+      rptRunActive_(false);
+    });
+  });
+
+  document.getElementById('rptRunBtn').addEventListener('click', function () {
+    rptState.loaded = {};           // date range changed — every tab is stale
+    rptRunActive_(true);
+  });
+
+  document.getElementById('rptTodayBtn').addEventListener('click', function () {
+    var t = new Date();
+    var iso = t.getFullYear() + '-' + ('0' + (t.getMonth() + 1)).slice(-2) + '-' + ('0' + t.getDate()).slice(-2);
+    document.getElementById('rptFrom').value = iso;
+    document.getElementById('rptTo').value = iso;
+    rptState.loaded = {};
+    rptRunActive_(true);
+  });
+
+  document.getElementById('rptMonthBtn').addEventListener('click', function () {
+    var t = new Date();
+    var ym = t.getFullYear() + '-' + ('0' + (t.getMonth() + 1)).slice(-2);
+    document.getElementById('rptFrom').value = ym + '-01';
+    document.getElementById('rptTo').value = ym + '-' + ('0' + t.getDate()).slice(-2);
+    rptState.loaded = {};
+    rptRunActive_(true);
+  });
+
+  document.getElementById('rptPrintBtn').addEventListener('click', function () {
+    var activeBtn = document.querySelector('#page-reports .tab-btn.active');
+    var activeLabel = activeBtn ? activeBtn.querySelector('.tab-label') : null;
+    document.getElementById('rptPrintShop').textContent = rptState.shopName;
+    document.getElementById('rptPrintMeta').textContent =
+      (activeLabel ? activeLabel.textContent.trim() : 'Report') +
+      ((rptState.activeTab === 'rptStock' || rptState.activeTab === 'rptBalanceSheet')
+        ? ' — as of ' + new Date().toLocaleDateString()
+        : ' — ' + document.getElementById('rptFrom').value + ' to ' + document.getElementById('rptTo').value);
+    document.getElementById('rptPrintHeader').hidden = false;
+    document.body.classList.add('printing');
+    window.print();
+    // Restore straight after: print() blocks until the dialog closes in
+    // every browser this app targets.
+    document.body.classList.remove('printing');
+    document.getElementById('rptPrintHeader').hidden = true;
+  });
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var origGoToPage = goToPage;
+    goToPage = function (key) {
+      origGoToPage(key);
+      if (key !== 'reports') return;
+      if (!rptState._booted) {
+        rptBootstrap_().then(function () { rptRunActive_(false); });
+      } else {
+        rptRunActive_(false);
+      }
+    };
+  });
+</script>

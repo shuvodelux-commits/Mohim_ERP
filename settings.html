@@ -1,0 +1,167 @@
+<div class="card">
+  <h3 style="font-size:14px; margin-bottom:12px;">Shop Info <span class="bn-hint" style="display:inline;">— দোকানের তথ্য</span></h3>
+  <div class="form-grid">
+    <div><label>Shop Name (English) *</label><input id="setShopName" type="text"></div>
+    <div><label>Email</label><input id="setEmail" type="text"></div>
+  </div>
+  <p style="font-size:12px; color:var(--color-text-muted); margin-top:10px;">
+    This is the system name shown on the login screen and sidebar. The Bangla
+    shop name, description, address and phone numbers printed on invoices are
+    set under <strong>Settings &rarr; Invoice Design</strong>.
+  </p>
+</div>
+
+<div class="card" style="margin-top:18px;">
+  <h3 style="font-size:14px; margin-bottom:12px;">Financial <span class="bn-hint" style="display:inline;">— টাকাপয়সার সেটিং</span></h3>
+  <div class="form-grid">
+    <div><label>Currency Symbol</label><input id="setCurrencySymbol" type="text"></div>
+    <div><label>Currency Code</label><input id="setCurrencyCode" type="text"></div>
+    <div><label>Tax Percent</label><input id="setTaxPercent" type="number" min="0" step="0.01"></div>
+    <div><label>Default Discount</label><input id="setDefaultDiscount" type="number" min="0" step="0.01"></div>
+    <div><label>Low Stock Threshold</label><input id="setLowStock" type="number" min="0" step="1"></div>
+  </div>
+</div>
+
+
+<div class="card" style="margin-top:18px;">
+  <h3 style="font-size:14px; margin-bottom:12px;">Receipt &amp; Other <span class="bn-hint" style="display:inline;">— রশিদ ও অন্যান্য</span></h3>
+  <div class="form-grid">
+    <div><label>Timezone</label><input id="setTimezone" type="text" placeholder="e.g. Asia/Dhaka"></div>
+    <div><label>Drive Folder Id</label><input id="setDriveFolder" type="text"></div>
+  </div>
+  <p style="font-size:12px; color:var(--color-text-muted); margin-top:10px;">
+    Invoice branding, logo, Bismillah, terms and paper size now live under
+    <strong>Settings &rarr; Invoice Design</strong>.
+  </p>
+</div>
+
+<div class="card" style="margin-top:18px;">
+  <h3 style="font-size:14px; margin-bottom:12px;">Bank &amp; Session <span class="bn-hint" style="display:inline;">— ব্যাংক ও ক্যাশ সেশন</span></h3>
+  <div class="form-grid">
+    <div>
+      <label>Default Bank Account</label>
+      <select id="setDefaultBank"><option value="">None</option></select>
+    </div>
+    <div><label>Session Timeout (hours)</label><input id="setSessionTimeout" type="number" min="1" step="1"></div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:18px;">
+  <h3 style="font-size:14px; margin-bottom:12px;">Security <span class="bn-hint" style="display:inline;">— নিরাপত্তা</span></h3>
+  <div class="form-grid">
+    <div class="full"><label>Delete Confirmation Key</label><input id="setDeleteKey" type="text" placeholder="Staff type this exact phrase to confirm a permanent delete"></div>
+    <div><label>Day Book Editable Days</label><input id="setDayBookDays" type="number" min="0" step="1"></div>
+  </div>
+  <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--color-border);">
+    <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer;">
+      <input id="setPosShowCost" type="checkbox" style="width:16px; height:16px;">
+      Show purchase price in POS <span class="bn-hint" style="display:inline;">— বিক্রির সময় কেনা দাম দেখান</span>
+    </label>
+    <p style="font-size:12px; color:var(--color-text-muted); margin-top:8px;">
+      Lets staff check what an item cost while agreeing a price at the counter.
+      It appears as a small unlabelled dot on the cart line and only shows the
+      figure when clicked, so it isn't readable over a customer's shoulder.
+      This switch alone shows it to nobody &mdash; each role must also be given
+      <strong>POS Purchase Price &rarr; View</strong> under
+      <strong>Settings &rarr; Roles</strong>. Roles without it never receive the
+      cost from the server at all.
+    </p>
+  </div>
+</div>
+
+<div class="field-error" id="setFormError"></div>
+<button class="btn btn-primary" id="setSaveBtn" style="margin-top:12px;">Save Settings</button>
+
+<script>
+  var setState = { settings: {}, bankAccounts: [], _loaded: false };
+
+  function setLoad() {
+    return withLoader(serverCall('getSettingsBootstrap', authToken)).then(function (data) {
+      setState.settings = data.settings || {};
+      setState.bankAccounts = data.bankAccounts || [];
+      setFillBankSelect_();
+      setPopulateForm_();
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  function setFillBankSelect_() {
+    var sel = document.getElementById('setDefaultBank');
+    sel.innerHTML = '<option value="">None</option>' + setState.bankAccounts.map(function (b) {
+      return '<option value="' + escapeHtml(b.id) + '">' + escapeHtml(b.name) + '</option>';
+    }).join('');
+  }
+
+  function setPopulateForm_() {
+    var s = setState.settings;
+    document.getElementById('setShopName').value = s['Shop Name'] || '';
+    document.getElementById('setEmail').value = s['Email'] || '';
+    document.getElementById('setCurrencySymbol').value = s['Currency Symbol'] || '';
+    document.getElementById('setCurrencyCode').value = s['Currency Code'] || '';
+    document.getElementById('setTaxPercent').value = s['Tax Percent'] || 0;
+    document.getElementById('setDefaultDiscount').value = s['Default Discount'] || 0;
+    document.getElementById('setLowStock').value = s['Low Stock Threshold'] || 0;
+    document.getElementById('setTimezone').value = s['Timezone'] || '';
+    document.getElementById('setDriveFolder').value = s['Drive Folder Id'] || '';
+    document.getElementById('setDefaultBank').value = s['Default Bank Account'] || '';
+    document.getElementById('setSessionTimeout').value = s['Session Timeout Hours'] || 12;
+    document.getElementById('setDeleteKey').value = s['Delete Confirmation Key'] || '';
+    document.getElementById('setDayBookDays').value = s['Day Book Editable Days'] || 0;
+    // Not `=== 'true'`: this setting is written as the string 'true' but
+    // Google Sheets auto-types the cell, so it arrives here as a real
+    // boolean just as often (see isSettingEnabled_ in Utils.gs, which is
+    // the server-side half of this). Accepts either, and anything else —
+    // including an unset key — reads as off rather than defaulting open.
+    var showCostRaw = s['POS Show Purchase Price'];
+    document.getElementById('setPosShowCost').checked =
+      showCostRaw === true || String(showCostRaw).trim().toLowerCase() === 'true';
+  }
+
+  function setSave_() {
+    var errEl = document.getElementById('setFormError');
+    errEl.style.display = 'none';
+    errEl.textContent = '';
+
+    var shopName = document.getElementById('setShopName').value.trim();
+    if (!shopName) {
+      errEl.textContent = 'Shop Name is required.';
+      errEl.style.display = 'block';
+      return;
+    }
+
+    var payload = {
+      'Shop Name': shopName,
+      'Email': document.getElementById('setEmail').value.trim(),
+      'Currency Symbol': document.getElementById('setCurrencySymbol').value.trim(),
+      'Currency Code': document.getElementById('setCurrencyCode').value.trim(),
+      'Tax Percent': document.getElementById('setTaxPercent').value,
+      'Default Discount': document.getElementById('setDefaultDiscount').value,
+      'Low Stock Threshold': document.getElementById('setLowStock').value,
+      'Timezone': document.getElementById('setTimezone').value.trim(),
+      'Drive Folder Id': document.getElementById('setDriveFolder').value.trim(),
+      'Default Bank Account': document.getElementById('setDefaultBank').value,
+      'Session Timeout Hours': document.getElementById('setSessionTimeout').value,
+      'Delete Confirmation Key': document.getElementById('setDeleteKey').value.trim(),
+      'Day Book Editable Days': document.getElementById('setDayBookDays').value,
+      'POS Show Purchase Price': document.getElementById('setPosShowCost').checked ? 'true' : 'false'
+    };
+
+    withLoader(serverCall('updateSettings', authToken, payload)).then(function () {
+      showToast('Settings saved.', 'success');
+      setLoad();
+    }).catch(function (err) {
+      errEl.textContent = err.message;
+      errEl.style.display = 'block';
+    });
+  }
+
+  document.getElementById('setSaveBtn').addEventListener('click', setSave_);
+
+  // Load once the Settings page is first shown, not on every app boot — same pattern as every other page.
+  document.addEventListener('DOMContentLoaded', function () {
+    var origGoToPage = goToPage;
+    goToPage = function (key) {
+      origGoToPage(key);
+      if (key === 'settings' && !setState._loaded) { setState._loaded = true; setLoad(); }
+    };
+  });
+</script>

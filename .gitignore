@@ -1,0 +1,8 @@
+.worktrees/
+.superpowers/
+*.bak
+*.before_*
+*.log
+__pycache__/
+.DS_Store
+Thumbs.db

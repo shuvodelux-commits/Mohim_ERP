@@ -1,0 +1,533 @@
+<!--
+  bank.html
+  Four tabs now, using the same .tabs / .tab-btn / .tab-panel pattern
+  purchase.html and reports.html use, all scoped to #page-bank.
+
+    Accounts      — unchanged from before, just moved into a tab
+    Ledger        — NEW. The audit statement per account.
+    Manual Entry  — NEW. Bank charges, interest, bounced cheques,
+                    cash deposits and withdrawals.
+    Transfers     — unchanged from before, just moved into a tab
+
+  Every pre-existing function keeps its name and behaviour; the tab
+  wrapper and the two new panels are additive.
+-->
+
+<div class="tabs">
+  <button class="tab-btn active" data-tab="bnkAccounts">Accounts<span class="bn-hint">হিসাবের তালিকা</span></button>
+  <button class="tab-btn" data-tab="bnkLedger">Ledger<span class="bn-hint">লেনদেনের হিসাব</span></button>
+  <button class="tab-btn" data-tab="bnkManual">Manual Entry<span class="bn-hint">চার্জ, সুদ ইত্যাদি</span></button>
+  <button class="tab-btn" data-tab="bnkTransfers">Transfers<span class="bn-hint">হিসাব বদল</span></button>
+</div>
+
+<!-- ======================================================== Accounts -->
+<div class="tab-panel" id="bnkAccounts">
+  <div class="toolbar">
+    <input class="search-input" id="bnkSearch" type="text" placeholder="Search by account or bank name...">
+    <div class="toolbar-spacer"></div>
+    <button class="btn btn-primary" id="bnkAddBtn">+ Add Bank Account</button>
+  </div>
+
+  <div class="card" style="padding:0;">
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Account Name</th><th>Type</th><th>Bank Name</th><th>Account Number</th><th class="num">Opening Balance</th><th class="num">Current Balance</th><th>Status</th><th></th></tr></thead>
+        <tbody id="bnkTableBody"></tbody>
+      </table>
+    </div>
+    <div class="empty-state" id="bnkEmpty" hidden>No bank accounts yet.</div>
+  </div>
+</div>
+
+<!-- ========================================================== Ledger -->
+<div class="tab-panel" id="bnkLedger" hidden>
+  <div class="toolbar">
+    <select id="bnkLedAccount" style="width:auto; min-width:180px;"><option value="">Select account...</option></select>
+    <label style="font-size:12px; color:var(--color-text-muted);">From</label>
+    <input id="bnkLedFrom" type="date" style="width:auto;">
+    <label style="font-size:12px; color:var(--color-text-muted);">To</label>
+    <input id="bnkLedTo" type="date" style="width:auto;">
+    <button class="btn btn-primary" id="bnkLedRunBtn">Show</button>
+    <div class="toolbar-spacer"></div>
+    <button class="btn" id="bnkLedPrintBtn">Print</button>
+  </div>
+
+  <div class="card" id="bnkLedIntegrityCard" style="margin-bottom:18px; border-left:3px solid var(--color-danger);" hidden>
+    <h3 style="font-size:14px; margin-bottom:6px;">Ledger does not reconcile <span class="bn-hint" style="display:inline;">— হিসাব মিলছে না</span></h3>
+    <p style="font-size:12px; margin:0; color:var(--color-text-muted);">
+      Adding up every entry gives <strong id="bnkLedComputed"></strong>, but the account's stored Current Balance is
+      <strong id="bnkLedStored"></strong> — a difference of <strong id="bnkLedDrift"></strong>.
+      Those two can only disagree if something wrote Current Balance without going through <code>addBankBookEntry_</code>,
+      or a Bank Book row was edited by hand in the sheet. Worth investigating before trusting this statement.
+    </p>
+  </div>
+
+  <div class="card" id="bnkLedOpeningCard" style="margin-bottom:18px; border-left:3px solid var(--color-warning, #b7791f);" hidden>
+    <h3 style="font-size:14px; margin-bottom:6px;">No opening balance entry <span class="bn-hint" style="display:inline;">— শুরুর ব্যালেন্স নেই</span></h3>
+    <p style="font-size:12px; margin:0; color:var(--color-text-muted);">
+      This account has no "Opening Balance" line, so the statement starts from the figure stored on the account rather
+      than from a ledger entry you can point at. Run <strong>Hardware ERP &rarr; Backfill Bank Opening Balances</strong>
+      in the Google Sheet once to add it. Balances are correct either way — this is about the audit trail being complete.
+    </p>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card"><div class="stat-label">Opening Balance</div><div class="stat-value" id="bnkLedOpening">--</div></div>
+    <div class="stat-card"><div class="stat-label">Money In</div><div class="stat-value" id="bnkLedIn">--</div></div>
+    <div class="stat-card"><div class="stat-label">Money Out</div><div class="stat-value" id="bnkLedOut">--</div></div>
+    <div class="stat-card"><div class="stat-label">Closing Balance</div><div class="stat-value" id="bnkLedClosing">--</div></div>
+  </div>
+
+  <div class="card" style="padding:0;">
+    <div class="table-scroll">
+      <table>
+        <thead><tr>
+          <th>Date</th><th>Entry</th><th>Type</th><th>Reference</th><th>Description</th>
+          <th class="num">Out<br><span class="bn-hint" style="display:inline;">খরচ</span></th>
+          <th class="num">In<br><span class="bn-hint" style="display:inline;">জমা</span></th>
+          <th class="num">Balance</th><th>By</th><th></th>
+        </tr></thead>
+        <tbody id="bnkLedBody"></tbody>
+      </table>
+    </div>
+    <div class="empty-state" id="bnkLedEmpty" hidden>No entries for this account in this date range.</div>
+  </div>
+</div>
+
+<!-- ==================================================== Manual Entry -->
+<div class="tab-panel" id="bnkManual" hidden>
+  <div class="card" style="margin-bottom:18px;">
+    <h3 style="font-size:14px; margin-bottom:4px;">Record a Bank Entry <span class="bn-hint" style="display:inline;">— ব্যাংকে এন্ট্রি করুন</span></h3>
+    <p style="font-size:12px; color:var(--color-text-muted); margin:0 0 12px;">
+      For money that moves through the bank without a sale, purchase or payment behind it &mdash; charges, interest,
+      a bounced cheque, or cash moved between the drawer and the bank.
+    </p>
+    <div class="form-grid">
+      <div><label>Bank Account *</label><select id="bnkManAccount"><option value="">Select account...</option></select></div>
+      <div><label>Entry Type *</label><select id="bnkManType"><option value="">Select type...</option></select></div>
+      <div><label>Amount *</label><input id="bnkManAmount" type="number" min="0" step="0.01"></div>
+      <div><label>Date</label><input id="bnkManDate" type="date"></div>
+      <div id="bnkManDirectionWrap" hidden>
+        <label>Direction *</label>
+        <select id="bnkManDirection">
+          <option value="credit">Adds to the account</option>
+          <option value="debit">Subtracts from the account</option>
+        </select>
+      </div>
+      <div><label>Reference</label><input id="bnkManReference" type="text" placeholder="Cheque no, advice no..."></div>
+      <div class="full"><label>Description</label><input id="bnkManDescription" type="text" placeholder="Defaults to the entry type"></div>
+      <div class="full"><label>Notes</label><input id="bnkManNotes" type="text" placeholder="Optional"></div>
+      <div class="full" id="bnkManBackdateWrap" hidden>
+        <label>Reason for backdating *</label>
+        <input id="bnkManBackdateReason" type="text" placeholder="Required when the date is in the past">
+      </div>
+    </div>
+    <p style="font-size:12px; color:var(--color-text-muted); margin:10px 0 0;" id="bnkManHint"></p>
+    <div class="field-error" id="bnkManError"></div>
+    <button class="btn btn-primary" id="bnkManSaveBtn" style="margin-top:10px;">Record Entry</button>
+  </div>
+</div>
+
+<!-- ======================================================= Transfers -->
+<div class="tab-panel" id="bnkTransfers" hidden>
+  <div class="card">
+    <h3 style="font-size:14px; margin-bottom:12px;">Transfer Between Accounts <span class="bn-hint" style="display:inline;">— এক হিসাব থেকে অন্য হিসাবে</span></h3>
+    <div class="form-grid">
+      <div><label>From Account *</label><select id="bnkTransferFrom"><option value="">Select account...</option></select></div>
+      <div><label>To Account *</label><select id="bnkTransferTo"><option value="">Select account...</option></select></div>
+      <div><label>Amount *</label><input id="bnkTransferAmount" type="number" min="0" step="0.01"></div>
+      <div id="bnkTransferDateWrap" hidden><label>Business Date *</label><input id="bnkTransferDate" type="date"></div>
+      <div class="full"><label>Notes</label><input id="bnkTransferNotes" type="text" placeholder="Optional"></div>
+    </div>
+    <div class="field-error" id="bnkTransferError"></div>
+    <div style="display:flex; gap:8px; margin-top:8px;">
+      <button class="btn btn-primary" id="bnkTransferBtn">Transfer</button>
+      <button class="btn" id="bnkTransferCancelEditBtn" hidden>Cancel Edit</button>
+    </div>
+  </div>
+
+  <div class="card" style="padding:0; margin-top:18px;">
+    <h3 style="font-size:14px; padding:16px 16px 0;">Transfer History <span class="bn-hint" style="display:inline;">— আগের হিসাব বদলের তালিকা</span></h3>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Date</th><th>From</th><th>To</th><th class="num">Amount</th><th>Notes</th><th>Actions</th></tr></thead>
+        <tbody id="bnkTransferHistoryBody"></tbody>
+      </table>
+    </div>
+    <div class="empty-state" id="bnkTransferHistoryEmpty" hidden>No transfers yet.</div>
+  </div>
+</div>
+
+<!-- Add / Edit Bank Account modal -->
+<div class="modal-overlay" id="bnkModal" hidden>
+  <div class="modal">
+    <div class="modal-header">
+      <div><h3 id="bnkModalTitle">Add Bank Account</h3><span class="bn-hint">ব্যাংক হিসাবের তথ্য</span></div>
+      <button class="modal-close" onclick="closeModal('bnkModal')">&#10005;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="full"><label>Account Name *</label><input id="bnkName" type="text" placeholder="e.g. Main Account"></div>
+        <div><label>Account Type *</label>
+          <select id="bnkAccountType">
+            <option value="Bank">Bank</option>
+            <option value="Mobile Banking">Mobile Banking</option>
+          </select>
+        </div>
+        <div><label>Bank Name</label><input id="bnkBankName" type="text" placeholder="e.g. Dutch-Bangla Bank, or bKash/Nagad/Rocket"></div>
+        <div><label>Account Number</label><input id="bnkAccountNumber" type="text"></div>
+        <div><label>Opening Balance</label><input id="bnkOpening" type="number" min="0" step="0.01" value="0"></div>
+        <div class="full"><label>Notes</label><input id="bnkNotes" type="text"></div>
+      </div>
+      <div class="field-error" id="bnkFormError"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('bnkModal')">Cancel</button>
+      <button class="btn btn-primary" id="bnkSaveBtn">Save Bank Account</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  var bnkState = { bankAccounts: [], currencySymbol: '', editingId: null, editingTransferId: null, ledger: null, entryTypes: [] };
+
+  function bnkLoad() {
+    return withLoader(serverCall('getBankAccountsBootstrap', authToken)).then(function (data) {
+      bnkState.bankAccounts = data.bankAccounts;
+      bnkState.currencySymbol = data.currencySymbol;
+      bnkRender();
+      bnkFillTransferSelects_();
+      return bnkLoadTransferHistory_();
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  function bnkFillTransferSelects_() {
+    ['bnkTransferFrom', 'bnkTransferTo'].forEach(function (selectId) {
+      var sel = document.getElementById(selectId);
+      var current = sel.value;
+      sel.innerHTML = '<option value="">Select account...</option>';
+      bnkState.bankAccounts.filter(function (b) { return b['Status'] !== 'Inactive'; }).forEach(function (b) {
+        var typeSuffix = b['Account Type'] === 'Mobile Banking' ? ' (Mobile Banking)' : '';
+        sel.innerHTML += '<option value="' + b['Bank Account ID'] + '">' + escapeHtml(b['Account Name']) + typeSuffix + '</option>';
+      });
+      if (current) sel.value = current;
+    });
+  }
+
+  function bnkRender() {
+    var q = (document.getElementById('bnkSearch').value || '').toLowerCase();
+    var rows = bnkState.bankAccounts.filter(function (b) {
+      return !q || String(b['Account Name']).toLowerCase().indexOf(q) !== -1 || String(b['Bank Name']).toLowerCase().indexOf(q) !== -1;
+    });
+    var body = document.getElementById('bnkTableBody');
+    body.innerHTML = '';
+    rows.forEach(function (b) {
+      var statusBadge = b['Status'] === 'Active' ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-danger">Inactive</span>';
+      var typeBadge = b['Account Type'] === 'Mobile Banking' ? '<span class="badge badge-warning">Mobile Banking</span>' : 'Bank';
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td>' + escapeHtml(b['Account Name']) + '</td>' +
+        '<td>' + typeBadge + '</td>' +
+        '<td>' + escapeHtml(b['Bank Name'] || '') + '</td>' +
+        '<td class="mono">' + escapeHtml(b['Account Number'] || '') + '</td>' +
+        '<td class="num mono">' + formatMoney(b['Opening Balance']) + '</td>' +
+        '<td class="num mono">' + formatMoney(b['Current Balance']) + '</td>' +
+        '<td>' + statusBadge + '</td>' +
+        '<td style="white-space:nowrap;"><button class="btn" data-act="menu" data-id="' + b['Bank Account ID'] + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button></td>';
+      body.appendChild(tr);
+    });
+    document.getElementById('bnkEmpty').hidden = rows.length > 0;
+  }
+
+  document.getElementById('bnkSearch').addEventListener('input', bnkRender);
+
+  document.getElementById('bnkAddBtn').addEventListener('click', function () {
+    bnkState.editingId = null;
+    document.getElementById('bnkModalTitle').textContent = 'Add Bank Account';
+    ['bnkName', 'bnkBankName', 'bnkAccountNumber', 'bnkNotes'].forEach(function (id) { document.getElementById(id).value = ''; });
+    document.getElementById('bnkAccountType').value = 'Bank';
+    document.getElementById('bnkOpening').value = 0;
+    document.getElementById('bnkOpening').disabled = false;
+    document.getElementById('bnkFormError').style.display = 'none';
+    openModal('bnkModal');
+  });
+
+  function bnkOpenEdit_(id) {
+    var account = bnkState.bankAccounts.filter(function (b) { return b['Bank Account ID'] === id; })[0];
+    if (!account) return;
+    bnkState.editingId = id;
+    document.getElementById('bnkModalTitle').textContent = 'Edit Bank Account';
+    document.getElementById('bnkName').value = account['Account Name'];
+    document.getElementById('bnkAccountType').value = account['Account Type'] === 'Mobile Banking' ? 'Mobile Banking' : 'Bank';
+    document.getElementById('bnkBankName').value = account['Bank Name'] || '';
+    document.getElementById('bnkAccountNumber').value = account['Account Number'] || '';
+    document.getElementById('bnkNotes').value = account['Notes'] || '';
+    document.getElementById('bnkOpening').value = account['Opening Balance'];
+    document.getElementById('bnkOpening').disabled = true;
+    document.getElementById('bnkFormError').style.display = 'none';
+    openModal('bnkModal');
+  }
+
+  document.getElementById('bnkTableBody').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-act]');
+    if (!btn || btn.dataset.act !== 'menu') return;
+    var id = btn.dataset.id;
+    var account = bnkState.bankAccounts.filter(function (b) { return b['Bank Account ID'] === id; })[0];
+    if (!account) return;
+    openRowActionMenu_(btn, [
+      { action: 'ledger', label: 'Ledger' },
+      { action: 'edit', label: 'Edit' },
+      { action: 'toggle', label: account['Status'] === 'Active' ? 'Deactivate' : 'Activate' }
+    ], function (action) {
+      if (action === 'ledger') { bnkShowTab_('bnkLedger'); document.getElementById('bnkLedAccount').value = id; bnkLoadLedger_(); }
+      if (action === 'edit') bnkOpenEdit_(id);
+      if (action === 'toggle') {
+        var next = account['Status'] === 'Active' ? 'Inactive' : 'Active';
+        runConfirmedAction({type:'state-change',title:(next === 'Inactive' ? 'Deactivate Bank Account?' : 'Activate Bank Account?'),message:'This changes whether the account can be used for new transactions.',details:[{label:'Account',value:account['Account Name'],emphasis:true},{label:'New Status',value:next}],confirmLabel:(next === 'Inactive' ? 'Deactivate' : 'Activate'),loadingLabel:'Updating...',trigger:btn}, function () {
+          return withLoader(serverCall('setBankAccountStatus', authToken, id, next)).then(function () { showToast('Bank account updated', 'success'); bnkLoad(); });
+        }).catch(function (err) { showToast(err.message, 'error'); });
+      }
+    });
+  });
+
+  document.getElementById('bnkSaveBtn').addEventListener('click', function () {
+    var payload = {
+      name: document.getElementById('bnkName').value.trim(),
+      accountType: document.getElementById('bnkAccountType').value,
+      bankName: document.getElementById('bnkBankName').value.trim(),
+      accountNumber: document.getElementById('bnkAccountNumber').value.trim(),
+      notes: document.getElementById('bnkNotes').value.trim(),
+      openingBalance: document.getElementById('bnkOpening').value
+    };
+    var errEl = document.getElementById('bnkFormError');
+    errEl.style.display = 'none';
+    var call = bnkState.editingId ? serverCall('updateBankAccount', authToken, bnkState.editingId, payload) : serverCall('addBankAccount', authToken, payload);
+    withLoader(call).then(function () {
+      closeModal('bnkModal');
+      document.getElementById('bnkOpening').disabled = false;
+      showToast('Bank account saved', 'success');
+      bnkLoad();
+      bnkLedgerBootstrap_(true);
+    }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+  });
+
+  // ---------------- Transfer Between Accounts ----------------
+  function bnkResetTransferEdit_() {
+    bnkState.editingTransferId = null;
+    document.getElementById('bnkTransferDateWrap').hidden = true;
+    document.getElementById('bnkTransferDate').value = '';
+    document.getElementById('bnkTransferAmount').value = '';
+    document.getElementById('bnkTransferNotes').value = '';
+    document.getElementById('bnkTransferBtn').textContent = 'Transfer';
+    document.getElementById('bnkTransferCancelEditBtn').hidden = true;
+  }
+
+  document.getElementById('bnkTransferCancelEditBtn').addEventListener('click', bnkResetTransferEdit_);
+
+  document.getElementById('bnkTransferBtn').addEventListener('click', function () {
+    var payload = {
+      fromAccountId: document.getElementById('bnkTransferFrom').value,
+      toAccountId: document.getElementById('bnkTransferTo').value,
+      amount: document.getElementById('bnkTransferAmount').value,
+      notes: document.getElementById('bnkTransferNotes').value.trim()
+    };
+    var errEl = document.getElementById('bnkTransferError');
+    errEl.style.display = 'none';
+    runConfirmedAction({type:'financial',title:'Transfer Between Accounts?',message:'This will move money between bank accounts.',details:[{label:'From',value:selectedOptionText_('bnkTransferFrom'),emphasis:true},{label:'To',value:selectedOptionText_('bnkTransferTo'),emphasis:true},{label:'Amount',value:formatMoney(Number(payload.amount)||0),emphasis:true},{label:'In words',value:banglaAmountInWords_(payload.amount)}],confirmLabel:'Transfer ' + formatMoney(Number(payload.amount)||0),loadingLabel:'Transferring...',trigger:document.getElementById('bnkTransferBtn')}, function () {
+      return withLoader(serverCall('transferBetweenBankAccounts', authToken, payload)).then(function () { bnkResetTransferEdit_(); showToast('Transfer recorded', 'success'); bnkLoad(); });
+    }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+  });
+
+  function bnkLoadTransferHistory_() {
+    return withLoader(serverCall('getBankTransferHistory', authToken)).then(function (transfers) {
+      var body = document.getElementById('bnkTransferHistoryBody');
+      body.innerHTML = '';
+      transfers.forEach(function (t) {
+        var tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td>' + escapeHtml(bnkFormatDateShort_(t['Date'])) + '</td>' +
+          '<td>' + escapeHtml(t['From Account Name']) + '</td>' +
+          '<td>' + escapeHtml(t['To Account Name']) + '</td>' +
+          '<td class="num mono">' + formatMoney(t['Amount']) + '</td>' +
+          '<td>' + escapeHtml(t['Notes'] || '') + '</td>' +
+          '<td></td>';
+        body.appendChild(tr);
+      });
+      document.getElementById('bnkTransferHistoryEmpty').hidden = transfers.length > 0;
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  function bnkFormatDateShort_(val) {
+    var d = new Date(val);
+    if (isNaN(d.getTime())) return String(val);
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+
+  // ---------------- Tabs ----------------
+  function bnkShowTab_(tabId) {
+    document.querySelectorAll('#page-bank .tab-btn').forEach(function (b) {
+      b.classList.toggle('active', b.dataset.tab === tabId);
+    });
+    document.querySelectorAll('#page-bank .tab-panel').forEach(function (p) {
+      p.hidden = p.id !== tabId;
+    });
+  }
+
+  document.querySelectorAll('#page-bank .tab-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      bnkShowTab_(btn.dataset.tab);
+      if (btn.dataset.tab === 'bnkLedger' || btn.dataset.tab === 'bnkManual') bnkLedgerBootstrap_(false);
+    });
+  });
+
+  // ---------------- Ledger + Manual Entry ----------------
+  /** Fills both account dropdowns and the entry-type list. force=true re-fetches after an account is added. */
+  function bnkLedgerBootstrap_(force) {
+    if (bnkState._ledBooted && !force) return Promise.resolve();
+    return withLoader(serverCall('getBankLedgerBootstrap', authToken)).then(function (d) {
+      bnkState._ledBooted = true;
+      bnkState.entryTypes = d.entryTypes;
+
+      ['bnkLedAccount', 'bnkManAccount'].forEach(function (id) {
+        var sel = document.getElementById(id);
+        var current = sel.value;
+        sel.innerHTML = '<option value="">Select account...</option>';
+        d.accounts.forEach(function (a) {
+          var typeSuffix = a.type === 'Mobile Banking' ? ' (Mobile Banking)' : '';
+          sel.innerHTML += '<option value="' + a.id + '">' + escapeHtml(a.name) + (a.bankName ? ' — ' + escapeHtml(a.bankName) : '') + typeSuffix + '</option>';
+        });
+        if (current) sel.value = current;
+        else if (d.accounts.length === 1) sel.value = d.accounts[0].id;
+      });
+
+      var typeSel = document.getElementById('bnkManType');
+      typeSel.innerHTML = '<option value="">Select type...</option>';
+      d.entryTypes.forEach(function (t) {
+        typeSel.innerHTML += '<option value="' + escapeHtml(t.key) + '">' + escapeHtml(t.label) + '</option>';
+      });
+
+      if (!document.getElementById('bnkLedFrom').value) document.getElementById('bnkLedFrom').value = d.defaultFrom;
+      if (!document.getElementById('bnkLedTo').value) document.getElementById('bnkLedTo').value = d.defaultTo;
+      if (!document.getElementById('bnkManDate').value) document.getElementById('bnkManDate').value = d.defaultTo;
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  function bnkLoadLedger_() {
+    var accountId = document.getElementById('bnkLedAccount').value;
+    if (!accountId) { showToast('Choose a bank account first.', 'error'); return Promise.resolve(); }
+    var filters = {
+      bankAccountId: accountId,
+      from: document.getElementById('bnkLedFrom').value,
+      to: document.getElementById('bnkLedTo').value
+    };
+    return withLoader(serverCall('getBankLedger', authToken, filters)).then(function (d) {
+      bnkState.ledger = d;
+
+      document.getElementById('bnkLedOpening').textContent = formatMoney(d.openingBalance);
+      document.getElementById('bnkLedIn').textContent = formatMoney(d.totalCredit);
+      document.getElementById('bnkLedOut').textContent = formatMoney(d.totalDebit);
+      document.getElementById('bnkLedClosing').textContent = formatMoney(d.closingBalance);
+
+      document.getElementById('bnkLedIntegrityCard').hidden = d.integrity.balanced;
+      if (!d.integrity.balanced) {
+        document.getElementById('bnkLedComputed').textContent = formatMoney(d.integrity.computedBalance);
+        document.getElementById('bnkLedStored').textContent = formatMoney(d.integrity.storedBalance);
+        document.getElementById('bnkLedDrift').textContent = formatMoney(d.integrity.drift);
+      }
+      document.getElementById('bnkLedOpeningCard').hidden = d.integrity.hasOpeningRow;
+
+      var body = document.getElementById('bnkLedBody');
+      body.innerHTML = '';
+      d.entries.forEach(function (e) {
+        var flags = '';
+        if (e.status === 'Reversed') flags += ' <span class="badge badge-danger">reversed</span>';
+        if (e.reversalOf) flags += ' <span class="badge badge-warning">reversal</span>';
+        if (e.isBackdated) flags += ' <span class="badge badge-warning">backdated</span>';
+
+        // Only a live, non-reversal entry can be reversed.
+        var canReverse = e.status !== 'Reversed' && !e.reversalOf && String(e.type || '').toLowerCase().indexOf('correction') === -1;
+        var tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td class="mono">' + escapeHtml(e.date) + '</td>' +
+          '<td class="mono">' + escapeHtml(e.entryId) + '</td>' +
+          '<td>' + escapeHtml(e.type) + flags + '</td>' +
+          '<td class="mono">' + escapeHtml(e.reference) + '</td>' +
+          '<td>' + escapeHtml(e.description) + (e.notes ? '<br><span style="font-size:11px; color:var(--color-text-muted);">' + escapeHtml(e.notes) + '</span>' : '') + '</td>' +
+          '<td class="num mono">' + (e.debit ? formatMoney(e.debit) : '') + '</td>' +
+          '<td class="num mono">' + (e.credit ? formatMoney(e.credit) : '') + '</td>' +
+          '<td class="num mono">' + formatMoney(e.balance) + '</td>' +
+          '<td>' + escapeHtml(e.createdBy) + '</td>' +
+          '<td style="white-space:nowrap;">' +
+            (canReverse ? '<button class="btn" data-act="reverse" data-id="' + escapeHtml(e.entryId) + '">Reverse</button>' : '') +
+          '</td>';
+        body.appendChild(tr);
+      });
+      document.getElementById('bnkLedEmpty').hidden = d.entries.length > 0;
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  document.getElementById('bnkLedRunBtn').addEventListener('click', bnkLoadLedger_);
+  document.getElementById('bnkLedAccount').addEventListener('change', bnkLoadLedger_);
+
+  document.getElementById('bnkLedBody').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-act="reverse"]');
+    if (!btn) return;
+    var id = btn.dataset.id;
+    runConfirmedAction({type:'danger',title:'Reverse Bank Entry?',message:'This will post the native reversal for this bank entry.',details:[{label:'Entry',value:id,emphasis:true}],confirmLabel:'Reverse Entry',loadingLabel:'Reversing...',reason:{required:true,label:'Reason',placeholder:'Why is this entry being reversed?',maxLength:200},trigger:btn}, function (reason) {
+      return withLoader(serverCall('reverseBankEntry', authToken, id, reason)).then(function () { showToast('Entry reversed', 'success'); bnkLoadLedger_(); bnkLoad(); });
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  });
+
+  document.getElementById('bnkLedPrintBtn').addEventListener('click', function () {
+    if (!bnkState.ledger) { showToast('Show a ledger first.', 'error'); return; }
+    window.print();
+  });
+
+  // Direction picker only matters for the one type that doesn't imply its own
+  // direction; the hint explains what each type will do before you save it.
+  document.getElementById('bnkManType').addEventListener('change', function () {
+    var t = bnkState.entryTypes.filter(function (x) { return x.key === this.value; }.bind(this))[0];
+    document.getElementById('bnkManDirectionWrap').hidden = !t || t.direction !== 'either';
+    var hint = '';
+    if (t) {
+      if (t.direction === 'debit') hint = 'This will SUBTRACT from the bank account balance.';
+      else if (t.direction === 'credit') hint = 'This will ADD to the bank account balance.';
+      else hint = 'Choose whether this adds to or subtracts from the account.';
+      if (t.contra === 'cash') hint += ' It also writes the matching Cash Book entry, so a cash session must be open.';
+    }
+    document.getElementById('bnkManHint').textContent = hint;
+  });
+
+  document.getElementById('bnkManDate').addEventListener('change', function () {
+    var today = new Date();
+    var iso = today.getFullYear() + '-' + ('0' + (today.getMonth() + 1)).slice(-2) + '-' + ('0' + today.getDate()).slice(-2);
+    document.getElementById('bnkManBackdateWrap').hidden = !(this.value && this.value < iso);
+  });
+
+  document.getElementById('bnkManSaveBtn').addEventListener('click', function () {
+    var payload = {
+      bankAccountId: document.getElementById('bnkManAccount').value,
+      entryType: document.getElementById('bnkManType').value,
+      amount: document.getElementById('bnkManAmount').value,
+      date: document.getElementById('bnkManDate').value,
+      direction: document.getElementById('bnkManDirection').value,
+      reference: document.getElementById('bnkManReference').value.trim(),
+      description: document.getElementById('bnkManDescription').value.trim(),
+      notes: document.getElementById('bnkManNotes').value.trim(),
+      backdatedReason: document.getElementById('bnkManBackdateReason').value.trim()
+    };
+    var errEl = document.getElementById('bnkManError');
+    errEl.style.display = 'none';
+    runConfirmedAction({type:'financial',title:'Record Bank Entry?',message:'This will post a manual entry to the selected account.',details:[{label:'Account',value:selectedOptionText_('bnkManAccount'),emphasis:true},{label:'Entry Type',value:selectedOptionText_('bnkManType')},{label:'Direction',value:payload.direction},{label:'Amount',value:formatMoney(Number(payload.amount)||0),emphasis:true},{label:'In words',value:banglaAmountInWords_(payload.amount)},{label:'Reference',value:payload.reference}],confirmLabel:'Record ' + formatMoney(Number(payload.amount)||0),loadingLabel:'Recording...',trigger:document.getElementById('bnkManSaveBtn')}, function () {
+      return withLoader(serverCall('addBankManualEntry', authToken, payload)).then(function () { ['bnkManAmount', 'bnkManReference', 'bnkManDescription', 'bnkManNotes', 'bnkManBackdateReason'].forEach(function (id) { document.getElementById(id).value = ''; }); showToast('Entry recorded', 'success'); bnkLoad(); if (document.getElementById('bnkLedAccount').value === payload.bankAccountId) bnkLoadLedger_(); });
+    }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+  });
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var origGoToPage = goToPage;
+    goToPage = function (key) {
+      origGoToPage(key);
+      if (key === 'bank' && !bnkState._loaded) { bnkState._loaded = true; bnkLoad(); }
+    };
+  });
+</script>

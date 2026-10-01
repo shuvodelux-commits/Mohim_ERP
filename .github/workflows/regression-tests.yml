@@ -1,0 +1,119 @@
+name: SherERP Regression Tests
+
+on:
+  push:
+    branches:
+      - main
+      - test/**
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Multi-invoice sales return regressions
+        run: node tests/multi_invoice_sales_return_regressions.test.js
+
+      - name: Recent chat update regressions
+        run: node tests/chat_updates_regressions.test.js
+
+      - name: Dashboard business logic
+        run: node --test tests/dashboard_business_logic.test.js
+
+      - name: Vendor multi-product memo
+        run: node tests/vendor_multi_product_memo_regressions.test.js
+
+      - name: Finance multi-balance logic
+        run: node tests/finance_multibalance_business_logic.test.js
+
+      - name: Vendor finance and inventory confirmations
+        run: node tests/confirmation_vendor_finance_inventory.test.js
+
+      - name: Invoice integrity regressions
+        run: node tests/invoice_integrity_regressions.test.js
+
+      - name: Sales and stock audit
+        run: node tests/audit_sales_stock.test.js
+
+      - name: Stock lot cost correction
+        run: node --test tests/stock_lot_cost_correction_regressions.test.js
+
+      - name: Stock lot cost correction UI
+        run: node --test tests/stock_lot_cost_correction_ui_static.test.js
+
+      - name: Public RPC security
+        run: node tests/public_rpc_security.test.js
+
+      - name: Production static gate
+        run: node tests/production_gate_static.test.js
+
+      - name: All Node regression suites
+        id: all_node
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -uo pipefail
+          count=0
+          failures=0
+          for test_file in tests/*.test.js; do
+            echo "::group::$test_file"
+            if node "$test_file"; then
+              echo "PASS $test_file"
+            else
+              echo "FAIL $test_file"
+              failures=$((failures + 1))
+            fi
+            echo "::endgroup::"
+            count=$((count + 1))
+          done
+          echo "Executed $count Node regression suites; failures: $failures."
+          test "$failures" -eq 0
+
+      - name: Python E2E probe syntax
+        id: py_probe
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile tests/*.py
+
+      - name: Install Playwright for mocked browser production gate
+        id: pw_install
+        continue-on-error: true
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Mocked browser production gate
+        id: browser_gate
+        continue-on-error: true
+        run: node tests/production_gate_browser.cjs
+
+      - name: Full production gate result
+        if: always()
+        shell: bash
+        run: |
+          echo "All Node suites: ${{ steps.all_node.outcome }}"
+          echo "Python probe syntax: ${{ steps.py_probe.outcome }}"
+          echo "Playwright install: ${{ steps.pw_install.outcome }}"
+          echo "Mocked browser gate: ${{ steps.browser_gate.outcome }}"
+          test "${{ steps.all_node.outcome }}" = "success"
+          test "${{ steps.py_probe.outcome }}" = "success"
+          test "${{ steps.pw_install.outcome }}" = "success"
+          test "${{ steps.browser_gate.outcome }}" = "success"

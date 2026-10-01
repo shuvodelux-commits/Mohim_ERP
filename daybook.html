@@ -1,0 +1,311 @@
+<div class="toolbar">
+  <input id="dbDateFrom" type="date" style="max-width:150px;">
+  <input id="dbDateTo" type="date" style="max-width:150px;">
+  <select id="dbModule" style="max-width:170px;"><option value="">All modules</option></select>
+  <input class="search-input" id="dbSearch" type="text" placeholder="Search reference, customer/supplier, description...">
+  <label style="display:flex; align-items:center; gap:4px; font-size:13px; white-space:nowrap;"><input id="dbBackdatedOnly" type="checkbox" style="width:auto;"> Backdated only</label>
+  <div class="toolbar-spacer"></div>
+  <button class="btn" id="dbTodayBtn">Today</button>
+  <button class="btn" id="dbRefreshBtn">Refresh</button>
+</div>
+
+<div class="stat-grid" style="margin-bottom:16px;">
+  <div class="stat-card"><div class="stat-label">Cash In (shown rows)</div><div class="stat-value" id="dbTotalIn">--</div></div>
+  <div class="stat-card"><div class="stat-label">Cash Out (shown rows)</div><div class="stat-value" id="dbTotalOut">--</div></div>
+  <div class="stat-card"><div class="stat-label">Net</div><div class="stat-value" id="dbTotalNet">--</div></div>
+  <div class="stat-card"><div class="stat-label">Entries</div><div class="stat-value" id="dbTotalCount">--</div></div>
+</div>
+
+<div class="card" style="padding:0;">
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Time</th><th>Date</th><th>Reference</th><th>Module</th><th>Type</th>
+          <th>Party</th><th>Description</th><th>Method</th>
+          <th class="num">Cash In<br><span class="bn-hint" style="display:inline;">জমা</span></th>
+          <th class="num">Cash Out<br><span class="bn-hint" style="display:inline;">খরচ</span></th>
+          <th class="num">Bank In<br><span class="bn-hint" style="display:inline;">জমা</span></th>
+          <th class="num">Bank Out<br><span class="bn-hint" style="display:inline;">খরচ</span></th>
+          <th class="num">Cash Balance</th>
+          <th>By</th><th>Status</th><th></th>
+        </tr>
+      </thead>
+      <tbody id="dbTableBody"></tbody>
+    </table>
+  </div>
+  <div class="empty-state" id="dbEmpty" hidden>No transactions match these filters.</div>
+</div>
+
+<!-- View / Edit / Open Original modal -->
+<div class="modal-overlay" id="dbViewModal" hidden>
+  <div class="modal">
+    <div class="modal-header"><h3>Transaction <span class="bn-hint" style="display:inline;">— লেনদেনের বিস্তারিত</span> <span id="dbViewRef" class="mono"></span></h3><button class="modal-close" onclick="closeModal('dbViewModal')">&#10005;</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div><label>Date / Time</label><div id="dbViewDateTime"></div></div>
+        <div><label>Module</label><div id="dbViewModule"></div></div>
+        <div><label>Type</label><div id="dbViewType"></div></div>
+        <div><label>Party</label><div id="dbViewParty"></div></div>
+        <div><label>Payment Method</label><div id="dbViewMethod"></div></div>
+        <div><label>Status</label><div id="dbViewStatus"></div></div>
+        <div><label>Cash In</label><div class="mono" id="dbViewIn"></div></div>
+        <div><label>Cash Out</label><div class="mono" id="dbViewOut"></div></div>
+        <div><label>Running Cash Balance</label><div class="mono" id="dbViewBalance"></div></div>
+        <div><label>Created By</label><div id="dbViewBy"></div></div>
+        <div class="full"><label>Description</label><div id="dbViewDesc"></div></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('dbViewModal')">Close</button>
+      <button class="btn" id="dbViewEditBtn">Edit</button>
+      <button class="btn btn-primary" id="dbViewOpenBtn">Open Original</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  var dbState = { transactions: [], editableDays: 0, currencySymbol: '', currentRow: null };
+
+  function dbToday_() {
+    var d = new Date();
+    var m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + m + '-' + day;
+  }
+
+  function dbLoad() {
+    return withLoader(serverCall('getDayBookBootstrap', authToken)).then(function (data) {
+      dbState.editableDays = data.editableDays;
+      dbState.currencySymbol = data.currencySymbol;
+      var sel = document.getElementById('dbModule');
+      sel.innerHTML = '<option value="">All modules</option>';
+      data.modules.forEach(function (m) { sel.innerHTML += '<option value="' + m + '">' + m + '</option>'; });
+      var today = dbToday_();
+      document.getElementById('dbDateFrom').value = today;
+      document.getElementById('dbDateTo').value = today;
+      return dbFetch();
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  function dbFetch() {
+    var filters = {
+      dateFrom: document.getElementById('dbDateFrom').value,
+      dateTo: document.getElementById('dbDateTo').value,
+      module: document.getElementById('dbModule').value,
+      query: document.getElementById('dbSearch').value.trim(),
+      backdatedOnly: document.getElementById('dbBackdatedOnly').checked,
+      paymentMethod: (document.getElementById('dbMethod') || {}).value || '',
+      includeDeleted: !!(document.getElementById('dbShowDeleted') || {}).checked
+    };
+    return withLoader(serverCall('getDayBookTransactions', authToken, filters)).then(function (data) {
+      // New shape: { rows, totals, isAdmin, count }. Tolerates the old bare
+      // array too, so a half-applied update degrades instead of breaking.
+      var payload = Array.isArray(data) ? { rows: data, totals: null, isAdmin: false } : data;
+      dbState.transactions = payload.rows || [];
+      dbState.totals = payload.totals || null;
+      dbState.isAdmin = !!payload.isAdmin;
+      dbRender();
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  function dbRender() {
+    var rows = dbState.transactions;
+    var body = document.getElementById('dbTableBody');
+    body.innerHTML = '';
+    var totalIn = 0, totalOut = 0;
+    rows.forEach(function (r, idx) {
+      totalIn += r.cashIn || 0;
+      totalOut += r.cashOut || 0;
+      var statusBadge = r.status === 'Cancelled'
+        ? '<span class="badge badge-danger">Cancelled</span>'
+        : (r.status === 'Due' ? '<span class="badge badge-danger">Due</span>' : (r.status === 'Partial' ? '<span class="badge badge-warning">Partial</span>' : '<span class="badge badge-success">' + escapeHtml(r.status || 'Active') + '</span>'));
+      var backdatedBadge = r.isBackdated ? ' <span class="badge badge-warning" title="Entered ' + r.backdatedDays + ' day(s) late' + (r.backdatedReason ? ' \u2014 ' + escapeHtml(r.backdatedReason) : '') + '">\u26a0 Backdated</span>' : '';
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td class="mono">' + escapeHtml(r.time || '') + '</td>' +
+        '<td>' + escapeHtml(r.date || '') + backdatedBadge + '</td>' +
+        '<td class="mono">' + escapeHtml(r.referenceNo || '') + '</td>' +
+        '<td>' + escapeHtml(r.module) + '</td>' +
+        '<td>' + escapeHtml(r.transactionType || '') + '</td>' +
+        '<td>' + escapeHtml(r.party || '') + '</td>' +
+        '<td>' + escapeHtml(r.description || '') + '</td>' +
+        '<td>' + escapeHtml(r.paymentMethod || '') + '</td>' +
+         '<td class="num mono" style="color:var(--color-success);">' + (r.cashIn ? formatMoney(r.cashIn) : '') + '</td>' +
+        '<td class="num mono" style="color:var(--color-danger);">' + (r.cashOut ? formatMoney(r.cashOut) : '') + '</td>' +
+        '<td class="num mono" style="color:var(--color-success);">' + (r.bankIn ? formatMoney(r.bankIn) : '') + '</td>' +
+        '<td class="num mono" style="color:var(--color-danger);">' + (r.bankOut ? formatMoney(r.bankOut) : '') + '</td>' +
+        '<td class="num mono">' + (r.runningCashBalance === null || r.runningCashBalance === undefined ? '\u2014' : formatMoney(r.runningCashBalance)) + '</td>' +
+        '<td>' + escapeHtml(r.createdBy || '') + '</td>' +
+        '<td>' + statusBadge + '</td>' +
+        '<td style="white-space:nowrap;">' +
+          '<button class="btn" data-act="view" data-idx="' + idx + '">View</button>' +
+          (r.deleteModule && !r.isDeleted
+            ? ' <button class="btn btn-danger" data-act="del" data-idx="' + idx + '">Delete</button>'
+            : '') +
+        '</td>';
+      if (r.isDeleted) tr.className = 'row-deleted';
+      body.appendChild(tr);
+    });
+    document.getElementById('dbEmpty').hidden = rows.length > 0;
+    document.getElementById('dbTotalIn').textContent = formatMoney(totalIn);
+    document.getElementById('dbTotalOut').textContent = formatMoney(totalOut);
+    document.getElementById('dbTotalNet').textContent = formatMoney(totalIn - totalOut);
+    document.getElementById('dbTotalCount').textContent = rows.length;
+  }
+
+  document.getElementById('dbTableBody').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+   var row = dbState.transactions[Number(btn.dataset.idx)];
+    if (!row) return;
+    if (btn.dataset.act === 'del') { dbDelete_(row); return; }
+    dbOpenView_(row);
+  });
+
+  /**
+   * Deletes straight from the Day Book. deleteDayBookEntry dispatches to
+   * the owning module, so this is the same operation - and the same
+   * permission and day-window check - as deleting from the source page.
+   * None of the reversal logic is duplicated here.
+   */
+  function dbDelete_(row) {
+    confirmDelete({
+      title: 'Delete ' + row.module + ' ' + (row.referenceNo || ''),
+      summary: '<p><b>' + escapeHtml(row.transactionType || row.module) + '</b>' +
+               (row.party ? ' &mdash; ' + escapeHtml(row.party) : '') + '<br>' +
+               escapeHtml(row.date || '') + ' &middot; ' + formatMoney(Math.abs(row.amount || 0)) + '</p>',
+      fn: 'deleteDayBookEntry',
+      args: [row.deleteModule, row.deleteId],
+      reloadPages: ['daybook']
+    });
+  }
+
+  function dbWithinEditableWindow_(dateStr) {
+    var days = Number(dbState.editableDays) || 0;
+    var cutoff = new Date(); cutoff.setHours(0, 0, 0, 0); cutoff.setDate(cutoff.getDate() - days);
+    var rowDate = new Date(dateStr + 'T00:00:00');
+    return rowDate >= cutoff;
+  }
+
+  function dbCanEdit_(row) {
+    if (row.module === 'Sales') {
+      if (!dbWithinEditableWindow_(row.date)) return { possible: true, allowed: false, reason: 'Outside the editable window (Settings \u2192 Day Book Editable Days).' };
+      return { possible: true, allowed: true, reason: '' };
+    }
+    if (row.module === 'Expense') {
+      if (row.status === 'Cancelled') return { possible: true, allowed: false, reason: 'This expense is cancelled.' };
+      if (!dbWithinEditableWindow_(row.date)) return { possible: true, allowed: false, reason: 'Outside the editable window (Settings \u2192 Day Book Editable Days).' };
+      return { possible: true, allowed: true, reason: '' };
+    }
+    return { possible: false, allowed: false, reason: 'Editing not yet available for this module.' };
+  }
+
+  function dbOpenView_(row) {
+    dbState.currentRow = row;
+    document.getElementById('dbViewRef').textContent = row.referenceNo;
+    document.getElementById('dbViewDateTime').textContent = row.date + ' ' + row.time;
+    document.getElementById('dbViewModule').textContent = row.module;
+    document.getElementById('dbViewType').textContent = row.transactionType;
+    document.getElementById('dbViewParty').textContent = row.party || '\u2014';
+    document.getElementById('dbViewMethod').textContent = row.paymentMethod || '\u2014';
+    document.getElementById('dbViewStatus').textContent = row.status;
+    document.getElementById('dbViewIn').textContent = formatMoney(row.cashIn || 0);
+    document.getElementById('dbViewOut').textContent = formatMoney(row.cashOut || 0);
+    document.getElementById('dbViewBalance').textContent = (row.runningCashBalance === null || row.runningCashBalance === undefined) ? '\u2014' : formatMoney(row.runningCashBalance);
+    document.getElementById('dbViewBy').textContent = row.createdBy || '\u2014';
+    document.getElementById('dbViewDesc').textContent = row.description || '\u2014';
+
+    var editable = dbCanEdit_(row);
+    var editBtn = document.getElementById('dbViewEditBtn');
+    editBtn.hidden = !editable.possible;
+    editBtn.disabled = !editable.allowed;
+    editBtn.title = editable.reason || '';
+
+    var openBtn = document.getElementById('dbViewOpenBtn');
+    openBtn.hidden = !row.openPage;
+
+    openModal('dbViewModal');
+  }
+
+  document.getElementById('dbViewEditBtn').addEventListener('click', function () {
+    var row = dbState.currentRow;
+    if (!row) return;
+    closeModal('dbViewModal');
+    if (row.module === 'Sales') {
+      var reason = promptForUpdateReason_();
+      if (!reason) return;
+      withLoader(serverCall('getSaleForUpdate', authToken, row.sourceId)).then(function (inv) {
+        goToPage('pos');
+        posLoadUpdateInvoice_(inv, reason);
+        showToast('Loaded into POS for update \u2014 adjust and save', 'success');
+      }).catch(function (err) { showToast(err.message, 'error'); });
+    } else if (row.module === 'Expense') {
+      goToPage('expenseList');
+      expOpenEdit_(row.sourceId);
+    }
+  });
+
+  document.getElementById('dbViewOpenBtn').addEventListener('click', function () {
+    var row = dbState.currentRow;
+    if (!row) return;
+    closeModal('dbViewModal');
+    dbOpenOriginal_(row);
+  });
+
+  function dbOpenOriginal_(row) {
+    switch (row.module) {
+      case 'Sales':
+        goToPage('sales'); smOpenView_(row.sourceId); break;
+      case 'Sales Return':
+        goToPage('returnHistory');
+        rhOpenDetailById_(row.sourceId);
+        break;
+      case 'Purchase':
+        goToPage('purchase');
+        document.querySelector('#page-purchase .tab-btn[data-tab="purHistory"]').click();
+        purOpenView_(row.sourceId);
+        break;
+      case 'Purchase Return':
+        goToPage('purchase');
+        document.querySelector('#page-purchase .tab-btn[data-tab="purReturn"]').click();
+        prtOpenDetailById_(row.sourceId);
+        break;
+      case 'Customer Payment':
+        goToPage('customers'); custOpenDetail_(row.sourceId); break;
+      case 'Supplier Payment':
+        goToPage('suppliers'); supOpenDetail_(row.sourceId); break;
+      case 'Expense':
+        goToPage('expenseList');
+        expOpenView_(row.sourceId);
+        break;
+      case 'Finance':
+        goToPage('financeLedger');
+        finLedOpenViewById_(row.sourceId);
+        break;
+    }
+  }
+
+  ['dbDateFrom', 'dbDateTo', 'dbModule', 'dbBackdatedOnly'].forEach(function (id) {
+    document.getElementById(id).addEventListener('change', dbFetch);
+  });
+  var dbSearchTimer = null;
+  document.getElementById('dbSearch').addEventListener('input', function () {
+    clearTimeout(dbSearchTimer);
+    dbSearchTimer = setTimeout(dbFetch, 300);
+  });
+  document.getElementById('dbTodayBtn').addEventListener('click', function () {
+    var today = dbToday_();
+    document.getElementById('dbDateFrom').value = today;
+    document.getElementById('dbDateTo').value = today;
+    dbFetch();
+  });
+  document.getElementById('dbRefreshBtn').addEventListener('click', dbFetch);
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var origGoToPage = goToPage;
+    goToPage = function (key) {
+      origGoToPage(key);
+      if (key === 'daybook' && !dbState._loaded) { dbState._loaded = true; dbLoad(); }
+    };
+  });
+</script>

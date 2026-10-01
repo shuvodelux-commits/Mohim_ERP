@@ -1,0 +1,494 @@
+<div class="toolbar">
+  <input class="search-input" id="custSearch" type="text" placeholder="Search by name or phone...">
+  <div class="toolbar-spacer"></div>
+  <button class="btn btn-primary" id="custAddBtn">+ Add Customer</button>
+</div>
+
+<div class="card" style="padding:0;">
+  <div class="table-scroll">
+    <table class="mobile-card-table customer-directory-table">
+      <thead><tr><th>Customer</th><th>Phone</th><th>Address</th><th class="num">Current Due</th><th></th></tr></thead>
+      <tbody id="custTableBody"></tbody>
+    </table>
+  </div>
+  <div class="empty-state" id="custEmpty" hidden>No customers yet.</div>
+</div>
+
+<!-- Add / Edit Customer modal -->
+<div class="modal-overlay" id="custModal" hidden>
+  <div class="modal">
+    <div class="modal-header"><div><h3 id="custModalTitle">Add Customer</h3><span class="bn-hint">কাস্টমারের তথ্য</span></div><button class="modal-close" onclick="custCloseAddModal_()">&#10005;</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="full"><label>Customer Name *</label><input id="custName" type="text"></div>
+        <div><label>Father Name</label><input id="custFatherName" type="text"></div>
+        <div><label>Phone *</label><input id="custPhone" type="text"></div>
+        <div><label>Opening Balance (Due / Credit)</label><input id="custOpening" type="number" step="0.01" value="0"><div class="bn-hint">Positive = due, negative = customer credit</div></div>
+        <div class="full" id="custOpeningReasonRow" style="display:none;"><label>Opening Balance Change Reason *</label><input id="custOpeningBalanceReason" type="text" placeholder="Why is the opening balance being corrected?"></div>
+        <div class="full"><label>Address</label><input id="custAddress" type="text"></div>
+        <div class="full"><label>Notes</label><input id="custNotes" type="text"></div>
+      </div>
+      <div class="field-error" id="custFormError"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="custCloseAddModal_()">Cancel</button>
+      <button class="btn btn-primary" id="custSaveBtn">Save Customer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Customer detail / ledger / receive payment modal -->
+<div class="modal-overlay" id="custDetailModal" hidden>
+  <div class="modal modal-lg">
+    <div class="modal-header"><div><h3 id="custDetailName"></h3><span class="bn-hint">কাস্টমারের বাকি ও হিসাব</span></div><button class="modal-close" onclick="closeModal('custDetailModal')">&#10005;</button></div>
+    <div class="modal-body">
+      <div style="display:flex; gap:24px; flex-wrap:wrap; margin-bottom:16px; align-items:flex-start;">
+        <div><div class="stat-label">Current Due</div><div class="stat-value" id="custDetailDue"></div></div>
+        <div class="mobile-payment-workspace" style="flex:1; min-width:520px;">
+          <div style="display:flex; align-items:flex-end; gap:8px; flex-wrap:wrap;" class="mobile-payment-panel">
+            <div style="flex:1; min-width:110px;"><label>Receive Amount</label><input id="custPayAmount" type="number" min="0" step="0.01" placeholder="Amount"></div>
+            <div style="flex:1; min-width:110px;"><label>Discount Given</label><input id="custPayDiscount" type="number" min="0" step="0.01" value="0" placeholder="0.00"></div>
+            <select id="custPayMethod" style="max-width:120px;"><option value="Cash">Cash</option><option value="Bank">Bank</option><option value="Mobile Banking">Mobile Banking</option></select>
+            <select id="custPayBankAccount" style="max-width:180px; display:none;"><option value="">Select bank account...</option></select>
+            <div style="flex:1; min-width:140px;"><label>Note</label><input id="custPayNote" type="text" placeholder="Optional"></div>
+            <div style="min-width:140px;"><label>Payment Date</label><input id="custPayDate" type="date"></div>
+            <button class="btn btn-primary" id="custPaySaveBtn">Receive</button>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; margin-top:8px;">
+            <div id="custPayDiscountReasonRow" style="flex:1; min-width:240px; display:none;"><label>Discount Reason *</label><input id="custPayDiscountReason" type="text" placeholder="Why is this discount being given?"></div>
+            <button type="button" class="btn" id="custPaySettleFullBtn">Settle Full Balance</button>
+            <div style="font-size:12px; color:var(--color-text-muted); min-width:230px; padding:7px 0;" class="mobile-payment-summary"><div class="mobile-payment-summary-row"><span>Total Settled</span><strong id="custPayTotalSettled">0</strong></div><div class="mobile-payment-summary-row"><span>Balance After</span><strong id="custPayBalanceAfter">0</strong></div></div>
+          </div>
+          <div id="custPayBackdatedReasonRow" style="margin-top:8px; display:none;"><label>Reason for Backdating *</label><input id="custPayBackdatedReason" type="text" placeholder="Why is this dated in the past?"></div>
+        </div>
+      </div>
+      <div class="field-error" id="custPayError"></div>
+      <h3 style="font-size:14px; margin:16px 0 8px;">Ledger <span class="bn-hint" style="display:inline;">— কাস্টমারের বাকি হিসাব</span></h3>
+      <table class="mobile-card-table mobile-ledger-table">
+        <thead><tr><th>Date</th><th>Type</th><th>Reference</th><th class="num">Debit<br><span class="bn-hint" style="display:inline;">খরচ</span></th><th class="num">Credit<br><span class="bn-hint" style="display:inline;">জমা</span></th><th class="num">Balance</th><th></th></tr></thead>
+        <tbody id="custLedgerBody"></tbody>
+      </table>
+      <div class="empty-state" id="custLedgerEmpty" hidden>No transactions yet.</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" id="custDeleteBtn" style="color:var(--color-danger); border-color:var(--color-danger);">Delete Customer</button>
+      <button class="btn" onclick="closeModal('custDetailModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Payment (ledger row) modal -->
+<div class="modal-overlay" id="custLedEditModal" hidden>
+  <div class="modal">
+    <div class="modal-header"><h3>Edit Payment <span class="bn-hint" style="display:inline;">— জমা ঠিক করুন</span></h3><button class="modal-close" onclick="closeModal('custLedEditModal')">&#10005;</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div><label>Date *</label><input id="custLedEditDate" type="date"></div>
+        <div><label>Payment Amount *</label><input id="custLedEditAmount" type="number" min="0" step="0.01"></div>
+        <div><label>Discount Given</label><input id="custLedEditDiscount" type="number" min="0" step="0.01" value="0"></div>
+        <div class="full"><label>Discount Reason</label><input id="custLedEditDiscountReason" type="text" placeholder="Required when discount is changed"></div>
+        <div>
+          <label>Payment Method</label>
+          <select id="custLedEditMethod">
+            <option value="Cash">Cash</option><option value="Bank">Bank</option>
+            <option value="Mobile Banking">Mobile Banking</option><option value="Other">Other</option>
+          </select>
+        </div>
+        <div id="custLedEditBankAccountRow" style="display:none;">
+          <label id="custLedEditBankAccountLabel">Bank Account *</label>
+          <select id="custLedEditBankAccount"><option value="">Select bank account...</option></select>
+        </div>
+        <div class="full"><label>Note</label><input id="custLedEditNote" type="text"></div>
+      </div>
+      <div class="field-error" id="custLedEditFormError"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('custLedEditModal')">Cancel</button>
+      <button class="btn btn-primary" id="custLedEditSaveBtn">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  var custState = { customers: [], bankAccounts: [], ledger: [], currencySymbol: '', editingId: null, detailId: null, detailDue: 0, editingLedgerId: null, originalOpening: 0, addSuccessCallback: null };
+
+
+  function custCanOpeningBalanceEdit_() {
+    return userPermissions === null || !!(userPermissions && userPermissions.openingBalance && userPermissions.openingBalance.edit);
+  }
+
+  function custCanSettlementDiscount_() {
+    return userPermissions === null || !!(userPermissions && userPermissions.settlementDiscount && userPermissions.settlementDiscount.edit);
+  }
+
+  function custPayRecalc_() {
+    var payment = Number(document.getElementById('custPayAmount').value) || 0;
+    var discount = Number(document.getElementById('custPayDiscount').value) || 0;
+    var total = Math.round((payment + discount) * 100) / 100;
+    var balance = Math.round((custState.detailDue - total) * 100) / 100;
+    document.getElementById('custPayTotalSettled').textContent = formatMoney(total);
+    document.getElementById('custPayBalanceAfter').textContent = balance < 0 ? ('Credit ' + formatMoney(Math.abs(balance))) : formatMoney(balance);
+    document.getElementById('custPayDiscountReasonRow').style.display = discount > 0 ? '' : 'none';
+    var canDiscount = custCanSettlementDiscount_() && custState.detailDue > 0;
+    document.getElementById('custPayDiscount').disabled = !canDiscount;
+    document.getElementById('custPaySettleFullBtn').disabled = !canDiscount || payment <= 0 || payment > custState.detailDue;
+  }
+
+  function custConfigureOpeningBalance_(editing, originalValue) {
+    var input = document.getElementById('custOpening');
+    var reasonRow = document.getElementById('custOpeningReasonRow');
+    var reason = document.getElementById('custOpeningBalanceReason');
+    custState.originalOpening = Number(originalValue) || 0;
+    reason.value = '';
+    if (!editing) {
+      input.disabled = false;
+      reasonRow.style.display = 'none';
+      return;
+    }
+    var canEdit = custCanOpeningBalanceEdit_();
+    input.disabled = !canEdit;
+    reasonRow.style.display = canEdit ? '' : 'none';
+  }
+
+  function custLoad() {
+    return withLoader(serverCall('getCustomersBootstrap', authToken)).then(function (data) {
+      custState.customers = data.customers;
+      custState.bankAccounts = data.bankAccounts;
+      custState.currencySymbol = data.currencySymbol;
+      custFillBankAccountSelect_(document.getElementById('custPayMethod').value);
+      custRender();
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  function custFillBankAccountSelect_(paymentMethod) {
+    fillBankAccountSelect_(document.getElementById('custPayBankAccount'), custState.bankAccounts, paymentMethod);
+  }
+
+  function custRender() {
+    var q = (document.getElementById('custSearch').value || '').toLowerCase();
+    var rows = custState.customers.filter(function (c) {
+      return !q || String(c['Customer Name']).toLowerCase().indexOf(q) !== -1 || phoneSearchMatches_(c['Phone'], q);
+    });
+    var body = document.getElementById('custTableBody');
+    body.innerHTML = '';
+    rows.forEach(function (c) {
+      var due = Number(c['Current Due']) || 0;
+      var dueCell = due > 0
+        ? '<span class="badge badge-danger">' + formatMoney(due) + '</span>'
+        : (due < 0 ? '<span class="badge badge-success">Credit ' + formatMoney(Math.abs(due)) + '</span>' : formatMoney(0));
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td class="customer-name-cell"><button type="button" class="party-ledger-link" data-customer-ledger-id="' + c['Customer ID'] + '">' + escapeHtml(c['Customer Name']) + '</button></td>' +
+        '<td class="customer-phone-cell" data-label="Phone">' + escapeHtml(c['Phone'] || '') + '</td>' +
+        '<td class="customer-address-cell" data-label="Address">' + escapeHtml(c['Address'] || '') + '</td>' +
+        '<td class="num mono customer-due-cell" data-label="Current Due">' + dueCell + '</td>' +
+        '<td class="customer-actions-cell" style="white-space:nowrap;"><button class="btn" data-act="menu" data-id="' + c['Customer ID'] + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button></td>';
+      body.appendChild(tr);
+    });
+    document.getElementById('custEmpty').hidden = rows.length > 0;
+  }
+
+  document.getElementById('custSearch').addEventListener('input', custRender);
+
+  function custOpenAdd_(onSaved) {
+    custState.editingId = null;
+    custState.addSuccessCallback = typeof onSaved === 'function' ? onSaved : null;
+    document.getElementById('custModalTitle').textContent = 'Add Customer';
+    ['custName', 'custFatherName', 'custPhone', 'custAddress', 'custNotes'].forEach(function (id) { document.getElementById(id).value = ''; });
+    document.getElementById('custOpening').value = 0;
+    custConfigureOpeningBalance_(false, 0);
+    document.getElementById('custFormError').style.display = 'none';
+    openModal('custModal');
+  }
+
+  function custCloseAddModal_() {
+    custState.addSuccessCallback = null;
+    closeModal('custModal');
+  }
+
+  document.getElementById('custAddBtn').addEventListener('click', function () {
+    custOpenAdd_(null);
+  });
+
+  function custOpenEdit_(id) {
+    custState.addSuccessCallback = null;
+    var customer = custState.customers.filter(function (c) { return c['Customer ID'] === id; })[0];
+    if (!customer) return;
+    custState.editingId = id;
+    document.getElementById('custModalTitle').textContent = 'Edit Customer';
+    document.getElementById('custName').value = customer['Customer Name'];
+    document.getElementById('custFatherName').value = customer['Father Name'] || '';
+    document.getElementById('custPhone').value = customer['Phone'];
+    document.getElementById('custAddress').value = customer['Address'];
+    document.getElementById('custNotes').value = customer['Notes'];
+    document.getElementById('custOpening').value = customer['Opening Balance'];
+    custConfigureOpeningBalance_(true, customer['Opening Balance']);
+    document.getElementById('custFormError').style.display = 'none';
+    openModal('custModal');
+  }
+
+  function custDeleteCustomer_(id) {
+    var customer = custState.customers.filter(function (c) { return c['Customer ID'] === id; })[0];
+    var name = customer ? customer['Customer Name'] : 'this customer';
+    confirmAction({
+      type: 'danger',
+      title: 'Delete Customer?',
+      message: 'This permanently deletes the customer after the existing Delete Confirmation Key is verified. This cannot be undone.',
+      details: [{ label: 'Customer', value: name, emphasis: true }],
+      confirmLabel: 'Continue to Key',
+      trigger: document.activeElement
+    }).then(function (result) {
+      if (!result.confirmed) return;
+      var key = prompt('Enter the delete confirmation key to proceed:');
+      if (key === null) return;
+      return withLoader(serverCall('deleteCustomer', authToken, id, key)).then(function () {
+        if (!document.getElementById('custDetailModal').hidden) closeModal('custDetailModal');
+        showToast('Customer deleted', 'success');
+        custLoad();
+      }).catch(function (err) { showToast(err.message, 'error'); });
+    });
+  }
+
+  document.getElementById('custTableBody').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-act]');
+    if (!btn || btn.dataset.act !== 'menu') return;
+    var id = btn.dataset.id;
+    openRowActionMenu_(btn, [
+      { action: 'view', label: 'View / Pay' },
+      { action: 'edit', label: 'Edit' },
+      { divider: true },
+      { action: 'delete', label: 'Delete', danger: true }
+    ], function (action) {
+      if (action === 'view') custOpenDetail_(id);
+      if (action === 'edit') custOpenEdit_(id);
+      if (action === 'delete') custDeleteCustomer_(id);
+    });
+  });
+
+  document.getElementById('custSaveBtn').addEventListener('click', function () {
+    var payload = {
+      name: document.getElementById('custName').value.trim(),
+      fatherName: document.getElementById('custFatherName').value.trim(),
+      phone: document.getElementById('custPhone').value.trim(),
+      address: document.getElementById('custAddress').value.trim(),
+      notes: document.getElementById('custNotes').value.trim(),
+      openingBalance: document.getElementById('custOpening').value,
+      openingBalanceReason: document.getElementById('custOpeningBalanceReason').value.trim()
+    };
+    var errEl = document.getElementById('custFormError');
+    errEl.style.display = 'none';
+    if (custState.editingId && custCanOpeningBalanceEdit_()) {
+      var nextOpening = Number(payload.openingBalance);
+      if (isFinite(nextOpening) && Math.abs(nextOpening - custState.originalOpening) >= 0.005 && !payload.openingBalanceReason) {
+        errEl.textContent = 'Reason is required when changing the opening balance.';
+        errEl.style.display = 'block';
+        return;
+      }
+    }
+    var call = custState.editingId ? serverCall('updateCustomer', authToken, custState.editingId, payload) : serverCall('addCustomerChecked', authToken, payload);
+    withLoader(call).then(function (res) {
+      var addCallback = custState.editingId ? null : custState.addSuccessCallback;
+      custState.addSuccessCallback = null;
+      closeModal('custModal');
+      document.getElementById('custOpening').disabled = false;
+      showToast('Customer saved', 'success');
+      custLoad();
+      if (addCallback && res && res.id) addCallback(res.id);
+    }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+  });
+
+  function custOpenDetail_(id) {
+    custState.detailId = id;
+    withLoader(serverCall('getCustomerDetail', authToken, id)).then(function (data) {
+      document.getElementById('custDetailName').textContent = data.customer['Customer Name'] + ' \u2014 ' + (data.customer['Phone'] || '');
+      var detailDue = Number(data.customer['Current Due']) || 0;
+      custState.detailDue = detailDue;
+      document.getElementById('custDetailDue').textContent = detailDue < 0 ? ('Credit ' + formatMoney(Math.abs(detailDue))) : formatMoney(detailDue);
+      document.getElementById('custPayAmount').value = '';
+      document.getElementById('custPayDiscount').value = '0';
+      document.getElementById('custPayDiscountReason').value = '';
+      document.getElementById('custPayNote').value = '';
+      document.getElementById('custPayDate').value = custPayToday_();
+      document.getElementById('custPayBackdatedReason').value = '';
+      document.getElementById('custPayBackdatedReasonRow').style.display = 'none';
+      document.getElementById('custPayError').style.display = 'none';
+      custPayRecalc_();
+
+      custState.ledger = data.ledger;
+      var body = document.getElementById('custLedgerBody');
+      body.innerHTML = '';
+      data.ledger.forEach(function (l) {
+        // Only raw Payment rows can be edited/deleted here — Sale-driven
+        // ledger rows (due, corrections, etc.) have to be corrected through
+        // the module that created them, same guard as
+        // updateCustomerPayment/deleteCustomerPayment enforce server-side.
+        var isPayment = l['Type'] === 'Payment';
+        var paymentAmount = (l['Payment Amount'] === '' || l['Payment Amount'] == null) ? (Number(l['Credit']) || 0) : (Number(l['Payment Amount']) || 0);
+        var discountAmount = Number(l['Discount Amount']) || 0;
+        var creditHtml = l['Credit'] ? formatMoney(l['Credit']) : '';
+        if (isPayment && discountAmount > 0) creditHtml += '<div style="font-size:11px;color:var(--color-text-muted);">Payment ' + formatMoney(paymentAmount) + ' + Discount ' + formatMoney(discountAmount) + '</div>';
+        var tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td>' + escapeHtml(formatDateShort_(l['Date'])) + '</td>' +
+          '<td>' + escapeHtml(l['Type']) + '</td>' +
+          '<td class="mono">' + escapeHtml(l['Reference'] || '') + '</td>' +
+          '<td class="num mono">' + (l['Debit'] ? formatMoney(l['Debit']) : '') + '</td>' +
+          '<td class="num mono">' + creditHtml + '</td>' +
+          '<td class="num mono">' + formatMoney(l['Balance']) + '</td>' +
+          '<td style="white-space:nowrap;">' +
+          (isPayment
+            ? '<button class="btn" data-act="menuLed" data-id="' + l['Ledger ID'] + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button>'
+            : '') +
+          '</td>';
+        body.appendChild(tr);
+      });
+      document.getElementById('custLedgerEmpty').hidden = data.ledger.length > 0;
+      openModal('custDetailModal');
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  function formatDateShort_(val) {
+    var d = new Date(val);
+    if (isNaN(d.getTime())) return String(val);
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+
+  function custPayToday_() {
+    var d = new Date();
+    var m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + m + '-' + day;
+  }
+
+  document.getElementById('custPayDate').addEventListener('change', function () {
+    var val = document.getElementById('custPayDate').value;
+    document.getElementById('custPayBackdatedReasonRow').style.display = (val && val < custPayToday_()) ? '' : 'none';
+  });
+
+  document.getElementById('custPayMethod').addEventListener('change', function () {
+    document.getElementById('custPayBankAccount').style.display = paymentMethodNeedsAccount_(this.value) ? '' : 'none';
+    custFillBankAccountSelect_(this.value);
+  });
+  document.getElementById('custPayAmount').addEventListener('input', custPayRecalc_);
+  document.getElementById('custPayDiscount').addEventListener('input', custPayRecalc_);
+  document.getElementById('custPaySettleFullBtn').addEventListener('click', function () {
+    if (!custCanSettlementDiscount_()) return;
+    var payment = Number(document.getElementById('custPayAmount').value) || 0;
+    if (payment <= 0 || custState.detailDue <= 0 || payment > custState.detailDue) return;
+    document.getElementById('custPayDiscount').value = (Math.round((custState.detailDue - payment) * 100) / 100).toFixed(2);
+    custPayRecalc_();
+    if (Number(document.getElementById('custPayDiscount').value) > 0) document.getElementById('custPayDiscountReason').focus();
+  });
+
+  document.getElementById('custPaySaveBtn').addEventListener('click', function () {
+    var amount = document.getElementById('custPayAmount').value;
+    var method = document.getElementById('custPayMethod').value;
+    var discountAmount = Number(document.getElementById('custPayDiscount').value) || 0;
+    var discountReason = document.getElementById('custPayDiscountReason').value.trim();
+    var note = document.getElementById('custPayNote').value.trim();
+    var errEl = document.getElementById('custPayError');
+    errEl.style.display = 'none';
+    var payDate = document.getElementById('custPayDate').value || custPayToday_();
+    var backdatedReason = document.getElementById('custPayBackdatedReason').value.trim();
+    if (payDate < custPayToday_() && !backdatedReason) { errEl.textContent = 'A reason is required when dating a payment in the past.'; errEl.style.display = 'block'; return; }
+    if (discountAmount > 0 && !discountReason) { errEl.textContent = 'Discount Reason is required.'; errEl.style.display = 'block'; return; }
+    if (discountAmount > 0 && ((Number(amount) || 0) + discountAmount) - custState.detailDue > 0.004) { errEl.textContent = 'Receive amount plus discount cannot exceed the current due.'; errEl.style.display = 'block'; return; }
+    var bankAccountId = document.getElementById('custPayBankAccount').value;
+    if (paymentMethodNeedsAccount_(method) && !bankAccountId) { errEl.textContent = 'Choose a bank account.'; errEl.style.display = 'block'; return; }
+    var customerName = document.getElementById('custDetailName').textContent || 'Customer';
+    var customerId = custState.detailId;
+    runConfirmedAction({
+      type:'financial', title:'Receive Payment?',
+      message:customerName + '-এর কাছ থেকে পেমেন্ট গ্রহণ করছেন।',
+      details:settlementConfirmDetails_({partyLabel:'Customer',partyName:customerName,directionLabel:'Receive',amount:Number(amount)||0,discount:discountAmount,discountLabel:'Discount Given',method:method,accountName:paymentMethodNeedsAccount_(method)?selectedOptionText_('custPayBankAccount'):'',date:payDate}),
+      confirmLabel:'Receive ' + formatMoney(Number(amount)||0), loadingLabel:'Receiving...', trigger:document.getElementById('custPaySaveBtn')
+    }, function () {
+      return withLoader(serverCall('receivePayment', authToken, customerId, amount, method, bankAccountId, note, payDate, backdatedReason, discountAmount, discountReason)).then(function () {
+        showToast('Payment recorded', 'success'); custLoad(); custOpenDetail_(customerId);
+      });
+    }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+  });
+
+  document.getElementById('custLedgerBody').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-act="menuLed"]');
+    if (!btn) return;
+    var ledgerId = btn.dataset.id;
+    openRowActionMenu_(btn, [
+      { action: 'edit', label: 'Edit' },
+      { divider: true },
+      { action: 'delete', label: 'Delete', danger: true }
+    ], function (action) {
+      if (action === 'edit') custLedOpenEdit_(ledgerId);
+      if (action === 'delete') custLedDelete_(ledgerId);
+    });
+  });
+
+  function custLedOpenEdit_(ledgerId) {
+    withLoader(serverCall('getCustomerPaymentForEdit', authToken, ledgerId)).then(function (data) {
+      var p = data || {};
+      custState.editingLedgerId = ledgerId;
+      document.getElementById('custLedEditDate').value = p.date || '';
+      document.getElementById('custLedEditAmount').value = p.amount;
+      document.getElementById('custLedEditDiscount').value = p.discountAmount || 0;
+      document.getElementById('custLedEditDiscountReason').value = p.discountReason || '';
+      document.getElementById('custLedEditDiscount').disabled = !custCanSettlementDiscount_();
+      document.getElementById('custLedEditDiscountReason').disabled = !custCanSettlementDiscount_();
+      document.getElementById('custLedEditMethod').value = p.method || 'Cash';
+      document.getElementById('custLedEditBankAccountRow').style.display = paymentMethodNeedsAccount_(p.method) ? '' : 'none';
+      document.getElementById('custLedEditBankAccountLabel').textContent = (p.method === 'Mobile Banking' ? 'Mobile Banking Account *' : 'Bank Account *');
+      fillBankAccountSelect_(document.getElementById('custLedEditBankAccount'), custState.bankAccounts, p.method);
+      document.getElementById('custLedEditBankAccount').value = p.bankAccountId || '';
+      document.getElementById('custLedEditNote').value = p.notes || '';
+      document.getElementById('custLedEditFormError').style.display = 'none';
+      openModal('custLedEditModal');
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  document.getElementById('custLedEditMethod').addEventListener('change', function () {
+    document.getElementById('custLedEditBankAccountRow').style.display = paymentMethodNeedsAccount_(this.value) ? '' : 'none';
+    document.getElementById('custLedEditBankAccountLabel').textContent = (this.value === 'Mobile Banking' ? 'Mobile Banking Account *' : 'Bank Account *');
+    fillBankAccountSelect_(document.getElementById('custLedEditBankAccount'), custState.bankAccounts, this.value);
+  });
+
+  document.getElementById('custLedEditSaveBtn').addEventListener('click', function () {
+    var errEl = document.getElementById('custLedEditFormError');
+    errEl.style.display = 'none';
+    var payload = {
+      date: document.getElementById('custLedEditDate').value,
+      amount: document.getElementById('custLedEditAmount').value,
+      discountAmount: document.getElementById('custLedEditDiscount').value,
+      discountReason: document.getElementById('custLedEditDiscountReason').value.trim(),
+      method: document.getElementById('custLedEditMethod').value,
+      bankAccountId: document.getElementById('custLedEditBankAccount').value,
+      notes: document.getElementById('custLedEditNote').value.trim()
+    };
+    var ledgerId = custState.editingLedgerId;
+    var customerName = document.getElementById('custDetailName').textContent || 'Customer';
+    var customerId = custState.detailId;
+    runConfirmedAction({type:'financial',title:'Update Customer Payment?',message:'This will update the customer ledger and Cash/Bank accounting.',
+      details:settlementConfirmDetails_({partyLabel:'Customer',partyName:customerName,directionLabel:'New Amount',amount:Number(payload.amount)||0,discount:Number(payload.discountAmount)||0,discountLabel:'Discount Given',method:payload.method,accountName:paymentMethodNeedsAccount_(payload.method)?selectedOptionText_('custLedEditBankAccount'):'',date:payload.date}),
+      confirmLabel:'Update Payment',loadingLabel:'Updating...',trigger:document.getElementById('custLedEditSaveBtn')}, function () {
+      return withLoader(serverCall('updateCustomerPayment', authToken, ledgerId, payload)).then(function () {
+        closeModal('custLedEditModal'); showToast('Payment updated', 'success'); custLoad(); custOpenDetail_(custState.detailId); reloadPage_('daybook'); reloadPage_('dashboard');
+      });
+    }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+  });
+
+  function custLedDelete_(ledgerId) {
+    confirmDelete({
+      title: 'Delete customer payment',
+      summary: '<p>This will reverse the payment and restore the customer balance.</p>',
+      fn: 'deleteCustomerPayment', args: [ledgerId], reloadPages: ['customers', 'daybook', 'dashboard'],
+      onDone: function () { custLoad(); custOpenDetail_(custState.detailId); }
+    });
+  }
+
+  document.getElementById('custDeleteBtn').addEventListener('click', function () { custDeleteCustomer_(custState.detailId); });
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var origGoToPage = goToPage;
+    goToPage = function (key) {
+      origGoToPage(key);
+      if (key === 'customers' && !custState._loaded) { custState._loaded = true; custLoad(); }
+    };
+  });
+</script>

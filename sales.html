@@ -1,0 +1,678 @@
+<div class="toolbar">
+  <input
+    class="search-input"
+    id="smSearch"
+    type="text"
+    placeholder="Search invoice #, customer, or phone..."
+  />
+  <input id="smDateFrom" type="date" style="max-width: 150px" />
+  <input id="smDateTo" type="date" style="max-width: 150px" />
+  <select id="smPaymentStatus" style="max-width: 150px">
+    <option value="">All payment status</option>
+    <option value="Paid">Paid</option>
+    <option value="Partial">Partial</option>
+    <option value="Due">Due</option>
+  </select>
+  <select id="smReturnStatus" style="max-width: 170px">
+    <option value="">All return status</option>
+    <option value="No Return">No Return</option>
+    <option value="Partially Returned">Partially Returned</option>
+    <option value="Fully Returned">Fully Returned</option>
+  </select>
+  <div class="toolbar-spacer"></div>
+  <button class="btn" id="smRefreshBtn">Refresh</button>
+</div>
+
+<div class="card" style="padding: 0">
+  <div
+    id="smTopScroll"
+    aria-label="Sales table horizontal scroll"
+    style="display:none;overflow-x:auto;overflow-y:hidden;height:18px;border-bottom:1px solid var(--color-border);background:var(--color-surface);"
+  >
+    <div id="smTopScrollInner" style="height:1px;"></div>
+  </div>
+  <div class="table-scroll" id="smTableScroll">
+    <table class="mobile-card-table">
+      <thead>
+        <tr>
+          <th>Invoice</th>
+          <th>Date</th>
+          <th>Customer</th>
+          <th>Phone</th>
+          <th class="num">Total</th>
+          <th class="num">Paid</th>
+          <th class="num">Due</th>
+          <th class="num">Returned</th>
+          <th class="num" id="smProfitHeader" style="display:none;">Profit</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="smTableBody"></tbody>
+    </table>
+  </div>
+  <div class="empty-state" id="smEmpty" hidden>
+    No sales match these filters.
+  </div>
+</div>
+
+<!-- ===== View Invoice popup ===== -->
+<div class="modal-overlay" id="smViewModal" hidden>
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3>Invoice <span class="bn-hint" style="display:inline;">— বিক্রির বিস্তারিত</span> <span id="smViewInvoiceId" class="mono"></span></h3>
+      <button class="modal-close" onclick="closeModal('smViewModal')">
+        &#10005;
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid" style="margin-bottom: 14px">
+        <div>
+          <label>Customer</label>
+          <div id="smViewCustomer"></div>
+        </div>
+        <div>
+          <label>Phone</label>
+          <div id="smViewPhone"></div>
+        </div>
+        <div class="full">
+          <label>Address</label>
+          <div id="smViewAddress"></div>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th class="num">Qty</th>
+            <th class="num">Price</th>
+            <th class="num">Line Total</th>
+          </tr>
+        </thead>
+        <tbody id="smViewItemsBody"></tbody>
+      </table>
+      <div style="max-width: 320px; margin-left: auto; margin-top: 14px">
+        <div class="totals-row">
+          <span>Subtotal</span><span class="v" id="smViewSubtotal"></span>
+        </div>
+        <div class="totals-row">
+          <span>Discount</span><span class="v" id="smViewDiscount"></span>
+        </div>
+        <div class="totals-row grand">
+          <span>Grand Total</span><span class="v" id="smViewGrandTotal"></span>
+        </div>
+        <div class="totals-row">
+          <span>Paid / Settled</span><span class="v" id="smViewPaid"></span>
+        </div>
+        <div class="totals-row" id="smViewCreditRow" style="display:none;">
+          <span>Customer Credit</span><span class="v" id="smViewCredit"></span>
+        </div>
+        <div class="totals-row">
+          <span>Due</span><span class="v" id="smViewDue"></span>
+        </div>
+        <div class="totals-row">
+          <span>Returned</span><span class="v" id="smViewReturned"></span>
+        </div>
+        <div class="totals-row grand">
+          <span>Net Sale</span><span class="v" id="smViewNetSale"></span>
+        </div>
+        <div class="totals-row grand" id="smViewProfitRow" style="display:none;">
+          <span>Gross Profit</span><span class="v" id="smViewProfit"></span>
+        </div>
+        <div class="totals-row" id="smViewProfitMarginRow" style="display:none;">
+          <span>Profit Margin</span><span class="v" id="smViewProfitMargin"></span>
+        </div>
+        <div class="bn-hint" id="smViewProfitWarning" style="display:none;text-align:right;margin-top:4px;">
+          Cost coverage is incomplete for this historical invoice; profit uses the available recorded cost evidence.
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('smViewModal')">Close</button>
+      <button class="btn" id="smViewReturnBtn">Sales Return</button>
+      <button class="btn" id="smViewPayBtn">Receive Payment</button>
+      <button class="btn" id="smViewJpgBtn">Save JPG</button>
+      <button class="btn btn-primary" id="smViewPrintBtn">Print</button>
+      <button class="btn btn-danger" id="smViewDeleteBtn">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Receive Due Payment popup ===== -->
+<div class="modal-overlay" id="smPayModal" hidden>
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Receive Due Payment <span class="bn-hint" style="display:inline;">— বাকির টাকা নিন</span></h3>
+      <button class="modal-close" onclick="closeModal('smPayModal')">
+        &#10005;
+      </button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size: 13px; color: var(--color-text-muted)">
+        Remaining due on this invoice:
+        <strong class="mono" id="smPayCurrentDue"></strong>
+      </p>
+      <p
+        style="
+          font-size: 12px;
+          color: var(--color-text-muted);
+          margin-top: -6px;
+        "
+      >
+        This payment is applied to invoice <strong class="mono" id="smPayInvoiceId"></strong>.
+        Any extra Cash, Bank, or Mobile Banking payment becomes Customer Advance automatically.
+      </p>
+      <div class="form-grid" style="margin-top: 10px">
+        <div>
+          <label>Payment Amount *</label
+          ><input id="smPayAmount" type="number" min="0" step="0.01" />
+        </div>
+        <div>
+          <label>Payment Method</label>
+          <select id="smPayMethod">
+            <option value="Cash">Cash</option>
+            <option value="Bank">Bank</option>
+            <option value="Mobile Banking">Mobile Banking</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div id="smPayBankAccountRow" style="display: none">
+          <label id="smPayBankAccountLabel">Bank Account *</label>
+          <select id="smPayBankAccount">
+            <option value="">Select bank account...</option>
+          </select>
+        </div>
+        <div>
+          <label>Reference Number (Optional)</label
+          ><input id="smPayReference" type="text" />
+        </div>
+        <div class="full">
+          <label>Note</label><input id="smPayNote" type="text" />
+        </div>
+      </div>
+      <div class="field-error" id="smPayError"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('smPayModal')">Cancel</button>
+      <button class="btn btn-primary" id="smPaySaveBtn">Receive Payment</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  var smState = { sales: [], bankAccounts: [], currentInvoiceId: null, currentCustomerId: null, showProfit: false };
+
+  function smLoad() {
+    return withLoader(serverCall("getSalesManagementList", authToken))
+      .then(function (sales) {
+        smState.sales = sales;
+        smState.showProfit = sales.some(function (s) { return Object.prototype.hasOwnProperty.call(s, "profit"); });
+        document.getElementById("smProfitHeader").style.display = smState.showProfit ? "" : "none";
+        smRender();
+        return serverCall("getSalesManagementBankAccounts", authToken);
+      })
+      .then(function (bankAccounts) {
+        smState.bankAccounts = bankAccounts;
+        fillBankAccountSelect_(document.getElementById("smPayBankAccount"), smState.bankAccounts, document.getElementById("smPayMethod").value);
+      })
+      .catch(function (err) {
+        showToast(err.message, "error");
+      });
+  }
+
+  function smRender() {
+    var q = (document.getElementById("smSearch").value || "").toLowerCase();
+    var from = document.getElementById("smDateFrom").value;
+    var to = document.getElementById("smDateTo").value;
+    var payStatus = document.getElementById("smPaymentStatus").value;
+    var retStatus = document.getElementById("smReturnStatus").value;
+
+    var rows = smState.sales.filter(function (s) {
+      var matchesQ =
+        !q ||
+        s.invoiceId.toLowerCase().indexOf(q) !== -1 ||
+        String(s.customerName).toLowerCase().indexOf(q) !== -1 ||
+        phoneSearchMatches_(s.customerPhone, q);
+      var matchesFrom = !from || s.date >= from;
+      var matchesTo = !to || s.date <= to;
+      var matchesPay = !payStatus || s.paymentStatus === payStatus;
+      var matchesRet = !retStatus || s.returnStatus === retStatus;
+      return matchesQ && matchesFrom && matchesTo && matchesPay && matchesRet;
+    });
+
+    var body = document.getElementById("smTableBody");
+    body.innerHTML = "";
+    rows.forEach(function (s) {
+      var payBadge =
+        s.paymentStatus === "Paid"
+          ? "badge-success"
+          : s.paymentStatus === "Partial"
+            ? "badge-warning"
+            : "badge-danger";
+      var retBadge =
+        s.returnStatus === "No Return"
+          ? ""
+          : s.returnStatus === "Fully Returned" || s.returnStatus === "Integrity Error"
+            ? "badge-danger"
+            : "badge-warning";
+      var integrityBadge = s.duplicateInvoiceId
+        ? ' <span class="badge badge-danger" title="Duplicate historical invoice ID. Repair data before using invoice actions.">Duplicate ID</span>'
+        : '';
+      var tr = document.createElement("tr");
+      tr.innerHTML =
+        '<td class="mono"><button type="button" class="party-ledger-link mono" data-invoice-view-id="' + s.invoiceId + '" title="Open invoice">' +
+        escapeHtml(s.invoiceId) + '</button>' + integrityBadge +
+        "</td>" +
+        "<td>" +
+        escapeHtml(s.date) +
+        "</td>" +
+        "<td>" +
+        (s.customerId
+          ? '<button type="button" class="party-ledger-link" data-customer-profile-id="' + s.customerId + '" title="Open customer">' + escapeHtml(s.customerName || "") + '</button>'
+          : escapeHtml(s.customerName || "")) +
+        "</td>" +
+        "<td>" +
+        escapeHtml(s.customerPhone || "") +
+        "</td>" +
+        '<td class="num mono">' +
+        formatMoney(s.grandTotal) +
+        "</td>" +
+        '<td class="num mono">' +
+        formatMoney(s.paidAmount) +
+        ((Number(s.customerCreditUsed) || 0) > 0 ? '<span class="bn-hint" style="display:block;">Credit</span>' : '') +
+        "</td>" +
+        '<td class="num mono">' +
+        formatMoney(s.dueAmount) +
+        "</td>" +
+        '<td class="num mono">' +
+        (s.duplicateInvoiceId ? '&mdash;' : formatMoney(s.returnedAmount)) +
+        "</td>" +
+        (smState.showProfit
+          ? '<td class="num mono"' + (!s.profitCostComplete && !s.duplicateInvoiceId ? ' title="Incomplete historical cost coverage; profit uses available recorded cost evidence."' : '') + '>' +
+            (s.duplicateInvoiceId || !Object.prototype.hasOwnProperty.call(s, "profit") ? '&mdash;' : formatMoney(s.profit)) +
+            (!s.profitCostComplete && !s.duplicateInvoiceId && Object.prototype.hasOwnProperty.call(s, "profit") ? '<span class="bn-hint" style="display:block;">Cost incomplete</span>' : '') +
+            '</td>'
+          : '') +
+        '<td><span class="badge ' +
+        payBadge +
+        '">' +
+        s.paymentStatus +
+        "</span>" +
+        (retBadge
+          ? ' <span class="badge ' +
+            retBadge +
+            '">' +
+            s.returnStatus +
+            "</span>"
+          : "") +
+        "</td>" +
+        '<td style="white-space:nowrap;"><button class="btn" data-act="menu" data-id="' + s.invoiceId + '" aria-haspopup="menu" aria-expanded="false"' + (s.duplicateInvoiceId ? ' disabled title="Duplicate invoice ID must be repaired before actions can continue"' : '') + '>Actions &#9662;</button></td>';
+      body.appendChild(tr);
+    });
+    document.getElementById("smEmpty").hidden = rows.length > 0;
+    if (window.requestAnimationFrame) requestAnimationFrame(smSyncTopScrollbar_);
+    else setTimeout(smSyncTopScrollbar_, 0);
+  }
+
+  var smTopScrollSyncing_ = false;
+
+  function smSyncTopScrollbar_() {
+    var top = document.getElementById("smTopScroll");
+    var inner = document.getElementById("smTopScrollInner");
+    var tableScroll = document.getElementById("smTableScroll");
+    if (!top || !inner || !tableScroll) return;
+
+    var hasOverflow = tableScroll.scrollWidth - tableScroll.clientWidth > 1;
+    top.style.display = hasOverflow ? "block" : "none";
+    if (!hasOverflow) {
+      top.scrollLeft = 0;
+      return;
+    }
+
+    inner.style.width = tableScroll.scrollWidth + "px";
+    if (!smTopScrollSyncing_) {
+      smTopScrollSyncing_ = true;
+      top.scrollLeft = tableScroll.scrollLeft;
+      smTopScrollSyncing_ = false;
+    }
+  }
+
+  function smWireTopScrollbar_() {
+    var top = document.getElementById("smTopScroll");
+    var tableScroll = document.getElementById("smTableScroll");
+    if (!top || !tableScroll || top.dataset.wired === "1") return;
+    top.dataset.wired = "1";
+
+    top.addEventListener("scroll", function () {
+      if (smTopScrollSyncing_) return;
+      smTopScrollSyncing_ = true;
+      tableScroll.scrollLeft = top.scrollLeft;
+      smTopScrollSyncing_ = false;
+    }, { passive: true });
+
+    tableScroll.addEventListener("scroll", function () {
+      if (smTopScrollSyncing_) return;
+      smTopScrollSyncing_ = true;
+      top.scrollLeft = tableScroll.scrollLeft;
+      smTopScrollSyncing_ = false;
+    }, { passive: true });
+
+    window.addEventListener("resize", smSyncTopScrollbar_);
+    if (window.ResizeObserver) {
+      new ResizeObserver(smSyncTopScrollbar_).observe(tableScroll);
+    }
+    smSyncTopScrollbar_();
+  }
+
+  smWireTopScrollbar_();
+
+  [
+    "smSearch",
+    "smDateFrom",
+    "smDateTo",
+    "smPaymentStatus",
+    "smReturnStatus",
+  ].forEach(function (id) {
+    document.getElementById(id).addEventListener("input", smRender);
+    document.getElementById(id).addEventListener("change", smRender);
+  });
+  document.getElementById("smRefreshBtn").addEventListener("click", smLoad);
+
+  document
+    .getElementById("smTableBody")
+    .addEventListener("click", function (e) {
+      var invoiceLink = e.target.closest("button[data-invoice-view-id]");
+      if (invoiceLink) {
+        smOpenView_(invoiceLink.dataset.invoiceViewId || "");
+        return;
+      }
+
+      var customerLink = e.target.closest("button[data-customer-profile-id]");
+      if (customerLink) {
+        var customerId = customerLink.dataset.customerProfileId || "";
+        if (!customerId) return;
+        goToPage('customers');
+        if (currentPage !== 'customers') {
+          showToast('You do not have access to Customers.', 'error');
+          return;
+        }
+        if (typeof custOpenDetail_ === 'function') custOpenDetail_(customerId);
+        return;
+      }
+
+      var btn = e.target.closest("button[data-act]");
+      if (!btn || btn.dataset.act !== 'menu') return;
+      var id = btn.dataset.id;
+      var row = smState.sales.filter(function (x) { return x.invoiceId === id; })[0];
+      if (!row) return;
+      openRowActionMenu_(btn, [
+        { action: 'view', label: 'View' },
+        { action: 'duplicate', label: 'Duplicate' },
+        { action: 'edit', label: 'Edit', disabled: !row.editable, title: row.editable ? '' : 'This invoice is no longer available for editing' },
+        { action: 'receive-payment', label: 'Receive Payment', hidden: !row.customerId || Number(row.dueAmount) <= 0.004 },
+        { action: 'return', label: 'Sales Return' },
+        { divider: true },
+        { action: 'delete', label: 'Delete', danger: true }
+      ], function (action) {
+        if (action === 'view') smOpenView_(id);
+        if (action === 'duplicate') smDuplicateSale_(id);
+        if (action === 'edit') smUpdateInvoice_(id);
+        if (action === 'receive-payment') smOpenPayForInvoice_(row);
+        if (action === 'return') {
+          goToPage('returns');
+          returnsLoadInvoiceById_(id);
+        }
+        if (action === 'delete') smDeleteInvoice_(row);
+      });
+    });
+
+  function smOpenView_(invoiceId) {
+    withLoader(serverCall("getSaleDetail", authToken, invoiceId))
+      .then(function (inv) {
+        smState.currentInvoiceId = inv.invoiceId;
+        smState.currentCustomerId = inv.customerId;
+        smState._lastDetail = inv;
+
+        document.getElementById("smViewInvoiceId").textContent = inv.invoiceId;
+        document.getElementById("smViewCustomer").textContent =
+          inv.customerName || "Walk-in Customer";
+        document.getElementById("smViewPhone").textContent =
+          inv.customerPhone || "\u2014";
+        document.getElementById("smViewAddress").textContent =
+          inv.customerAddress || "\u2014";
+
+        var body = document.getElementById("smViewItemsBody");
+        body.innerHTML = "";
+        inv.items.forEach(function (i) {
+          var tr = document.createElement("tr");
+          tr.innerHTML =
+            "<td>" +
+            escapeHtml(i.name) +
+            '</td><td class="num">' +
+            i.qty +
+            '</td><td class="num mono">' +
+            formatMoney(i.unitPrice) +
+            '</td><td class="num mono">' +
+            formatMoney(i.lineTotal) +
+            "</td>";
+          body.appendChild(tr);
+        });
+
+        document.getElementById("smViewSubtotal").textContent = formatMoney(
+          inv.subtotal,
+        );
+        document.getElementById("smViewDiscount").textContent = formatMoney(
+          inv.discount,
+        );
+        document.getElementById("smViewGrandTotal").textContent = formatMoney(
+          inv.grandTotal,
+        );
+        document.getElementById("smViewPaid").textContent = formatMoney(
+          inv.paidAmount,
+        );
+        var creditUsed = Number(inv.customerCreditUsed) || 0;
+        document.getElementById("smViewCredit").textContent = formatMoney(creditUsed);
+        document.getElementById("smViewCreditRow").style.display = creditUsed > 0 ? "flex" : "none";
+        document.getElementById("smViewDue").textContent = formatMoney(
+          inv.dueAmount,
+        );
+        document.getElementById("smViewReturned").textContent = formatMoney(
+          inv.returnedAmount,
+        );
+        document.getElementById("smViewNetSale").textContent = formatMoney(
+          inv.netSale,
+        );
+        var canSeeProfit = Object.prototype.hasOwnProperty.call(inv, "profit");
+        document.getElementById("smViewProfitRow").style.display = canSeeProfit ? "flex" : "none";
+        document.getElementById("smViewProfitMarginRow").style.display = canSeeProfit ? "flex" : "none";
+        document.getElementById("smViewProfitWarning").style.display = canSeeProfit && !inv.profitCostComplete ? "block" : "none";
+        if (canSeeProfit) {
+          document.getElementById("smViewProfit").textContent = formatMoney(inv.profit);
+          document.getElementById("smViewProfitMargin").textContent = (Number(inv.profitMarginPercent) || 0).toFixed(2) + "%";
+        }
+        document.getElementById("smViewPayBtn").style.display =
+          inv.dueAmount > 0 ? "inline-flex" : "none";
+
+        openModal("smViewModal");
+      })
+      .catch(function (err) {
+        showToast(err.message, "error");
+      });
+  }
+
+  document
+    .getElementById("smViewPrintBtn")
+    .addEventListener("click", function () {
+      posRenderInvoice_(smState._lastDetail);
+      closeModal("smViewModal");
+      openModal("invoiceModal");
+      setTimeout(function () {
+        printInvoice_();
+      }, 150);
+    });
+  document
+    .getElementById("smViewJpgBtn")
+    .addEventListener("click", function () {
+      downloadInvoiceJpg_(smState._lastDetail);
+    });
+  document
+    .getElementById("smViewReturnBtn")
+    .addEventListener("click", function () {
+      var id = smState.currentInvoiceId;
+      closeModal("smViewModal");
+      goToPage("returns");
+      returnsLoadInvoiceById_(id);
+    });
+  document
+    .getElementById("smViewPayBtn")
+    .addEventListener("click", function () {
+      smOpenPay_();
+    });
+  document
+    .getElementById("smViewDeleteBtn")
+    .addEventListener("click", function () {
+      smDeleteInvoice_(smState._lastDetail);
+    });
+
+  /**
+   * Reuses the same deleteDayBookEntry dispatch Day Book's own Delete
+   * button calls for Sales rows, so this is the identical permission
+   * check, day-window check, and stock/cash/due reversal - not a second
+   * copy of that logic.
+   */
+  function smDeleteInvoice_(inv) {
+    if (!inv) return;
+    closeModal("smViewModal");
+    confirmDelete({
+      title: "Delete invoice " + inv.invoiceId,
+      summary:
+        "<p><b>" + escapeHtml(inv.invoiceId) + "</b>" +
+        (inv.customerName ? " &mdash; " + escapeHtml(inv.customerName) : "") +
+        "<br>" + formatMoney(inv.grandTotal) + "</p>",
+      fn: "deleteDayBookEntry",
+      args: ["sales", inv.invoiceId],
+      reloadPages: ["sales", "dashboard"],
+    });
+  }
+
+  function smOpenPayForInvoice_(row) {
+    if (!row || !row.invoiceId || !row.customerId || Number(row.dueAmount) <= 0.004) return;
+    smState.currentInvoiceId = row.invoiceId;
+    smState.currentCustomerId = row.customerId;
+    smOpenPay_();
+  }
+
+  function smOpenPay_() {
+    if (!smState.currentInvoiceId || !smState.currentCustomerId) {
+      showToast("This invoice has no linked customer to pay against.", "error");
+      return;
+    }
+    var invoiceId = smState.currentInvoiceId;
+    closeModal("smViewModal");
+    withLoader(serverCall("getInvoicePaymentContext", authToken, invoiceId))
+      .then(function (ctx) {
+        if (invoiceId !== smState.currentInvoiceId) return;
+        document.getElementById("smPayCurrentDue").textContent = formatMoney(ctx.invoiceRemainingDue || 0);
+        document.getElementById("smPayInvoiceId").textContent = invoiceId;
+        document.getElementById("smPayAmount").value = "";
+        document.getElementById("smPayMethod").value = "Cash";
+        document.getElementById("smPayBankAccountRow").style.display = "none";
+        document.getElementById("smPayReference").value = "";
+        document.getElementById("smPayNote").value = "";
+        document.getElementById("smPayError").style.display = "none";
+        openModal("smPayModal");
+      })
+      .catch(function (err) { showToast(err.message, "error"); });
+  }
+
+  document.getElementById("smPayMethod").addEventListener("change", function () {
+    document.getElementById("smPayBankAccountRow").style.display = paymentMethodNeedsAccount_(this.value) ? "" : "none";
+    document.getElementById("smPayBankAccountLabel").textContent = (this.value === "Mobile Banking" ? "Mobile Banking Account *" : "Bank Account *");
+    fillBankAccountSelect_(document.getElementById("smPayBankAccount"), smState.bankAccounts, this.value);
+  });
+
+  document
+    .getElementById("smPaySaveBtn")
+    .addEventListener("click", function () {
+      var errEl = document.getElementById("smPayError");
+      errEl.style.display = "none";
+      if (!smState.currentCustomerId) {
+        errEl.textContent =
+          "This invoice has no linked customer to pay against.";
+        errEl.style.display = "block";
+        return;
+      }
+
+      var amount = document.getElementById("smPayAmount").value;
+      var method = document.getElementById("smPayMethod").value;
+      var bankAccountId = document.getElementById("smPayBankAccount").value;
+      var ref = document.getElementById("smPayReference").value.trim();
+      var note = document.getElementById("smPayNote").value.trim();
+      var combinedNote = ref
+        ? "Ref: " + ref + (note ? " \u2014 " + note : "")
+        : note;
+
+      withLoader(
+        serverCall(
+          "receivePayment",
+          authToken,
+          smState.currentCustomerId,
+          amount,
+          method,
+          bankAccountId,
+          combinedNote,
+          "",
+          "",
+          0,
+          "",
+          smState.currentInvoiceId,
+        ),
+      )
+        .then(function () {
+          closeModal("smPayModal");
+          showToast("Payment recorded", "success");
+          smLoad();
+        })
+        .catch(function (err) {
+          errEl.textContent = err.message;
+          errEl.style.display = "block";
+        });
+    });
+
+  function smDuplicateSale_(invoiceId) {
+    withLoader(serverCall("findInvoice", authToken, invoiceId))
+      .then(function (inv) {
+        goToPage("pos");
+        posLoadDuplicateInvoice_(inv);
+        showToast(
+          "Loaded into POS \u2014 adjust and complete the sale",
+          "success",
+        );
+      })
+      .catch(function (err) {
+        showToast(err.message, "error");
+      });
+  }
+  function smUpdateInvoice_(invoiceId) {
+    var reason = promptForUpdateReason_();
+    if (!reason) return;
+    withLoader(serverCall('getSaleForUpdate', authToken, invoiceId))
+      .then(function (inv) {
+        goToPage('pos');
+        posLoadUpdateInvoice_(inv, reason, 'legacy');
+        showToast('Loaded into POS for update — adjust and save', 'success');
+      })
+      .catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  document.addEventListener("DOMContentLoaded", function () {
+    var origGoToPage = goToPage;
+    goToPage = function (key) {
+      origGoToPage(key);
+      if (key === "sales" && !smState._loaded) {
+        smState._loaded = true;
+        smLoad();
+      }
+    };
+  });
+</script>

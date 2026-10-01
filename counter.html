@@ -1,0 +1,1093 @@
+<div class="counter-page" id="counterPage">
+  <div class="page-header"><div><h2>Counter</h2><span class="bn-hint">দ্রুত লেনদেন</span></div></div>
+  <div class="counter-type-switch" role="tablist" aria-label="Counter transaction type">
+    <button type="button" class="btn counter-type-btn" data-counter-type="customer">Customer Receive</button>
+    <button type="button" class="btn counter-type-btn" data-counter-type="supplier">Supplier Pay</button>
+    <button type="button" class="btn counter-type-btn" data-counter-type="expense">Expense</button>
+    <button type="button" class="btn counter-type-btn" data-counter-type="transfer">Bank Transfer</button>
+  </div>
+  <div id="counterWorkspace" class="counter-workspace">
+    <section id="counterCustomerPanel" class="card counter-form-panel" data-counter-panel="customer">
+      <div class="counter-field">
+        <label for="counterCustomerSearch">Customer</label>
+        <div class="counter-party-picker">
+          <div class="counter-combobox">
+            <input id="counterCustomerSearch" type="search" autocomplete="off" placeholder="Search customer by name or phone...">
+            <div id="counterCustomerResults" class="counter-combo-results" hidden></div>
+          </div>
+          <button type="button" class="btn" id="counterCustomerAdd">+ Add</button>
+        </div>
+      </div>
+      <div class="counter-balance-line"><span>Current Due</span><strong id="counterCustomerDue">—</strong></div>
+      <div class="counter-balance-line">
+        <span>Customer Credit</span>
+        <span><strong id="counterCustomerAdvance">—</strong> <button type="button" class="btn btn-sm" id="counterCustomerAdvanceRefundBtn" hidden>Refund Credit</button></span>
+      </div>
+      <div class="counter-grid">
+        <div class="counter-field">
+          <label for="counterCustomerAmount">Amount *</label>
+          <input id="counterCustomerAmount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00">
+          <div class="counter-amount-words" id="counterCustomerWords"></div>
+        </div>
+        <div class="counter-field">
+          <label for="counterCustomerDiscount">Discount Given</label>
+          <input id="counterCustomerDiscount" type="number" inputmode="decimal" min="0" step="0.01" value="0">
+        </div>
+        <div class="counter-field counter-span-2" id="counterCustomerDiscountReasonRow" hidden>
+          <label for="counterCustomerDiscountReason">Discount Reason *</label>
+          <input id="counterCustomerDiscountReason" type="text" placeholder="Why is this discount being given?">
+        </div>
+        <div class="counter-field">
+          <label for="counterCustomerMethod">Payment Method</label>
+          <select id="counterCustomerMethod"><option value="Cash">Cash</option><option value="Bank">Bank</option><option value="Mobile Banking">Mobile Banking</option></select>
+        </div>
+        <div class="counter-field" id="counterCustomerAccountRow" hidden>
+          <label for="counterCustomerAccount" id="counterCustomerAccountLabel">Bank Account *</label>
+          <select id="counterCustomerAccount"><option value="">Select account...</option></select>
+        </div>
+      </div>
+      <div class="counter-settlement-summary">
+        <span>Total Settled <strong id="counterCustomerTotal">0</strong></span>
+        <span>Balance After <strong id="counterCustomerBalance">—</strong></span>
+      </div>
+      <details id="counterCustomerMore" class="counter-more">
+        <summary>More details</summary>
+        <div class="counter-grid">
+          <div class="counter-field counter-span-2">
+            <label for="counterCustomerInvoice">Apply to invoice (optional)</label>
+            <select id="counterCustomerInvoice"><option value="">Auto — oldest due first</option></select>
+          </div>
+          <div class="counter-field"><label for="counterCustomerDate">Payment Date</label><input id="counterCustomerDate" type="date"></div>
+          <div class="counter-field"><label for="counterCustomerNote">Note</label><input id="counterCustomerNote" type="text" placeholder="Optional"></div>
+          <div class="counter-field counter-span-2" id="counterCustomerBackdatedReasonRow" hidden><label for="counterCustomerBackdatedReason">Reason for Backdating *</label><input id="counterCustomerBackdatedReason" type="text" placeholder="Why is this dated in the past?"></div>
+        </div>
+      </details>
+      <div class="field-error" id="counterCustomerError"></div>
+      <div class="counter-post-row"><button type="button" class="btn btn-primary btn-lg counter-post-btn" id="counterCustomerPost">RECEIVE</button></div>
+    </section>
+    <section id="counterSupplierPanel" class="card counter-form-panel" data-counter-panel="supplier" hidden>
+      <div class="counter-field">
+        <label for="counterSupplierSearch">Supplier</label>
+        <div class="counter-party-picker">
+          <div class="counter-combobox">
+            <input id="counterSupplierSearch" type="search" autocomplete="off" placeholder="Search supplier by name or phone...">
+            <div id="counterSupplierResults" class="counter-combo-results" hidden></div>
+          </div>
+          <button type="button" class="btn" id="counterSupplierAdd">+ Add</button>
+        </div>
+      </div>
+      <div class="counter-balance-line"><span>Current Payable</span><strong id="counterSupplierPayable">—</strong></div>
+      <div class="counter-grid">
+        <div class="counter-field">
+          <label for="counterSupplierAmount">Amount *</label>
+          <input id="counterSupplierAmount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00">
+          <div class="counter-amount-words" id="counterSupplierWords"></div>
+        </div>
+        <div class="counter-field">
+          <label for="counterSupplierDiscount">Discount Received</label>
+          <input id="counterSupplierDiscount" type="number" inputmode="decimal" min="0" step="0.01" value="0">
+        </div>
+        <div class="counter-field counter-span-2" id="counterSupplierDiscountReasonRow" hidden>
+          <label for="counterSupplierDiscountReason">Discount Reason *</label>
+          <input id="counterSupplierDiscountReason" type="text" placeholder="Why did the supplier give this discount?">
+        </div>
+        <div class="counter-field">
+          <label for="counterSupplierMethod">Payment Method</label>
+          <select id="counterSupplierMethod"><option value="Cash">Cash</option><option value="Bank">Bank</option><option value="Mobile Banking">Mobile Banking</option></select>
+        </div>
+        <div class="counter-field" id="counterSupplierAccountRow" hidden>
+          <label for="counterSupplierAccount" id="counterSupplierAccountLabel">Bank Account *</label>
+          <select id="counterSupplierAccount"><option value="">Select account...</option></select>
+        </div>
+      </div>
+      <div class="counter-settlement-summary">
+        <span>Total Settled <strong id="counterSupplierTotal">0</strong></span>
+        <span>Balance After <strong id="counterSupplierBalance">—</strong></span>
+      </div>
+      <details id="counterSupplierMore" class="counter-more">
+        <summary>More details</summary>
+        <div class="counter-grid">
+          <div class="counter-field"><label for="counterSupplierDate">Payment Date</label><input id="counterSupplierDate" type="date"></div>
+          <div class="counter-field"><label for="counterSupplierNote">Note</label><input id="counterSupplierNote" type="text" placeholder="Optional"></div>
+          <div class="counter-field counter-span-2" id="counterSupplierBackdatedReasonRow" hidden><label for="counterSupplierBackdatedReason">Reason for Backdating *</label><input id="counterSupplierBackdatedReason" type="text" placeholder="Why is this dated in the past?"></div>
+        </div>
+      </details>
+      <div class="field-error" id="counterSupplierError"></div>
+      <div class="counter-post-row"><button type="button" class="btn btn-primary btn-lg counter-post-btn" id="counterSupplierPost">PAY SUPPLIER</button></div>
+    </section>
+    <section id="counterExpensePanel" class="card counter-form-panel" data-counter-panel="expense" hidden>
+      <div class="counter-grid">
+        <div class="counter-field">
+          <label for="counterExpenseCategory">Expense Category *</label>
+          <div class="counter-party-picker">
+            <select id="counterExpenseCategory"><option value="">Select category...</option></select>
+            <button type="button" class="btn" id="counterExpenseCategoryAdd">+ Add</button>
+          </div>
+          <div class="counter-quick-add-row" id="counterExpenseCategoryQuick" hidden>
+            <input id="counterExpenseCategoryName" type="text" placeholder="New category name">
+            <button type="button" class="btn btn-primary" id="counterExpenseCategorySave">Save</button>
+          </div>
+        </div>
+        <div class="counter-field">
+          <label for="counterExpensePayee">Payee *</label>
+          <div class="counter-party-picker">
+            <select id="counterExpensePayee"><option value="">Select payee...</option></select>
+            <button type="button" class="btn" id="counterExpensePayeeAdd">+ Add</button>
+          </div>
+          <div class="counter-quick-add-row counter-quick-add-payee" id="counterExpensePayeeQuick" hidden>
+            <input id="counterExpensePayeeName" type="text" placeholder="Payee name">
+            <input id="counterExpensePayeePhone" type="tel" inputmode="tel" placeholder="Phone (optional)">
+            <button type="button" class="btn btn-primary" id="counterExpensePayeeSave">Save</button>
+          </div>
+        </div>
+        <div class="counter-field counter-span-2">
+          <label for="counterExpenseDescription">Description</label>
+          <input id="counterExpenseDescription" type="text" placeholder="What was this expense for?">
+        </div>
+        <div class="counter-field">
+          <label for="counterExpenseAmount">Amount *</label>
+          <input id="counterExpenseAmount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00">
+          <div class="counter-amount-words" id="counterExpenseWords"></div>
+        </div>
+        <div class="counter-field">
+          <label for="counterExpenseMethod">Payment Method *</label>
+          <select id="counterExpenseMethod"></select>
+        </div>
+        <div class="counter-field counter-span-2" id="counterExpenseAccountRow" hidden>
+          <label for="counterExpenseAccount" id="counterExpenseAccountLabel">Bank Account *</label>
+          <select id="counterExpenseAccount"><option value="">Select account...</option></select>
+        </div>
+      </div>
+      <details id="counterExpenseMore" class="counter-more">
+        <summary>More details</summary>
+        <div class="counter-grid">
+          <div class="counter-field"><label for="counterExpenseDate">Expense Date</label><input id="counterExpenseDate" type="date"></div>
+          <div class="counter-field"><label for="counterExpenseReference">Reference No.</label><input id="counterExpenseReference" type="text" placeholder="Optional"></div>
+          <div class="counter-field counter-span-2"><label for="counterExpenseNotes">Notes</label><textarea id="counterExpenseNotes" rows="2" placeholder="Optional"></textarea></div>
+          <div class="counter-field counter-span-2" id="counterExpenseBackdatedReasonRow" hidden><label for="counterExpenseBackdatedReason">Reason for Backdating *</label><input id="counterExpenseBackdatedReason" type="text" placeholder="Why is this dated in the past?"></div>
+        </div>
+      </details>
+      <div class="field-error" id="counterExpenseError"></div>
+      <div class="counter-post-row"><button type="button" class="btn btn-primary btn-lg counter-post-btn" id="counterExpensePost">ADD EXPENSE</button></div>
+    </section>
+    <section id="counterTransferPanel" class="card counter-form-panel" data-counter-panel="transfer" hidden>
+      <div class="counter-grid">
+        <div class="counter-field">
+          <label for="counterTransferFrom">From Account *</label>
+          <select id="counterTransferFrom"><option value="">Select account...</option></select>
+        </div>
+        <div class="counter-field">
+          <label for="counterTransferTo">To Account *</label>
+          <select id="counterTransferTo"><option value="">Select account...</option></select>
+        </div>
+        <div class="counter-field counter-span-2">
+          <label for="counterTransferAmount">Amount *</label>
+          <input id="counterTransferAmount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00">
+          <div class="counter-amount-words" id="counterTransferWords"></div>
+        </div>
+      </div>
+      <details id="counterTransferMore" class="counter-more">
+        <summary>More details</summary>
+        <div class="counter-field"><label for="counterTransferNotes">Notes</label><textarea id="counterTransferNotes" rows="2" placeholder="Optional"></textarea></div>
+      </details>
+      <div class="field-error" id="counterTransferError"></div>
+      <div class="counter-post-row"><button type="button" class="btn btn-primary btn-lg counter-post-btn" id="counterTransferPost">TRANSFER</button></div>
+    </section>
+  </div>
+</div>
+
+<div class="modal-overlay" id="counterAdvanceRefundModal" hidden>
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Refund Credit</h3>
+      <button class="modal-close" type="button" onclick="closeModal('counterAdvanceRefundModal')">&#10005;</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--color-text-muted)">Available Customer Credit: <strong id="counterAdvanceRefundAvailable">0</strong></p>
+      <div class="form-grid">
+        <div><label for="counterAdvanceRefundAmount">Refund Amount *</label><input id="counterAdvanceRefundAmount" type="number" min="0" step="0.01"></div>
+        <div><label for="counterAdvanceRefundMethod">Refund Method</label><select id="counterAdvanceRefundMethod"><option value="Cash">Cash</option><option value="Bank">Bank</option><option value="Mobile Banking">Mobile Banking</option></select></div>
+        <div id="counterAdvanceRefundAccountRow" hidden><label id="counterAdvanceRefundAccountLabel" for="counterAdvanceRefundAccount">Bank Account *</label><select id="counterAdvanceRefundAccount"><option value="">Select account...</option></select></div>
+        <div><label for="counterAdvanceRefundDate">Refund Date</label><input id="counterAdvanceRefundDate" type="date"></div>
+        <div class="full"><label for="counterAdvanceRefundNote">Note</label><input id="counterAdvanceRefundNote" type="text" placeholder="Optional"></div>
+        <div class="full" id="counterAdvanceRefundBackdatedRow" hidden><label for="counterAdvanceRefundBackdatedReason">Reason for Backdating *</label><input id="counterAdvanceRefundBackdatedReason" type="text"></div>
+      </div>
+      <div class="field-error" id="counterAdvanceRefundError"></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn" onclick="closeModal('counterAdvanceRefundModal')">Cancel</button>
+      <button type="button" class="btn btn-primary" id="counterAdvanceRefundSaveBtn">Refund Credit</button>
+    </div>
+  </div>
+</div>
+<script>
+  var COUNTER_BN_0_99_ = [
+    'শূন্য','এক','দুই','তিন','চার','পাঁচ','ছয়','সাত','আট','নয়',
+    'দশ','এগারো','বারো','তেরো','চৌদ্দ','পনেরো','ষোলো','সতেরো','আঠারো','উনিশ',
+    'বিশ','একুশ','বাইশ','তেইশ','চব্বিশ','পঁচিশ','ছাব্বিশ','সাতাশ','আটাশ','ঊনত্রিশ',
+    'ত্রিশ','একত্রিশ','বত্রিশ','তেত্রিশ','চৌত্রিশ','পঁয়ত্রিশ','ছত্রিশ','সাঁইত্রিশ','আটত্রিশ','ঊনচল্লিশ',
+    'চল্লিশ','একচল্লিশ','বিয়াল্লিশ','তেতাল্লিশ','চুয়াল্লিশ','পঁয়তাল্লিশ','ছেচল্লিশ','সাতচল্লিশ','আটচল্লিশ','ঊনপঞ্চাশ',
+    'পঞ্চাশ','একান্ন','বাহান্ন','তিপ্পান্ন','চুয়ান্ন','পঞ্চান্ন','ছাপ্পান্ন','সাতান্ন','আটান্ন','ঊনষাট',
+    'ষাট','একষট্টি','বাষট্টি','তেষট্টি','চৌষট্টি','পঁয়ষট্টি','ছেষট্টি','সাতষট্টি','আটষট্টি','ঊনসত্তর',
+    'সত্তর','একাত্তর','বাহাত্তর','তিয়াত্তর','চুয়াত্তর','পঁচাত্তর','ছিয়াত্তর','সাতাত্তর','আটাত্তর','ঊনআশি',
+    'আশি','একাশি','বিরাশি','তিরাশি','চুরাশি','পঁচাশি','ছিয়াশি','সাতাশি','আটাশি','ঊননব্বই',
+    'নব্বই','একানব্বই','বিরানব্বই','তিরানব্বই','চুরানব্বই','পঁচানব্বই','ছিয়ানব্বই','সাতানব্বই','আটানব্বই','নিরানব্বই'
+  ];
+
+  function counterBanglaInteger_(n) {
+    n = Math.floor(Number(n) || 0);
+    if (n <= 0) return '';
+    if (n < 100) return COUNTER_BN_0_99_[n];
+    var parts = [];
+    if (n >= 10000000) {
+      var crore = Math.floor(n / 10000000);
+      parts.push(counterBanglaInteger_(crore) + ' কোটি');
+      n %= 10000000;
+    }
+    if (n >= 100000) {
+      var lakh = Math.floor(n / 100000);
+      parts.push(counterBanglaInteger_(lakh) + ' লাখ');
+      n %= 100000;
+    }
+    if (n >= 1000) {
+      var thousand = Math.floor(n / 1000);
+      parts.push(counterBanglaInteger_(thousand) + ' হাজার');
+      n %= 1000;
+    }
+    if (n >= 100) {
+      var hundred = Math.floor(n / 100);
+      parts.push(COUNTER_BN_0_99_[hundred] + 'শ');
+      n %= 100;
+    }
+    if (n > 0) parts.push(COUNTER_BN_0_99_[n]);
+    return parts.join(' ');
+  }
+
+  function counterAmountInBangla_(value) {
+    if (typeof banglaAmountInWords_ === 'function') return banglaAmountInWords_(value);
+    // Isolated-test fallback. Production Counter uses the shared converter.
+    if (value === null || value === undefined || String(value).trim() === '') return '';
+    var cleaned = String(value).replace(/,/g, '').trim();
+    var num = Number(cleaned);
+    if (!isFinite(num) || num <= 0) return '';
+    var totalPoisha = Math.round(num * 100);
+    var taka = Math.floor(totalPoisha / 100);
+    var poisha = totalPoisha % 100;
+    var text = (counterBanglaInteger_(taka) || COUNTER_BN_0_99_[0]) + ' টাকা';
+    if (poisha > 0) text += ' ' + counterBanglaInteger_(poisha) + ' পয়সা';
+    return text + ' মাত্র';
+  }
+
+  function counterNormalizeSearch_(text) {
+    var value = String(text || '');
+    try { value = value.normalize('NFKC'); } catch (e) {}
+    return value.toLowerCase().replace(/\s+/g, ' ').trim();
+  }
+
+  function counterFilterItems_(items, query) {
+    var q = counterNormalizeSearch_(query);
+    if (!q) return (items || []).slice(0, 20);
+    return (items || []).filter(function (item) {
+      var nameHay = counterNormalizeSearch_(item.name || '');
+      return nameHay.indexOf(q) !== -1 || phoneSearchMatches_(item.phone, query);
+    }).slice(0, 20);
+  }
+
+  function counterCreateCombobox_(config) {
+    var input = config.input;
+    var results = config.results;
+    var items = config.items || [];
+    var matches = [];
+    var activeIndex = -1;
+
+    function close_() {
+      results.hidden = true;
+      results.innerHTML = '';
+      activeIndex = -1;
+    }
+
+    function render_() {
+      matches = counterFilterItems_(items, input.value);
+      results.innerHTML = '';
+      matches.forEach(function (item, index) {
+        var row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'counter-combo-option' + (index === activeIndex ? ' active' : '');
+        row.dataset.id = item.id;
+        row.innerHTML = '<span><strong>' + escapeHtml(item.name || '') + '</strong>' +
+          (item.phone ? '<small>' + escapeHtml(item.phone) + '</small>' : '') + '</span>' +
+          (config.metaText ? '<span class="counter-combo-meta">' + escapeHtml(config.metaText(item)) + '</span>' : '');
+        row.addEventListener('mousedown', function (e) { e.preventDefault(); select_(item); });
+        results.appendChild(row);
+      });
+      results.hidden = matches.length === 0;
+    }
+
+    function select_(item) {
+      input.value = item.name || '';
+      input.dataset.selectedId = item.id || '';
+      close_();
+      if (config.onSelect) config.onSelect(item);
+    }
+
+    input.addEventListener('input', function () {
+      input.dataset.selectedId = '';
+      activeIndex = -1;
+      if (config.onSelect) config.onSelect(null);
+      render_();
+    });
+    input.addEventListener('focus', render_);
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (!matches.length) render_();
+        if (matches.length) activeIndex = Math.min(activeIndex + 1, matches.length - 1);
+        render_();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (matches.length) activeIndex = Math.max(activeIndex - 1, 0);
+        render_();
+      } else if (e.key === 'Enter') {
+        if (!results.hidden && matches.length) {
+          e.preventDefault();
+          select_(matches[activeIndex >= 0 ? activeIndex : 0]);
+        }
+      } else if (e.key === 'Escape') {
+        close_();
+      }
+    });
+    input.addEventListener('blur', function () { setTimeout(close_, 120); });
+
+    return {
+      setItems: function (next) { items = next || []; },
+      selectById: function (id) {
+        var item = items.filter(function (x) { return String(x.id) === String(id); })[0];
+        if (item) select_(item);
+        return item || null;
+      },
+      clear: function () { input.value = ''; input.dataset.selectedId = ''; close_(); },
+      focus: function () { input.focus(); },
+      getSelectedId: function () { return input.dataset.selectedId || ''; }
+    };
+  }
+
+
+  function counterWireEnterAdvance_(panel) {
+    if (!panel || panel.dataset.counterEnterWired === '1') return;
+    panel.dataset.counterEnterWired = '1';
+    panel.addEventListener('keydown', function (e) {
+      if (e.defaultPrevented || e.key !== 'Enter') return;
+      var target = e.target;
+      var type = String(target && target.type || '').toLowerCase();
+      if (type === 'search' || (target && target.tagName === 'TEXTAREA')) return;
+      if (target && target.classList && target.classList.contains('counter-post-btn')) return;
+      var fields = Array.prototype.filter.call(panel.querySelectorAll('input, select, button.counter-post-btn'), function (el) {
+        if (el.disabled || el.hidden || String(el.type || '').toLowerCase() === 'search') return false;
+        if (el.closest && el.closest('[hidden]')) return false;
+        if (el.closest && el.closest('details:not([open])')) return false;
+        return !(el.closest && el.closest('[aria-hidden="true"]'));
+      });
+      var index = fields.indexOf(target);
+      if (index < 0 || index >= fields.length - 1) return;
+      e.preventDefault();
+      fields[index + 1].focus();
+    });
+  }
+
+  var counterState = {
+    loaded: false,
+    inFlight: false,
+    activeType: 'customer',
+    capabilities: {},
+    customers: [], suppliers: [], expenseCategories: [], expensePayees: [],
+    paymentAccounts: [], transferAccounts: [], expensePaymentMethods: [],
+    currencySymbol: '', businessDate: '',
+    customerCombo: null, currentCustomer: null, customerPaymentContext: null,
+    supplierCombo: null, currentSupplier: null
+  };
+
+  function counterSetPosting_(posting, buttonText) {
+    counterState.inFlight = !!posting;
+    document.querySelectorAll('.counter-type-btn').forEach(function (btn) { btn.disabled = !!posting; });
+    document.querySelectorAll('.counter-post-btn').forEach(function (btn) { btn.disabled = !!posting; });
+    var postIds = { customer: 'counterCustomerPost', supplier: 'counterSupplierPost', expense: 'counterExpensePost', transfer: 'counterTransferPost' };
+    var activePost = document.getElementById(postIds[counterState.activeType] || '');
+    if (activePost && buttonText) activePost.textContent = buttonText;
+  }
+
+  function counterSetActiveType_(type) {
+    if (counterState.inFlight) return;
+    counterState.activeType = type;
+    document.querySelectorAll('[data-counter-panel]').forEach(function (panel) { panel.hidden = panel.dataset.counterPanel !== type; });
+    document.querySelectorAll('.counter-type-btn').forEach(function (btn) {
+      btn.classList.toggle('active', btn.dataset.counterType === type);
+      btn.setAttribute('aria-selected', btn.dataset.counterType === type ? 'true' : 'false');
+    });
+  }
+
+  function counterCustomerBalanceText_(value) {
+    var n = Number(value) || 0;
+    return n < 0 ? ('Credit ' + formatMoney(Math.abs(n))) : formatMoney(n);
+  }
+
+  function counterCustomerFillInvoiceSelect_() {
+    var select = document.getElementById('counterCustomerInvoice');
+    var current = select.value;
+    select.innerHTML = '<option value="">Auto — oldest due first</option>';
+    var invoices = (counterState.customerPaymentContext && counterState.customerPaymentContext.invoices) || [];
+    invoices.forEach(function (inv) {
+      var option = document.createElement('option');
+      option.value = inv.invoiceId;
+      option.textContent = inv.invoiceId + ' · ' + (inv.date || '') + ' · Due ' + formatMoney(inv.remainingDue || 0);
+      select.appendChild(option);
+    });
+    if (Array.prototype.some.call(select.options, function (o) { return o.value === current; })) select.value = current;
+  }
+
+  function counterCustomerApplyPaymentContext_(ctx) {
+    counterState.customerPaymentContext = ctx || null;
+    var credit = Number(ctx && ctx.customerCredit) || 0;
+    document.getElementById('counterCustomerAdvance').textContent = counterState.currentCustomer ? formatMoney(credit) : '—';
+    var btn = document.getElementById('counterCustomerAdvanceRefundBtn');
+    btn.hidden = !(counterState.currentCustomer && credit > 0.004);
+    counterCustomerFillInvoiceSelect_();
+  }
+
+  function counterLoadCustomerPaymentContext_(item) {
+    counterCustomerApplyPaymentContext_(null);
+    if (!item || !item.id) return Promise.resolve(null);
+    var customerId = item.id;
+    return serverCall('getCustomerPaymentContext', authToken, customerId).then(function (ctx) {
+      if (!counterState.currentCustomer || String(counterState.currentCustomer.id) !== String(customerId)) return null;
+      counterCustomerApplyPaymentContext_(ctx);
+      return ctx;
+    }).catch(function (err) {
+      if (counterState.currentCustomer && String(counterState.currentCustomer.id) === String(customerId)) {
+        document.getElementById('counterCustomerError').textContent = err.message || 'Could not load customer payment details.';
+        document.getElementById('counterCustomerError').style.display = 'block';
+      }
+      return null;
+    });
+  }
+
+  function counterCustomerSelected_(item) {
+    counterState.currentCustomer = item || null;
+    document.getElementById('counterCustomerDue').textContent = item ? formatMoney(Math.max(0, Number(item.due) || 0)) : '—';
+    counterCustomerRecalc_();
+    counterLoadCustomerPaymentContext_(item);
+    if (item) setTimeout(function () { document.getElementById('counterCustomerAmount').focus(); }, 0);
+  }
+
+  function counterCustomerFillAccount_() {
+    var method = document.getElementById('counterCustomerMethod').value;
+    var row = document.getElementById('counterCustomerAccountRow');
+    var select = document.getElementById('counterCustomerAccount');
+    var needs = paymentMethodNeedsAccount_(method);
+    row.hidden = !needs;
+    document.getElementById('counterCustomerAccountLabel').textContent = method === 'Mobile Banking' ? 'Mobile Banking Account *' : 'Bank Account *';
+    if (!needs) {
+      select.value = '';
+      select.innerHTML = '<option value="">Select account...</option>';
+      return;
+    }
+    fillBankAccountSelect_(select, counterState.paymentAccounts, method);
+  }
+
+  function counterCustomerRecalc_() {
+    var payment = Number(document.getElementById('counterCustomerAmount').value) || 0;
+    var discount = Number(document.getElementById('counterCustomerDiscount').value) || 0;
+    document.getElementById('counterCustomerWords').textContent = counterAmountInBangla_(document.getElementById('counterCustomerAmount').value);
+    document.getElementById('counterCustomerDiscountReasonRow').hidden = !(discount > 0);
+    var total = Math.round((payment + discount) * 100) / 100;
+    document.getElementById('counterCustomerTotal').textContent = formatMoney(total);
+    var due = counterState.currentCustomer ? (Number(counterState.currentCustomer.due) || 0) : 0;
+    document.getElementById('counterCustomerBalance').textContent = counterState.currentCustomer ? counterCustomerBalanceText_(Math.round((due - total) * 100) / 100) : '—';
+    document.getElementById('counterCustomerPost').textContent = payment > 0 ? ('RECEIVE ' + formatMoney(payment)) : 'RECEIVE';
+  }
+
+  function counterResetCustomer_() {
+    counterState.currentCustomer = null;
+    counterState.customerPaymentContext = null;
+    if (counterState.customerCombo) counterState.customerCombo.clear();
+    document.getElementById('counterCustomerDue').textContent = '—';
+    document.getElementById('counterCustomerAdvance').textContent = '—';
+    document.getElementById('counterCustomerAdvanceRefundBtn').hidden = true;
+    document.getElementById('counterCustomerInvoice').innerHTML = '<option value="">Auto — oldest due first</option>';
+    document.getElementById('counterCustomerAmount').value = '';
+    document.getElementById('counterCustomerDiscount').value = '0';
+    document.getElementById('counterCustomerDiscountReason').value = '';
+    document.getElementById('counterCustomerDiscountReasonRow').hidden = true;
+    document.getElementById('counterCustomerMethod').value = 'Cash';
+    document.getElementById('counterCustomerAccount').value = '';
+    document.getElementById('counterCustomerAccountRow').hidden = true;
+    document.getElementById('counterCustomerDate').value = counterState.businessDate || '';
+    document.getElementById('counterCustomerNote').value = '';
+    document.getElementById('counterCustomerBackdatedReason').value = '';
+    document.getElementById('counterCustomerBackdatedReasonRow').hidden = true;
+    document.getElementById('counterCustomerMore').open = false;
+    document.getElementById('counterCustomerError').style.display = 'none';
+    counterCustomerRecalc_();
+    setTimeout(function () { if (counterState.customerCombo) counterState.customerCombo.focus(); }, 0);
+  }
+
+  function counterCustomerPost_() {
+    if (counterState.inFlight) return;
+    var errEl = document.getElementById('counterCustomerError');
+    errEl.style.display = 'none';
+    var customerId = counterState.customerCombo ? counterState.customerCombo.getSelectedId() : '';
+    var amount = document.getElementById('counterCustomerAmount').value;
+    var discountAmount = Number(document.getElementById('counterCustomerDiscount').value) || 0;
+    var discountReason = document.getElementById('counterCustomerDiscountReason').value.trim();
+    var method = document.getElementById('counterCustomerMethod').value;
+    var bankId = document.getElementById('counterCustomerAccount').value;
+    var note = document.getElementById('counterCustomerNote').value.trim();
+    var date = document.getElementById('counterCustomerDate').value || counterState.businessDate;
+    var backdatedReason = document.getElementById('counterCustomerBackdatedReason').value.trim();
+    var allocatedInvoiceId = document.getElementById('counterCustomerInvoice').value || '';
+    var payment = Number(amount) || 0;
+    var currentDue = counterState.currentCustomer ? Number(counterState.currentCustomer.due) || 0 : 0;
+    if (!customerId) { errEl.textContent = 'Choose a customer.'; errEl.style.display = 'block'; document.getElementById('counterCustomerSearch').focus(); return; }
+    if (payment <= 0) { errEl.textContent = 'Enter a valid payment amount.'; errEl.style.display = 'block'; document.getElementById('counterCustomerAmount').focus(); return; }
+    if (discountAmount > 0 && !counterState.capabilities.settlementDiscount) { errEl.textContent = 'You do not have permission to give a settlement discount.'; errEl.style.display = 'block'; return; }
+    if (discountAmount > 0 && !discountReason) { errEl.textContent = 'Discount Reason is required.'; errEl.style.display = 'block'; document.getElementById('counterCustomerDiscountReason').focus(); return; }
+    if (discountAmount > 0 && payment + discountAmount - currentDue > 0.004) { errEl.textContent = 'Payment plus discount cannot exceed the current due.'; errEl.style.display = 'block'; return; }
+    if (paymentMethodNeedsAccount_(method) && !bankId) { errEl.textContent = 'Choose an account.'; errEl.style.display = 'block'; document.getElementById('counterCustomerAccount').focus(); return; }
+    if (date && counterState.businessDate && date < counterState.businessDate && !backdatedReason) { errEl.textContent = 'A reason is required when dating a payment in the past.'; errEl.style.display = 'block'; document.getElementById('counterCustomerBackdatedReason').focus(); return; }
+    var customerName = counterState.currentCustomer ? counterState.currentCustomer.name : 'Customer';
+    var accountName = paymentMethodNeedsAccount_(method) ? selectedOptionText_('counterCustomerAccount') : '';
+    runConfirmedAction({
+      type: 'financial',
+      title: 'Receive Payment?',
+      message: customerName + '-এর কাছ থেকে পেমেন্ট গ্রহণ করছেন।',
+      details: settlementConfirmDetails_({
+        partyLabel: 'Customer', partyName: customerName, directionLabel: 'Receive', amount: payment,
+        discount: discountAmount, discountLabel: 'Discount Given', method: method, accountName: accountName, date: date
+      }),
+      confirmLabel: 'Receive ' + formatMoney(payment),
+      loadingLabel: 'Receiving...',
+      trigger: document.getElementById('counterCustomerPost')
+    }, function () {
+      counterSetPosting_(true, 'Receiving...');
+      return serverCall('receivePayment', authToken, customerId, amount, method, bankId, note, date, backdatedReason, discountAmount, discountReason, allocatedInvoiceId).then(function (res) {
+        if (counterState.currentCustomer && res && res.newDue !== undefined) counterState.currentCustomer.due = Number(res.newDue) || 0;
+        showToast('Received ' + formatMoney(payment) + ' from ' + customerName, 'success');
+        counterSetPosting_(false);
+        counterResetCustomer_();
+        return res;
+      });
+    }).catch(function (err) {
+      counterSetPosting_(false);
+      counterCustomerRecalc_();
+      errEl.textContent = err.message || 'Could not receive payment.';
+      errEl.style.display = 'block';
+    });
+  }
+
+  function counterAdvanceRefundFillAccount_() {
+    var method = document.getElementById('counterAdvanceRefundMethod').value;
+    var row = document.getElementById('counterAdvanceRefundAccountRow');
+    var select = document.getElementById('counterAdvanceRefundAccount');
+    var needs = paymentMethodNeedsAccount_(method);
+    row.hidden = !needs;
+    document.getElementById('counterAdvanceRefundAccountLabel').textContent = method === 'Mobile Banking' ? 'Mobile Banking Account *' : 'Bank Account *';
+    if (!needs) { select.value = ''; select.innerHTML = '<option value="">Select account...</option>'; return; }
+    fillBankAccountSelect_(select, counterState.paymentAccounts, method);
+  }
+
+  function counterOpenAdvanceRefund_() {
+    if (!counterState.currentCustomer || !counterState.customerPaymentContext) return;
+    var credit = Number(counterState.customerPaymentContext.customerCredit) || 0;
+    if (credit <= 0.004) { showToast('No refundable Customer Credit is available.', 'error'); return; }
+    document.getElementById('counterAdvanceRefundAvailable').textContent = formatMoney(credit);
+    document.getElementById('counterAdvanceRefundAmount').value = '';
+    document.getElementById('counterAdvanceRefundAmount').max = String(credit);
+    document.getElementById('counterAdvanceRefundMethod').value = 'Cash';
+    document.getElementById('counterAdvanceRefundDate').value = counterState.businessDate || '';
+    document.getElementById('counterAdvanceRefundNote').value = '';
+    document.getElementById('counterAdvanceRefundBackdatedReason').value = '';
+    document.getElementById('counterAdvanceRefundBackdatedRow').hidden = true;
+    document.getElementById('counterAdvanceRefundError').style.display = 'none';
+    counterAdvanceRefundFillAccount_();
+    openModal('counterAdvanceRefundModal');
+  }
+
+  function counterSaveAdvanceRefund_() {
+    if (counterState.inFlight || !counterState.currentCustomer) return;
+    var errEl = document.getElementById('counterAdvanceRefundError');
+    errEl.style.display = 'none';
+    var customerId = counterState.currentCustomer.id;
+    var customerName = counterState.currentCustomer.name || 'Customer';
+    var amount = Number(document.getElementById('counterAdvanceRefundAmount').value) || 0;
+    var available = Number(counterState.customerPaymentContext && counterState.customerPaymentContext.customerCredit) || 0;
+    var method = document.getElementById('counterAdvanceRefundMethod').value;
+    var bankId = document.getElementById('counterAdvanceRefundAccount').value;
+    var date = document.getElementById('counterAdvanceRefundDate').value || counterState.businessDate;
+    var note = document.getElementById('counterAdvanceRefundNote').value.trim();
+    var backdatedReason = document.getElementById('counterAdvanceRefundBackdatedReason').value.trim();
+    if (amount <= 0) { errEl.textContent = 'Enter a valid refund amount.'; errEl.style.display = 'block'; return; }
+    if (amount > available + 0.004) { errEl.textContent = 'Refund cannot exceed available Customer Credit.'; errEl.style.display = 'block'; return; }
+    if (paymentMethodNeedsAccount_(method) && !bankId) { errEl.textContent = 'Choose an account.'; errEl.style.display = 'block'; return; }
+    if (date && counterState.businessDate && date < counterState.businessDate && !backdatedReason) { errEl.textContent = 'A reason is required when dating a refund in the past.'; errEl.style.display = 'block'; return; }
+    runConfirmedAction({
+      type: 'financial', title: 'Refund Customer Credit?',
+      message: 'This refunds available Customer Credit and increases the customer balance by the same amount.',
+      details: [{label:'Customer',value:customerName,emphasis:true},{label:'Refund',value:formatMoney(amount),emphasis:true},{label:'Method',value:method},{label:'Date',value:date}],
+      confirmLabel: 'Refund ' + formatMoney(amount), loadingLabel: 'Refunding...', trigger: document.getElementById('counterAdvanceRefundSaveBtn')
+    }, function () {
+      counterSetPosting_(true, 'Refunding...');
+      return serverCall('refundCustomerAdvance', authToken, customerId, amount, method, bankId, note, date, backdatedReason).then(function (res) {
+        if (counterState.currentCustomer && res && res.newDue !== undefined) counterState.currentCustomer.due = Number(res.newDue) || 0;
+        closeModal('counterAdvanceRefundModal');
+        showToast('Customer Credit refunded: ' + formatMoney(amount), 'success');
+        counterSetPosting_(false);
+        document.getElementById('counterCustomerDue').textContent = formatMoney(Math.max(0, Number(counterState.currentCustomer.due) || 0));
+        return counterLoadCustomerPaymentContext_(counterState.currentCustomer);
+      });
+    }).catch(function (err) {
+      counterSetPosting_(false);
+      errEl.textContent = err.message || 'Could not refund Customer Credit.';
+      errEl.style.display = 'block';
+    });
+  }
+
+  function counterSetupCustomer_() {
+    if (!counterState.customerCombo) {
+      counterState.customerCombo = counterCreateCombobox_({
+        input: document.getElementById('counterCustomerSearch'),
+        results: document.getElementById('counterCustomerResults'),
+        items: counterState.customers,
+        metaText: function (item) { return 'Due ' + formatMoney(item.due); },
+        onSelect: counterCustomerSelected_
+      });
+    } else counterState.customerCombo.setItems(counterState.customers);
+    document.getElementById('counterCustomerDiscount').disabled = !counterState.capabilities.settlementDiscount;
+    if (!counterState.capabilities.settlementDiscount) document.getElementById('counterCustomerDiscount').value = '0';
+    document.getElementById('counterCustomerAdd').hidden = !counterState.capabilities.customerAdd;
+    document.getElementById('counterCustomerDate').value = counterState.businessDate || '';
+    counterCustomerFillAccount_();
+    counterCustomerRecalc_();
+  }
+
+  function counterSupplierBalanceText_(value) {
+    var n = Number(value) || 0;
+    return n < 0 ? ('Credit ' + formatMoney(Math.abs(n))) : formatMoney(n);
+  }
+
+  function counterSupplierSelected_(item) {
+    counterState.currentSupplier = item || null;
+    document.getElementById('counterSupplierPayable').textContent = item ? counterSupplierBalanceText_(item.payable) : '—';
+    counterSupplierRecalc_();
+    if (item) setTimeout(function () { document.getElementById('counterSupplierAmount').focus(); }, 0);
+  }
+
+  function counterSupplierFillAccount_() {
+    var method = document.getElementById('counterSupplierMethod').value;
+    var row = document.getElementById('counterSupplierAccountRow');
+    var select = document.getElementById('counterSupplierAccount');
+    var needs = paymentMethodNeedsAccount_(method);
+    row.hidden = !needs;
+    document.getElementById('counterSupplierAccountLabel').textContent = method === 'Mobile Banking' ? 'Mobile Banking Account *' : 'Bank Account *';
+    if (!needs) {
+      select.value = '';
+      select.innerHTML = '<option value="">Select account...</option>';
+      return;
+    }
+    fillBankAccountSelect_(select, counterState.paymentAccounts, method);
+  }
+
+  function counterSupplierRecalc_() {
+    var payment = Number(document.getElementById('counterSupplierAmount').value) || 0;
+    var discount = Number(document.getElementById('counterSupplierDiscount').value) || 0;
+    document.getElementById('counterSupplierWords').textContent = counterAmountInBangla_(document.getElementById('counterSupplierAmount').value);
+    document.getElementById('counterSupplierDiscountReasonRow').hidden = !(discount > 0);
+    var total = Math.round((payment + discount) * 100) / 100;
+    document.getElementById('counterSupplierTotal').textContent = formatMoney(total);
+    var due = counterState.currentSupplier ? (Number(counterState.currentSupplier.payable) || 0) : 0;
+    document.getElementById('counterSupplierBalance').textContent = counterState.currentSupplier ? counterSupplierBalanceText_(Math.round((due - total) * 100) / 100) : '—';
+    document.getElementById('counterSupplierPost').textContent = payment > 0 ? ('PAY ' + formatMoney(payment)) : 'PAY SUPPLIER';
+  }
+
+  function counterResetSupplier_() {
+    counterState.currentSupplier = null;
+    if (counterState.supplierCombo) counterState.supplierCombo.clear();
+    document.getElementById('counterSupplierPayable').textContent = '—';
+    document.getElementById('counterSupplierAmount').value = '';
+    document.getElementById('counterSupplierDiscount').value = '0';
+    document.getElementById('counterSupplierDiscountReason').value = '';
+    document.getElementById('counterSupplierDiscountReasonRow').hidden = true;
+    document.getElementById('counterSupplierMethod').value = 'Cash';
+    document.getElementById('counterSupplierAccount').value = '';
+    document.getElementById('counterSupplierAccountRow').hidden = true;
+    document.getElementById('counterSupplierDate').value = counterState.businessDate || '';
+    document.getElementById('counterSupplierNote').value = '';
+    document.getElementById('counterSupplierBackdatedReason').value = '';
+    document.getElementById('counterSupplierBackdatedReasonRow').hidden = true;
+    document.getElementById('counterSupplierMore').open = false;
+    document.getElementById('counterSupplierError').style.display = 'none';
+    counterSupplierRecalc_();
+    setTimeout(function () { if (counterState.supplierCombo) counterState.supplierCombo.focus(); }, 0);
+  }
+
+  function counterSupplierPost_() {
+    if (counterState.inFlight) return;
+    var errEl = document.getElementById('counterSupplierError');
+    errEl.style.display = 'none';
+    var supplierId = counterState.supplierCombo ? counterState.supplierCombo.getSelectedId() : '';
+    var amount = document.getElementById('counterSupplierAmount').value;
+    var discountAmount = Number(document.getElementById('counterSupplierDiscount').value) || 0;
+    var discountReason = document.getElementById('counterSupplierDiscountReason').value.trim();
+    var method = document.getElementById('counterSupplierMethod').value;
+    var bankId = document.getElementById('counterSupplierAccount').value;
+    var note = document.getElementById('counterSupplierNote').value.trim();
+    var date = document.getElementById('counterSupplierDate').value || counterState.businessDate;
+    var backdatedReason = document.getElementById('counterSupplierBackdatedReason').value.trim();
+    var payment = Number(amount) || 0;
+    var currentDue = counterState.currentSupplier ? Number(counterState.currentSupplier.payable) || 0 : 0;
+    if (!supplierId) { errEl.textContent = 'Choose a supplier.'; errEl.style.display = 'block'; document.getElementById('counterSupplierSearch').focus(); return; }
+    if (payment <= 0) { errEl.textContent = 'Enter a valid payment amount.'; errEl.style.display = 'block'; document.getElementById('counterSupplierAmount').focus(); return; }
+    if (discountAmount > 0 && !counterState.capabilities.settlementDiscount) { errEl.textContent = 'You do not have permission to receive a settlement discount.'; errEl.style.display = 'block'; return; }
+    if (discountAmount > 0 && !discountReason) { errEl.textContent = 'Discount Reason is required.'; errEl.style.display = 'block'; document.getElementById('counterSupplierDiscountReason').focus(); return; }
+    if (discountAmount > 0 && payment + discountAmount - currentDue > 0.004) { errEl.textContent = 'Pay amount plus discount cannot exceed the current payable.'; errEl.style.display = 'block'; return; }
+    if (paymentMethodNeedsAccount_(method) && !bankId) { errEl.textContent = 'Choose an account.'; errEl.style.display = 'block'; document.getElementById('counterSupplierAccount').focus(); return; }
+    if (date && counterState.businessDate && date < counterState.businessDate && !backdatedReason) { errEl.textContent = 'A reason is required when dating a payment in the past.'; errEl.style.display = 'block'; document.getElementById('counterSupplierBackdatedReason').focus(); return; }
+    var supplierName = counterState.currentSupplier ? counterState.currentSupplier.name : 'Supplier';
+    var accountName = paymentMethodNeedsAccount_(method) ? selectedOptionText_('counterSupplierAccount') : '';
+    runConfirmedAction({
+      type: 'financial',
+      title: 'Pay Supplier?',
+      message: supplierName + '-কে পেমেন্ট করছেন।',
+      details: settlementConfirmDetails_({
+        partyLabel: 'Supplier', partyName: supplierName, directionLabel: 'Pay', amount: payment,
+        discount: discountAmount, discountLabel: 'Discount Received', method: method, accountName: accountName, date: date
+      }),
+      confirmLabel: 'Pay ' + formatMoney(payment),
+      loadingLabel: 'Paying...',
+      trigger: document.getElementById('counterSupplierPost')
+    }, function () {
+      counterSetPosting_(true, 'Paying...');
+      return serverCall('paySupplier', authToken, supplierId, amount, method, bankId, note, date, backdatedReason, discountAmount, discountReason).then(function (res) {
+        if (counterState.currentSupplier && res && res.newDue !== undefined) counterState.currentSupplier.payable = Number(res.newDue) || 0;
+        showToast('Paid ' + formatMoney(payment) + ' to ' + supplierName, 'success');
+        counterSetPosting_(false);
+        counterResetSupplier_();
+        return res;
+      });
+    }).catch(function (err) {
+      counterSetPosting_(false);
+      counterSupplierRecalc_();
+      errEl.textContent = err.message || 'Could not pay supplier.';
+      errEl.style.display = 'block';
+    });
+  }
+
+  function counterSetupSupplier_() {
+    if (!counterState.supplierCombo) {
+      counterState.supplierCombo = counterCreateCombobox_({
+        input: document.getElementById('counterSupplierSearch'),
+        results: document.getElementById('counterSupplierResults'),
+        items: counterState.suppliers,
+        metaText: function (item) { return 'Payable ' + formatMoney(item.payable); },
+        onSelect: counterSupplierSelected_
+      });
+    } else counterState.supplierCombo.setItems(counterState.suppliers);
+    document.getElementById('counterSupplierDiscount').disabled = !counterState.capabilities.settlementDiscount;
+    if (!counterState.capabilities.settlementDiscount) document.getElementById('counterSupplierDiscount').value = '0';
+    document.getElementById('counterSupplierAdd').hidden = !counterState.capabilities.supplierAdd;
+    document.getElementById('counterSupplierDate').value = counterState.businessDate || '';
+    counterSupplierFillAccount_();
+    counterSupplierRecalc_();
+  }
+
+  function counterFillSimpleSelect_(selectEl, items, placeholder) {
+    var current = selectEl.value;
+    selectEl.innerHTML = '<option value="">' + escapeHtml(placeholder || 'Select...') + '</option>' +
+      (items || []).map(function (item) { return '<option value="' + escapeHtml(item.id) + '">' + escapeHtml(item.name || '') + '</option>'; }).join('');
+    if ((items || []).some(function (item) { return String(item.id) === String(current); })) selectEl.value = current;
+  }
+
+  function counterExpenseFillAccount_() {
+    var method = document.getElementById('counterExpenseMethod').value;
+    var row = document.getElementById('counterExpenseAccountRow');
+    var select = document.getElementById('counterExpenseAccount');
+    var needs = paymentMethodNeedsAccount_(method);
+    row.hidden = !needs;
+    document.getElementById('counterExpenseAccountLabel').textContent = method === 'Mobile Banking' ? 'Mobile Banking Account *' : 'Bank Account *';
+    if (!needs) {
+      select.value = '';
+      select.innerHTML = '<option value="">Select account...</option>';
+      return;
+    }
+    fillBankAccountSelect_(select, counterState.paymentAccounts, method);
+  }
+
+  function counterExpenseRecalc_() {
+    var amount = Number(document.getElementById('counterExpenseAmount').value) || 0;
+    document.getElementById('counterExpenseWords').textContent = counterAmountInBangla_(document.getElementById('counterExpenseAmount').value);
+    document.getElementById('counterExpensePost').textContent = amount > 0 ? ('ADD EXPENSE ' + formatMoney(amount)) : 'ADD EXPENSE';
+  }
+
+  function counterResetExpense_() {
+    document.getElementById('counterExpenseCategory').value = '';
+    document.getElementById('counterExpensePayee').value = '';
+    document.getElementById('counterExpenseDescription').value = '';
+    document.getElementById('counterExpenseAmount').value = '';
+    var methods = counterState.expensePaymentMethods || [];
+    document.getElementById('counterExpenseMethod').value = methods.indexOf('Cash') !== -1 ? 'Cash' : (methods[0] || '');
+    document.getElementById('counterExpenseAccount').value = '';
+    document.getElementById('counterExpenseAccountRow').hidden = true;
+    document.getElementById('counterExpenseDate').value = counterState.businessDate || '';
+    document.getElementById('counterExpenseReference').value = '';
+    document.getElementById('counterExpenseNotes').value = '';
+    document.getElementById('counterExpenseBackdatedReason').value = '';
+    document.getElementById('counterExpenseBackdatedReasonRow').hidden = true;
+    document.getElementById('counterExpenseMore').open = false;
+    document.getElementById('counterExpenseError').style.display = 'none';
+    counterExpenseFillAccount_();
+    counterExpenseRecalc_();
+    setTimeout(function () { document.getElementById('counterExpenseCategory').focus(); }, 0);
+  }
+
+  function counterExpensePost_() {
+    if (counterState.inFlight) return;
+    var errEl = document.getElementById('counterExpenseError');
+    errEl.style.display = 'none';
+    var categoryId = document.getElementById('counterExpenseCategory').value;
+    var payeeId = document.getElementById('counterExpensePayee').value;
+    var description = document.getElementById('counterExpenseDescription').value.trim();
+    var amount = Number(document.getElementById('counterExpenseAmount').value) || 0;
+    var method = document.getElementById('counterExpenseMethod').value;
+    var bankId = document.getElementById('counterExpenseAccount').value;
+    var date = document.getElementById('counterExpenseDate').value || counterState.businessDate;
+    var referenceNo = document.getElementById('counterExpenseReference').value.trim();
+    var notes = document.getElementById('counterExpenseNotes').value.trim();
+    var backdatedReason = document.getElementById('counterExpenseBackdatedReason').value.trim();
+    if (!categoryId) { errEl.textContent = 'Choose an expense category.'; errEl.style.display = 'block'; document.getElementById('counterExpenseCategory').focus(); return; }
+    if (!payeeId) { errEl.textContent = 'Choose a payee.'; errEl.style.display = 'block'; document.getElementById('counterExpensePayee').focus(); return; }
+    if (amount <= 0) { errEl.textContent = 'Enter a valid expense amount.'; errEl.style.display = 'block'; document.getElementById('counterExpenseAmount').focus(); return; }
+    if (!method) { errEl.textContent = 'Choose a payment method.'; errEl.style.display = 'block'; document.getElementById('counterExpenseMethod').focus(); return; }
+    if (paymentMethodNeedsAccount_(method) && !bankId) { errEl.textContent = 'Choose an account.'; errEl.style.display = 'block'; document.getElementById('counterExpenseAccount').focus(); return; }
+    if (date && counterState.businessDate && date < counterState.businessDate && !backdatedReason) { errEl.textContent = 'A reason is required when dating an expense in the past.'; errEl.style.display = 'block'; document.getElementById('counterExpenseBackdatedReason').focus(); return; }
+    var expensePayload = {
+      date: date,
+      categoryId: categoryId,
+      payeeId: payeeId,
+      amount: amount,
+      paymentMethod: method,
+      bankAccountId: bankId,
+      description: description,
+      referenceNo: referenceNo,
+      notes: notes,
+      backdatedReason: backdatedReason
+    };
+    runConfirmedAction({type:'financial',title:'Add Expense?',message:'This will record an expense from the selected payment source.',details:[{label:'Category',value:selectedOptionText_('counterExpenseCategory'),emphasis:true},{label:'Payee',value:selectedOptionText_('counterExpensePayee')},{label:'Amount',value:formatMoney(amount),emphasis:true},{label:'In words',value:banglaAmountInWords_(amount)},{label:'Method',value:method},{label:'Account',value:paymentMethodNeedsAccount_(method)?selectedOptionText_('counterExpenseAccount'):''}],confirmLabel:'Add Expense ' + formatMoney(amount),loadingLabel:'Adding...',trigger:document.getElementById('counterExpensePost')}, function () {
+      counterSetPosting_(true, 'Adding...');
+      return serverCall('addExpense', authToken, expensePayload).then(function () { showToast('Expense added: ' + formatMoney(amount), 'success'); counterSetPosting_(false); counterResetExpense_(); });
+    }).catch(function (err) { counterSetPosting_(false); counterExpenseRecalc_(); errEl.textContent = err.message || 'Could not add expense.'; errEl.style.display = 'block'; });
+  }
+
+  function counterSetupExpense_() {
+    counterFillSimpleSelect_(document.getElementById('counterExpenseCategory'), counterState.expenseCategories, 'Select category...');
+    counterFillSimpleSelect_(document.getElementById('counterExpensePayee'), counterState.expensePayees, 'Select payee...');
+    var methodSelect = document.getElementById('counterExpenseMethod');
+    var current = methodSelect.value;
+    methodSelect.innerHTML = (counterState.expensePaymentMethods || []).map(function (method) { return '<option value="' + escapeHtml(method) + '">' + escapeHtml(method) + '</option>'; }).join('');
+    if ((counterState.expensePaymentMethods || []).indexOf(current) !== -1) methodSelect.value = current;
+    else methodSelect.value = (counterState.expensePaymentMethods || []).indexOf('Cash') !== -1 ? 'Cash' : ((counterState.expensePaymentMethods || [])[0] || '');
+    document.getElementById('counterExpenseDate').value = counterState.businessDate || '';
+    counterExpenseFillAccount_();
+    counterExpenseRecalc_();
+  }
+
+  function counterTransferFillAccounts_() {
+    counterFillSimpleSelect_(document.getElementById('counterTransferFrom'), counterState.transferAccounts, 'Select account...');
+    counterFillSimpleSelect_(document.getElementById('counterTransferTo'), counterState.transferAccounts, 'Select account...');
+  }
+
+  function counterTransferRecalc_() {
+    var amount = Number(document.getElementById('counterTransferAmount').value) || 0;
+    document.getElementById('counterTransferWords').textContent = counterAmountInBangla_(document.getElementById('counterTransferAmount').value);
+    document.getElementById('counterTransferPost').textContent = amount > 0 ? ('TRANSFER ' + formatMoney(amount)) : 'TRANSFER';
+  }
+
+  function counterResetTransfer_() {
+    document.getElementById('counterTransferFrom').value = '';
+    document.getElementById('counterTransferTo').value = '';
+    document.getElementById('counterTransferAmount').value = '';
+    document.getElementById('counterTransferNotes').value = '';
+    document.getElementById('counterTransferMore').open = false;
+    document.getElementById('counterTransferError').style.display = 'none';
+    counterTransferRecalc_();
+    setTimeout(function () { document.getElementById('counterTransferFrom').focus(); }, 0);
+  }
+
+  function counterTransferPost_() {
+    if (counterState.inFlight) return;
+    var errEl = document.getElementById('counterTransferError');
+    errEl.style.display = 'none';
+    var fromAccountId = document.getElementById('counterTransferFrom').value;
+    var toAccountId = document.getElementById('counterTransferTo').value;
+    var amount = Number(document.getElementById('counterTransferAmount').value) || 0;
+    var notes = document.getElementById('counterTransferNotes').value.trim();
+    if (!fromAccountId || !toAccountId) { errEl.textContent = 'Choose both a from and to account.'; errEl.style.display = 'block'; (!fromAccountId ? document.getElementById('counterTransferFrom') : document.getElementById('counterTransferTo')).focus(); return; }
+    if (fromAccountId === toAccountId) { errEl.textContent = 'Choose two different bank accounts.'; errEl.style.display = 'block'; document.getElementById('counterTransferTo').focus(); return; }
+    if (amount <= 0) { errEl.textContent = 'Enter a valid transfer amount.'; errEl.style.display = 'block'; document.getElementById('counterTransferAmount').focus(); return; }
+    var transferPayload = { fromAccountId: fromAccountId, toAccountId: toAccountId, amount: amount, notes: notes };
+    runConfirmedAction({type:'financial',title:'Transfer Between Accounts?',message:'This will move money between bank accounts.',details:[{label:'From',value:selectedOptionText_('counterTransferFrom'),emphasis:true},{label:'To',value:selectedOptionText_('counterTransferTo'),emphasis:true},{label:'Amount',value:formatMoney(amount),emphasis:true},{label:'In words',value:banglaAmountInWords_(amount)}],confirmLabel:'Transfer ' + formatMoney(amount),loadingLabel:'Transferring...',trigger:document.getElementById('counterTransferPost')}, function () {
+      counterSetPosting_(true, 'Transferring...');
+      return serverCall('transferBetweenBankAccounts', authToken, transferPayload).then(function () { showToast('Transferred ' + formatMoney(amount), 'success'); counterSetPosting_(false); counterResetTransfer_(); });
+    }).catch(function (err) { counterSetPosting_(false); counterTransferRecalc_(); errEl.textContent = err.message || 'Could not transfer funds.'; errEl.style.display = 'block'; });
+  }
+
+  function counterSetupTransfer_() {
+    counterTransferFillAccounts_();
+    counterTransferRecalc_();
+  }
+
+  function counterEnsureGlobalModal_(modalId) {
+    var modal = document.getElementById(modalId);
+    if (!modal || modal.parentNode === document.body) return modal;
+    document.body.appendChild(modal);
+    return modal;
+  }
+
+  function counterLoad() {
+    return withLoader(serverCall('getCounterBootstrap', authToken)).then(function (data) {
+      counterState.loaded = true;
+      counterState.capabilities = data.capabilities || {};
+      counterState.customers = data.customers || [];
+      counterState.suppliers = data.suppliers || [];
+      counterState.expenseCategories = data.expenseCategories || [];
+      counterState.expensePayees = data.expensePayees || [];
+      counterState.paymentAccounts = data.paymentAccounts || [];
+      counterState.transferAccounts = data.transferAccounts || [];
+      counterState.expensePaymentMethods = data.expensePaymentMethods || [];
+      counterState.currencySymbol = data.currencySymbol || '';
+      counterState.businessDate = data.businessDate || '';
+      counterSetupCustomer_();
+      counterSetupSupplier_();
+      counterSetupExpense_();
+      counterSetupTransfer_();
+      document.querySelector('[data-counter-type="customer"]').hidden = !counterState.capabilities.customerReceive;
+      document.querySelector('[data-counter-type="supplier"]').hidden = !counterState.capabilities.supplierPay;
+      document.querySelector('[data-counter-type="expense"]').hidden = !counterState.capabilities.expenseAdd;
+      document.querySelector('[data-counter-type="transfer"]').hidden = !counterState.capabilities.bankTransfer;
+      var preferred = counterState.activeType;
+      var allowed = (preferred === 'customer' && counterState.capabilities.customerReceive) ||
+        (preferred === 'supplier' && counterState.capabilities.supplierPay) ||
+        (preferred === 'expense' && counterState.capabilities.expenseAdd) ||
+        (preferred === 'transfer' && counterState.capabilities.bankTransfer);
+      if (!allowed) preferred = counterState.capabilities.customerReceive ? 'customer' : counterState.capabilities.supplierPay ? 'supplier' : counterState.capabilities.expenseAdd ? 'expense' : 'transfer';
+      counterSetActiveType_(preferred);
+      return data;
+    }).catch(function (err) { showToast(err.message || 'Could not load Counter.', 'error'); throw err; });
+  }
+
+  document.querySelectorAll('.counter-type-btn').forEach(function (btn) { btn.addEventListener('click', function () { counterSetActiveType_(btn.dataset.counterType); }); });
+  document.getElementById('counterCustomerAmount').addEventListener('input', counterCustomerRecalc_);
+  document.getElementById('counterCustomerDiscount').addEventListener('input', counterCustomerRecalc_);
+  document.getElementById('counterCustomerMethod').addEventListener('change', function () { counterCustomerFillAccount_(); });
+  document.getElementById('counterCustomerDate').addEventListener('change', function () {
+    var date = this.value;
+    document.getElementById('counterCustomerBackdatedReasonRow').hidden = !(date && counterState.businessDate && date < counterState.businessDate);
+  });
+  document.getElementById('counterCustomerPost').addEventListener('click', counterCustomerPost_);
+  document.getElementById('counterCustomerAdvanceRefundBtn').addEventListener('click', counterOpenAdvanceRefund_);
+  document.getElementById('counterAdvanceRefundMethod').addEventListener('change', counterAdvanceRefundFillAccount_);
+  document.getElementById('counterAdvanceRefundDate').addEventListener('change', function () {
+    var date = this.value;
+    document.getElementById('counterAdvanceRefundBackdatedRow').hidden = !(date && counterState.businessDate && date < counterState.businessDate);
+  });
+  document.getElementById('counterAdvanceRefundSaveBtn').addEventListener('click', counterSaveAdvanceRefund_);
+  document.getElementById('counterCustomerAdd').addEventListener('click', function () {
+    if (!counterState.capabilities.customerAdd || typeof custOpenAdd_ !== 'function') return;
+    counterEnsureGlobalModal_('custModal');
+    custOpenAdd_(function (newId) {
+      serverCall('getCounterCustomers', authToken).then(function (rows) {
+        counterState.customers = rows || [];
+        counterState.customerCombo.setItems(counterState.customers);
+        counterState.customerCombo.selectById(newId);
+      }).catch(function (err) { showToast(err.message || 'Customer was added, but Counter could not refresh the list.', 'error'); });
+    });
+  });
+  document.getElementById('counterSupplierAmount').addEventListener('input', counterSupplierRecalc_);
+  document.getElementById('counterSupplierDiscount').addEventListener('input', counterSupplierRecalc_);
+  document.getElementById('counterSupplierMethod').addEventListener('change', function () { counterSupplierFillAccount_(); });
+  document.getElementById('counterSupplierDate').addEventListener('change', function () {
+    var date = this.value;
+    document.getElementById('counterSupplierBackdatedReasonRow').hidden = !(date && counterState.businessDate && date < counterState.businessDate);
+  });
+  document.getElementById('counterSupplierPost').addEventListener('click', counterSupplierPost_);
+  document.getElementById('counterSupplierAdd').addEventListener('click', function () {
+    if (!counterState.capabilities.supplierAdd || typeof supOpenAdd_ !== 'function') return;
+    counterEnsureGlobalModal_('supModal');
+    supOpenAdd_(function (newId) {
+      serverCall('getCounterSuppliers', authToken).then(function (rows) {
+        counterState.suppliers = rows || [];
+        counterState.supplierCombo.setItems(counterState.suppliers);
+        counterState.supplierCombo.selectById(newId);
+      }).catch(function (err) { showToast(err.message || 'Supplier was added, but Counter could not refresh the list.', 'error'); });
+    });
+  });
+  document.getElementById('counterExpenseCategoryAdd').addEventListener('click', function () {
+    var row = document.getElementById('counterExpenseCategoryQuick');
+    row.hidden = !row.hidden;
+    if (!row.hidden) document.getElementById('counterExpenseCategoryName').focus();
+  });
+  document.getElementById('counterExpenseCategorySave').addEventListener('click', function () {
+    var nameInput = document.getElementById('counterExpenseCategoryName');
+    var name = nameInput.value.trim();
+    if (!name) { showToast('Enter category name.', 'error'); nameInput.focus(); return; }
+    withLoader(serverCall('addExpenseCategory', authToken, { name: name })).then(function (res) {
+      counterState.expenseCategories.push({ id: res.id, name: name });
+      counterState.expenseCategories.sort(function (a, b) { return String(a.name).localeCompare(String(b.name)); });
+      counterFillSimpleSelect_(document.getElementById('counterExpenseCategory'), counterState.expenseCategories, 'Select category...');
+      document.getElementById('counterExpenseCategory').value = res.id;
+      nameInput.value = '';
+      document.getElementById('counterExpenseCategoryQuick').hidden = true;
+      showToast('Category added', 'success');
+      document.getElementById('counterExpensePayee').focus();
+    }).catch(function (err) { showToast(err.message || 'Could not add category.', 'error'); nameInput.focus(); });
+  });
+  document.getElementById('counterExpensePayeeAdd').addEventListener('click', function () {
+    var row = document.getElementById('counterExpensePayeeQuick');
+    row.hidden = !row.hidden;
+    if (!row.hidden) document.getElementById('counterExpensePayeeName').focus();
+  });
+  document.getElementById('counterExpensePayeeSave').addEventListener('click', function () {
+    var nameInput = document.getElementById('counterExpensePayeeName');
+    var phoneInput = document.getElementById('counterExpensePayeePhone');
+    var name = nameInput.value.trim();
+    var phone = phoneInput.value.trim();
+    if (!name) { showToast('Enter payee name.', 'error'); nameInput.focus(); return; }
+    withLoader(serverCall('addExpensePayee', authToken, { name: name, phone: phone })).then(function (res) {
+      counterState.expensePayees.push({ id: res.id, name: res.name || name, phone: phone });
+      counterState.expensePayees.sort(function (a, b) { return String(a.name).localeCompare(String(b.name)); });
+      counterFillSimpleSelect_(document.getElementById('counterExpensePayee'), counterState.expensePayees, 'Select payee...');
+      document.getElementById('counterExpensePayee').value = res.id;
+      nameInput.value = '';
+      phoneInput.value = '';
+      document.getElementById('counterExpensePayeeQuick').hidden = true;
+      showToast('Payee added', 'success');
+      document.getElementById('counterExpenseDescription').focus();
+    }).catch(function (err) { showToast(err.message || 'Could not add payee.', 'error'); nameInput.focus(); });
+  });
+  document.getElementById('counterExpenseAmount').addEventListener('input', counterExpenseRecalc_);
+  document.getElementById('counterExpenseMethod').addEventListener('change', counterExpenseFillAccount_);
+  document.getElementById('counterExpenseDate').addEventListener('change', function () {
+    var date = this.value;
+    document.getElementById('counterExpenseBackdatedReasonRow').hidden = !(date && counterState.businessDate && date < counterState.businessDate);
+  });
+  document.getElementById('counterExpensePost').addEventListener('click', counterExpensePost_);
+  document.getElementById('counterTransferAmount').addEventListener('input', counterTransferRecalc_);
+  document.getElementById('counterTransferPost').addEventListener('click', counterTransferPost_);
+
+  document.querySelectorAll('[data-counter-panel]').forEach(counterWireEnterAdvance_);
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var origGoToPage = goToPage;
+    goToPage = function (key) {
+      origGoToPage(key);
+      if (key === 'counter' && !counterState.loaded) counterLoad();
+    };
+  });
+</script>

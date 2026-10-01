@@ -1,0 +1,4214 @@
+<script>
+  /* ---------------------------------------------------------------------
+   * javascript.html — the shared client engine.
+   *
+   * COMPLETE REBUILD. This file now contains a full authentication layer
+   * written against Auth.gs's contract (login / validateSession / logout,
+   * returning { token, user, allowedModules }). It REPLACES whatever auth
+   * wiring your live copy had rather than merging with it — diff the two
+   * if yours stored the token differently or filtered the nav its own way.
+   *
+   * What lives here:
+   *   1.  Icon set
+   *   2.  Auth: boot, login, logout, session restore
+   *   3.  Navigation, filtered by the signed-in role
+   *   4.  serverCall  — the one wrapper every page uses
+   *   5.  Shared UI helpers (toast, loader, modals, money, escaping)
+   *   6.  Bangla invoice rendering
+   *   7.  One-page printing
+   *   8.  Canvas receipt (JPG download)
+   * ------------------------------------------------------------------- */
+
+  // ---------------- 1. Inline SVG icons — no icon font, no CDN ----------------
+  var ICONS = {
+    dashboard: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 13h6V4H4v9Zm0 7h6v-5H4v5Zm10 0h6V11h-6v9Zm0-16v5h6V4h-6Z" fill="currentColor"/></svg>',
+    pos: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M3 5h18l-1.5 9h-13L3 5Zm2.5 12a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm11 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>',
+    counter: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M5 4h14v16H5zM8 8h8M8 12h3M14 12h2M8 16h3M14 16h2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    purchase: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M3 7h13l3 4v6h-3M3 7v10h3M3 7l1-3h9l1 3M9 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    suppliers: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M3 21V10l9-6 9 6v11h-6v-7H9v7H3Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>',
+    vendors: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M3 7l9-4 9 4-9 4-9-4Zm0 5 9 4 9-4M3 12v5l9 4 9-4v-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    products: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M21 8 12 3 3 8l9 5 9-5Zm0 0v8l-9 5-9-5V8m18 0-9 5m0 0L3 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>',
+    customers: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M16 14a4 4 0 1 0-4-4M4 20c0-3 3-5 6-5m4-1c3 0 6 2 6 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="8" r="3" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
+    sales: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M6 3h9l3 3v15H6V3Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 9h6M9 13h6M9 17h3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+    returns: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 8h11a5 5 0 0 1 0 10h-2M4 8l4-4M4 8l4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    reports: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 20V10m6 10V4m6 16v-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+    settings: '<svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.3.9a7 7 0 0 0-2-1.2L14 3h-4l-.6 2.5a7 7 0 0 0-2 1.2l-2.3-.9-2 3.4 2 1.6A7 7 0 0 0 5 12a7 7 0 0 0 .1 1.2l-2 1.6 2 3.4 2.3-.9a7 7 0 0 0 2 1.2L10 21h4l.6-2.5a7 7 0 0 0 2-1.2l2.3.9 2-3.4-2-1.6c.1-.4.1-.8.1-1.2Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>',
+    bank: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M3 10 12 4l9 6M5 10v9M9 10v9M15 10v9M19 10v9M3 21h18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    expense: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 8h6M9 12h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+    daybook: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 5c2-1 5-1 8 1 3-2 6-2 8-1v13c-2-1-5-1-8 1-3-2-6-2-8-1V5Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 6v13" stroke="currentColor" stroke-width="2"/></svg>',
+    cashReconciliation: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 7h16M7 4v6M17 4v6M5 12h14v8H5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="m8 16 2 2 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    finance: '<svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v10M9.5 9.5c0-1.4 1.1-2.5 2.5-2.5s2.5.8 2.5 2c0 3-5 1.5-5 4.5 0 1.2 1.1 2 2.5 2s2.5-1.1 2.5-2.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
+    users: '<svg viewBox="0 0 24 24" width="18" height="18"><circle cx="9" cy="8" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5M16.5 5.5a3 3 0 0 1 0 5.8M18 14.8c2 .7 3.5 2.5 3.5 5.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+    roles: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 3 4 6v6c0 4.4 3.4 7.9 8 9 4.6-1.1 8-4.6 8-9V6l-8-3Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="m9 12 2 2 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+  };
+
+  // ---------------- 2. Application + auth state ----------------
+  // authToken is read by every page file, so it must stay a global.
+  var authToken = '';
+  var currentUser = null;
+  var allowedModules = null;      // null = Administrator = every module
+  var userPermissions = null;     // null = Administrator; otherwise per-module actions
+  var appCurrencySymbol = '';
+  var currentPage = 'dashboard';
+  var navItems_ = [];        // the full NAV_ITEMS from UI.gs, groups and all
+  var appShellDataPromise_ = null; // one request shared by login branding + authenticated shell
+
+  var TOKEN_KEY = 'hwerp.session.token';
+  var SIDEBAR_COLLAPSED_KEY = 'hwerp.sidebar.collapsed.v1';
+  var memoryToken = '';           // fallback when storage is unavailable
+
+  /**
+   * Apps Script serves the app inside a sandboxed iframe, and some browser
+   * privacy settings make localStorage throw on access rather than simply
+   * return null. Falling back to a variable keeps the session alive for the
+   * current tab instead of breaking login outright.
+   */
+  function storeToken_(token) {
+    memoryToken = token || '';
+    try { if (token) window.localStorage.setItem(TOKEN_KEY, token); else window.localStorage.removeItem(TOKEN_KEY); }
+    catch (e) { /* storage blocked — memoryToken carries it */ }
+  }
+  function readStoredToken_() {
+    try { return window.localStorage.getItem(TOKEN_KEY) || memoryToken || ''; }
+    catch (e) { return memoryToken || ''; }
+  }
+  function clearStoredToken_() { storeToken_(''); }
+
+  function isPhoneViewport_() {
+    if (window.matchMedia) {
+      return window.matchMedia('(max-width: 540px), (orientation: landscape) and (max-height: 540px) and (pointer: coarse)').matches;
+    }
+    return !!window.innerWidth && window.innerWidth <= 540;
+  }
+
+  function setSidebarCollapsed_(collapsed, persist) {
+    var app = document.getElementById('app');
+    if (!app) return;
+    app.classList.toggle('sidebar-collapsed', !!collapsed);
+    var toggle = document.getElementById('menuToggle');
+    if (toggle) toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    if (persist === false) return;
+    try { window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0'); }
+    catch (e) { /* storage blocked — current DOM state still works */ }
+  }
+
+  function restoreSidebarState_() {
+    if (!window.innerWidth || isPhoneViewport_()) return;
+    var saved = null;
+    try { saved = window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY); }
+    catch (e) { saved = null; }
+    var collapsed = saved === '1';
+    if (saved === null) collapsed = true;
+    setSidebarCollapsed_(collapsed, false);
+  }
+
+  function collapseSidebarOverlay_() {
+    if (isPhoneViewport_()) return;
+    var app = document.getElementById('app');
+    if (!app || app.classList.contains('sidebar-collapsed')) return;
+    setSidebarCollapsed_(true, true);
+  }
+
+  function updateMobileViewportMetrics_() {
+    var root = document.documentElement;
+    if (!root) return;
+    var viewportHeight = window.visualViewport && window.visualViewport.height
+      ? window.visualViewport.height
+      : (window.innerHeight || root.clientHeight || 0);
+    if (viewportHeight > 0) root.style.setProperty('--app-viewport-height', Math.round(viewportHeight) + 'px');
+
+    var nav = document.getElementById('mobileBottomNav');
+    var navHeight = 0;
+    if (isPhoneViewport_() && nav) {
+      var display = window.getComputedStyle ? window.getComputedStyle(nav).display : '';
+      if (display !== 'none') {
+        var rect = nav.getBoundingClientRect();
+        navHeight = Math.max(0, Math.ceil(rect.height || 0));
+      }
+    }
+    root.style.setProperty('--mobile-nav-clearance', (navHeight > 0 ? navHeight + 8 : 72) + 'px');
+  }
+
+  function wireMobileViewportMetrics_() {
+    updateMobileViewportMetrics_();
+    window.addEventListener('resize', updateMobileViewportMetrics_);
+    window.addEventListener('orientationchange', updateMobileViewportMetrics_);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', updateMobileViewportMetrics_);
+      window.visualViewport.addEventListener('scroll', updateMobileViewportMetrics_);
+    }
+  }
+
+  function toggleDesktopSidebar_() {
+    var app = document.getElementById('app');
+    if (!app) return;
+    setSidebarCollapsed_(!app.classList.contains('sidebar-collapsed'), true);
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    renderClock_();
+    setInterval(renderClock_, 60 * 1000);
+    wireTopbarDatePopover_();
+
+    restoreSidebarState_();
+    wireMobileViewportMetrics_();
+
+    var menuToggle = document.getElementById('menuToggle');
+    if (menuToggle) {
+      menuToggle.addEventListener('click', function () {
+        if (isPhoneViewport_()) {
+          openMobileMore_();
+          return;
+        }
+        toggleDesktopSidebar_();
+      });
+    }
+
+    var sidebarCollapseBtn = document.getElementById('sidebarCollapseBtn');
+    if (sidebarCollapseBtn) {
+      sidebarCollapseBtn.addEventListener('click', function () {
+        setSidebarCollapsed_(true, true);
+      });
+    }
+
+    var sidebarBackdrop = document.getElementById('sidebarBackdrop');
+    if (sidebarBackdrop) {
+      sidebarBackdrop.addEventListener('click', function () {
+        collapseSidebarOverlay_();
+      });
+    }
+
+    wireCalcPanel_();
+    initSearchClearUx_();
+    initTouchControls_();
+
+    wireLoginForm_();
+    brandLoginScreen_();
+    bootstrapSession_();
+    // Runs after every page file's <script> has executed, so their loader
+    // functions exist by now.
+    wirePageReloaders_();
+  });
+
+  /**
+   * One app-shell request per page lifetime. Login branding starts it early;
+   * authenticated shell construction reuses the same promise instead of
+   * immediately issuing the same Apps Script call again.
+   */
+  function getAppShellDataOnce_() {
+    if (!appShellDataPromise_) {
+      appShellDataPromise_ = serverCall('getAppShellData').catch(function (err) {
+        // A setup/transient error must not poison future attempts.
+        appShellDataPromise_ = null;
+        throw err;
+      });
+    }
+    return appShellDataPromise_;
+  }
+
+  /** Fills the shop name on the login card. getAppShellData is deliberately ungated so this works before sign-in. */
+  function brandLoginScreen_() {
+    getAppShellDataOnce_().then(function (data) {
+      var n = document.getElementById('loginShopName');
+      var l = document.getElementById('loginLogoMark');
+      if (n) n.textContent = data.shopName;
+      if (l) l.textContent = initials_(data.shopName);
+    }).catch(function () { /* not set up yet — the default title stands */ });
+  }
+
+  /** Restores a saved session, or shows the login card. */
+  function bootstrapSession_() {
+    var saved = readStoredToken_();
+    if (!saved) { showLogin_(); return; }
+    withLoader(serverCall('validateSession', saved))
+      .then(function (payload) { onAuthenticated_(payload); })
+      .catch(function () { clearStoredToken_(); showLogin_(); });
+  }
+
+  function wireLoginForm_() {
+    var btn = document.getElementById('loginSubmitBtn');
+    if (!btn) return;
+
+    btn.addEventListener('click', doLogin_);
+    ['loginMobile', 'loginPassword'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.addEventListener('keydown', function (e) { if (e.key === 'Enter') doLogin_(); });
+    });
+
+    var toggle = document.getElementById('loginTogglePassword');
+    if (toggle) {
+      toggle.addEventListener('click', function () {
+        var pw = document.getElementById('loginPassword');
+        var showing = pw.type === 'text';
+        pw.type = showing ? 'password' : 'text';
+        toggle.textContent = showing ? 'Show' : 'Hide';
+      });
+    }
+  }
+
+  function setLoginPending_(pending) {
+    var btn = document.getElementById('loginSubmitBtn');
+    var spinner = document.getElementById('loginBtnSpinner');
+    var label = document.getElementById('loginBtnLabel');
+    if (!btn) return;
+    btn.disabled = !!pending;
+    btn.setAttribute('aria-busy', pending ? 'true' : 'false');
+    if (spinner) spinner.hidden = !pending;
+    if (label) label.textContent = pending ? 'Logging in…' : 'Login';
+  }
+
+  function doLogin_() {
+    var errEl = document.getElementById('loginError');
+    var btn = document.getElementById('loginSubmitBtn');
+    var mobile = (document.getElementById('loginMobile').value || '').trim();
+    var password = document.getElementById('loginPassword').value || '';
+
+    if (errEl) errEl.style.display = 'none';
+    if (!mobile || !password) {
+      if (errEl) { errEl.textContent = 'Enter your mobile number and password.'; errEl.style.display = 'block'; }
+      return;
+    }
+
+    setLoginPending_(true);
+    withLoader(serverCall('login', mobile, password))
+      .then(function (payload) {
+        document.getElementById('loginPassword').value = '';
+        onAuthenticated_(payload);
+      })
+      .catch(function (err) {
+        if (errEl) { errEl.textContent = err.message || 'Sign in failed.'; errEl.style.display = 'block'; }
+      })
+      .finally(function () { setLoginPending_(false); });
+  }
+
+  function onAuthenticated_(payload) {
+    authToken = payload.token;
+    currentUser = payload.user;
+    allowedModules = payload.allowedModules;   // null for Administrator
+    userPermissions = payload.permissions || null;
+    storeToken_(authToken);
+    hideLogin_();
+    return loadAppShell_();
+  }
+
+  function doLogout_() {
+    var token = authToken;
+    authToken = '';
+    currentUser = null;
+    allowedModules = null;
+    userPermissions = null;
+    clearStoredToken_();
+    serverCall('logout', token).catch(function () { /* the local session is gone either way */ });
+    window.location.reload();
+  }
+
+  function showLogin_() {
+    var o = document.getElementById('loginOverlay');
+    if (o) o.hidden = false;
+    var app = document.getElementById('app');
+    if (app) app.style.visibility = 'hidden';
+  }
+
+  function hideLogin_() {
+    var o = document.getElementById('loginOverlay');
+    if (o) o.hidden = true;
+    var app = document.getElementById('app');
+    if (app) app.style.visibility = '';
+  }
+
+  function loadAppShell_() {
+    return getAppShellDataOnce_()
+      .then(function (data) {
+        document.getElementById('shopNameLabel').textContent = data.shopName;
+        document.getElementById('logoMark').textContent = initials_(data.shopName);
+        appCurrencySymbol = data.currencySymbol || '';
+
+        navItems_ = data.navItems;
+        var items = filterNavByRole_(data.navItems);
+        buildNav_(items);
+        buildMobileNav_(items);
+        renderSidebarFooter_();
+
+        // Land on a page this role can actually open — for a group that
+        // means its first visible tab, not the group itself.
+        goToPage(firstReachableKey_(items));
+
+        // Cash Session is a global topbar control. Its UI logic is loaded by
+        // pos.html with the rest of the shared runtime, but it must refresh
+        // even when the user's first page is Dashboard or another module.
+        if (typeof posRefreshGlobalSessionStatus_ === 'function') {
+          posRefreshGlobalSessionStatus_(true);
+        }
+      })
+      .catch(function (err) {
+        showToast(err.message || 'Could not load app settings.', 'error');
+      });
+  }
+
+  /**
+   * Administrator (allowedModules === null) sees everything. Any other role
+   * sees Dashboard plus whatever its Allowed Modules lists.
+   *
+   * This is presentation only. The real gate is requirePermission_ on every
+   * server function — hiding a menu item is convenience, not security.
+   */
+  function hasSpecialEditPermission_(permissionKey) {
+    if (allowedModules === null) return true;
+    var p = userPermissions && userPermissions[permissionKey];
+    return !!(p && p.edit);
+  }
+
+  function hasActionPermission_(moduleKey, action) {
+    if (allowedModules === null) return true;
+    var p = userPermissions && userPermissions[moduleKey];
+    return !!(p && p[action]);
+  }
+
+  function actionPermAnyVisible_(item) {
+    return !!(item && item.actionPermAny && item.actionPermAny.some(function (perm) {
+      return hasActionPermission_(perm.module, perm.action);
+    }));
+  }
+
+  function navItemVisible_(item) {
+    if (!item) return false;
+    if (allowedModules === null || allowedModules === undefined) return true;
+    if (item.actionPermAny) return actionPermAnyVisible_(item);
+    if (item.specialPermKey) return hasSpecialEditPermission_(item.specialPermKey);
+    if (allowedModules.indexOf(item.key) !== -1) return true;
+    return (item.children || []).some(function (c) {
+      if (c.adminOnly) return false;
+      if (c.specialPermKey) return hasSpecialEditPermission_(c.specialPermKey);
+      var key = c.permKey || c.key;
+      return allowedModules.indexOf(key) !== -1;
+    });
+  }
+
+  function filterNavByRole_(navItems) {
+    if (allowedModules === null || allowedModules === undefined) return navItems;
+    return navItems.filter(function (item) {
+      if (item && item.specialPermKey) return hasSpecialEditPermission_(item.specialPermKey);
+      return navItemVisible_(item);
+    });
+  }
+
+  /**
+   * Is this sub-tab visible to the signed-in user? groupKey is the parent
+   * group's own key (e.g. 'settings') — children like 'invoiceDesign' that
+   * don't have their own PERMISSION_MODULES entry ride on the group's grant
+   * instead, the same way the group's own landing-page child always has.
+   */
+  function subNavVisible_(child, groupKey) {
+    if (child.adminOnly) return allowedModules === null;
+    if (allowedModules === null) return true;
+    if (child.actionPermAny) return actionPermAnyVisible_(child);
+    if (child.specialPermKey) return hasSpecialEditPermission_(child.specialPermKey);
+    if (child.permKey) return allowedModules.indexOf(child.permKey) !== -1;
+    if (child.key === groupKey) return allowedModules.indexOf(groupKey) !== -1;
+    if (child.key === 'returns' || child.key === 'users' || child.key === 'roles') {
+      return allowedModules.indexOf(child.key) !== -1;
+    }
+    return !!groupKey && allowedModules.indexOf(groupKey) !== -1;
+  }
+
+  /** The NAV_ITEMS entry a page key belongs to — itself, or the group holding it. */
+  function navGroupFor_(key) {
+    for (var i = 0; i < navItems_.length; i++) {
+      var item = navItems_[i];
+      if (item.key === key && !item.children) return item;
+      if ((item.children || []).some(function (c) { return c.key === key; })) return item;
+      if (item.key === key) return item;
+    }
+    return null;
+  }
+
+  /** First page this user can actually open, so we never land on a blank one. */
+  function firstReachableKey_(items) {
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i];
+      if (!it.children) {
+        if (navItemVisible_(it)) return it.key;
+      } else {
+        var kids = it.children.filter(function (c) { return subNavVisible_(c, it.key); });
+        if (kids.length) return kids[0].key;
+      }
+    }
+    return allowedModules === null ? 'dashboard' : 'noAccess';
+  }
+
+  /**
+   * Renders the sub-tab strip under the header. Doing it centrally means
+   * sales.html, returns.html, settings.html, users.html and roles.html need
+   * no changes at all — they are still ordinary pages, just reached from a
+   * tab instead of the sidebar.
+   */
+  function renderSubNav_(group, activeKey) {
+    var host = document.getElementById('subNav');
+    if (!host) return;
+    var kids = (group && group.children) ? group.children.filter(function (c) { return subNavVisible_(c, group.key); }) : [];
+    if (kids.length < 2) { host.hidden = true; host.innerHTML = ''; return; }
+
+    host.innerHTML = '';
+    kids.forEach(function (c) {
+      var b = document.createElement('button');
+      b.className = 'tab-btn' + (c.key === activeKey ? ' active' : '');
+      b.innerHTML = escapeHtml(c.label) + (c.bn ? '<span class="bn-hint">' + escapeHtml(c.bn) + '</span>' : '');
+      b.addEventListener('click', function () { goToPage(c.key); });
+      host.appendChild(b);
+    });
+    host.hidden = false;
+  }
+
+  function firstAvailablePage_(items) {
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i];
+      if (!it.children) return it.key;
+      var kids = it.children.filter(function (c) { return subNavVisible_(c, it.key); });
+      if (kids.length) return kids[0].key;
+    }
+    return 'pos';
+  }
+
+  function renderSidebarFooter_() {
+    var footer = document.querySelector('.sidebar-footer');
+    if (!footer || !currentUser) return;
+    footer.innerHTML =
+      '<div style="font-weight:600;">' + escapeHtml(currentUser.name || currentUser.mobile) + '</div>' +
+      '<div style="opacity:.7; margin-bottom:8px;">' + escapeHtml(currentUser.role) + '</div>' +
+      '<button class="btn" id="logoutBtn" style="width:100%;" title="Sign out" aria-label="Sign out">Sign out</button>';
+    document.getElementById('logoutBtn').addEventListener('click', function () {
+      var btn = this;
+      confirmAction({
+        type: 'state-change',
+        title: 'Sign out?',
+        message: 'Your current SherERP session will end.',
+        details: [{ label: 'User', value: currentUser ? (currentUser.name || currentUser.mobile || '') : '', emphasis: true }],
+        confirmLabel: 'Sign out',
+        trigger: btn
+      }).then(function (result) { if (result.confirmed) doLogout_(); });
+    });
+  }
+
+  function initials_(name) {
+    if (!name) return 'HS';
+    var words = name.trim().split(/\s+/).slice(0, 2);
+    return words.map(function (w) { return w.charAt(0).toUpperCase(); }).join('') || 'HS';
+  }
+
+  // ---------------- 3. Navigation ----------------
+  // UI.gs's NAV_ITEMS is the only nav list. There used to be a duplicate
+  // defaultNavItems_() here and the two had drifted apart — this copy had
+  // Expenses and Day Book, the server one didn't, so those pages appeared
+  // only when the shell call FAILED.
+  function sidebarItemsInOrder_(items) {
+    return (items || []).slice().sort(function (a, b) {
+      var ao = Number(a && a.sidebarOrder);
+      var bo = Number(b && b.sidebarOrder);
+      if (!isFinite(ao)) ao = 9999;
+      if (!isFinite(bo)) bo = 9999;
+      return ao - bo;
+    });
+  }
+
+  function navLandingKey_(item) {
+    if (!item) return '';
+    if (!item.children) return item.key;
+
+    var visible = (item.children || []).filter(function (c) {
+      return subNavVisible_(c, item.key);
+    });
+    var preferred = String(item.landingKey || '');
+    if (preferred) {
+      var preferredVisible = visible.filter(function (c) { return c.key === preferred; })[0];
+      if (preferredVisible) return preferredVisible.key;
+    }
+    return visible.length ? visible[0].key : item.key;
+  }
+
+  function buildNav_(items) {
+    var nav = document.getElementById('navList');
+    nav.innerHTML = '';
+    var lastGroup = null;
+    sidebarItemsInOrder_(items).forEach(function (item) {
+      var group = Number(item.sidebarGroup);
+      if (lastGroup !== null && group !== lastGroup) {
+        var divider = document.createElement('div');
+        divider.className = 'nav-divider';
+        divider.setAttribute('aria-hidden', 'true');
+        nav.appendChild(divider);
+      }
+      lastGroup = group;
+
+      var el = document.createElement('div');
+      el.className = 'nav-item';
+      el.dataset.page = item.key;
+      el.title = item.label;
+      el.setAttribute('aria-label', item.label);
+      el.innerHTML = (ICONS[item.icon || item.key] || '') +
+        '<span class="nav-item-text"><span>' + escapeHtml(item.label) + '</span>' +
+        (item.bn ? '<span class="bn-hint">' + escapeHtml(item.bn) + '</span>' : '') +
+        '</span>';
+      el.addEventListener('click', function () { goToPage(navLandingKey_(item)); });
+      nav.appendChild(el);
+    });
+  }
+
+
+
+  // ---------------- 3a. Phone/PWA navigation ----------------
+  // Uses the same role-filtered NAV_ITEMS as the desktop sidebar. No second
+  // permission model and no separate mobile routes are introduced.
+  var MOBILE_PRIMARY_KEYS_ = ['dashboard', 'pos', 'sales', 'products'];
+
+  function mobileItemKey_(item) {
+    return navLandingKey_(item);
+  }
+
+  function buildMobileNav_(items) {
+    var visible = filterNavByRole_(items || navItems_ || []);
+    var more = document.getElementById('mobileMoreList');
+    if (!more) return;
+
+    document.querySelectorAll('#mobileBottomNav [data-mobile-page]').forEach(function (btn) {
+      var key = btn.dataset.mobilePage;
+      if (key === 'more') return;
+      var group = visible.filter(function (item) { return item.key === key; })[0];
+      btn.hidden = !group;
+      var iconHost = btn.querySelector('[data-mobile-icon]');
+      if (iconHost && group) iconHost.innerHTML = ICONS[group.icon || group.key] || '';
+    });
+
+
+    document.querySelectorAll('.mobile-quick-action[data-mobile-quick]').forEach(function (btn) {
+      var key = btn.dataset.mobileQuick;
+      if (btn.querySelector('.mobile-quick-icon')) return;
+      var icon = document.createElement('span');
+      icon.className = 'mobile-quick-icon';
+      icon.innerHTML = ICONS[key] || '';
+      btn.insertBefore(icon, btn.firstChild);
+    });
+
+    more.innerHTML = '';
+    visible.forEach(function (item) {
+      if (MOBILE_PRIMARY_KEYS_.indexOf(item.key) !== -1) return;
+      var target = mobileItemKey_(item);
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'mobile-more-item';
+      button.dataset.mobileTarget = target;
+      button.innerHTML = '<span class="mobile-more-item-icon">' + (ICONS[item.icon || item.key] || '') + '</span>' +
+        '<span class="mobile-more-item-copy"><strong>' + escapeHtml(item.label) + '</strong>' +
+        (item.bn ? '<span class="bn-hint">' + escapeHtml(item.bn) + '</span>' : '') + '</span>' +
+        '<span class="mobile-more-chevron" aria-hidden="true">›</span>';
+      button.addEventListener('click', function () { closeMobileMore_(); goToPage(target); });
+      more.appendChild(button);
+    });
+    syncMobileNavigation_(currentPage);
+  }
+
+  function syncMobileNavigation_(key) {
+    var group = navGroupFor_(key);
+    var parentKey = group ? group.key : key;
+    var activeKey = MOBILE_PRIMARY_KEYS_.indexOf(parentKey) !== -1 ? parentKey : 'more';
+    document.querySelectorAll('#mobileBottomNav [data-mobile-page]').forEach(function (btn) {
+      btn.classList.toggle('active', btn.dataset.mobilePage === activeKey);
+      if (btn.dataset.mobilePage === activeKey) btn.setAttribute('aria-current', 'page');
+      else btn.removeAttribute('aria-current');
+    });
+    document.querySelectorAll('#mobileMoreList [data-mobile-target]').forEach(function (btn) {
+      var targetGroup = navGroupFor_(btn.dataset.mobileTarget);
+      btn.classList.toggle('active', !!targetGroup && !!group && targetGroup.key === group.key);
+    });
+  }
+
+  function openMobileMore_() {
+    var sheet = document.getElementById('mobileMoreSheet');
+    if (!sheet) return;
+    buildMobileNav_(filterNavByRole_(navItems_));
+    sheet.hidden = false;
+    document.body.classList.add('mobile-sheet-open');
+    syncMobileNavigation_('more');
+  }
+
+  function closeMobileMore_() {
+    var sheet = document.getElementById('mobileMoreSheet');
+    if (sheet) sheet.hidden = true;
+    document.body.classList.remove('mobile-sheet-open');
+    syncMobileNavigation_(currentPage);
+  }
+
+  function enhanceMobileCardTables_(root) {
+    var scope = root || document;
+    var tables = [];
+    if (scope.matches && scope.matches('table.mobile-card-table')) tables.push(scope);
+    if (scope.querySelectorAll) tables = tables.concat(Array.prototype.slice.call(scope.querySelectorAll('table.mobile-card-table')));
+    tables.forEach(function (table) {
+      var labels = Array.prototype.map.call(table.querySelectorAll('thead th'), function (th) {
+        return (th.textContent || '').replace(/\s+/g, ' ').trim();
+      });
+      Array.prototype.forEach.call(table.querySelectorAll('tbody tr'), function (row) {
+        Array.prototype.forEach.call(row.children, function (cell, idx) {
+          if (!cell.getAttribute('data-label')) cell.setAttribute('data-label', labels[idx] || '');
+        });
+      });
+    });
+  }
+
+  (function wireMobileEnhancements_() {
+    function setup() {
+      enhanceMobileCardTables_(document);
+      var content = document.getElementById('content');
+      if (content && window.MutationObserver) {
+        new MutationObserver(function (mutations) {
+          mutations.forEach(function (m) {
+            Array.prototype.forEach.call(m.addedNodes || [], function (node) {
+              if (node && node.nodeType === 1) enhanceMobileCardTables_(node.closest && node.closest('table.mobile-card-table') || node);
+            });
+          });
+        }).observe(content, { childList: true, subtree: true });
+      }
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeMobileMore_(); });
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setup);
+    else setup();
+  })();
+
+  function goToPage(key) {
+    if (allowedModules !== null && key !== 'noAccess') {
+      var direct = navGroupFor_(key);
+      var permitted = direct ? (!direct.children
+        ? navItemVisible_(direct)
+        : subNavVisible_((direct.children || []).filter(function (c) { return c.key === key; })[0] || { key: key }, direct.key)) : false;
+      if (!permitted) {
+        key = firstReachableKey_(filterNavByRole_(navItems_));
+        if (!key || key === 'noAccess') { key = 'noAccess'; }
+      }
+    }
+    currentPage = key;
+    var runtimeKey = key === 'posv2' ? 'pos' : key;
+    document.body.classList.toggle('pos-v2-active', key === 'posv2');
+    document.querySelectorAll('.page').forEach(function (el) {
+      el.hidden = el.dataset.page !== runtimeKey;
+    });
+
+    // Returns, Users and Roles are no longer sidebar entries, so the
+    // highlight follows the GROUP they belong to. goToPage('returns') still
+    // works exactly as before — daybook.html, pos.html and sales.html all
+    // call it directly — it just lights up Sales instead of nothing.
+    var group = navGroupFor_(key);
+    var parentKey = group ? group.key : key;
+    document.querySelectorAll('.nav-item').forEach(function (el) {
+      el.classList.toggle('active', el.dataset.page === parentKey);
+    });
+
+    renderSubNav_(group, key);
+
+    var title = group ? group.label : key;
+    var titleBn = group ? group.bn : '';
+    if (group && group.children) {
+      var child = group.children.filter(function (c) { return c.key === key; })[0];
+      if (child && child.key !== group.key) {
+        title = group.label + ' \u203A ' + child.label;
+        titleBn = child.bn || group.bn;
+      }
+    }
+    document.getElementById('pageTitle').innerHTML = escapeHtml(title) +
+      (titleBn ? '<span class="bn-hint">' + escapeHtml(titleBn) + '</span>' : '');
+    document.getElementById('sidebar').classList.remove('open');
+    collapseSidebarOverlay_();
+    closeMobileMore_();
+    syncMobileNavigation_(key);
+    enhanceMobileCardTables_(document.querySelector('#page-' + runtimeKey) || document);
+    if (key === 'draftSales' && typeof reloadPage_ === 'function') reloadPage_('draftSales');
+    if (key === 'customerLedger' && typeof customerLedgerOnPageEnter_ === 'function') {
+      var pendingCustomerId = partyLedgerPendingOpen_.customer;
+      partyLedgerPendingOpen_.customer = '';
+      customerLedgerOnPageEnter_(pendingCustomerId);
+    }
+    if (key === 'supplierLedger' && typeof supplierLedgerOnPageEnter_ === 'function') {
+      var pendingSupplierId = partyLedgerPendingOpen_.supplier;
+      partyLedgerPendingOpen_.supplier = '';
+      supplierLedgerOnPageEnter_(pendingSupplierId);
+    }
+  }
+
+  function toBanglaDigits_(value) {
+    var map = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+    return String(value).replace(/[0-9]/g, function (digit) { return map[Number(digit)]; });
+  }
+
+  function formatEnglishDate_(date) {
+    return new Intl.DateTimeFormat('en-GB', {
+      weekday: 'short', day: '2-digit', month: 'short', year: 'numeric'
+    }).format(date);
+  }
+
+  function isGregorianLeapYear_(year) {
+    return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  }
+
+  function formatBanglaDate_(date) {
+    // Bangladesh civil Bangla calendar display. Keep storage/reporting in Gregorian date.
+    var months = ['বৈশাখ', 'জ্যৈষ্ঠ', 'আষাঢ়', 'শ্রাবণ', 'ভাদ্র', 'আশ্বিন', 'কার্তিক', 'অগ্রহায়ণ', 'পৌষ', 'মাঘ', 'ফাল্গুন', 'চৈত্র'];
+    var gy = date.getFullYear();
+    var start = new Date(gy, 3, 14); // 14 April is ১ বৈশাখ in Bangladesh.
+    var by = gy - 593;
+    var diff = Math.floor((new Date(date.getFullYear(), date.getMonth(), date.getDate()) - start) / 86400000);
+
+    if (diff < 0) {
+      gy -= 1;
+      start = new Date(gy, 3, 14);
+      by = gy - 593;
+      diff = Math.floor((new Date(date.getFullYear(), date.getMonth(), date.getDate()) - start) / 86400000);
+    }
+
+    var lengths = [31, 31, 31, 31, 31, 30, 30, 30, 30, 30, isGregorianLeapYear_(gy + 1) ? 31 : 30, 30];
+    var mi = 0;
+    while (mi < lengths.length - 1 && diff >= lengths[mi]) {
+      diff -= lengths[mi];
+      mi += 1;
+    }
+
+    return toBanglaDigits_(diff + 1) + ' ' + months[mi] + ' ' + toBanglaDigits_(by);
+  }
+
+  var HIJRI_BANGLADESH_DAY_ADJUSTMENT = -2; // Bangladesh observed Hijri date can differ from browser Intl by moon sighting.
+
+  function gregorianToIslamicCivil_(date) {
+    // Deterministic fallback for browsers/WebViews with incomplete Intl Islamic-calendar support.
+    // The Bangladesh moon-sighting adjustment is applied before this function is called.
+    var y = date.getFullYear();
+    var m = date.getMonth() + 1;
+    var d = date.getDate();
+
+    var a = Math.floor((14 - m) / 12);
+    var yy = y + 4800 - a;
+    var mm = m + 12 * a - 3;
+    var jd = d + Math.floor((153 * mm + 2) / 5) + 365 * yy + Math.floor(yy / 4)
+      - Math.floor(yy / 100) + Math.floor(yy / 400) - 32045;
+
+    var l = jd - 1948440 + 10632;
+    var n = Math.floor((l - 1) / 10631);
+    l = l - 10631 * n + 354;
+    var j = Math.floor((10985 - l) / 5316) * Math.floor((50 * l) / 17719)
+      + Math.floor(l / 5670) * Math.floor((43 * l) / 15238);
+    l = l - Math.floor((30 - j) / 15) * Math.floor((17719 * j) / 50)
+      - Math.floor(j / 16) * Math.floor((15238 * j) / 43) + 29;
+    var im = Math.floor((24 * l) / 709);
+    var id = l - Math.floor((709 * im) / 24);
+    var iy = 30 * n + j - 30;
+
+    return { day: id, month: im, year: iy };
+  }
+
+  function formatHijriDate_(date) {
+    var hijriMonths = [
+      'মহরম',
+      'সফর',
+      'রবিউল আউয়াল',
+      'রবিউস সানি',
+      'জমাদিউল আউয়াল',
+      'জমাদিউস সানি',
+      'রজব',
+      'শাবান',
+      'রমজান',
+      'শাওয়াল',
+      'জিলকদ',
+      'জিলহজ'
+    ];
+
+    var bdObservedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    bdObservedDate.setDate(bdObservedDate.getDate() + HIJRI_BANGLADESH_DAY_ADJUSTMENT);
+
+    try {
+      // Use only numeric Islamic calendar parts. Some Android Chrome/WebView versions
+      // return a Gregorian English month name (for example "March") when month:'long'
+      // is requested even though the Hijri day/year are correct.
+      var formatter = new Intl.DateTimeFormat('en-US-u-ca-islamic-nu-latn', {
+        day: 'numeric', month: 'numeric', year: 'numeric'
+      });
+      var resolved = formatter.resolvedOptions ? formatter.resolvedOptions() : null;
+      var calendar = resolved && resolved.calendar ? String(resolved.calendar).toLowerCase() : '';
+
+      if (!calendar || calendar.indexOf('islamic') === 0) {
+        var parts = formatter.formatToParts(bdObservedDate);
+        var dayPart = parts.filter(function (p) { return p.type === 'day'; })[0];
+        var monthPart = parts.filter(function (p) { return p.type === 'month'; })[0];
+        var yearPart = parts.filter(function (p) { return p.type === 'year'; })[0];
+
+        var day = dayPart ? parseInt(dayPart.value, 10) : NaN;
+        var month = monthPart ? parseInt(monthPart.value, 10) : NaN;
+        var year = yearPart ? parseInt(yearPart.value, 10) : NaN;
+
+        if (isFinite(day) && isFinite(month) && month >= 1 && month <= 12 && isFinite(year)) {
+          return toBanglaDigits_(day) + ' ' + hijriMonths[month - 1] + ' ' + toBanglaDigits_(year);
+        }
+      }
+    } catch (err) {
+      // Fall through to deterministic conversion below.
+    }
+
+    var fallback = gregorianToIslamicCivil_(bdObservedDate);
+    return toBanglaDigits_(fallback.day) + ' ' + hijriMonths[fallback.month - 1] + ' ' + toBanglaDigits_(fallback.year);
+  }
+
+  function renderClock_() {
+    var today = new Date();
+    var englishEl = document.getElementById('englishDateView');
+    var banglaEl = document.getElementById('banglaDateView');
+    var arabicEl = document.getElementById('arabicDateView');
+
+    if (englishEl) englishEl.textContent = formatEnglishDate_(today);
+    if (banglaEl) banglaEl.textContent = formatBanglaDate_(today);
+    if (arabicEl) arabicEl.textContent = formatHijriDate_(today);
+  }
+
+  function wireTopbarDatePopover_() {
+    var wrap = document.getElementById('topbarDate');
+    var toggle = document.getElementById('topbarDateToggle');
+    var popover = document.getElementById('topbarDatePopover');
+    if (!wrap || !toggle || !popover || toggle._datePopoverWired) return;
+    toggle._datePopoverWired = true;
+
+    function setOpen_(open) {
+      popover.hidden = !open;
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      wrap.classList.toggle('is-open', open);
+    }
+
+    toggle.addEventListener('click', function (event) {
+      event.stopPropagation();
+      setOpen_(popover.hidden);
+    });
+    document.addEventListener('click', function (event) {
+      if (!popover.hidden && !wrap.contains(event.target)) setOpen_(false);
+    });
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape' && !popover.hidden) {
+        setOpen_(false);
+        toggle.focus();
+      }
+    });
+  }
+
+  // ---------------- 4. toast / loader ----------------
+  var toastTimer = null;
+  function showToast(message, type) {
+    var el = document.getElementById('toast');
+    el.textContent = message;
+    el.className = 'toast' + (type ? ' ' + type : '');
+    el.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.hidden = true; }, 3200);
+  }
+  function showLoader() { document.getElementById('loader').hidden = false; }
+  function hideLoader() { document.getElementById('loader').hidden = true; }
+
+  // ---------------- 5. google.script.run wrapped as a Promise ----------------
+  // Every server function returns { success, data } or { success:false, message }
+  // (see ok_ / fail_ in Utils.gs) so every call is handled the same way:
+  //   serverCall('someFunction', authToken, arg).then(...).catch(...)
+  function serverCall(fnName) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    return new Promise(function (resolve, reject) {
+      var runner = google.script.run
+        .withSuccessHandler(function (res) {
+          if (res === null || res === undefined) {
+            reject(new Error(fnName + '() returned nothing. If this keeps happening, check Extensions → Apps Script → Executions for the real server-side error.'));
+            return;
+          }
+          if (res.success === false) { reject(new Error(res.message || 'Server error')); return; }
+          resolve(res.data !== undefined ? res.data : res);
+        })
+        .withFailureHandler(function (err) { reject(err); });
+
+      // Without this guard, calling a name that doesn't exist server-side
+      // fails as "Cannot read properties of undefined (reading 'apply')",
+      // which says nothing about WHICH call broke. Two causes, both named
+      // here: the function genuinely doesn't exist, or a .gs file failed to
+      // parse and took every global down with it.
+      if (typeof runner[fnName] !== 'function') {
+        reject(new Error(
+          'No server function named "' + fnName + '". Either it is missing from the .gs files, ' +
+          'or one of them has a syntax error and none of the functions loaded. ' +
+          'Check Extensions → Apps Script → Executions.'
+        ));
+        return;
+      }
+      runner[fnName].apply(runner, args);
+    });
+  }
+
+  // ---------------- 6. Shared across every page ----------------
+  function formatMoney(amount) {
+    var n = Number(amount) || 0;
+    return appCurrencySymbol + n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  }
+
+  function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    var div = document.createElement('div');
+    div.textContent = String(str);
+    return div.innerHTML;
+  }
+
+  // Phone numbers are identifiers, not numbers. These client helpers mirror
+  // Utils.gs so local 017..., a legacy Sheets-damaged 17..., +880..., and
+  // punctuation-separated forms all resolve to the same Bangladesh mobile
+  // for search/selection without changing the value shown to the user.
+  function normalizePhoneSearch_(value) {
+    var text = value === null || value === undefined ? '' : String(value).trim();
+    var bnDigits = '০১২৩৪৫৬৭৮৯';
+    text = text.replace(/[০-৯]/g, function (d) { return String(bnDigits.indexOf(d)); });
+    var digits = text.replace(/\D/g, '');
+    if (/^8801[3-9]\d{8}$/.test(digits)) digits = '0' + digits.slice(3);
+    else if (/^1[3-9]\d{8}$/.test(digits)) digits = '0' + digits;
+    return digits;
+  }
+
+  function phoneNumbersEqualClient_(a, b) {
+    var left = normalizePhoneSearch_(a);
+    var right = normalizePhoneSearch_(b);
+    return !!left && !!right && left === right;
+  }
+
+  function phoneSearchMatches_(phoneValue, query) {
+    var phone = normalizePhoneSearch_(phoneValue);
+    var q = normalizePhoneSearch_(query);
+    return !!phone && !!q && phone.indexOf(q) !== -1;
+  }
+
+  // ---------------- Shared customer/supplier party search ----------------
+  // Custom comboboxes avoid the browser datalist behavior that can dump the
+  // full party list over the page. Search is local, capped, keyboard friendly,
+  // and uses the same Bangla/English phone normalization as the rest of ERP.
+  function partySearchNormalize_(value) {
+    return typeof smartSearchNormalize_ === 'function'
+      ? smartSearchNormalize_(value)
+      : String(value || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  }
+
+  function partySearchFilterItems_(items, query, limit) {
+    var q = partySearchNormalize_(query);
+    if (!q) return [];
+    var compact = q.replace(/\s+/g, '');
+    var phoneOnly = /^[0-9]+$/.test(compact);
+    var tokens = q.split(' ').filter(Boolean);
+    var max = Math.max(1, Number(limit) || 20);
+    return (items || []).filter(function (item) {
+      if (phoneOnly) return phoneSearchMatches_(item && item.phone, query);
+      var name = partySearchNormalize_(item && item.name || '');
+      return tokens.every(function (token) { return name.indexOf(token) !== -1; });
+    }).slice(0, max);
+  }
+
+  function createPartySearchCombobox_(config) {
+    var input = config && config.input;
+    var results = config && config.results;
+    if (!input || !results) return null;
+    var matches = [];
+    var activeIndex = -1;
+
+    function getItems_() {
+      return typeof config.getItems === 'function' ? (config.getItems() || []) : (config.items || []);
+    }
+
+    function displayText_(item) {
+      if (typeof config.displayText === 'function') return config.displayText(item);
+      return String(item && item.name || '') + (item && item.phone ? ' (' + item.phone + ')' : '');
+    }
+
+    function close_() {
+      results.hidden = true;
+      results.innerHTML = '';
+      activeIndex = -1;
+      input.setAttribute('aria-expanded', 'false');
+    }
+
+    function highlight_() {
+      Array.prototype.forEach.call(results.querySelectorAll('.combo-option'), function (row, index) {
+        row.classList.toggle('active', index === activeIndex);
+        row.setAttribute('aria-selected', index === activeIndex ? 'true' : 'false');
+      });
+      var active = activeIndex >= 0 ? results.querySelectorAll('.combo-option')[activeIndex] : null;
+      if (active && active.scrollIntoView) active.scrollIntoView({ block: 'nearest' });
+    }
+
+    function renderMatches_() {
+      results.innerHTML = '';
+      if (!matches.length) {
+        var empty = document.createElement('div');
+        empty.className = 'combo-option-empty';
+        empty.textContent = config.emptyText || 'No matching records';
+        results.appendChild(empty);
+        activeIndex = -1;
+      } else {
+        matches.forEach(function (item, index) {
+          var row = document.createElement('button');
+          row.type = 'button';
+          row.className = 'counter-combo-option combo-option';
+          row.setAttribute('role', 'option');
+          row.dataset.idx = String(index);
+          row.innerHTML = '<span><strong>' + escapeHtml(item.name || '') + '</strong>' +
+            (item.phone ? '<small>' + escapeHtml(item.phone) + '</small>' : '') + '</span>';
+          results.appendChild(row);
+        });
+        activeIndex = 0;
+      }
+      results.hidden = false;
+      input.setAttribute('aria-expanded', 'true');
+      highlight_();
+    }
+
+    function render_() {
+      var query = String(input.value || '').trim();
+      if (!query || input.dataset.selectedId) { close_(); return; }
+      matches = partySearchFilterItems_(getItems_(), query, config.limit || 20);
+      renderMatches_();
+    }
+
+    function renderAll_() {
+      matches = getItems_().slice(0, Math.max(1, Number(config.limit) || 20));
+      renderMatches_();
+    }
+
+    function pick_(index) {
+      var item = matches[index];
+      if (!item) return;
+      input.value = displayText_(item);
+      input.dataset.selectedId = String(item.id || '');
+      close_();
+      if (typeof config.onSelect === 'function') config.onSelect(item);
+    }
+
+    function setSelected_(item) {
+      if (!item) {
+        input.value = '';
+        input.dataset.selectedId = '';
+        close_();
+        return;
+      }
+      input.value = displayText_(item);
+      input.dataset.selectedId = String(item.id || '');
+      close_();
+    }
+
+    input.setAttribute('role', 'combobox');
+    input.setAttribute('aria-autocomplete', 'list');
+    input.setAttribute('aria-controls', results.id || '');
+    input.setAttribute('aria-expanded', 'false');
+
+    input.addEventListener('input', function () {
+      var hadSelection = !!input.dataset.selectedId;
+      input.dataset.selectedId = '';
+      if (!String(input.value || '').trim()) {
+        if (hadSelection && typeof config.onClear === 'function') config.onClear();
+        if (config.showAllOnEmpty) renderAll_();
+        else close_();
+        return;
+      }
+      render_();
+    });
+    input.addEventListener('focus', function () {
+      if (config.showAllOnEmpty) renderAll_();
+      else if (!input.dataset.selectedId) render_();
+    });
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (results.hidden) render_();
+        if (matches.length) activeIndex = Math.min(activeIndex + 1, matches.length - 1);
+        highlight_();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (matches.length) activeIndex = Math.max(activeIndex - 1, 0);
+        highlight_();
+      } else if (e.key === 'Enter') {
+        if (!results.hidden && matches.length) { e.preventDefault(); pick_(activeIndex >= 0 ? activeIndex : 0); }
+      } else if (e.key === 'Escape') {
+        close_();
+      }
+    });
+    results.addEventListener('mousedown', function (e) {
+      var row = e.target && e.target.closest ? e.target.closest('.combo-option') : null;
+      if (!row) return;
+      e.preventDefault();
+      pick_(Number(row.dataset.idx));
+    });
+    var toggleButton = config && config.toggleButton;
+    if (toggleButton) {
+      toggleButton.addEventListener('mousedown', function (e) { e.preventDefault(); });
+      toggleButton.addEventListener('click', function (e) {
+        e.preventDefault();
+        if (input.disabled || input.readOnly) return;
+        if (!results.hidden) { close_(); return; }
+        renderAll_();
+        input.focus({ preventScroll: true });
+      });
+    }
+    input.addEventListener('blur', function () { setTimeout(close_, 120); });
+
+    return {
+      render: render_,
+      close: close_,
+      setSelected: setSelected_,
+      clear: function (notify) {
+        var hadSelection = !!input.dataset.selectedId;
+        setSelected_(null);
+        if (notify !== false && hadSelection && typeof config.onClear === 'function') config.onClear();
+      },
+      getSelectedId: function () { return input.dataset.selectedId || ''; }
+    };
+  }
+
+
+  // ---------------- 6a. Reusable smart product search ----------------
+  // Search metadata is normalized/indexed ONCE when each page loads its
+  // product bootstrap. Keypresses only score the prebuilt index, so POS and
+  // other selectors do not rebuild concatenated search strings repeatedly.
+  //
+  // Ranking (large gaps keep the small stock bonus from changing priority):
+  //   exact barcode > exact name > name prefix > word prefix > substring
+  // and in-stock items get a small tie-breaking bonus at the end.
+  var SMART_PRODUCT_SEARCH_KEY_ = '_smartProductSearch';
+
+  function smartSearchNormalize_(value) {
+    var text = value === null || value === undefined ? '' : String(value);
+    try { if (text.normalize) text = text.normalize('NFKC'); } catch (e) {}
+
+    // Bengali digits -> ASCII digits. This intentionally runs before
+    // lower-casing so "১২W" and "12w" normalize to the same text.
+    var bnDigits = '০১২৩৪৫৬৭৮৯';
+    text = text.replace(/[০-৯]/g, function (d) { return String(bnDigits.indexOf(d)); });
+
+    text = text.toLowerCase();
+    // Invisible Unicode characters should never make a product unfindable.
+    text = text.replace(/[\u200B-\u200D\uFEFF]/g, '');
+    // Common separators become spaces so forms such as ACI-200 can still be
+    // searched as independent words.
+    text = text.replace(/[\t\r\n_,;:|\/\\+()\[\]{}<>"'`~!@#$%^&*=?.-]+/g, ' ');
+    return text.replace(/\s+/g, ' ').trim();
+  }
+
+  function smartProductValue_(product, compactKey, sheetKey) {
+    var value = product && product[compactKey] !== undefined ? product[compactKey] : product && product[sheetKey];
+    if (Array.isArray(value)) return value.join(' ');
+    return value === null || value === undefined ? '' : String(value);
+  }
+
+  function smartBuildProductIndex_(product) {
+    var name = smartSearchNormalize_(smartProductValue_(product, 'name', 'Product Name'));
+    var brand = smartSearchNormalize_(smartProductValue_(product, 'brand', 'Brand'));
+    var category = smartSearchNormalize_(smartProductValue_(product, 'category', 'Category'));
+    var barcode = smartSearchNormalize_(smartProductValue_(product, 'barcode', 'Barcode'));
+    var unit = smartSearchNormalize_(smartProductValue_(product, 'unit', 'Unit'));
+    var stockRaw = product && product.stock !== undefined ? product.stock
+      : product && product.currentStock !== undefined ? product.currentStock
+      : product && product['Current Stock'];
+    var stock = Number(stockRaw) || 0;
+    var text = [name, brand, category, barcode, unit].filter(Boolean).join(' ');
+
+    return {
+      name: name,
+      brand: brand,
+      category: category,
+      barcode: barcode,
+      unit: unit,
+      text: text,
+      nameWords: name ? name.split(' ') : [],
+      words: text ? text.split(' ') : [],
+      stock: stock
+    };
+  }
+
+  function smartIndexProducts_(products) {
+    (products || []).forEach(function (product) {
+      product[SMART_PRODUCT_SEARCH_KEY_] = smartBuildProductIndex_(product);
+    });
+    return products || [];
+  }
+
+  function smartAllTokensMatch_(tokens, predicate) {
+    for (var i = 0; i < tokens.length; i++) if (!predicate(tokens[i])) return false;
+    return true;
+  }
+
+  function smartAnyWordStartsWith_(words, token) {
+    for (var i = 0; i < words.length; i++) if (words[i].indexOf(token) === 0) return true;
+    return false;
+  }
+
+  /**
+   * Returns products ranked by the shared product-search policy. When query
+   * is blank, original order is preserved. `limit` is optional and is only
+   * applied after ranking.
+   */
+  function smartSearchProducts_(products, query, limit) {
+    var list = products || [];
+    var q = smartSearchNormalize_(query);
+    if (!q) return typeof limit === 'number' ? list.slice(0, limit) : list.slice();
+
+    var tokens = q.split(' ').filter(Boolean);
+    var ranked = [];
+    list.forEach(function (product, originalIndex) {
+      var idx = product[SMART_PRODUCT_SEARCH_KEY_] || smartBuildProductIndex_(product);
+      // Fallback index assignment is defensive for callers that forget to
+      // pre-index; normal page loaders always call smartIndexProducts_().
+      if (!product[SMART_PRODUCT_SEARCH_KEY_]) product[SMART_PRODUCT_SEARCH_KEY_] = idx;
+
+      var allSubstring = smartAllTokensMatch_(tokens, function (token) {
+        return idx.text.indexOf(token) !== -1;
+      });
+      if (!allSubstring) return;
+
+      var score;
+      if (idx.barcode && q === idx.barcode) score = 600000;
+      else if (idx.name && q === idx.name) score = 400000;
+      else if (idx.name && idx.name.indexOf(q) === 0) score = 300000;
+      else if (smartAllTokensMatch_(tokens, function (token) { return smartAnyWordStartsWith_(idx.nameWords, token); })) score = 200000;
+      else if (smartAllTokensMatch_(tokens, function (token) { return smartAnyWordStartsWith_(idx.words, token); })) score = 100000;
+      else score = 50000;
+
+      // Small relevance tie-breakers stay far below the 50k ranking gaps.
+      var firstPos = idx.text.indexOf(tokens[0]);
+      if (firstPos >= 0) score += Math.max(0, 500 - Math.min(firstPos, 500));
+      score += Math.min(tokens.length, 20) * 10;
+      if (idx.stock > 0) score += 25;
+
+      ranked.push({ product: product, score: score, originalIndex: originalIndex });
+    });
+
+    ranked.sort(function (a, b) {
+      if (b.score !== a.score) return b.score - a.score;
+      return a.originalIndex - b.originalIndex;
+    });
+    var out = ranked.map(function (row) { return row.product; });
+    return typeof limit === 'number' ? out.slice(0, limit) : out;
+  }
+
+  function smartProductHasExactCode_(product, query) {
+    if (!product) return false;
+    var idx = product[SMART_PRODUCT_SEARCH_KEY_] || smartBuildProductIndex_(product);
+    var q = smartSearchNormalize_(query);
+    return !!q && !!idx.barcode && q === idx.barcode;
+  }
+
+  function openModal(id) { document.getElementById(id).hidden = false; }
+  function closeModal(id) { document.getElementById(id).hidden = true; }
+
+
+  // ---------------- Global confirmation safety layer ----------------
+  // Client-side only: it decides WHEN an existing action may run, never WHAT
+  // that action does. All accounting/stock mutations remain in their native
+  // server functions.
+  var confirmActionState_ = null;
+  var confirmActionWired_ = false;
+
+  var BN_AMOUNT_0_99_ = [
+    'শূন্য','এক','দুই','তিন','চার','পাঁচ','ছয়','সাত','আট','নয়',
+    'দশ','এগারো','বারো','তেরো','চৌদ্দ','পনেরো','ষোলো','সতেরো','আঠারো','উনিশ',
+    'বিশ','একুশ','বাইশ','তেইশ','চব্বিশ','পঁচিশ','ছাব্বিশ','সাতাশ','আটাশ','ঊনত্রিশ',
+    'ত্রিশ','একত্রিশ','বত্রিশ','তেত্রিশ','চৌত্রিশ','পঁয়ত্রিশ','ছত্রিশ','সাঁইত্রিশ','আটত্রিশ','ঊনচল্লিশ',
+    'চল্লিশ','একচল্লিশ','বিয়াল্লিশ','তেতাল্লিশ','চুয়াল্লিশ','পঁয়তাল্লিশ','ছেচল্লিশ','সাতচল্লিশ','আটচল্লিশ','ঊনপঞ্চাশ',
+    'পঞ্চাশ','একান্ন','বাহান্ন','তিপ্পান্ন','চুয়ান্ন','পঞ্চান্ন','ছাপ্পান্ন','সাতান্ন','আটান্ন','ঊনষাট',
+    'ষাট','একষট্টি','বাষট্টি','তেষট্টি','চৌষট্টি','পঁয়ষট্টি','ছেষট্টি','সাতষট্টি','আটষট্টি','ঊনসত্তর',
+    'সত্তর','একাত্তর','বাহাত্তর','তিয়াত্তর','চুয়াত্তর','পঁচাত্তর','ছিয়াত্তর','সাতাত্তর','আটাত্তর','ঊনআশি',
+    'আশি','একাশি','বিরাশি','তিরাশি','চুরাশি','পঁচাশি','ছিয়াশি','সাতাশি','আটাশি','ঊননব্বই',
+    'নব্বই','একানব্বই','বিরানব্বই','তিরানব্বই','চুরানব্বই','পঁচানব্বই','ছিয়ানব্বই','সাতানব্বই','আটানব্বই','নিরানব্বই'
+  ];
+
+  function banglaInteger_(n) {
+    n = Math.floor(Number(n) || 0);
+    if (n <= 0) return '';
+    if (n < 100) return BN_AMOUNT_0_99_[n];
+    var parts = [];
+    if (n >= 10000000) {
+      var crore = Math.floor(n / 10000000);
+      parts.push(banglaInteger_(crore) + ' কোটি');
+      n %= 10000000;
+    }
+    if (n >= 100000) {
+      var lakh = Math.floor(n / 100000);
+      parts.push(banglaInteger_(lakh) + ' লাখ');
+      n %= 100000;
+    }
+    if (n >= 1000) {
+      var thousand = Math.floor(n / 1000);
+      parts.push(banglaInteger_(thousand) + ' হাজার');
+      n %= 1000;
+    }
+    if (n >= 100) {
+      var hundred = Math.floor(n / 100);
+      parts.push(BN_AMOUNT_0_99_[hundred] + 'শ');
+      n %= 100;
+    }
+    if (n > 0) parts.push(BN_AMOUNT_0_99_[n]);
+    return parts.join(' ');
+  }
+
+  function banglaAmountInWords_(value) {
+    if (value === null || value === undefined || value === '') return '';
+    var raw = String(value).replace(/,/g, '').trim();
+    if (!raw || !/^\d+(?:\.\d+)?$/.test(raw)) return '';
+    var num = Number(raw);
+    if (!isFinite(num) || num <= 0) return '';
+    var taka = Math.floor(num + 1e-9);
+    var poisha = Math.round((num - taka) * 100);
+    if (poisha >= 100) { taka += 1; poisha -= 100; }
+    var text = (banglaInteger_(taka) || BN_AMOUNT_0_99_[0]) + ' টাকা';
+    if (poisha > 0) text += ' ' + banglaInteger_(poisha) + ' পয়সা';
+    return text + ' মাত্র';
+  }
+
+  function normalizeConfirmActionOptions_(options) {
+    var o = options || {};
+    var reason = o.reason || {};
+    return {
+      type: o.type || 'financial',
+      title: o.title || 'Confirm action?',
+      message: o.message || '',
+      details: Array.isArray(o.details) ? o.details.slice() : [],
+      confirmLabel: o.confirmLabel || 'Confirm',
+      cancelLabel: o.cancelLabel || 'Cancel',
+      loadingLabel: o.loadingLabel || 'Processing...',
+      reason: {
+        required: !!reason.required,
+        label: reason.label || 'Reason',
+        placeholder: reason.placeholder || 'Enter reason...',
+        maxLength: Number(reason.maxLength) > 0 ? Number(reason.maxLength) : 200
+      },
+      trigger: o.trigger || (typeof document !== 'undefined' ? document.activeElement : null),
+      openingEvent: o.openingEvent || null
+    };
+  }
+
+  function ensureConfirmActionWired_() {
+    if (confirmActionWired_) return;
+    var overlay = document.getElementById('confirmActionModal');
+    if (!overlay) return;
+    document.getElementById('confirmActionCancel').addEventListener('click', function () {
+      if (!confirmActionState_ || confirmActionState_.pending) return;
+      closeConfirmAction_({ confirmed: false, reason: '' }, true);
+    });
+    document.getElementById('confirmActionClose').addEventListener('click', function () {
+      if (!confirmActionState_ || confirmActionState_.pending) return;
+      closeConfirmAction_({ confirmed: false, reason: '' }, true);
+    });
+    document.getElementById('confirmActionConfirm').addEventListener('click', function (event) {
+      if (!confirmActionState_ || confirmActionState_.pending || confirmActionState_.openingGuard) return;
+      confirmActionSubmit_(event);
+    });
+    overlay.addEventListener('click', function (event) {
+      if (event.target !== overlay || !confirmActionState_ || confirmActionState_.pending) return;
+      closeConfirmAction_({ confirmed: false, reason: '' }, true);
+    });
+    document.addEventListener('keydown', confirmActionKeydown_, true);
+    confirmActionWired_ = true;
+  }
+
+  function confirmActionFocusable_() {
+    var overlay = document.getElementById('confirmActionModal');
+    if (!overlay || overlay.hidden) return [];
+    return Array.prototype.slice.call(overlay.querySelectorAll('button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'))
+      .filter(function (el) { return !el.hidden && el.offsetParent !== null; });
+  }
+
+  function confirmActionKeydown_(event) {
+    var state = confirmActionState_;
+    if (!state) return;
+    if (state.options.openingEvent && (event === state.options.openingEvent || (event.timeStamp && state.options.openingEvent.timeStamp === event.timeStamp))) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!state.pending) closeConfirmAction_({ confirmed: false, reason: '' }, true);
+      return;
+    }
+    if (event.key === 'Tab') {
+      var focusable = confirmActionFocusable_();
+      if (!focusable.length) return;
+      var first = focusable[0], last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+      return;
+    }
+    if (event.key === 'Enter' && !state.pending && document.activeElement === document.getElementById('confirmActionConfirm')) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (state.openingGuard) return;
+      confirmActionSubmit_(event);
+    }
+  }
+
+  function renderConfirmAction_(state) {
+    var o = state.options;
+    var overlay = document.getElementById('confirmActionModal');
+    var dialog = overlay.querySelector('.confirm-action-dialog');
+    dialog.classList.remove('is-financial', 'is-danger', 'is-state-change', 'is-pending');
+    dialog.classList.add(o.type === 'danger' ? 'is-danger' : (o.type === 'state-change' ? 'is-state-change' : 'is-financial'));
+    dialog.setAttribute('data-confirm-kind', o.type === 'danger' ? 'Destructive action' : (o.type === 'state-change' ? 'Important change' : 'Financial action'));
+    ['confirmActionConfirm','confirmActionCancel','confirmActionClose'].forEach(function (id) {
+      var control = document.getElementById(id);
+      if (control) control.disabled = false;
+    });
+    document.getElementById('confirmActionTitle').textContent = o.title;
+    var msg = document.getElementById('confirmActionMessage');
+    msg.textContent = o.message || '';
+    msg.hidden = !o.message;
+    var details = document.getElementById('confirmActionDetails');
+    details.innerHTML = '';
+    o.details.forEach(function (row) {
+      if (!row || row.value === null || row.value === undefined || row.value === '') return;
+      var item = document.createElement('div');
+      item.className = 'confirm-action-detail' + (row.emphasis ? ' is-emphasis' : '');
+      var label = document.createElement('span');
+      label.className = 'confirm-action-detail-label';
+      label.textContent = row.label || '';
+      var value = document.createElement('strong');
+      value.className = 'confirm-action-detail-value';
+      value.textContent = String(row.value);
+      item.appendChild(label);
+      item.appendChild(value);
+      details.appendChild(item);
+    });
+    var reasonRow = document.getElementById('confirmActionReasonRow');
+    var reasonInput = document.getElementById('confirmActionReason');
+    document.getElementById('confirmActionReasonLabel').textContent = o.reason.label + (o.reason.required ? ' *' : '');
+    reasonInput.value = '';
+    reasonInput.disabled = false;
+    reasonInput.placeholder = o.reason.placeholder;
+    reasonInput.maxLength = o.reason.maxLength;
+    reasonRow.hidden = !o.reason.required;
+    var reasonError = document.getElementById('confirmActionReasonError');
+    reasonError.textContent = '';
+    reasonError.style.display = 'none';
+    document.getElementById('confirmActionCancel').textContent = o.cancelLabel;
+    var confirmBtn = document.getElementById('confirmActionConfirm');
+    confirmBtn.textContent = o.confirmLabel;
+    confirmBtn.className = 'btn ' + (o.type === 'danger' ? 'btn-danger' : (o.type === 'state-change' ? 'btn-warning' : 'btn-primary'));
+    overlay.hidden = false;
+    document.body.classList.add('confirm-action-open');
+    state.openingGuard = true;
+    setTimeout(function () {
+      if (confirmActionState_ === state) {
+        state.openingGuard = false;
+        try { confirmBtn.focus(); } catch (e) {}
+      }
+    }, 0);
+  }
+
+  function setConfirmActionPending_(pending, label) {
+    var state = confirmActionState_;
+    if (!state) return;
+    state.pending = !!pending;
+    state.phase = pending ? 'PENDING' : 'OPEN';
+    var dialog = document.querySelector('#confirmActionModal .confirm-action-dialog');
+    if (dialog) dialog.classList.toggle('is-pending', !!pending);
+    ['confirmActionConfirm','confirmActionCancel','confirmActionClose'].forEach(function (id) {
+      var el = document.getElementById(id); if (el) el.disabled = !!pending;
+    });
+    var reason = document.getElementById('confirmActionReason');
+    if (reason) reason.disabled = !!pending;
+    var btn = document.getElementById('confirmActionConfirm');
+    if (btn) btn.textContent = pending ? (label || state.options.loadingLabel) : state.options.confirmLabel;
+  }
+
+  function closeConfirmAction_(result, restoreFocus) {
+    var state = confirmActionState_;
+    if (!state || state.settled) return;
+    state.settled = true;
+    state.phase = result && result.confirmed ? 'CLOSED' : 'CANCELLED';
+    var overlay = document.getElementById('confirmActionModal');
+    if (overlay) overlay.hidden = true;
+    document.body.classList.remove('confirm-action-open');
+    setConfirmActionPending_(false);
+    confirmActionState_ = null;
+    if (restoreFocus && state.options.trigger && state.options.trigger.isConnected !== false && typeof state.options.trigger.focus === 'function') {
+      try { state.options.trigger.focus(); } catch (e) {}
+    }
+    state.resolve(result);
+  }
+
+  function failConfirmAction_(error) {
+    var state = confirmActionState_;
+    if (!state || state.settled) return;
+    setConfirmActionPending_(false);
+    state.settled = true;
+    state.phase = 'CLOSED';
+    var overlay = document.getElementById('confirmActionModal');
+    if (overlay) overlay.hidden = true;
+    document.body.classList.remove('confirm-action-open');
+    confirmActionState_ = null;
+    if (state.options.trigger && state.options.trigger.isConnected !== false && typeof state.options.trigger.focus === 'function') {
+      try { state.options.trigger.focus(); } catch (e) {}
+    }
+    state.reject(error);
+  }
+
+  function confirmActionSubmit_() {
+    var state = confirmActionState_;
+    if (!state || state.pending || state.settled) return;
+    var input = document.getElementById('confirmActionReason');
+    var reason = input ? String(input.value || '').trim() : '';
+    if (state.options.reason.required && !reason) {
+      var err = document.getElementById('confirmActionReasonError');
+      err.textContent = 'Please enter a reason.';
+      err.style.display = 'block';
+      if (input) input.focus();
+      return;
+    }
+    if (!state.runner) {
+      closeConfirmAction_({ confirmed: true, reason: reason }, false);
+      return;
+    }
+    setConfirmActionPending_(true, state.options.loadingLabel);
+    Promise.resolve().then(function () { return state.runner(reason); }).then(function (value) {
+      var current = confirmActionState_;
+      if (!current || current !== state) return;
+      setConfirmActionPending_(false);
+      state.settled = true;
+      state.phase = 'CLOSED';
+      var overlay = document.getElementById('confirmActionModal');
+      if (overlay) overlay.hidden = true;
+      document.body.classList.remove('confirm-action-open');
+      confirmActionState_ = null;
+      state.resolve({ confirmed: true, reason: reason, value: value });
+    }).catch(function (error) {
+      if (confirmActionState_ === state) failConfirmAction_(error);
+    });
+  }
+
+  function openConfirmAction_(options, runner) {
+    ensureConfirmActionWired_();
+    if (confirmActionState_) return confirmActionState_.promise;
+    var normalized = normalizeConfirmActionOptions_(options);
+    var state = { options: normalized, runner: runner || null, phase: 'OPEN', pending: false, settled: false, openingGuard: false };
+    state.promise = new Promise(function (resolve, reject) { state.resolve = resolve; state.reject = reject; });
+    confirmActionState_ = state;
+    renderConfirmAction_(state);
+    return state.promise;
+  }
+
+  function confirmAction(options) {
+    return openConfirmAction_(options, null).then(function (result) {
+      return { confirmed: !!(result && result.confirmed), reason: result && result.reason ? result.reason : '' };
+    });
+  }
+
+  function runConfirmedAction(options, runner) {
+    if (typeof runner !== 'function') return Promise.reject(new Error('Confirmed action runner is required.'));
+    return openConfirmAction_(options, runner).then(function (result) {
+      return result && result.confirmed ? result.value : null;
+    });
+  }
+
+
+  function selectedOptionText_(selectOrId) {
+    var el = typeof selectOrId === 'string' ? document.getElementById(selectOrId) : selectOrId;
+    if (!el || el.selectedIndex < 0 || !el.options || !el.options[el.selectedIndex]) return '';
+    return String(el.options[el.selectedIndex].textContent || '').trim();
+  }
+
+  function settlementConfirmDetails_(o) {
+    o = o || {};
+    var amount = Number(o.amount) || 0;
+    var discount = Number(o.discount) || 0;
+    return [
+      { label: o.partyLabel || 'Party', value: o.partyName || '', emphasis: true },
+      { label: o.directionLabel || 'Amount', value: formatMoney(amount), emphasis: true },
+      { label: 'In words', value: banglaAmountInWords_(amount) },
+      { label: o.discountLabel || 'Discount', value: discount > 0 ? formatMoney(discount) : '' },
+      { label: 'Total Settlement', value: discount > 0 ? formatMoney(amount + discount) : '' },
+      { label: 'Method', value: o.method || '' },
+      { label: 'Account', value: o.accountName || '' },
+      { label: 'Date', value: o.date || '' }
+    ].filter(function (row) { return row.value !== ''; });
+  }
+
+  /**
+   * Payment methods that need a bank-account picker shown. The backend
+   * treats 'Bank' and 'Mobile Banking' identically (same BANK_ACCOUNTS
+   * rows, same ledger — see isBankLikePaymentMethod_ in Utils.gs); the
+   * only place the two ever diverge is here, in which accounts a
+   * dropdown offers.
+   */
+  function paymentMethodNeedsAccount_(method) {
+    return method === 'Bank' || method === 'Mobile Banking';
+  }
+
+  /**
+   * Fills a bank-account <select> with only the accounts matching the
+   * chosen payment method ('Bank' -> type 'Bank' accounts, 'Mobile
+   * Banking' -> type 'Mobile Banking' accounts). `accounts` is the
+   * {id, name, type} list every bootstrap returns (getActiveBankAccountsForUI_,
+   * Utils.gs). Preserves the current selection when it's still valid for
+   * the new type, same as every page's old hand-rolled version did.
+   */
+  function fillBankAccountSelect_(selectEl, accounts, paymentMethod) {
+    var current = selectEl.value;
+    var wantType = paymentMethod === 'Mobile Banking' ? 'Mobile Banking' : 'Bank';
+    var filtered = (accounts || []).filter(function (a) { return (a.type || 'Bank') === wantType; });
+    selectEl.innerHTML = '<option value="">Select account...</option>' +
+      filtered.map(function (a) { return '<option value="' + a.id + '">' + escapeHtml(a.name) + '</option>'; }).join('');
+    if (filtered.some(function (a) { return a.id === current; })) selectEl.value = current;
+  }
+
+  /** Shows the overlay for the duration of a server call and always hides it after. */
+  function withLoader(promise) {
+    showLoader();
+    return promise.finally(function () { hideLoader(); });
+  }
+
+  /** Prompts for a required reason before entering Invoice Update Mode. Returns the trimmed reason, or null if cancelled/empty. */
+  function promptForUpdateReason_() {
+    var reason = prompt('Reason for updating this invoice (e.g. Wrong quantity, Wrong product, Wrong discount, Wrong customer, Other):');
+    if (reason === null) return null;
+    reason = reason.trim();
+    if (!reason) { showToast('A reason is required to update an invoice.', 'error'); return null; }
+    return reason;
+  }
+
+  // ---------------- 6b. Topbar calculator ----------------
+  // A scratchpad, not a transaction tool: it never touches serverCall or
+  // any sheet, so it carries none of CLAUDE.md's transaction-safety rules.
+  // Numbered lines are the source of truth; each is a free-typed expression
+  // evaluated independently (no cross-line references), and the total is
+  // the sum of every line that currently evaluates cleanly.
+  var CALC_STORAGE_KEY = 'hwerp.calc.lines';
+  var calcLines_ = [''];
+  var calcActiveIdx_ = 0; // which line the touch keypad types into — kept in sync by each input's 'focus' handler
+
+  function calcLoad_() {
+    try {
+      var raw = window.localStorage.getItem(CALC_STORAGE_KEY);
+      var parsed = raw ? JSON.parse(raw) : null;
+      if (Array.isArray(parsed) && parsed.length) {
+        calcLines_ = parsed.map(function (v) { return String(v); });
+        return;
+      }
+    } catch (e) { /* storage blocked or corrupt — fall through to default */ }
+    calcLines_ = [''];
+  }
+  function calcSave_() {
+    try { window.localStorage.setItem(CALC_STORAGE_KEY, JSON.stringify(calcLines_)); }
+    catch (e) { /* storage blocked — scratchpad just won't survive a reload */ }
+  }
+
+  /**
+   * A small recursive-descent parser for +, -, *, / and parentheses —
+   * deliberately not eval()/Function(), since this reads whatever the user
+   * types. Accepts × ÷ x as multiply/divide so "5 x 5" and "5×5" both work.
+   * Returns {value, error} instead of throwing so callers never need a
+   * try/catch around every keystroke.
+   *
+   * '%' is context-sensitive, matching phone/OS calculators: as the
+   * immediate right-hand side of + or -, "N%" means "N percent of the
+   * running total so far" (500 + 10% -> 550, a discount/markup shortcut).
+   * Everywhere else — standalone, or combined with * or / — it's just
+   * N/100 (500 * 10% -> 50). parseFactor/parseTerm carry a `percent` flag
+   * so parseExpr can tell which case it's in; the flag is dropped the
+   * moment a term becomes anything more than a single percented factor
+   * (multiplied/divided, or parenthesized), which is what keeps e.g.
+   * "(10%)" or "5%*2" literal instead of "smart".
+   */
+  function calcEvaluate_(expr) {
+    var s = String(expr || '').trim();
+    if (!s) return { value: 0, error: false };
+    s = s.replace(/,/g, '').replace(/[×xX]/g, '*').replace(/÷/g, '/');
+    var pos = 0;
+    function peek() { return s.charAt(pos); }
+    function skipSpace() { while (s.charAt(pos) === ' ') pos++; }
+    function parseExpr() {
+      var t = parseTerm();
+      var v = t.value;
+      while (true) {
+        skipSpace();
+        var c = peek();
+        if (c === '+' || c === '-') {
+          pos++;
+          var left = v;
+          var rhs = parseTerm();
+          var rhsVal = rhs.percent ? left * rhs.value : rhs.value;
+          v = c === '+' ? v + rhsVal : v - rhsVal;
+        } else break;
+      }
+      return v;
+    }
+    function parseTerm() {
+      var f = parseFactor();
+      var v = f.value;
+      var percent = f.percent;
+      while (true) {
+        skipSpace();
+        var c = peek();
+        if (c === '*' || c === '/') {
+          pos++;
+          var rhs = parseFactor();
+          v = c === '*' ? v * rhs.value : v / rhs.value;
+          percent = false;
+        } else break;
+      }
+      return { value: v, percent: percent };
+    }
+    function parseFactor() {
+      skipSpace();
+      var c = peek();
+      if (c === '+') { pos++; return parseFactor(); }
+      if (c === '-') { pos++; var f = parseFactor(); return { value: -f.value, percent: f.percent }; }
+      if (c === '(') {
+        pos++;
+        var v = parseExpr();
+        skipSpace();
+        if (peek() !== ')') throw new Error('bad expression');
+        pos++;
+        return applyPercentSuffix_(v);
+      }
+      return applyPercentSuffix_(parseNumber());
+    }
+    function applyPercentSuffix_(v) {
+      skipSpace();
+      if (peek() === '%') { pos++; return { value: v / 100, percent: true }; }
+      return { value: v, percent: false };
+    }
+    function parseNumber() {
+      skipSpace();
+      var start = pos;
+      while (/[0-9.]/.test(s.charAt(pos))) pos++;
+      if (pos === start) throw new Error('bad expression');
+      var v = parseFloat(s.slice(start, pos));
+      if (isNaN(v)) throw new Error('bad expression');
+      return v;
+    }
+    try {
+      var result = parseExpr();
+      skipSpace();
+      if (pos !== s.length) throw new Error('bad expression');
+      if (!isFinite(result)) throw new Error('bad expression');
+      return { value: result, error: false };
+    } catch (e) {
+      return { value: 0, error: true };
+    }
+  }
+
+  /** Trims float noise (0.1+0.2) and adds thousands separators, without forcing decimal places a whole-number result doesn't need. */
+  function calcFormatNumber_(n) {
+    var rounded = Math.round((n + Number.EPSILON) * 1e6) / 1e6;
+    return rounded.toLocaleString(undefined, { maximumFractionDigits: 6 });
+  }
+
+  function calcTotal_() {
+    var sum = 0;
+    calcLines_.forEach(function (expr) {
+      var r = calcEvaluate_(expr);
+      if (!r.error && expr.trim() !== '') sum += r.value;
+    });
+    var el = document.getElementById('calcTotalValue');
+    if (el) el.textContent = calcFormatNumber_(sum);
+  }
+
+  /** Full rebuild of the line list — used for add/remove/clear/load, where losing focus is expected anyway. Single-line edits go through calcOnLineInput_ instead so typing doesn't get interrupted. */
+  function calcRender_() {
+    var container = document.getElementById('calcLines');
+    if (!container) return;
+    container.innerHTML = calcLines_.map(function (expr, i) {
+      var r = calcEvaluate_(expr);
+      var trimmed = expr.trim();
+      var resultText = trimmed === '' ? '' : (r.error ? 'err' : '= ' + calcFormatNumber_(r.value));
+      return '<div class="calc-line" data-idx="' + i + '">' +
+        '<span class="calc-line-no">' + (i + 1) + '</span>' +
+        '<input type="text" inputmode="none" readonly aria-readonly="true" autocomplete="off" spellcheck="false" class="calc-line-input' + (r.error && trimmed !== '' ? ' has-error' : '') + '" value="' + escapeHtml(expr) + '" placeholder="Tap calculator keys">' +
+        '<span class="calc-line-result">' + escapeHtml(resultText) + '</span>' +
+        '<button type="button" class="calc-line-remove" aria-label="Remove line">&times;</button>' +
+        '</div>';
+    }).join('');
+    calcTotal_();
+    if (calcActiveIdx_ >= calcLines_.length) calcActiveIdx_ = calcLines_.length - 1;
+    if (calcActiveIdx_ < 0) calcActiveIdx_ = 0;
+    Array.prototype.forEach.call(container.querySelectorAll('.calc-line'), function (rowEl) {
+      var idx = Number(rowEl.getAttribute('data-idx'));
+      var input = rowEl.querySelector('.calc-line-input');
+      input.addEventListener('input', function () { calcOnLineInput_(idx, input.value); });
+      input.addEventListener('keydown', function (e) { calcOnLineKeydown_(idx, e); });
+      input.addEventListener('focus', function () { calcActiveIdx_ = idx; });
+      input.addEventListener('pointerdown', function (e) {
+        // Touch calculator mode: select the line without opening Android/iOS soft keyboard.
+        if (e.pointerType === 'touch' || e.pointerType === 'pen') {
+          e.preventDefault();
+          calcActiveIdx_ = idx;
+          calcMoveCursorToEnd_(input);
+        }
+      });
+      input.addEventListener('click', function () {
+        calcActiveIdx_ = idx;
+        calcMoveCursorToEnd_(input);
+      });
+      rowEl.querySelector('.calc-line-remove').addEventListener('click', function () { calcRemoveLine_(idx); });
+    });
+  }
+
+  /** Updates one line's stored expression + its own result in place, so typing never loses focus or cursor position the way a full calcRender_() would. */
+  function calcOnLineInput_(idx, value) {
+    calcLines_[idx] = value;
+    var container = document.getElementById('calcLines');
+    var rowEl = container && container.querySelector('.calc-line[data-idx="' + idx + '"]');
+    if (rowEl) {
+      var r = calcEvaluate_(value);
+      var trimmed = value.trim();
+      rowEl.querySelector('.calc-line-result').textContent = trimmed === '' ? '' : (r.error ? 'err' : '= ' + calcFormatNumber_(r.value));
+      rowEl.querySelector('.calc-line-input').classList.toggle('has-error', !!r.error && trimmed !== '');
+    }
+    calcTotal_();
+    calcSave_();
+  }
+
+  function calcMoveCursorToEnd_(input) {
+    if (!input) return;
+    try { input.setSelectionRange(input.value.length, input.value.length); } catch (err) { /* readonly input selection can fail in old browsers */ }
+  }
+
+  /** Keep the active calculator row visible inside the scrollable line list without moving the page behind the fixed calculator panel. */
+  function calcEnsureLineVisible_(rowEl) {
+    var container = document.getElementById('calcLines');
+    if (!container || !rowEl) return;
+    var containerRect = container.getBoundingClientRect();
+    var rowRect = rowEl.getBoundingClientRect();
+    var padding = 6;
+    if (rowRect.bottom > containerRect.bottom) {
+      container.scrollTop += rowRect.bottom - containerRect.bottom + padding;
+    } else if (rowRect.top < containerRect.top) {
+      container.scrollTop -= containerRect.top - rowRect.top + padding;
+    }
+  }
+
+  function calcFocusLine_(idx) {
+    // Update the logical destination immediately. Previously this happened
+    // inside a 30ms timeout, so fast typing after Enter could still modify
+    // the previous row before the new row became active.
+    idx = Math.max(0, Math.min(Number(idx) || 0, calcLines_.length - 1));
+    calcActiveIdx_ = idx;
+
+    var container = document.getElementById('calcLines');
+    var rowEl = container && container.querySelector('.calc-line[data-idx="' + idx + '"]');
+    var input = rowEl && rowEl.querySelector('.calc-line-input');
+    if (!input) return;
+
+    // The input stays readonly + inputmode=none so Android/tablet soft
+    // keyboards do not open. Explicitly reveal the focused row because
+    // preventScroll otherwise leaves newly-added rows below the viewport.
+    try { input.focus({ preventScroll: true }); } catch (err) { input.focus(); }
+    calcMoveCursorToEnd_(input);
+    calcEnsureLineVisible_(rowEl);
+  }
+
+  function calcAddLine_() {
+    calcLines_.push('');
+    calcRender_();
+    calcSave_();
+    calcFocusLine_(calcLines_.length - 1);
+  }
+
+  /** Removing the only remaining line just clears it instead, so there's always at least one row to type into. */
+  function calcRemoveLine_(idx) {
+    if (calcLines_.length <= 1) {
+      calcLines_ = [''];
+      calcRender_();
+      calcSave_();
+      calcFocusLine_(0);
+      return;
+    }
+    calcLines_.splice(idx, 1);
+    calcRender_();
+    calcSave_();
+    calcFocusLine_(Math.max(0, idx - 1));
+  }
+
+  /** Enter appends/advances a line like a spreadsheet; Backspace on an already-empty line merges it away, same as a text editor. */
+  function calcOnLineKeydown_(idx, e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (idx === calcLines_.length - 1) calcAddLine_();
+      else calcFocusLine_(idx + 1);
+      return;
+    }
+    if (e.key === 'Backspace' && calcLines_[idx] === '' && idx > 0) {
+      e.preventDefault();
+      calcRemoveLine_(idx);
+    }
+  }
+
+  /** Keeps calcActiveIdx_ in range after lines are added/removed elsewhere (e.g. the header Clear button), so the keypad always has a real line to type into. */
+  function calcClampActiveIdx_() {
+    if (calcActiveIdx_ >= calcLines_.length) calcActiveIdx_ = calcLines_.length - 1;
+    if (calcActiveIdx_ < 0) calcActiveIdx_ = 0;
+    return calcActiveIdx_;
+  }
+
+  function calcActiveLineInput_() {
+    var idx = calcClampActiveIdx_();
+    var container = document.getElementById('calcLines');
+    var rowEl = container && container.querySelector('.calc-line[data-idx="' + idx + '"]');
+    return rowEl ? rowEl.querySelector('.calc-line-input') : null;
+  }
+
+  /**
+   * Touch-keypad equivalents of typing into the active line: insert at the
+   * cursor, backspace one character (or the current selection), or clear
+   * the whole line. wireCalcKeypad_() keeps focus on the input via
+   * mousedown/preventDefault, so selectionStart/End still reflect where the
+   * user last placed the cursor when these run.
+   */
+  function calcKeypadInsert_(text) {
+    var idx = calcClampActiveIdx_();
+    var input = calcActiveLineInput_();
+    if (!input) return;
+    var start = input.selectionStart != null ? input.selectionStart : input.value.length;
+    var end = input.selectionEnd != null ? input.selectionEnd : input.value.length;
+    var newValue = input.value.slice(0, start) + text + input.value.slice(end);
+    input.value = newValue;
+    var newPos = start + text.length;
+    try { input.focus({ preventScroll: true }); } catch (err) { input.focus(); }
+    try { input.setSelectionRange(newPos, newPos); } catch (err) { /* ignore selection failure */ }
+    calcOnLineInput_(idx, newValue);
+  }
+  function calcKeypadBackspace_() {
+    var idx = calcClampActiveIdx_();
+    var input = calcActiveLineInput_();
+    if (!input) return;
+    var start = input.selectionStart != null ? input.selectionStart : input.value.length;
+    var end = input.selectionEnd != null ? input.selectionEnd : input.value.length;
+    var newValue, newPos;
+    if (start !== end) { newValue = input.value.slice(0, start) + input.value.slice(end); newPos = start; }
+    else if (start > 0) { newValue = input.value.slice(0, start - 1) + input.value.slice(start); newPos = start - 1; }
+    else { newValue = input.value; newPos = 0; }
+    input.value = newValue;
+    try { input.focus({ preventScroll: true }); } catch (err) { input.focus(); }
+    try { input.setSelectionRange(newPos, newPos); } catch (err) { /* ignore selection failure */ }
+    calcOnLineInput_(idx, newValue);
+  }
+  function calcKeypadClearLine_() {
+    var idx = calcClampActiveIdx_();
+    var input = calcActiveLineInput_();
+    if (!input) return;
+    input.value = '';
+    try { input.focus({ preventScroll: true }); } catch (err) { input.focus(); }
+    calcOnLineInput_(idx, '');
+  }
+  /** Same as pressing Enter in the active line: advance to the next line, or open a new one if it's the last. */
+  function calcKeypadEnter_() {
+    var idx = calcClampActiveIdx_();
+    if (idx === calcLines_.length - 1) calcAddLine_();
+    else calcFocusLine_(idx + 1);
+  }
+
+  /** One-time wiring for the static keypad grid — its buttons never change, so unlike calc-lines this doesn't need rewiring on every calcRender_(). */
+  function wireCalcKeypad_() {
+    var keypad = document.getElementById('calcKeypad');
+    if (!keypad) return;
+    // Without this, tapping a key blurs the line input first and the
+    // insert/backspace helpers above lose selectionStart/End.
+    keypad.addEventListener('mousedown', function (e) {
+      if (e.target.closest && e.target.closest('.calc-key')) e.preventDefault();
+    });
+    keypad.addEventListener('click', function (e) {
+      var btn = e.target.closest ? e.target.closest('.calc-key') : null;
+      if (!btn) return;
+      var action = btn.getAttribute('data-action');
+      var value = btn.getAttribute('data-value');
+      if (action === 'digit' || action === 'op') calcKeypadInsert_(value);
+      else if (action === 'paren-open') calcKeypadInsert_('(');
+      else if (action === 'paren-close') calcKeypadInsert_(')');
+      else if (action === 'percent') calcKeypadInsert_('%');
+      else if (action === 'backspace') calcKeypadBackspace_();
+      else if (action === 'clear-line') calcKeypadClearLine_();
+      else if (action === 'equals') calcKeypadEnter_();
+    });
+  }
+
+
+  /** Desktop/laptop keyboard support while keeping mobile/tablet inputs touch-only.
+   *  The line input stays readonly + inputmode=none so Android does not open the
+   *  soft keyboard, but physical keyboard keys are handled here when the panel is open.
+   */
+  function calcHandlePhysicalKey_(e) {
+    var panel = document.getElementById('calcPanel');
+    if (!panel || panel.hidden) return;
+
+    var key = e.key;
+    if (/^[0-9]$/.test(key)) {
+      e.preventDefault();
+      calcKeypadInsert_(key);
+      return;
+    }
+
+    var insertMap = {
+      '+': '+',
+      '-': '-',
+      '*': '×',
+      'x': '×',
+      'X': '×',
+      '/': '÷',
+      '.': '.',
+      ',': '.',
+      '(': '(',
+      ')': ')',
+      '%': '%'
+    };
+
+    if (Object.prototype.hasOwnProperty.call(insertMap, key)) {
+      e.preventDefault();
+      calcKeypadInsert_(insertMap[key]);
+      return;
+    }
+
+    if (key === 'Enter' || key === '=') {
+      e.preventDefault();
+      calcKeypadEnter_();
+      return;
+    }
+
+    if (key === 'Backspace') {
+      e.preventDefault();
+      calcKeypadBackspace_();
+      return;
+    }
+
+    if (key === 'Delete') {
+      e.preventDefault();
+      calcKeypadClearLine_();
+    }
+  }
+
+  function calcOpen_() {
+    var panel = document.getElementById('calcPanel');
+    var btn = document.getElementById('calcToggleBtn');
+    if (!panel) return;
+    panel.hidden = false;
+    if (btn) { btn.classList.add('is-active'); btn.setAttribute('aria-expanded', 'true'); }
+    calcActiveIdx_ = calcLines_.length - 1;
+    calcFocusLine_(calcLines_.length - 1);
+  }
+  function calcClose_() {
+    var panel = document.getElementById('calcPanel');
+    var btn = document.getElementById('calcToggleBtn');
+    if (!panel) return;
+    panel.hidden = true;
+    if (btn) { btn.classList.remove('is-active'); btn.setAttribute('aria-expanded', 'false'); }
+  }
+
+  /** One-time wiring, called from the DOMContentLoaded handler above regardless of login state — the button/panel simply sit inside #app, hidden with the rest of the shell until sign-in. */
+  function wireCalcPanel_() {
+    var toggleBtn = document.getElementById('calcToggleBtn');
+    var panel = document.getElementById('calcPanel');
+    if (!toggleBtn || !panel) return;
+
+    calcLoad_();
+    calcRender_();
+    wireCalcKeypad_();
+
+    toggleBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (panel.hidden) calcOpen_(); else calcClose_();
+    });
+    var closeBtn = document.getElementById('calcCloseBtn');
+    if (closeBtn) closeBtn.addEventListener('click', calcClose_);
+    var clearBtn = document.getElementById('calcClearBtn');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', function () {
+        calcLines_ = [''];
+        calcRender_();
+        calcSave_();
+        calcFocusLine_(0);
+      });
+    }
+
+    document.addEventListener('click', function (e) {
+      if (panel.hidden) return;
+      if (panel.contains(e.target) || toggleBtn.contains(e.target)) return;
+      calcClose_();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (panel.hidden) return;
+      if (e.key === 'Escape') {
+        calcClose_();
+        return;
+      }
+      // Enter / empty-line Backspace can already be handled by the focused
+      // line's keydown listener. Do not process the same physical key twice
+      // when that event bubbles up to the document.
+      if (e.defaultPrevented) return;
+      calcHandlePhysicalKey_(e);
+    });
+  }
+
+  // ---------------- 7. Compact invoice print engine ----------------
+  // Font stack for the canvas receipt. Must mirror --font-bn in style.html:
+  // canvas ctx.font takes a CSS font-family list but cannot read a CSS
+  // custom property, so this one string is the unavoidable duplicate.
+  var RECEIPT_FONT_STACK = '"Noto Sans Bengali", "Inter", "Nirmala UI", "Shonar Bangla", ' +
+    'Vrinda, "Kohinoor Bangla", "Bangla Sangam MN", "Bangla MN", ' +
+    'SolaimanLipi, Kalpurush, "Siyam Rupali", sans-serif';
+
+  // Shared across the on-screen/print HTML (render*_ below), the thermal
+  // roll (same builders, narrower CSS) and the JPG receipt (buildReceiptCanvas_),
+  // so labels can never drift apart the way the date formatters once did.
+  //
+  // Time is deliberately NOT shown on the invoice — date only. The Sales
+  // sheet still records a 'Time' column on every sale and Day Book still
+  // displays it; this is a presentation choice, not a data change.
+  var BN = {
+    date: 'তারিখ',           status: 'অবস্থা',
+    customer: 'ক্রেতা',       phone: 'মোবাইল',
+    address: 'ঠিকানা',        item: 'পণ্যের নাম',
+    qty: 'পরিমাণ',            price: 'দর',
+    lineTotal: 'টাকা',
+    subtotal: 'সাব-টোটাল',    discount: 'ছাড়',
+    grandTotal: 'সর্বমোট',    paid: 'জমা',
+    customerCredit: 'কাস্টমার ক্রেডিট',
+    due: 'বকেয়া',            walkIn: 'খুচরা ক্রেতা'
+  };
+
+  // Payment Status is stored in English on the sheet; only the display translates.
+  var BN_STATUS = { 'Paid': 'পরিশোধিত', 'Partial': 'আংশিক', 'Due': 'বাকি' };
+
+  var BN_MONTHS = ['জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
+                   'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'];
+
+  var BN_DIGITS = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+
+  /** Rows per printed A4 page. Tuned against --inv-row-h (26px) and the compact header/totals in style.html so a single-page invoice (everything present) still fits inside the 277mm usable height from @page{margin:10mm} — see style.html's Invoice section for the math. */
+  var INVOICE_ROWS_PER_PAGE = 24;
+
+  /** '2026-08-05' -> '২০২৬-০৮-০৫'. Only digits change; separators and text pass through. */
+  function toBn_(value) {
+    return String(value === null || value === undefined ? '' : value)
+      .replace(/[0-9]/g, function (d) { return BN_DIGITS[Number(d)]; });
+  }
+
+  /** Money with Bangla numerals: 1234.5 -> '৳১,২৩৪.৫'. Grouping stays Western, which is what shop software in BD uses. */
+  function bnMoney_(amount, symbol) {
+    var n = Number(amount) || 0;
+    return (symbol || '') + toBn_(n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 }));
+  }
+
+  /** 'yyyy-MM-dd' (or any parseable date) -> '০৫ আগস্ট ২০২৬'. Falls back to the raw value if unparseable. */
+  function formatInvoiceDate_(dateStr) {
+    if (!dateStr) return '';
+    var parts = String(dateStr).split('-');
+    var d;
+    if (parts.length === 3 && parts[0].length === 4) {
+      // Building from parts avoids the UTC-parse day-shift trap that plain
+      // date strings hit in new Date() — the same trap DayBook.gs warns about.
+      d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    } else {
+      d = new Date(dateStr);
+    }
+    if (isNaN(d.getTime())) return String(dateStr);
+    var day = ('0' + d.getDate()).slice(-2);   // zero-padded: ০৫, not ৫
+    return toBn_(day) + ' ' + BN_MONTHS[d.getMonth()] + ' ' + toBn_(d.getFullYear());
+  }
+
+  // 0-99 in idiomatic Bangla number-words (irregular, like Hindi — not a
+  // simple tens+ones concatenation). Used only by bnAmountInWords_ below.
+  var BN_NUM_WORDS_ = ['শূন্য', 'এক', 'দুই', 'তিন', 'চার', 'পাঁচ', 'ছয়', 'সাত', 'আট', 'নয়',
+    'দশ', 'এগারো', 'বারো', 'তেরো', 'চৌদ্দ', 'পনের', 'ষোল', 'সতের', 'আঠারো', 'উনিশ',
+    'বিশ', 'একুশ', 'বাইশ', 'তেইশ', 'চব্বিশ', 'পঁচিশ', 'ছাব্বিশ', 'সাতাশ', 'আঠাশ', 'ঊনত্রিশ',
+    'ত্রিশ', 'একত্রিশ', 'বত্রিশ', 'তেত্রিশ', 'চৌত্রিশ', 'পঁয়ত্রিশ', 'ছত্রিশ', 'সাঁইত্রিশ', 'আটত্রিশ', 'ঊনচল্লিশ',
+    'চল্লিশ', 'একচল্লিশ', 'বিয়াল্লিশ', 'তেতাল্লিশ', 'চুয়াল্লিশ', 'পঁয়তাল্লিশ', 'ছেচল্লিশ', 'সাতচল্লিশ', 'আটচল্লিশ', 'ঊনপঞ্চাশ',
+    'পঞ্চাশ', 'একান্ন', 'বায়ান্ন', 'তিপ্পান্ন', 'চুয়ান্ন', 'পঞ্চান্ন', 'ছাপ্পান্ন', 'সাতান্ন', 'আটান্ন', 'ঊনষাট',
+    'ষাট', 'একষট্টি', 'বাষট্টি', 'তেষট্টি', 'চৌষট্টি', 'পঁয়ষট্টি', 'ছেষট্টি', 'সাতষট্টি', 'আটষট্টি', 'ঊনসত্তর',
+    'সত্তর', 'একাত্তর', 'বাহাত্তর', 'তিয়াত্তর', 'চুয়াত্তর', 'পঁচাত্তর', 'ছিয়াত্তর', 'সাতাত্তর', 'আটাত্তর', 'ঊনআশি',
+    'আশি', 'একাশি', 'বিরাশি', 'তিরাশি', 'চুরাশি', 'পঁচাশি', 'ছিয়াশি', 'সাতাশি', 'আটাশি', 'ঊননব্বই',
+    'নব্বই', 'একানব্বই', 'বিরানব্বই', 'তিরানব্বই', 'চুরানব্বই', 'পঁচানব্বই', 'ছিয়ানব্বই', 'সাতানব্বই', 'আটানব্বই', 'নিরানব্বই'];
+
+  /** ৳15800 -> 'পনের হাজার আট শত টাকা মাত্র'. Whole taka only — invoices here don't carry paisa. */
+  function bnAmountInWords_(amount) {
+    var n = Math.round(Number(amount) || 0);
+    if (n <= 0) return '';
+    var crore = Math.floor(n / 10000000); n %= 10000000;
+    var lakh = Math.floor(n / 100000); n %= 100000;
+    var thousand = Math.floor(n / 1000); n %= 1000;
+    var hundred = Math.floor(n / 100); n %= 100;
+    var rest = n;
+    var parts = [];
+    if (crore) parts.push(BN_NUM_WORDS_[crore] + ' কোটি');
+    if (lakh) parts.push(BN_NUM_WORDS_[lakh] + ' লক্ষ');
+    if (thousand) parts.push(BN_NUM_WORDS_[thousand] + ' হাজার');
+    if (hundred) parts.push(BN_NUM_WORDS_[hundred] + ' শত');
+    if (rest) parts.push(BN_NUM_WORDS_[rest]);
+    return parts.join(' ') + ' টাকা মাত্র';
+  }
+
+  /* ---- Component builders ----------------------------------------------
+   * Each takes the invoice payload (buildInvoicePayload_'s shape) and
+   * returns an HTML fragment, or '' when the section is disabled or has
+   * no data. renderInvoiceHtml_/renderInvoiceHtmlThermal_ below just filter
+   * out the empties and join what's left — no section ever reserves space
+   * it isn't using, per the "enabled AND has data, else skip" rule.
+   * ---------------------------------------------------------------------- */
+
+  function buildInvBismillah_(inv) {
+    if (!inv.shop.showBismillah) return '';
+    var text = String(inv.shop.bismillahText || '').trim();
+    if (!text) return '';
+    return '<div class="inv-bismillah" dir="auto">' + escapeHtml(text) + '</div>';
+  }
+
+  /** Logo (if any) + shop name/proprietor/description on the left, address/phones on the right. Max height is enforced by CSS (--inv-header-max-h), not here. */
+  function buildInvHeader_(inv) {
+    var shop = inv.shop;
+    var shopName = shop.nameBangla || shop.name || '';
+    var brand = '<div class="inv-header-brand">' +
+      (shop.logoDataUri ? '<img class="inv-logo" src="' + escapeHtml(shop.logoDataUri) + '" alt="Logo">' : '') +
+      '<div>' +
+        '<h1 class="inv-shop-name">' + escapeHtml(shopName) + '</h1>' +
+        (shop.proprietorName ? '<div class="inv-proprietor">প্রোপাইটর: ' + escapeHtml(shop.proprietorName) + '</div>' : '') +
+        (shop.proprietorParagraph ? '<em class="inv-proprietor-paragraph" dir="auto">' + escapeHtml(shop.proprietorParagraph) + '</em>' : '') +
+        (shop.description ? '<div class="inv-shop-desc">' + escapeHtml(shop.description) + '</div>' : '') +
+      '</div>' +
+    '</div>';
+
+    var sideParts = [];
+    if (shop.address) sideParts.push('<div class="inv-address">' + escapeHtml(shop.address) + '</div>');
+    if (shop.phone1) sideParts.push('<div class="inv-phone">' + toBn_(escapeHtml(shop.phone1)) + '</div>');
+    if (shop.phone2) sideParts.push('<div class="inv-phone">' + toBn_(escapeHtml(shop.phone2)) + '</div>');
+    var side = sideParts.length ? '<div class="inv-header-side">' + sideParts.join('') + '</div>' : '';
+
+    return '<header class="inv-header">' + brand + side + '</header>';
+  }
+
+  /** Compact single line: "চালান নং : ...   তারিখ : ...". Only the first page of a multi-page invoice. */
+  function buildInvInfoRow_(inv) {
+    var titleLabel = escapeHtml(inv.shop.invoiceTitle || 'চালান');
+    var parts = [
+      '<span><b>' + titleLabel + ' নং</b> : ' + escapeHtml(inv.invoiceId) + '</span>',
+      '<span><b>' + BN.date + '</b> : ' + escapeHtml(formatInvoiceDate_(inv.date)) + '</span>'
+    ];
+    if (inv.dueDate) parts.push('<span><b>পরিশোধের শেষ তারিখ</b> : ' + escapeHtml(formatInvoiceDate_(inv.dueDate)) + '</span>');
+    if (inv.shop.paymentTermsText) parts.push('<span><b>শর্ত</b> : ' + escapeHtml(inv.shop.paymentTermsText) + '</span>');
+    return '<div class="inv-info-row">' + parts.join('') + '</div>';
+  }
+
+  /** Name always shows (defaulting to "খুচরা ক্রেতা" for walk-ins); father/mobile/address only when present. */
+  function buildInvCustomer_(inv) {
+    var meta = [];
+    if (inv.customerFatherName) meta.push('<span>পিতা: ' + escapeHtml(inv.customerFatherName) + '</span>');
+    if (inv.customerPhone) meta.push('<span>' + BN.phone + ': ' + toBn_(escapeHtml(inv.customerPhone)) + '</span>');
+    if (inv.customerAddress) meta.push('<span>' + BN.address + ': ' + escapeHtml(inv.customerAddress) + '</span>');
+    return '<div class="inv-customer">' +
+      '<div class="inv-customer-name">নামঃ ' + escapeHtml(inv.customerName || BN.walkIn) + '</div>' +
+      (meta.length ? '<div class="inv-customer-meta">' + meta.join('') + '</div>' : '') +
+    '</div>';
+  }
+
+  /** Billed-to (left) and চালান নং/তারিখ (right) share one row, horizontally aligned, below the header line. */
+  function buildInvCustomerInfoRow_(inv) {
+    return '<div class="inv-customer-info-row">' + buildInvCustomer_(inv) + buildInvInfoRow_(inv) + '</div>';
+  }
+
+  /** নং / পণ্যের নাম / পরিমাণ / একক / দর / টাকা. startIndex lets নং keep counting across pages instead of resetting each page. */
+  function buildInvTable_(items, sym, startIndex) {
+    var rows = items.map(function (i, idx) {
+      return '<tr>' +
+        '<td class="idx">' + toBn_(startIndex + idx + 1) + '</td>' +
+        '<td class="name">' + escapeHtml(i.name) + '</td>' +
+        '<td class="num">' + toBn_(i.qty) + '</td>' +
+        '<td class="num">' + escapeHtml(i.unit || '') + '</td>' +
+        '<td class="num">' + bnMoney_(i.unitPrice, sym) + '</td>' +
+        '<td class="num">' + bnMoney_(i.lineTotal, sym) + '</td>' +
+      '</tr>';
+    }).join('');
+    return '<table class="inv-table"><thead><tr>' +
+      '<th>নং</th><th>' + BN.item + '</th><th class="num">' + BN.qty + '</th>' +
+      '<th class="num">একক</th><th class="num">' + BN.price + '</th><th class="num">' + BN.lineTotal + '</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table>';
+  }
+
+  /** Payment-method chips, bolding whichever one matches how this specific sale was actually paid (inv.paymentMethod/bankAccountName) rather than always the first entry admin listed. */
+  function buildInvPaymentMethods_(inv) {
+    var methods;
+    try { methods = JSON.parse(inv.shop.paymentMethods || '[]'); } catch (e) { methods = []; }
+    if (!Array.isArray(methods) || !methods.length) return '';
+    var usedNeedle = (paymentMethodNeedsAccount_(inv.paymentMethod) ? (inv.bankAccountName || '') : (inv.paymentMethod === 'Cash' ? 'cash' : '')).toLowerCase();
+    var chips = methods.map(function (m) {
+      var label = m.label || '';
+      var value = m.value || '';
+      var haystack = (label + ' ' + value).toLowerCase();
+      var isUsed = usedNeedle && (haystack.indexOf(usedNeedle) !== -1 ||
+        (inv.paymentMethod === 'Cash' && (haystack.indexOf('ক্যাশ') !== -1 || haystack.indexOf('নগদ') !== -1)));
+      return '<div class="inv-payment-chip' + (isUsed ? ' used' : '') + '">' + escapeHtml(label) + (value ? ' ' + escapeHtml(value) : '') + '</div>';
+    }).join('');
+    return '<div><div class="inv-side-label">সেন্ড-মানি</div><div class="inv-payment-methods">' + chips + '</div></div>';
+  }
+
+  function buildInvTerms_(inv) {
+    var terms;
+    try { terms = JSON.parse(inv.shop.terms || '[]'); } catch (e) { terms = []; }
+    if (!Array.isArray(terms) || !terms.length) return '';
+    var lis = terms.map(function (t) { return '<li>' + escapeHtml(t.text || t) + '</li>'; }).join('');
+    return '<div><div class="inv-side-label">শর্তাবলী</div><ul class="inv-terms">' + lis + '</ul></div>';
+  }
+
+  function buildInvTotalsPanel_(inv) {
+    var sym = inv.shop.currencySymbol;
+    var discount = Number(inv.discount) || 0;
+    var paid = Number(inv.paidAmount) || 0;
+    var customerCreditUsed = Number(inv.customerCreditUsed) || 0;
+    var moneyPaid = Math.max(0, paid - customerCreditUsed);
+    var due = Number(inv.dueAmount) || 0;
+    var grand = Number(inv.grandTotal) || 0;
+
+    var rows = '<div class="inv-total-row"><span>' + BN.subtotal + '</span><span class="v">' + bnMoney_(inv.subtotal, sym) + '</span></div>';
+    if (discount > 0) rows += '<div class="inv-total-row"><span>' + BN.discount + '</span><span class="v">− ' + bnMoney_(discount, sym) + '</span></div>';
+    rows += '<div class="inv-total-row grand"><span>' + BN.grandTotal + '</span><span class="v">' + bnMoney_(grand, sym) + '</span></div>';
+    if (customerCreditUsed > 0) rows += '<div class="inv-total-row"><span>' + BN.customerCredit + '</span><span class="v">− ' + bnMoney_(customerCreditUsed, sym) + '</span></div>';
+    if (moneyPaid > 0) rows += '<div class="inv-total-row"><span>' + BN.paid + '</span><span class="v">− ' + bnMoney_(moneyPaid, sym) + '</span></div>';
+    if (due > 0) rows += '<div class="inv-total-row due"><span>' + BN.due + '</span><span class="v">' + bnMoney_(due, sym) + '</span></div>';
+
+    // Always the grand total, per the brief's "final payable amount" — not
+    // the outstanding due, which is a partial-payment detail, not the
+    // invoice's own amount-in-words line.
+    var words = bnAmountInWords_(grand);
+    var wordsHtml = words ? '<div class="inv-words">কথায়ঃ ' + escapeHtml(words) + '</div>' : '';
+
+    return '<div class="inv-totals">' + rows + wordsHtml + '</div>';
+  }
+
+  /** Payment/terms (left) + totals (right) — only the last page of a multi-page invoice. */
+  function buildInvBottom_(inv) {
+    var sideParts = [buildInvPaymentMethods_(inv), buildInvTerms_(inv)].filter(function (s) { return s; });
+    var side = sideParts.length ? '<div class="inv-side">' + sideParts.join('') + '</div>' : '';
+    return '<div class="inv-bottom">' + side + buildInvTotalsPanel_(inv) + '</div>';
+  }
+
+  function buildInvDraftMark_(inv) {
+    return inv && inv.isDraft ? '<div class="inv-draft-mark"><strong>DRAFT</strong><span>খসড়া</span></div>' : '';
+  }
+
+  /** Automatic — Due == 0 and there's actually an amount owed in the first place. No setting; nothing to disable. */
+  function buildInvPaidBadge_(inv) {
+    if (inv.isDraft) return '';
+    var due = Number(inv.dueAmount) || 0;
+    var grand = Number(inv.grandTotal) || 0;
+    if (due !== 0 || grand <= 0) return '';
+    return '<div class="inv-paid-badge">পরিশোধিত</div>';
+  }
+
+  function buildInvSignatures_(inv) {
+    if (!inv.shop.showSignature) return '';
+    return '<div class="inv-signatures">' +
+      '<div class="inv-signature">ক্রেতার স্বাক্ষর</div>' +
+      '<div class="inv-signature">বিক্রেতার স্বাক্ষর</div>' +
+    '</div>';
+  }
+
+  function buildInvFooter_(inv) {
+    if (!inv.shop.footer) return '';
+    return '<div class="inv-footer-text">' + escapeHtml(inv.shop.footer) + '</div>';
+  }
+
+  /** Wraps signatures + footer text together so CSS (.inv-footer-block's margin-top:auto in style.html) can anchor just this pair to the bottom of the page — .inv-bottom's payment/terms/totals stay in normal flow right after the table, not pushed down with them. */
+  function buildInvFooterBlock_(inv) {
+    var parts = [buildInvSignatures_(inv), buildInvFooter_(inv)].filter(function (s) { return s; });
+    if (!parts.length) return '';
+    return '<div class="inv-footer-block">' + parts.join('') + '</div>';
+  }
+
+  /**
+   * The one on-screen/print/PDF layout, A4 or thermal, single-page or
+   * multi-page — all the same component builders above, just sliced
+   * differently. items.length > INVOICE_ROWS_PER_PAGE produces several
+   * stacked .invoice-page divs; style.html's print rule turns those into
+   * separate physical pages, repeating the header + table header on each
+   * and keeping totals/signature/footer on the last one only.
+   */
+  function renderInvoiceHtml_(inv) {
+    var items = inv.items || [];
+    var pageCount = Math.max(1, Math.ceil(items.length / INVOICE_ROWS_PER_PAGE));
+    var pages = [];
+    for (var p = 0; p < pageCount; p++) {
+      var isFirst = p === 0;
+      var isLast = p === pageCount - 1;
+      var pageItems = items.slice(p * INVOICE_ROWS_PER_PAGE, (p + 1) * INVOICE_ROWS_PER_PAGE);
+      var headerParts = [
+        buildInvBismillah_(inv),
+        buildInvHeader_(inv),
+        isFirst ? buildInvCustomerInfoRow_(inv) : ''
+      ].filter(function (s) { return s; }).join('');
+      var body = [
+        '<div class="inv-header-block">' + headerParts + '</div>',
+        buildInvTable_(pageItems, inv.shop.currencySymbol, p * INVOICE_ROWS_PER_PAGE)
+      ];
+      if (isLast) {
+        body.push(buildInvBottom_(inv));
+        body.push(buildInvFooterBlock_(inv));
+      }
+      var badge = isLast ? buildInvPaidBadge_(inv) : '';
+      pages.push('<div class="invoice-page">' + buildInvDraftMark_(inv) + body.filter(function (s) { return s; }).join('') + badge + '</div>');
+    }
+    return pages.join('');
+  }
+
+  /* Thermal receipt deliberately has its own compact presentation. It reads
+   * the same invoice payload as A4/JPG but excludes long A4-only branding,
+   * payment chips, terms, amount-in-words and signatures so a shop receipt
+   * stays usable on both 58mm and 80mm paper. No sale/accounting data changes. */
+  function buildInvThermalHeader_(inv) {
+    var shop = inv.shop || {};
+    var name = shop.nameBangla || shop.name || '';
+    var contacts = [];
+    if (shop.address) contacts.push('<div class="thermal-shop-address">' + escapeHtml(shop.address) + '</div>');
+    var phones = [shop.phone1, shop.phone2].filter(Boolean).map(function (p) { return toBn_(escapeHtml(p)); });
+    if (phones.length) contacts.push('<div class="thermal-shop-phone">' + phones.join(' · ') + '</div>');
+    return '<div class="thermal-head">' +
+      '<div class="thermal-shop-name">' + escapeHtml(name) + '</div>' + contacts.join('') +
+      '</div>';
+  }
+
+  function buildInvThermalMeta_(inv) {
+    var title = escapeHtml((inv.shop && inv.shop.invoiceTitle) || 'চালান');
+    var customer = escapeHtml(inv.customerName || BN.walkIn);
+    var rows = [
+      '<div><span>' + title + '</span><b>' + escapeHtml(inv.invoiceId) + '</b></div>',
+      '<div><span>' + BN.date + '</span><span>' + escapeHtml(formatInvoiceDate_(inv.date)) + '</span></div>',
+      '<div><span>নাম</span><span>' + customer + '</span></div>'
+    ];
+    if (inv.customerPhone) rows.push('<div><span>' + BN.phone + '</span><span>' + toBn_(escapeHtml(inv.customerPhone)) + '</span></div>');
+    return '<div class="thermal-meta">' + rows.join('') + '</div>';
+  }
+
+  function buildInvThermalItems_(inv) {
+    var sym = (inv.shop && inv.shop.currencySymbol) || '';
+    var rows = (inv.items || []).map(function (item) {
+      return '<div class="thermal-item">' +
+        '<div class="thermal-item-name">' + escapeHtml(item.name || '') + '</div>' +
+        '<div class="thermal-item-detail">' +
+          '<span>' + toBn_(item.qty) + ' × ' + bnMoney_(item.unitPrice, sym) + '</span>' +
+          '<b>' + bnMoney_(item.lineTotal, sym) + '</b>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+    return '<div class="thermal-items"><div class="thermal-items-head"><span>' + BN.item + '</span><span>' + BN.lineTotal + '</span></div>' + rows + '</div>';
+  }
+
+  function buildInvThermalTotals_(inv) {
+    var sym = (inv.shop && inv.shop.currencySymbol) || '';
+    var discount = Number(inv.discount) || 0;
+    var paid = Number(inv.paidAmount) || 0;
+    var customerCreditUsed = Number(inv.customerCreditUsed) || 0;
+    var moneyPaid = Math.max(0, paid - customerCreditUsed);
+    var due = Number(inv.dueAmount) || 0;
+    var grand = Number(inv.grandTotal) || 0;
+    var rows = '<div><span>' + BN.subtotal + '</span><span>' + bnMoney_(inv.subtotal, sym) + '</span></div>';
+    if (discount > 0) rows += '<div><span>' + BN.discount + '</span><span>− ' + bnMoney_(discount, sym) + '</span></div>';
+    rows += '<div class="thermal-grand"><span>' + BN.grandTotal + '</span><b>' + bnMoney_(grand, sym) + '</b></div>';
+    if (customerCreditUsed > 0) rows += '<div><span>' + BN.customerCredit + '</span><span>− ' + bnMoney_(customerCreditUsed, sym) + '</span></div>';
+    if (moneyPaid > 0) rows += '<div><span>' + BN.paid + '</span><span>− ' + bnMoney_(moneyPaid, sym) + '</span></div>';
+    if (due > 0) rows += '<div class="thermal-due"><span>' + BN.due + '</span><b>' + bnMoney_(due, sym) + '</b></div>';
+    return '<div class="thermal-totals">' + rows + '</div>';
+  }
+
+  function renderInvoiceHtmlThermal_(inv) {
+    var draft = inv && inv.isDraft ? '<div class="thermal-draft">DRAFT / খসড়া</div>' : '';
+    var body = [
+      draft,
+      buildInvThermalHeader_(inv),
+      buildInvThermalMeta_(inv),
+      buildInvThermalItems_(inv),
+      buildInvThermalTotals_(inv),
+      '<div class="thermal-thanks">ধন্যবাদ</div>'
+    ].filter(function (part) { return part; }).join('');
+    return '<div class="invoice-page thermal-page"><div class="thermal-receipt">' + body + '</div></div>';
+  }
+
+  // ---------------- 8. Browser print/PDF rendering ----------------
+  /**
+   * Prints just the invoice, on exactly one page.
+   *
+   * THE BUG THIS FIXES: the old print rule was `body * { visibility: hidden }`
+   * plus `#invoiceModal, #invoiceModal * { visibility: visible }`.
+   * visibility:hidden hides pixels but keeps every element's full layout
+   * height — the entire app shell still occupied space in the print flow.
+   * Stacked on top of that, `#app { min-height: 100vh }` guaranteed a full
+   * page of height on its own, and the modal's `position: fixed; inset: 0`
+   * plus 20px padding measured slightly TALLER than one sheet. So every
+   * print produced the invoice on page 1 and a blank page 2.
+   *
+   * The invoice is now cloned into a print-only host that is a DIRECT child
+   * of <body>. Printing hides every other body child outright with
+   * display:none, so the document is exactly as tall as the invoice.
+   *
+   * thermal print does NOT clone #invoicePaper — that always holds the
+   * full A4 layout (grid + mm-fixed widths), which cannot reflow into a
+   * 72mm roll. Callers passing thermal=true must also pass the raw
+   * invoice object so it can be re-rendered with renderInvoiceHtmlThermal_.
+   */
+
+  /**
+   * Print-only A4 renderer.
+   *
+   * Chrome can fragment a flex footer away from its totals when one very long
+   * invoice page is left to automatic pagination. Build explicit A4-sized
+   * chunks instead: repeat the shop/table header, show customer details only
+   * on page 1, and render totals/signature/footer only on the final page.
+   * This keeps 100+ product invoices predictable without changing invoice data.
+   */
+  function renderInvoicePrintHtml_(inv) {
+    var items = inv.items || [];
+    var pageCount = Math.max(1, Math.ceil(items.length / INVOICE_ROWS_PER_PAGE));
+    var pages = [];
+
+    for (var p = 0; p < pageCount; p++) {
+      var isFirst = p === 0;
+      var isLast = p === pageCount - 1;
+      var start = p * INVOICE_ROWS_PER_PAGE;
+      var pageItems = items.slice(start, start + INVOICE_ROWS_PER_PAGE);
+      var headerParts = [
+        buildInvBismillah_(inv),
+        buildInvHeader_(inv),
+        isFirst ? buildInvCustomerInfoRow_(inv) : ''
+      ].filter(function (s) { return s; }).join('');
+
+      var body = [
+        '<div class="inv-header-block">' + headerParts + '</div>',
+        buildInvTable_(pageItems, inv.shop.currencySymbol, start)
+      ];
+
+      if (isLast) {
+        body.push(buildInvBottom_(inv));
+        body.push(buildInvFooterBlock_(inv));
+      }
+
+      pages.push('<div class="invoice-page invoice-print-page">' + buildInvDraftMark_(inv) +
+        body.filter(function (s) { return s; }).join('') +
+        (isLast ? buildInvPaidBadge_(inv) : '') + '</div>');
+    }
+
+    return pages.join('');
+  }
+
+  function printInvoice_(thermal, invoiceData) {
+    var paper = document.getElementById('invoicePaper');
+    if (!paper || !paper.innerHTML.trim()) {
+      showToast('Nothing to print yet.', 'error');
+      return;
+    }
+    if (thermal && !invoiceData) {
+      showToast('Nothing to print yet.', 'error');
+      return;
+    }
+
+    if (!invoiceData && typeof posState !== 'undefined' && posState && posState._lastInvoice) {
+      invoiceData = posState._lastInvoice;
+    }
+
+    var contentHtml;
+    if (thermal) {
+      contentHtml = renderInvoiceHtmlThermal_(invoiceData);
+    } else if (invoiceData) {
+      contentHtml = renderInvoicePrintHtml_(invoiceData);
+    } else {
+      // Keep compatibility with any older caller that only rendered invoicePaper.
+      // The normal POS/Sales path always has posState._lastInvoice.
+      contentHtml = paper.innerHTML;
+    }
+    // 'Receipt Size' (58mm/80mm, set on Settings > Invoice Design) picks the
+    // narrower CSS variant; see .invoice-paper.thermal.size-58 in style.html.
+    var sizeClass = thermal && invoiceData.shop.receiptSize === '58mm' ? ' size-58' : '';
+
+    var host = document.getElementById('printHost');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'printHost';
+      document.body.appendChild(host);
+    }
+    host.innerHTML = '<div class="invoice-paper' + (thermal ? ' thermal' + sizeClass : '') + (invoiceData && invoiceData.isDraft ? ' is-draft' : '') + '">' + contentHtml + '</div>';
+
+    document.body.classList.add('printing-invoice');
+    try {
+      window.print();
+    } finally {
+      // window.print() blocks until the dialog is dismissed in every browser
+      // this app targets, so tearing down immediately after is safe.
+      document.body.classList.remove('printing-invoice');
+      host.innerHTML = '';
+    }
+  }
+
+  // ---------------- 9. Canvas receipt (JPG download) ----------------
+  // Drawn with text/line primitives (plus the logo image itself) only — no
+  // SVG, no foreignObject. Rendering HTML into an <img> via an SVG
+  // foreignObject taints the canvas in Chrome even for same-origin content,
+  // which blocks toBlob() with a SecurityError. Drawing natively sidesteps
+  // that entirely — the zero-CDN rule already ruled out an html2canvas-style
+  // shared-markup renderer, so this stays hand-drawn rather than a literal
+  // reuse of the HTML/CSS engine above. It draws from the SAME data and the
+  // same enabled/has-data visibility rules as renderInvoiceHtml_ though, so
+  // it's the same *design*, just a different rendering mechanism, per the
+  // "shared branding — only width differs" requirement.
+  function downloadInvoiceJpg_(inv) {
+    buildReceiptCanvas_(inv).then(function (canvas) {
+      canvas.toBlob(function (blob) {
+        if (!blob) { showToast('Could not generate the image.', 'error'); return; }
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = inv.invoiceId + '.jpg';
+        a.click();
+      }, 'image/jpeg', 0.95);
+    }).catch(function (err) {
+      showToast('Could not generate the image: ' + err.message, 'error');
+    });
+  }
+
+  /** Loads the logo as an Image so it can be canvas.drawImage'd — resolves null (no image row drawn) if there's no logo or it fails to decode, rather than rejecting the whole receipt. */
+  function loadInvoiceLogoImage_(dataUri) {
+    if (!dataUri) return Promise.resolve(null);
+    return new Promise(function (resolve) {
+      var img = new Image();
+      img.onload = function () { resolve(img); };
+      img.onerror = function () { resolve(null); };
+      img.src = dataUri;
+    });
+  }
+
+  function buildReceiptCanvas_(inv) {
+    return loadInvoiceLogoImage_(inv.shop.logoDataUri).then(function (logoImg) {
+      return drawReceiptCanvas_(inv, logoImg);
+    });
+  }
+
+  /** Wrap canvas text to a fixed width without splitting Bangla clusters. */
+  function wrapCanvasText_(ctx, text, maxWidth) {
+    var source = String(text === null || text === undefined ? '' : text);
+    if (!source) return [''];
+    var lines = [];
+
+    function splitLongToken(token) {
+      var rest = token;
+      while (rest) {
+        if (ctx.measureText(rest).width <= maxWidth) { lines.push(rest); break; }
+        var cut = 1;
+        for (var i = 2; i <= rest.length; i++) {
+          if (ctx.measureText(rest.slice(0, i)).width > maxWidth) { cut = i - 1; break; }
+          cut = i;
+        }
+        var safePrefix = bnSafeCut_(rest, Math.max(1, cut));
+        if (!safePrefix) safePrefix = rest.slice(0, 1);
+        lines.push(safePrefix);
+        rest = rest.slice(safePrefix.length);
+      }
+    }
+
+    source.split(/\r?\n/).forEach(function (paragraph) {
+      var words = paragraph.trim().split(/\s+/).filter(Boolean);
+      if (!words.length) { lines.push(''); return; }
+      var current = '';
+      words.forEach(function (word) {
+        var candidate = current ? current + ' ' + word : word;
+        if (ctx.measureText(candidate).width <= maxWidth) { current = candidate; return; }
+        if (current) { lines.push(current); current = ''; }
+        if (ctx.measureText(word).width <= maxWidth) current = word;
+        else splitLongToken(word);
+      });
+      if (current) lines.push(current);
+    });
+    return lines.length ? lines : [''];
+  }
+
+  function drawReceiptCanvas_(inv, logoImg) {
+    // Wider than the old 380: Bangla matras sit above and below the
+    // baseline so rows need the extra room.
+    var W = 420, PAD = 18, scale = 2;
+    var sym = inv.shop.currencySymbol || '';
+    var shop = inv.shop;
+    var rows = [];
+
+    function kvBn(label, value, size, bold) {
+      rows.push({ kv: [label, value], size: size || 12, bold: !!bold });
+    }
+
+    if (shop.showBismillah && String(shop.bismillahText || '').trim()) {
+      rows.push({ text: shop.bismillahText.trim(), size: 13, align: 'center' });
+    }
+    if (logoImg) rows.push({ logo: true });
+
+    rows.push({ text: shop.nameBangla || shop.name, size: 18, bold: true, align: 'center' });
+    if (shop.proprietorName) rows.push({ text: 'প্রোপাইটর: ' + shop.proprietorName, size: 11, align: 'center', color: '#555' });
+    if (shop.proprietorParagraph) rows.push({ text: shop.proprietorParagraph, size: 10.5, align: 'center', color: '#555', italic: true });
+    if (shop.description) rows.push({ text: shop.description, size: 11, align: 'center', color: '#555', wrap: true });
+    if (shop.address) rows.push({ text: shop.address, size: 11, align: 'center', color: '#555' });
+    var phoneLine = [shop.phone1, shop.phone2].filter(Boolean).map(toBn_).join('   ');
+    if (phoneLine) rows.push({ text: phoneLine, size: 11, align: 'center', color: '#555' });
+    rows.push({ rule: true });
+
+    var titleLabel = shop.invoiceTitle || 'চালান';
+    if (inv.isDraft) rows.push({ text: 'DRAFT / খসড়া', size: 14, bold: true, align: 'center', color: '#8a5a00' });
+    rows.push({ text: titleLabel, size: 15, bold: true, align: 'center' });
+    rows.push({ rule: true, thin: true });
+
+    kvBn(titleLabel + ' নং', inv.invoiceId, 12, true);
+    kvBn(BN.date, formatInvoiceDate_(inv.date), 12);
+    kvBn(BN.status, BN_STATUS[inv.paymentStatus] || inv.paymentStatus, 12);
+    rows.push({ rule: true, thin: true });
+
+    kvBn('নামঃ', inv.customerName || BN.walkIn, 12);
+    if (inv.customerFatherName) kvBn('পিতা', inv.customerFatherName, 11);
+    if (inv.customerPhone) kvBn(BN.phone, toBn_(inv.customerPhone), 11);
+    if (inv.customerAddress) kvBn(BN.address, inv.customerAddress, 11);
+    rows.push({ rule: true });
+
+    rows.push({ cols: [BN.item, BN.qty, BN.price, BN.lineTotal], size: 11, bold: true });
+    rows.push({ rule: true, thin: true });
+    (inv.items || []).forEach(function (i) {
+      rows.push({
+        cols: [i.name, toBn_(i.qty), bnMoney_(i.unitPrice, sym), bnMoney_(i.lineTotal, sym)],
+        size: 11
+      });
+    });
+    rows.push({ rule: true });
+
+    var discount = Number(inv.discount) || 0;
+    var paid = Number(inv.paidAmount) || 0;
+    var due = Number(inv.dueAmount) || 0;
+    var grand = Number(inv.grandTotal) || 0;
+
+    kvBn(BN.subtotal, bnMoney_(inv.subtotal, sym), 12);
+    if (discount > 0) kvBn(BN.discount, '− ' + bnMoney_(discount, sym), 12);
+    kvBn(BN.grandTotal, bnMoney_(grand, sym), 14, true);
+    if (paid > 0) kvBn(BN.paid, '− ' + bnMoney_(paid, sym), 12);
+    if (due > 0) kvBn(BN.due, bnMoney_(due, sym), 13, true);
+
+    var words = bnAmountInWords_(grand);
+    if (words) rows.push({ text: 'কথায়ঃ ' + words, size: 10.5, align: 'center', color: '#555' });
+    if (!inv.isDraft && due === 0 && grand > 0) rows.push({ text: 'PAID', size: 13, bold: true, align: 'center', color: '#12805c' });
+
+    try {
+      var methods = JSON.parse(shop.paymentMethods || '[]');
+      if (Array.isArray(methods) && methods.length) {
+        rows.push({ rule: true, thin: true });
+        rows.push({
+          text: methods.map(function (m) { return (m.label || '') + (m.value ? ' ' + m.value : ''); }).join('   |   '),
+          size: 10.5, align: 'center', color: '#555'
+        });
+      }
+    } catch (e) {}
+
+    try {
+      var terms = JSON.parse(shop.terms || '[]');
+      if (Array.isArray(terms) && terms.length) {
+        rows.push({ rule: true, thin: true });
+        terms.forEach(function (t) { rows.push({ text: '• ' + (t.text || t), size: 10, color: '#555' }); });
+      }
+    } catch (e) {}
+
+    if (shop.showSignature) {
+      rows.push({ rule: true });
+      rows.push({ cols2: ['ক্রেতার স্বাক্ষর', 'বিক্রেতার স্বাক্ষর'], size: 10.5 });
+    }
+
+    if (shop.footer) {
+      rows.push({ rule: true });
+      rows.push({ text: shop.footer, size: 11, align: 'center', color: '#555' });
+    }
+
+    // Wrapped rows need measuring before the final canvas height is known.
+    // Use a tiny throwaway canvas only for text metrics; the receipt itself is
+    // still drawn once on the final canvas below.
+    var measureCanvas = document.createElement('canvas');
+    var measureCtx = measureCanvas.getContext('2d');
+    rows.forEach(function (r) {
+      if (!r.wrap || r.text === undefined) return;
+      measureCtx.font = (r.bold ? 'bold ' : '') + (r.size || 12) + 'px ' + RECEIPT_FONT_STACK;
+      r.lines = wrapCanvasText_(measureCtx, r.text, W - PAD * 2);
+    });
+
+    // 1.95 rather than the old 1.7: Bangla stacks matras above the headline
+    // and below the baseline, so 1.7 clipped descenders like ু and ৃ.
+    var rowHeights = rows.map(function (r) {
+      if (r.rule) return r.thin ? 8 : 16;
+      if (r.logo) return 60;
+      var lineHeight = Math.round((r.size || 12) * 1.95);
+      return r.lines ? lineHeight * Math.max(1, r.lines.length) : lineHeight;
+    });
+    var totalHeight = rowHeights.reduce(function (a, b) { return a + b; }, 0) + PAD * 2;
+
+    var canvas = document.createElement('canvas');
+    canvas.width = W * scale;
+    canvas.height = totalHeight * scale;
+    var ctx = canvas.getContext('2d');
+    ctx.scale(scale, scale);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, W, totalHeight);
+    ctx.textBaseline = 'middle';
+
+    var colW = [(W - PAD * 2) * 0.40, (W - PAD * 2) * 0.15, (W - PAD * 2) * 0.21, (W - PAD * 2) * 0.24];
+    var aligns = ['left', 'center', 'right', 'right'];
+    var cy = PAD;
+
+    function setFont(size, bold) {
+      ctx.font = (bold ? 'bold ' : '') + size + 'px ' + RECEIPT_FONT_STACK;
+    }
+
+    rows.forEach(function (r, idx) {
+      var h = rowHeights[idx];
+      if (r.rule) {
+        ctx.strokeStyle = '#999';
+        ctx.lineWidth = r.thin ? 0.5 : 1;
+        ctx.beginPath();
+        ctx.moveTo(PAD, cy + h / 2);
+        ctx.lineTo(W - PAD, cy + h / 2);
+        ctx.stroke();
+      } else if (r.logo) {
+        var maxH = h - 10, maxW = W - PAD * 2;
+        var ratio = Math.min(maxH / logoImg.height, maxW / logoImg.width, 1);
+        var dw = logoImg.width * ratio, dh = logoImg.height * ratio;
+        ctx.drawImage(logoImg, (W - dw) / 2, cy + (h - dh) / 2, dw, dh);
+      } else if (r.cols2) {
+        setFont(r.size, false);
+        ctx.fillStyle = '#111';
+        ctx.textAlign = 'left';
+        ctx.fillText(r.cols2[0], PAD, cy + h / 2);
+        ctx.textAlign = 'right';
+        ctx.fillText(r.cols2[1], W - PAD, cy + h / 2);
+      } else if (r.cols) {
+        setFont(r.size, r.bold);
+        ctx.fillStyle = r.bold ? '#111' : '#222';
+        var x = PAD;
+        r.cols.forEach(function (text, ci) {
+          ctx.textAlign = aligns[ci];
+          var tx = aligns[ci] === 'left' ? x : (aligns[ci] === 'center' ? x + colW[ci] / 2 : x + colW[ci]);
+          ctx.fillText(truncateToWidth_(ctx, String(text), colW[ci] - 4), tx, cy + h / 2);
+          x += colW[ci];
+        });
+      } else if (r.kv) {
+        setFont(r.size, r.bold);
+        ctx.fillStyle = '#111';
+        ctx.textAlign = 'left';
+        ctx.fillText(truncateToWidth_(ctx, String(r.kv[0]), (W - PAD * 2) * 0.52), PAD, cy + h / 2);
+        ctx.textAlign = 'right';
+        ctx.fillText(truncateToWidth_(ctx, String(r.kv[1]), (W - PAD * 2) * 0.46), W - PAD, cy + h / 2);
+      } else if (r.text !== undefined) {
+        setFont(r.size || 12, r.bold);
+        ctx.fillStyle = r.color || '#111';
+        ctx.textAlign = r.align || 'left';
+        var tx2 = r.align === 'center' ? W / 2 : (r.align === 'right' ? W - PAD : PAD);
+        if (r.lines && r.lines.length) {
+          var lineHeight = Math.round((r.size || 12) * 1.95);
+          r.lines.forEach(function (line, li) {
+            ctx.fillText(line, tx2, cy + lineHeight * li + lineHeight / 2);
+          });
+        } else {
+          ctx.fillText(r.text, tx2, cy + h / 2);
+        }
+      }
+      cy += h;
+    });
+
+    return canvas;
+  }
+
+  /**
+   * Bengali is a complex script: a cluster like ক্ষ is consonant + virama (্)
+   * + consonant, and vowel signs (া ি ু ে ো) are separate code points that
+   * attach to the consonant before them. Cutting a string at an arbitrary
+   * index can therefore leave a dangling ্ or an orphan vowel sign, which
+   * renders as a visibly broken glyph or a dotted-circle placeholder.
+   *
+   * This backs the cut point up until it lands on a real cluster boundary.
+   */
+  function bnSafeCut_(text, n) {
+    var i = Math.max(0, Math.min(n, text.length));
+    while (i > 0) {
+      var prev = text.charCodeAt(i - 1);
+      var here = i < text.length ? text.charCodeAt(i) : 0;
+      var prevIsVirama = prev === 0x09CD;                       // hasant — binds to the NEXT consonant
+      var prevIsJoiner = prev === 0x200D || prev === 0x200C;    // ZWJ / ZWNJ
+      var hereIsMark =
+        (here >= 0x0981 && here <= 0x0983) ||                   // candrabindu, anusvara, visarga
+        here === 0x09BC ||                                      // nukta
+        (here >= 0x09BE && here <= 0x09C4) ||                   // vowel signs
+        (here >= 0x09C7 && here <= 0x09C8) ||
+        (here >= 0x09CB && here <= 0x09CD) ||                   // incl. virama
+        here === 0x09D7 ||
+        (here >= 0x09E2 && here <= 0x09E3);
+      if (!prevIsVirama && !prevIsJoiner && !hereIsMark) break;
+      i--;
+    }
+    return text.slice(0, i);
+  }
+
+  function truncateToWidth_(ctx, text, maxWidth) {
+    if (ctx.measureText(text).width <= maxWidth) return text;
+    var cut = text.length;
+    while (cut > 1) {
+      cut--;
+      var candidate = bnSafeCut_(text, cut);
+      if (!candidate) break;
+      if (ctx.measureText(candidate + '…').width <= maxWidth) return candidate + '…';
+      cut = candidate.length;   // skip the whole cluster we just rejected
+    }
+    return '…';
+  }
+
+  /* =====================================================================
+   * 9. Refresh, delete, and range printing - the shared layer
+   *
+   * These three jobs were wanted on every module. Rather than paste the
+   * same markup and handler into fifteen page files, each page registers
+   * one function here and gets all three behaviours for free. A new page
+   * added later needs a single registerPageReload() line.
+   * ===================================================================*/
+
+  // ---------------- Refresh ----------------
+  // pageKey -> the function that reloads that page's data.
+  var pageReloaders_ = {};
+
+  /**
+   * Lets a page say "this is how you reload me". The topbar Refresh button
+   * then works on that page with no further wiring, and so does any code
+   * that needs to force a reload after a delete.
+   */
+  function registerPageReload(pageKey, fn) {
+    if (typeof fn === 'function') pageReloaders_[pageKey] = fn;
+  }
+
+  /** Reloads whichever page is on screen. Wired to the topbar Refresh button. */
+  function refreshCurrentPage() {
+    var fn = pageReloaders_[currentPage];
+    if (!fn) { showToast('Nothing to refresh on this page.', 'info'); return; }
+    var btn = document.getElementById('refreshBtn');
+    if (btn) btn.classList.add('spinning');
+    try {
+      var result = fn();
+      // A loader that returns a promise lets us stop the spinner at the
+      // right moment; one that returns nothing just spins briefly.
+      if (result && typeof result.then === 'function') {
+        result.then(function () { stopRefreshSpin_(); showToast('Refreshed.', 'success'); })
+              .catch(function () { stopRefreshSpin_(); });
+      } else {
+        setTimeout(function () { stopRefreshSpin_(); showToast('Refreshed.', 'success'); }, 400);
+      }
+    } catch (e) {
+      stopRefreshSpin_();
+      showToast(e.message || 'Could not refresh.', 'error');
+    }
+  }
+
+  function stopRefreshSpin_() {
+    var btn = document.getElementById('refreshBtn');
+    if (btn) btn.classList.remove('spinning');
+  }
+
+  /** Reloads a page's data without the toast - used after a successful delete. */
+  function reloadPage_(pageKey) {
+    var fn = pageReloaders_[pageKey];
+    if (fn) try { fn(); } catch (e) { /* the page will show its own error */ }
+  }
+
+
+  // ---------------- Delete compatibility ----------------
+  // Existing modules keep calling confirmDelete(opts); this adapter routes
+  // every one of those calls through the global danger confirmation while
+  // preserving the exact native delete RPC and mandatory audit reason.
+  function legacyDeleteSummaryText_(html) {
+    if (!html) return '';
+    var el = document.createElement('div');
+    el.innerHTML = String(html);
+    return String(el.textContent || el.innerText || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function confirmDelete(opts) {
+    var o = opts || {};
+    var summaryText = legacyDeleteSummaryText_(o.summary || '');
+    var details = Array.isArray(o.details) ? o.details.slice() : [];
+    if (!details.length && summaryText) details.push({ label: 'Record', value: summaryText, emphasis: true });
+    var promise = runConfirmedAction({
+      type: 'danger',
+      title: o.title || 'Delete record?',
+      message: o.message || 'This action will reverse or remove the related record effects.',
+      details: details,
+      confirmLabel: o.confirmLabel || 'Delete',
+      loadingLabel: o.loadingLabel || 'Deleting...',
+      reason: {
+        required: true,
+        label: o.reasonLabel || 'Reason',
+        placeholder: o.reasonPlaceholder || 'e.g. entered twice by mistake',
+        maxLength: 200
+      },
+      trigger: o.trigger || document.activeElement
+    }, function (reason) {
+      var args = [o.fn, authToken].concat(o.args || [], [reason]);
+      return withLoader(serverCall.apply(null, args)).then(function (res) {
+        showToast(o.successMessage || 'Deleted. Stock and balances have been reversed.', 'success');
+        (o.reloadPages || [currentPage]).forEach(reloadPage_);
+        if (typeof o.onDone === 'function') o.onDone(res);
+        return res;
+      });
+    });
+    promise.catch(function (err) {
+      showToast(err && err.message ? err.message : 'Delete failed.', 'error');
+    });
+    return promise;
+  }
+
+  // ---------------- Date-range printing ----------------
+  /**
+   * Prints any ledger for the selected range. Builds a clean standalone
+   * document rather than printing the app shell, which is what caused the
+   * two-page invoice bug - the sidebar and modals carry layout height even
+   * when hidden.
+   */
+  function printLedgerRange(opts) {
+    var o = opts || {};
+    var host = document.getElementById('printHost');
+    if (!host) return;
+    var head = (o.columns || []).map(function (c) { return '<th>' + escapeHtml(c.label) + '</th>'; }).join('');
+    var body = (o.rows || []).map(function (r) {
+      return '<tr>' + (o.columns || []).map(function (c) {
+        var v = typeof c.value === 'function' ? c.value(r) : r[c.key];
+        return '<td' + (c.align ? ' style="text-align:' + c.align + '"' : '') + '>' +
+               (c.raw ? (v == null ? '' : v) : escapeHtml(v == null ? '' : String(v))) + '</td>';
+      }).join('') + '</tr>';
+    }).join('');
+
+    host.innerHTML =
+      // Wrapped in .invoice-paper so it inherits the print stylesheet that
+      // already exists, and driven by the same body.printing-invoice class
+      // that fixed the blank-second-page bug. No new print CSS needed.
+      '<div class="invoice-paper">' +
+        '<h2 class="ledger-print-title">' + escapeHtml(o.title || 'Ledger') + '</h2>' +
+        '<div class="ledger-print-meta">' + escapeHtml(o.subtitle || '') + '</div>' +
+        '<table class="ledger-print-table"><thead><tr>' + head + '</tr></thead><tbody>' + body + '</tbody></table>' +
+        (o.footer ? '<div class="ledger-print-total">' + o.footer + '</div>' : '') +
+      '</div>';
+    document.body.classList.add('printing-invoice');
+    try {
+      window.print();
+    } finally {
+      document.body.classList.remove('printing-invoice');
+      host.innerHTML = '';
+    }
+  }
+
+  /**
+   * Exports any table to a downloaded CSV file. Same { columns, rows }
+   * shape printLedgerRange takes, so a page that already builds columns
+   * for printing gets export for free with the same column list.
+   * opts = { filename, columns: [{ key, label, value? }], rows }
+   */
+  function exportRowsToCsv(opts) {
+    var o = opts || {};
+    var cols = o.columns || [];
+    function csvCell_(v) {
+      var s = v === null || v === undefined ? '' : String(v);
+      return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    }
+    var lines = [cols.map(function (c) { return csvCell_(c.label); }).join(',')];
+    (o.rows || []).forEach(function (r) {
+      lines.push(cols.map(function (c) {
+        var v = typeof c.value === 'function' ? c.value(r) : r[c.key];
+        return csvCell_(v == null ? '' : v);
+      }).join(','));
+    });
+    // Leading BOM so Excel opens UTF-8 (Bangla text, currency symbols) correctly.
+    var blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = (o.filename || 'export') + '.csv';
+    a.click();
+  }
+
+  /** Reads a From/To pair and returns {dateFrom,dateTo}, validating the order. */
+  function readDateRange(fromId, toId) {
+    var from = (document.getElementById(fromId) || {}).value || '';
+    var to = (document.getElementById(toId) || {}).value || '';
+    if (from && to && from > to) {
+      showToast('The "from" date is after the "to" date.', 'error');
+      return null;
+    }
+    return { dateFrom: from, dateTo: to };
+  }
+
+
+  /* ---------------- Dedicated Customer/Supplier Ledger workspaces ---------------- */
+  var partyLedgerPendingOpen_ = { customer: '', supplier: '' };
+
+  function openCustomerLedger_(customerId) {
+    partyLedgerPendingOpen_.customer = String(customerId || '');
+    goToPage('customerLedger');
+  }
+
+  function openSupplierLedger_(supplierId) {
+    partyLedgerPendingOpen_.supplier = String(supplierId || '');
+    goToPage('supplierLedger');
+  }
+
+  document.addEventListener('click', function (e) {
+    var customerLink = e.target.closest && e.target.closest('[data-customer-ledger-id]');
+    if (customerLink) {
+      e.preventDefault();
+      openCustomerLedger_(customerLink.dataset.customerLedgerId || '');
+      return;
+    }
+    var supplierLink = e.target.closest && e.target.closest('[data-supplier-ledger-id]');
+    if (supplierLink) {
+      e.preventDefault();
+      openSupplierLedger_(supplierLink.dataset.supplierLedgerId || '');
+    }
+  });
+
+  /**
+   * Route ledger-source actions into the ERP's native modules. This function
+   * contains no accounting mutation logic; it only navigates/orchestrates the
+   * already-authoritative handlers.
+   */
+  function partyLedgerRouteSourceAction_(kind, row, action, refreshFn) {
+    row = row || {};
+    action = String(action || '');
+    var done = typeof refreshFn === 'function' ? refreshFn : function () {};
+
+    if (row.sourceModule === 'sales') {
+      if (action === 'view') { goToPage('sales'); smOpenView_(row.sourceId); return true; }
+      if (action === 'edit') { goToPage('sales'); smUpdateInvoice_(row.sourceId); return true; }
+      if (action === 'return') { goToPage('returns'); returnsLoadInvoiceById_(row.sourceId); return true; }
+      if (action === 'print') {
+        withLoader(serverCall('getSaleDetail', authToken, row.sourceId)).then(function (inv) {
+          posRenderInvoice_(inv);
+          openModal('invoiceModal');
+          setTimeout(function () { printInvoice_(); }, 150);
+        }).catch(function (err) { showToast(err.message, 'error'); });
+        return true;
+      }
+      if (action === 'delete') {
+        confirmDelete({
+          title: 'Delete invoice ' + row.sourceId,
+          summary: '<p><b>' + escapeHtml(row.sourceId || '') + '</b></p>',
+          fn: 'deleteDayBookEntry',
+          args: ['sales', row.sourceId],
+          reloadPages: ['sales', 'customers', 'customerLedger', 'dashboard', 'daybook'],
+          onDone: done
+        });
+        return true;
+      }
+    }
+
+    if (row.sourceModule === 'purchase') {
+      if (action === 'view') { goToPage('purchase'); purOpenView_(row.sourceId); return true; }
+      if (action === 'edit') { goToPage('purchase'); purEdit_(row.sourceId); return true; }
+      if (action === 'return') {
+        goToPage('purchase');
+        var returnTab = document.querySelector('#page-purchase .tab-btn[data-tab="purReturn"]');
+        if (returnTab) returnTab.click();
+        prtLoadPurchaseById_(row.sourceId);
+        return true;
+      }
+      if (action === 'delete') { goToPage('purchase'); purDelete_(row.sourceId); return true; }
+    }
+
+    if (row.sourceModule === 'salesReturn' && action === 'view') {
+      goToPage('returnHistory');
+      if (typeof rhOpenDetailById_ === 'function') rhOpenDetailById_(row.sourceId);
+      return true;
+    }
+
+    if (row.sourceModule === 'purchaseReturn' && action === 'view') {
+      goToPage('purchase');
+      var purchaseReturnTab = document.querySelector('#page-purchase .tab-btn[data-tab="purReturn"]');
+      if (purchaseReturnTab) purchaseReturnTab.click();
+      if (typeof prtOpenDetailById_ === 'function') prtOpenDetailById_(row.sourceId);
+      return true;
+    }
+
+    if (row.sourceModule === 'customerOpeningBalance' && action === 'edit') {
+      goToPage('customers');
+      if (typeof custOpenEdit_ === 'function') custOpenEdit_(row.sourceId);
+      return true;
+    }
+
+    if (row.sourceModule === 'supplierOpeningBalance' && action === 'edit') {
+      goToPage('suppliers');
+      if (typeof supOpenEdit_ === 'function') supOpenEdit_(row.sourceId);
+      return true;
+    }
+
+    return false;
+  }
+
+  function partyLedgerPrintStatement_(statement) {
+    var s = statement || {};
+    var host = document.getElementById('printHost');
+    if (!host) return;
+    var business = s.business || {};
+    var party = s.party || {};
+    var isCustomer = s.kind === 'customer';
+    var title = isCustomer ? 'Customer Ledger Statement' : 'Supplier Ledger Statement';
+    var phoneLine = [business.phone1, business.phone2].filter(Boolean).join(' / ');
+    var partyMeta = [party.phone, party.address].filter(Boolean).join(' · ');
+    var rows = (s.rows || []).map(function (r) {
+      return '<tr>' +
+        '<td>' + escapeHtml(String(r['Date'] || '').slice(0, 10)) + '</td>' +
+        '<td>' + escapeHtml(r['Type'] || '') + '</td>' +
+        '<td>' + escapeHtml(r['Reference'] || '') + '</td>' +
+        '<td style="text-align:right">' + escapeHtml(formatMoney(Number(r['Debit']) || 0)) + '</td>' +
+        '<td style="text-align:right">' + escapeHtml(formatMoney(Number(r['Credit']) || 0)) + '</td>' +
+        '<td style="text-align:right">' + escapeHtml(formatMoney(Number(r['Balance']) || 0)) + '</td>' +
+      '</tr>';
+    }).join('');
+
+    host.innerHTML =
+      '<div class="invoice-paper party-ledger-print">' +
+        '<div style="text-align:center;margin-bottom:12px">' +
+          '<h2 style="margin:0">' + escapeHtml(business.name || '') + '</h2>' +
+          (business.nameBangla ? '<div>' + escapeHtml(business.nameBangla) + '</div>' : '') +
+          (business.address ? '<div>' + escapeHtml(business.address) + '</div>' : '') +
+          (phoneLine ? '<div>' + escapeHtml(phoneLine) + '</div>' : '') +
+        '</div>' +
+        '<h2 class="ledger-print-title">' + title + '</h2>' +
+        '<div class="ledger-print-meta"><strong>' + escapeHtml(party.name || '') + '</strong>' +
+          (partyMeta ? '<br>' + escapeHtml(partyMeta) : '') +
+          '<br>Period: ' + escapeHtml((s.period || {}).from || '') + ' to ' + escapeHtml((s.period || {}).to || '') + '</div>' +
+        '<div class="party-ledger-print-summary">' +
+          '<span>Opening Balance: <strong>' + escapeHtml(formatMoney(Number(s.openingBalance) || 0)) + '</strong></span>' +
+          '<span>Period Debit: <strong>' + escapeHtml(formatMoney(Number(s.periodDebit) || 0)) + '</strong></span>' +
+          '<span>Period Credit: <strong>' + escapeHtml(formatMoney(Number(s.periodCredit) || 0)) + '</strong></span>' +
+          '<span>Closing Balance: <strong>' + escapeHtml(formatMoney(Number(s.closingBalance) || 0)) + '</strong></span>' +
+        '</div>' +
+        '<table class="ledger-print-table"><thead><tr><th>Date</th><th>Type</th><th>Reference</th><th>Debit</th><th>Credit</th><th>Balance</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+        '<div class="ledger-print-meta" style="margin-top:10px">Printed: ' + escapeHtml(s.printedAt || '') + '</div>' +
+      '</div>';
+
+    document.body.classList.add('printing-invoice');
+    try { window.print(); }
+    finally {
+      document.body.classList.remove('printing-invoice');
+      host.innerHTML = '';
+    }
+  }
+
+  /**
+   * Registers every page's existing loader with the Refresh button.
+   *
+   * Each page file already owns a load function with a settled name
+   * (dashLoad, prodLoad, custLoad ...). Looking them up here means the
+   * Refresh button works on all fifteen pages without a single page file
+   * being edited - no duplicated button markup, no fifteen new handlers,
+   * nothing to keep in sync.
+   *
+   * A page whose loader is absent is simply skipped, so this stays safe
+   * if a page is removed or renamed later; Refresh just reports that
+   * there is nothing to reload there.
+   */
+
+
+  var PAGE_LOADERS_ = {
+    dashboard: 'dashLoad',        products: 'prodLoad',        customers: 'custLoad',
+    customerLedger: 'customerLedgerLoad',
+    suppliers: 'supLoad',         supplierLedger: 'supplierLedgerLoad',
+    purchase:  'purLoad',        sales:     'smLoad',        draftSales: 'draftSalesLoad',
+    vendors:   'vlLoad',
+    vendorWorkspace: 'vlWorkspaceLoad_',
+    returnHistory: 'rhLoad',      bank:      'bnkLoad',
+    daybook:   'dbLoad',          cashReconciliation: 'cashRecLoad',
+    pos:       'posLoad',        counter:  'counterLoad',
+    settings:  'setLoad',
+    users:     'usrLoad',         roles:     'rolLoad',
+    // Expense uses direct pages (was 1 page with internal tabs), each
+    // with its own loader to reload.
+    expense:             'expLoad',
+    expenseList:         'expListBootstrap_',
+    expenseCategories:   'exsCatLoad',
+    expenseReports:      'expRepLoad',
+    finance:             'finLoad',
+    financeLedger:       'finLedLoad',
+  };
+
+  function wirePageReloaders_() {
+    Object.keys(PAGE_LOADERS_).forEach(function (pageKey) {
+      var name = PAGE_LOADERS_[pageKey];
+      var fn = null;
+      try { fn = globalThis[name]; } catch (e) { /* ignore */ }
+      if (typeof fn !== 'function') {
+        try { fn = eval('typeof ' + name + " === 'function' ? " + name + ' : null'); } catch (e) { fn = null; }
+      }
+      if (typeof fn === 'function') registerPageReload(pageKey, fn);
+    });
+  }
+
+  /* ---------------- Floating horizontal scrollbar ----------------
+     Syncs the viewport scrollbar with the horizontally scrollable
+     module content. The shell remains fixed; this only controls the
+     content area's horizontal position. */
+  (function initFloatingHScroll_() {
+    function setup() {
+      const bar = document.getElementById('floatingHScroll');
+      const inner = document.getElementById('floatingHScrollInner');
+      const content = document.querySelector('.content');
+      if (!bar || !inner || !content) return;
+
+      let syncing = false;
+
+      function update() {
+        const overflow = Math.max(0, content.scrollWidth - content.clientWidth);
+        if (overflow <= 1) {
+          bar.hidden = true;
+          return;
+        }
+        inner.style.width = content.scrollWidth + 'px';
+        bar.hidden = false;
+        if (!syncing) {
+          syncing = true;
+          bar.scrollLeft = content.scrollLeft;
+          syncing = false;
+        }
+      }
+
+      bar.addEventListener('scroll', function () {
+        if (syncing) return;
+        syncing = true;
+        content.scrollLeft = bar.scrollLeft;
+        syncing = false;
+      });
+
+      content.addEventListener('scroll', function () {
+        if (syncing) return;
+        syncing = true;
+        bar.scrollLeft = content.scrollLeft;
+        syncing = false;
+      }, { passive: true });
+
+      window.addEventListener('resize', update);
+      if (window.ResizeObserver) {
+        new ResizeObserver(update).observe(content);
+      }
+      if (window.MutationObserver) {
+        new MutationObserver(update).observe(content, { childList: true, subtree: true });
+      }
+
+      update();
+      setTimeout(update, 250);
+      setTimeout(update, 1000);
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', setup);
+    } else {
+      setup();
+    }
+  })();
+
+  /* ---------------- Shared touch select presentation layer ---------------- */
+  var touchSelectState_ = { select: null, trigger: null, menu: null, observer: null };
+
+  function responsiveViewportMode_() {
+    var w = window.innerWidth || document.documentElement.clientWidth || 0;
+    if (w < 600) return 'mobile';
+    if (w < 1024) return 'tablet';
+    return 'desktop';
+  }
+
+  // ---------------- Shared search clear UX ----------------
+  // Genuine search/filter inputs get one small custom clear affordance. This
+  // deliberately avoids the browser's native type=search cancel decoration,
+  // whose visual treatment differs between Chrome/Edge/Windows and touch UIs.
+  function isSearchClearInput_(input) {
+    if (!input || String(input.tagName || '').toUpperCase() !== 'INPUT') return false;
+    if (input.dataset && input.dataset.searchClear === 'off') return false;
+    if (input.dataset && input.dataset.searchClear === 'on') return true;
+    var type = String(input.getAttribute('type') || input.type || 'text').toLowerCase();
+    var id = String(input.id || '');
+    var placeholder = String(input.getAttribute('placeholder') || '');
+    return type === 'search' ||
+      (input.classList && input.classList.contains('search-input')) ||
+      /search/i.test(id) || /search/i.test(placeholder);
+  }
+
+  function searchClearDispatch_(input, eventName) {
+    var ev;
+    try { ev = new Event(eventName, { bubbles: true }); }
+    catch (err) {
+      ev = document.createEvent('Event');
+      ev.initEvent(eventName, true, false);
+    }
+    input.dispatchEvent(ev);
+  }
+
+  function searchClearTransferLayout_(input, wrapper) {
+    // When a search input is itself the flex item (Returns / Purchase Return),
+    // move only layout properties to the wrapper. Visual input styles stay on
+    // the input, so the field remains pixel-compatible with its old layout.
+    [
+      'flex', 'flexGrow', 'flexShrink', 'flexBasis',
+      'width', 'minWidth', 'maxWidth',
+      'margin', 'marginTop', 'marginRight', 'marginBottom', 'marginLeft',
+      'alignSelf', 'gridColumn', 'gridRow'
+    ].forEach(function (prop) {
+      if (!input.style || !input.style[prop]) return;
+      wrapper.style[prop] = input.style[prop];
+      input.style[prop] = '';
+    });
+  }
+
+  function searchClearHost_(input) {
+    var parent = input.parentElement;
+    // These existing picker/search shells are already position:relative and
+    // must keep their dropdown result panels as direct siblings of the input.
+    if (parent && parent.classList && (
+      parent.classList.contains('counter-combobox') ||
+      parent.classList.contains('combo-wrap') ||
+      parent.classList.contains('smart-search-box') ||
+      parent.classList.contains('pos-customer-input-wrap')
+    )) {
+      parent.classList.add('erp-search-clear-host');
+      return parent;
+    }
+
+    var wrapper = document.createElement('span');
+    wrapper.className = 'erp-search-clear-field';
+    if (parent && parent.classList && parent.classList.contains('toolbar')) {
+      wrapper.classList.add('erp-search-clear-toolbar-field');
+    }
+    searchClearTransferLayout_(input, wrapper);
+    if (parent) parent.insertBefore(wrapper, input);
+    wrapper.appendChild(input);
+    return wrapper;
+  }
+
+  function enhanceSearchClearInput_(input) {
+    if (!isSearchClearInput_(input) || input.dataset.searchClearEnhanced === '1') return;
+    input.dataset.searchClearEnhanced = '1';
+
+    // POS and Products already have the same custom clear button wired to
+    // page-specific search state. Keep that behavior and only standardize its
+    // appearance; never add a second button beside it.
+    var parent = input.parentElement;
+    var existing = null;
+    if (parent) {
+      Array.prototype.some.call(parent.children || [], function (child) {
+        if (child !== input && child.classList && child.classList.contains('smart-search-clear')) {
+          existing = child;
+          return true;
+        }
+        return false;
+      });
+    }
+    if (existing) return;
+
+    var host = searchClearHost_(input);
+    var button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'erp-search-clear';
+    button.setAttribute('aria-label', 'Clear search');
+    button.innerHTML = '&#10005;';
+    host.appendChild(button);
+
+    function sync_() {
+      button.hidden = !String(input.value || '').length;
+    }
+
+    input.addEventListener('input', sync_);
+    input.addEventListener('change', sync_);
+    button.addEventListener('mousedown', function (e) {
+      // Keep focus ownership predictable for comboboxes whose blur handler
+      // closes their result panel before click would otherwise fire.
+      e.preventDefault();
+    });
+    button.addEventListener('click', function (e) {
+      e.preventDefault();
+      if (input.disabled || input.readOnly) return;
+      input.value = '';
+      searchClearDispatch_(input, 'input');
+      searchClearDispatch_(input, 'change');
+      input.focus();
+      sync_();
+    });
+    sync_();
+  }
+
+  function enhanceSearchClearInputs_(root) {
+    root = root || document;
+    if (root.nodeType === 1 && String(root.tagName || '').toUpperCase() === 'INPUT') {
+      enhanceSearchClearInput_(root);
+    }
+    if (!root.querySelectorAll) return;
+    Array.prototype.forEach.call(root.querySelectorAll('input'), enhanceSearchClearInput_);
+  }
+
+  function initSearchClearUx_() {
+    enhanceSearchClearInputs_(document);
+    if (!window.MutationObserver || initSearchClearUx_._observer) return;
+    initSearchClearUx_._observer = new MutationObserver(function (mutations) {
+      mutations.forEach(function (mutation) {
+        Array.prototype.forEach.call(mutation.addedNodes || [], function (node) {
+          if (node && node.nodeType === 1) enhanceSearchClearInputs_(node);
+        });
+      });
+    });
+    initSearchClearUx_._observer.observe(document.body || document.documentElement, { childList: true, subtree: true });
+  }
+
+  function touchControlMode_() {
+    return responsiveViewportMode_();
+  }
+
+  function touchDateShouldEnhance_() {
+    return touchControlMode_() !== 'mobile';
+  }
+
+  function touchSelectModeFor_(select) {
+    return touchControlMode_();
+  }
+
+  function touchSelectInternalScroll_(select) {
+    return !!(select && select.dataset && select.dataset.touchSelectInternalScroll === 'true' && touchSelectModeFor_(select) === 'tablet');
+  }
+
+  function touchSelectShouldEnhance_(select) {
+    if (!select || select.tagName !== 'SELECT') return false;
+    return true;
+  }
+
+  function touchSelectLabel_(select) {
+    var label = select.getAttribute('aria-label') || '';
+    if (!label && select.id) {
+      var linked = document.querySelector('label[for="' + String(select.id).replace(/"/g, '\\"') + '"]');
+      if (linked) label = (linked.textContent || '').trim();
+    }
+    if (!label) {
+      var parentLabel = select.closest && select.closest('label');
+      if (parentLabel) label = (parentLabel.textContent || '').trim();
+    }
+    if (!label) label = select.getAttribute('name') || select.id || 'Select option';
+    return label.replace(/\s+/g, ' ').trim();
+  }
+
+  function touchSelectGetMenu_() {
+    var menu = document.getElementById('touchSelectMenuGlobal');
+    if (menu) return menu;
+    menu = document.createElement('div');
+    menu.id = 'touchSelectMenuGlobal';
+    menu.className = 'touch-select-menu';
+    menu.setAttribute('role', 'listbox');
+    menu.hidden = true;
+    document.body.appendChild(menu);
+    menu._touchSelectScrollGesture = { active: false, startY: 0, startScrollTop: 0, moved: false, suppressClick: false };
+    menu.addEventListener('touchstart', function (e) {
+      if (!touchSelectInternalScroll_(touchSelectState_.select) || !e.touches || e.touches.length !== 1) return;
+      var gesture = menu._touchSelectScrollGesture;
+      gesture.active = true;
+      gesture.startY = e.touches[0].clientY;
+      gesture.startScrollTop = menu.scrollTop;
+      gesture.moved = false;
+      gesture.suppressClick = false;
+    }, { passive: true });
+    menu.addEventListener('touchmove', function (e) {
+      var gesture = menu._touchSelectScrollGesture;
+      if (!gesture.active || !touchSelectInternalScroll_(touchSelectState_.select) || !e.touches || e.touches.length !== 1) return;
+      var delta = gesture.startY - e.touches[0].clientY;
+      if (Math.abs(delta) < 4) return;
+      gesture.moved = true;
+      menu.scrollTop = gesture.startScrollTop + delta;
+      e.preventDefault();
+      e.stopPropagation();
+    }, { passive: false });
+    menu.addEventListener('touchend', function () {
+      var gesture = menu._touchSelectScrollGesture;
+      if (!gesture.active) return;
+      gesture.active = false;
+      if (gesture.moved) {
+        gesture.suppressClick = true;
+        setTimeout(function () { gesture.suppressClick = false; }, 60);
+      }
+    }, { passive: true });
+    menu.addEventListener('touchcancel', function () {
+      var gesture = menu._touchSelectScrollGesture;
+      gesture.active = false;
+      gesture.moved = false;
+      gesture.suppressClick = false;
+    }, { passive: true });
+    menu.addEventListener('click', function (e) {
+      var gesture = menu._touchSelectScrollGesture;
+      if (gesture && gesture.suppressClick) {
+        gesture.suppressClick = false;
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      var btn = e.target.closest('button[data-touch-option-index]');
+      if (!btn || btn.disabled || !touchSelectState_.select) return;
+      e.preventDefault();
+      e.stopPropagation();
+      var select = touchSelectState_.select;
+      var index = Number(btn.dataset.touchOptionIndex);
+      if (!Number.isFinite(index) || !select.options[index] || select.options[index].disabled) return;
+      select.selectedIndex = index;
+      refreshTouchSelect_(select);
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      closeTouchSelect_(true);
+    });
+    return menu;
+  }
+
+  function refreshTouchSelect_(select) {
+    if (!select || !select._touchSelectTrigger) return;
+    var trigger = select._touchSelectTrigger;
+    var text = trigger.querySelector('.touch-select-text');
+    var option = select.options && select.selectedIndex >= 0 ? select.options[select.selectedIndex] : null;
+    if (text) text.textContent = option ? option.textContent : '';
+    trigger.disabled = !!select.disabled;
+    trigger.setAttribute('aria-disabled', select.disabled ? 'true' : 'false');
+    trigger.classList.toggle('is-placeholder', !!option && (option.value === '' || option.disabled));
+  }
+
+  function destroyTouchSelect_(select) {
+    if (!select || !select._touchSelectTrigger) return;
+    if (touchSelectState_.select === select) closeTouchSelect_();
+    var trigger = select._touchSelectTrigger;
+    if (trigger && trigger.parentNode) trigger.parentNode.removeChild(trigger);
+    select._touchSelectTrigger = null;
+    select.classList.remove('touch-select-native');
+  }
+
+  function enhanceTouchSelect_(select) {
+    if (!select || select.tagName !== 'SELECT') return;
+    if (select._touchSelectTrigger) {
+      if (!touchSelectShouldEnhance_(select)) { destroyTouchSelect_(select); return; }
+      refreshTouchSelect_(select);
+      return;
+    }
+    if (!touchSelectShouldEnhance_(select)) return;
+
+    var trigger = document.createElement('button');
+    trigger.type = 'button';
+    trigger.className = 'touch-select-trigger';
+    trigger.setAttribute('aria-haspopup', 'listbox');
+    trigger.setAttribute('aria-expanded', 'false');
+    trigger.setAttribute('aria-label', touchSelectLabel_(select));
+    ['width','minWidth','maxWidth','flex','flexBasis','alignSelf'].forEach(function (prop) {
+      if (select.style && select.style[prop]) trigger.style[prop] = select.style[prop];
+    });
+
+    var text = document.createElement('span');
+    text.className = 'touch-select-text';
+    var caret = document.createElement('span');
+    caret.className = 'touch-select-caret';
+    caret.setAttribute('aria-hidden', 'true');
+    caret.textContent = '⌄';
+    trigger.appendChild(text);
+    trigger.appendChild(caret);
+
+    select.insertAdjacentElement('afterend', trigger);
+    select.classList.add('touch-select-native');
+    select._touchSelectTrigger = trigger;
+
+    trigger.addEventListener('click', function (e) {
+      if (!touchSelectShouldEnhance_(select)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      openTouchSelect_(select);
+    });
+    if (!select._touchSelectChangeHandler) {
+      select._touchSelectChangeHandler = function () { refreshTouchSelect_(select); };
+      select.addEventListener('change', select._touchSelectChangeHandler);
+    }
+    refreshTouchSelect_(select);
+  }
+
+  function enhanceTouchSelects_(root) {
+    root = root || document;
+    if (root.nodeType === 1 && root.tagName === 'SELECT') enhanceTouchSelect_(root);
+    if (!root.querySelectorAll) return;
+    Array.prototype.forEach.call(root.querySelectorAll('select'), function (select) {
+      enhanceTouchSelect_(select);
+    });
+  }
+
+  function touchSelectPositionAnchored_(trigger, menu) {
+    var r = trigger.getBoundingClientRect();
+    var gutter = 8;
+    var width = Math.max(180, r.width);
+    width = Math.min(width, window.innerWidth - gutter * 2);
+    menu.style.left = '0px';
+    menu.style.right = 'auto';
+    menu.style.top = '0px';
+    menu.style.bottom = 'auto';
+    menu.style.width = Math.round(width) + 'px';
+    menu.style.maxHeight = Math.max(120, Math.min(360, window.innerHeight - gutter * 2)) + 'px';
+    var m = menu.getBoundingClientRect();
+    var left = Math.max(gutter, Math.min(window.innerWidth - m.width - gutter, r.left));
+    var below = window.innerHeight - r.bottom - gutter;
+    var above = r.top - gutter;
+    var top;
+    if (below >= Math.min(m.height, 220) || below >= above) {
+      top = Math.min(window.innerHeight - m.height - gutter, r.bottom + 4);
+    } else {
+      top = Math.max(gutter, r.top - m.height - 4);
+    }
+    menu.style.left = Math.round(left) + 'px';
+    menu.style.top = Math.round(Math.max(gutter, top)) + 'px';
+  }
+
+  function openTouchSelect_(select) {
+    if (!touchSelectShouldEnhance_(select) || select.disabled) return;
+    closeTouchDatePicker_();
+    if (touchSelectState_.select === select && touchSelectState_.menu && !touchSelectState_.menu.hidden) {
+      closeTouchSelect_();
+      return;
+    }
+    closeTouchSelect_();
+    refreshTouchSelect_(select);
+    var trigger = select._touchSelectTrigger;
+    if (!trigger) return;
+    var menu = touchSelectGetMenu_();
+    menu.innerHTML = '';
+
+    var mode = touchSelectModeFor_(select);
+    if (mode === 'mobile') {
+      var head = document.createElement('div');
+      head.className = 'touch-select-sheet-head';
+      var title = document.createElement('div');
+      title.className = 'touch-select-sheet-title';
+      title.textContent = touchSelectLabel_(select);
+      var close = document.createElement('button');
+      close.type = 'button';
+      close.className = 'touch-select-sheet-close';
+      close.setAttribute('aria-label', 'Close');
+      close.textContent = '×';
+      close.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); closeTouchSelect_(true); });
+      head.appendChild(title); head.appendChild(close); menu.appendChild(head);
+    }
+
+    Array.prototype.forEach.call(select.options || [], function (option, index) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'touch-select-option' + (index === select.selectedIndex ? ' is-selected' : '');
+      btn.dataset.touchOptionIndex = String(index);
+      btn.textContent = option.textContent;
+      btn.disabled = !!option.disabled;
+      btn.setAttribute('role', 'option');
+      btn.setAttribute('aria-selected', index === select.selectedIndex ? 'true' : 'false');
+      menu.appendChild(btn);
+    });
+
+    touchSelectState_.select = select;
+    touchSelectState_.trigger = trigger;
+    touchSelectState_.menu = menu;
+    trigger.setAttribute('aria-expanded', 'true');
+    menu.hidden = false;
+    menu.dataset.mode = mode;
+    menu.style.touchAction = touchSelectInternalScroll_(select) ? 'none' : '';
+
+    if (mode !== 'mobile') {
+      menu.style.visibility = 'hidden';
+      touchSelectPositionAnchored_(trigger, menu);
+      menu.style.visibility = '';
+    } else {
+      menu.style.left = '';
+      menu.style.right = '';
+      menu.style.top = '';
+      menu.style.bottom = '';
+      menu.style.width = '';
+      menu.style.maxHeight = '';
+    }
+    var selected = menu.querySelector('.touch-select-option.is-selected:not([disabled])') || menu.querySelector('.touch-select-option:not([disabled])');
+    if (selected) selected.focus();
+  }
+
+  function closeTouchSelect_(restoreFocus) {
+    var menu = touchSelectState_.menu || document.getElementById('touchSelectMenuGlobal');
+    var trigger = touchSelectState_.trigger;
+    if (trigger) trigger.setAttribute('aria-expanded', 'false');
+    if (menu) { menu.hidden = true; menu.innerHTML = ''; }
+    touchSelectState_.select = null;
+    touchSelectState_.trigger = null;
+    touchSelectState_.menu = menu || null;
+    if (restoreFocus && trigger && document.contains(trigger)) trigger.focus();
+  }
+
+  function initTouchControls_() {
+    enhanceTouchSelects_(document);
+    enhanceTouchDates_(document);
+    if (window.MutationObserver && !touchSelectState_.observer) {
+      touchSelectState_.observer = new MutationObserver(function (mutations) {
+        mutations.forEach(function (mutation) {
+          Array.prototype.forEach.call(mutation.addedNodes || [], function (node) {
+            if (node && node.nodeType === 1) { enhanceTouchSelects_(node); enhanceTouchDates_(node); }
+          });
+          var target = mutation.target;
+          if (target && target.nodeType === 1) {
+            var select = target.tagName === 'SELECT' ? target : (target.closest ? target.closest('select') : null);
+            if (select && select._touchSelectTrigger) refreshTouchSelect_(select);
+            if (target.tagName === 'INPUT' && String(target.type).toLowerCase() === 'date' && target._touchDateTrigger) refreshTouchDate_(target);
+            if (mutation.type === 'attributes' && mutation.attributeName === 'hidden' && target.querySelectorAll) {
+              Array.prototype.forEach.call(target.querySelectorAll('select'), refreshTouchSelect_);
+              Array.prototype.forEach.call(target.querySelectorAll('input[type="date"]'), refreshTouchDate_);
+            }
+          }
+        });
+      });
+      touchSelectState_.observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden','disabled'] });
+    }
+    if (!initTouchControls_._listeners) {
+      initTouchControls_._listeners = true;
+      document.addEventListener('pointerdown', function (e) {
+        var menu = touchSelectState_.menu;
+        var trigger = touchSelectState_.trigger;
+        if (menu && !menu.hidden && !menu.contains(e.target) && !(trigger && trigger.contains(e.target))) closeTouchSelect_();
+        var datePanel = touchDateState_.panel;
+        var dateTrigger = touchDateState_.trigger;
+        if (datePanel && !datePanel.hidden && !datePanel.contains(e.target) && !(dateTrigger && dateTrigger.contains(e.target))) closeTouchDatePicker_();
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') { closeTouchSelect_(true); closeTouchDatePicker_(true); }
+      });
+      window.addEventListener('scroll', function (e) {
+        var menu = touchSelectState_.menu;
+        if (menu && !menu.hidden && (e.target === menu || menu.contains(e.target))) return;
+        var datePanel = touchDateState_.panel;
+        if (datePanel && !datePanel.hidden && (e.target === datePanel || datePanel.contains(e.target))) return;
+        closeTouchSelect_(); closeTouchDatePicker_();
+      }, true);
+      window.addEventListener('resize', function () {
+        closeTouchSelect_(); closeTouchDatePicker_();
+        enhanceTouchSelects_(document); enhanceTouchDates_(document);
+      });
+      window.addEventListener('orientationchange', function () {
+        closeTouchSelect_(); closeTouchDatePicker_();
+        setTimeout(function () { enhanceTouchSelects_(document); enhanceTouchDates_(document); }, 0);
+      });
+    }
+  }
+
+
+  /* ---------------- Shared tablet date presentation layer ---------------- */
+  var touchDateState_ = { input: null, trigger: null, panel: null, year: 0, month: 0, view: 'days' };
+  var touchDateMonthNames_ = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var touchDateWeekdays_ = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+  function touchDateIso_(year, monthIndex, day) {
+    return String(year) + '-' + String(monthIndex + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+  }
+
+  function touchDateParseIso_(value) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '');
+    if (!m) return null;
+    return { year: Number(m[1]), month: Number(m[2]) - 1, day: Number(m[3]) };
+  }
+
+  function touchDateLabel_(input) {
+    var label = input.getAttribute('aria-label') || '';
+    if (!label && input.id) {
+      var linked = document.querySelector('label[for="' + String(input.id).replace(/"/g, '\\"') + '"]');
+      if (linked) label = (linked.textContent || '').trim();
+    }
+    if (!label) label = input.getAttribute('name') || input.id || 'Choose date';
+    return label.replace(/\s+/g, ' ').trim();
+  }
+
+  function touchDateDisplayValue_(input) {
+    var parsed = touchDateParseIso_(input.value);
+    if (!parsed) return input.getAttribute('placeholder') || 'mm/dd/yyyy';
+    return String(parsed.month + 1).padStart(2, '0') + '/' + String(parsed.day).padStart(2, '0') + '/' + parsed.year;
+  }
+
+  function refreshTouchDate_(input) {
+    if (!input || !input._touchDateTrigger) return;
+    var text = input._touchDateTrigger.querySelector('.touch-date-text');
+    if (text) text.textContent = touchDateDisplayValue_(input);
+    input._touchDateTrigger.disabled = !!input.disabled;
+    input._touchDateTrigger.setAttribute('aria-disabled', input.disabled ? 'true' : 'false');
+  }
+
+  function destroyTouchDate_(input) {
+    if (!input || !input._touchDateTrigger) return;
+    if (touchDateState_.input === input) closeTouchDatePicker_();
+    var trigger = input._touchDateTrigger;
+    if (trigger && trigger.parentNode) trigger.parentNode.removeChild(trigger);
+    input._touchDateTrigger = null;
+    input.classList.remove('touch-date-native');
+  }
+
+  function enhanceTouchDate_(input) {
+    if (!input || input.tagName !== 'INPUT' || String(input.type).toLowerCase() !== 'date') return;
+    if (input._touchDateTrigger) {
+      if (!touchDateShouldEnhance_()) { destroyTouchDate_(input); return; }
+      refreshTouchDate_(input);
+      return;
+    }
+    if (!touchDateShouldEnhance_()) return;
+    var trigger = document.createElement('button');
+    trigger.type = 'button';
+    trigger.className = 'touch-date-trigger';
+    trigger.setAttribute('aria-haspopup', 'dialog');
+    trigger.setAttribute('aria-expanded', 'false');
+    trigger.setAttribute('aria-label', touchDateLabel_(input));
+    ['width','minWidth','maxWidth','flex','flexBasis','alignSelf'].forEach(function (prop) {
+      if (input.style && input.style[prop]) trigger.style[prop] = input.style[prop];
+    });
+    var text = document.createElement('span');
+    text.className = 'touch-date-text';
+    var icon = document.createElement('span');
+    icon.className = 'touch-date-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = '▣';
+    trigger.appendChild(text); trigger.appendChild(icon);
+    input.insertAdjacentElement('afterend', trigger);
+    input.classList.add('touch-date-native');
+    input._touchDateTrigger = trigger;
+    trigger.addEventListener('click', function (e) {
+      if (!touchDateShouldEnhance_()) return;
+      e.preventDefault(); e.stopPropagation();
+      openTouchDatePicker_(input);
+    });
+    if (!input._touchDateInputHandler) {
+      input._touchDateInputHandler = function () { refreshTouchDate_(input); };
+      input.addEventListener('input', input._touchDateInputHandler);
+      input.addEventListener('change', input._touchDateInputHandler);
+    }
+    refreshTouchDate_(input);
+  }
+
+  function enhanceTouchDates_(root) {
+    root = root || document;
+    if (root.nodeType === 1 && root.tagName === 'INPUT' && String(root.type).toLowerCase() === 'date') enhanceTouchDate_(root);
+    if (!root.querySelectorAll) return;
+    Array.prototype.forEach.call(root.querySelectorAll('input[type="date"]'), function (input) { enhanceTouchDate_(input); });
+  }
+
+  function touchDateGetPanel_() {
+    var panel = document.getElementById('touchDatePickerGlobal');
+    if (panel) return panel;
+    panel = document.createElement('div');
+    panel.id = 'touchDatePickerGlobal';
+    panel.className = 'touch-date-picker';
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-label', 'Choose date');
+    panel.hidden = true;
+    document.body.appendChild(panel);
+    return panel;
+  }
+
+  function touchDateWithinBounds_(iso, input) {
+    var min = input.min || '';
+    var max = input.max || '';
+    if (min && iso < min) return false;
+    if (max && iso > max) return false;
+    return true;
+  }
+
+  function touchDatePosition_(trigger, panel) {
+    var r = trigger.getBoundingClientRect();
+    var gutter = 8;
+    panel.style.left = '0px'; panel.style.top = '0px'; panel.style.right = 'auto'; panel.style.bottom = 'auto';
+    var m = panel.getBoundingClientRect();
+    var left = Math.max(gutter, Math.min(window.innerWidth - m.width - gutter, r.left));
+    var below = window.innerHeight - r.bottom - gutter;
+    var above = r.top - gutter;
+    var top = (below >= m.height || below >= above) ? Math.min(window.innerHeight - m.height - gutter, r.bottom + 4) : Math.max(gutter, r.top - m.height - 4);
+    panel.style.left = Math.round(left) + 'px';
+    panel.style.top = Math.round(Math.max(gutter, top)) + 'px';
+  }
+
+  function touchDateMakeButton_(text, className, onClick) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = className || '';
+    btn.textContent = text;
+    btn.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); onClick(); });
+    return btn;
+  }
+
+  function renderTouchDatePicker_() {
+    var input = touchDateState_.input;
+    var panel = touchDateState_.panel;
+    if (!input || !panel) return;
+    panel.innerHTML = '';
+
+    var header = document.createElement('div');
+    header.className = 'touch-date-head';
+    header.appendChild(touchDateMakeButton_('‹', 'touch-date-nav', function () {
+      var d = new Date(touchDateState_.year, touchDateState_.month - 1, 1);
+      touchDateState_.year = d.getFullYear(); touchDateState_.month = d.getMonth(); touchDateState_.view = 'days'; renderTouchDatePicker_();
+    }));
+    var title = document.createElement('div'); title.className = 'touch-date-title';
+    title.appendChild(touchDateMakeButton_(touchDateMonthNames_[touchDateState_.month], 'touch-date-month-btn', function () { touchDateState_.view = 'months'; renderTouchDatePicker_(); }));
+    title.appendChild(touchDateMakeButton_(String(touchDateState_.year), 'touch-date-year-btn', function () { touchDateState_.view = 'years'; renderTouchDatePicker_(); }));
+    header.appendChild(title);
+    header.appendChild(touchDateMakeButton_('›', 'touch-date-nav', function () {
+      var d = new Date(touchDateState_.year, touchDateState_.month + 1, 1);
+      touchDateState_.year = d.getFullYear(); touchDateState_.month = d.getMonth(); touchDateState_.view = 'days'; renderTouchDatePicker_();
+    }));
+    panel.appendChild(header);
+
+    if (touchDateState_.view === 'months') {
+      var months = document.createElement('div'); months.className = 'touch-date-month-grid';
+      touchDateMonthNames_.forEach(function (name, index) {
+        var btn = touchDateMakeButton_(name.slice(0,3), 'touch-date-choice' + (index === touchDateState_.month ? ' is-selected' : ''), function () {
+          touchDateState_.month = index; touchDateState_.view = 'days'; renderTouchDatePicker_();
+        }); months.appendChild(btn);
+      }); panel.appendChild(months); return;
+    }
+
+    if (touchDateState_.view === 'years') {
+      var years = document.createElement('div'); years.className = 'touch-date-year-grid';
+      var start = touchDateState_.year - 12;
+      for (var y = start; y <= start + 24; y++) {
+        (function (year) {
+          var btn = touchDateMakeButton_(String(year), 'touch-date-choice' + (year === touchDateState_.year ? ' is-selected' : ''), function () {
+            touchDateState_.year = year; touchDateState_.view = 'days'; renderTouchDatePicker_();
+          }); years.appendChild(btn);
+        })(y);
+      } panel.appendChild(years); return;
+    }
+
+    var weekdays = document.createElement('div'); weekdays.className = 'touch-date-weekdays';
+    touchDateWeekdays_.forEach(function (name) { var cell=document.createElement('span'); cell.textContent=name; weekdays.appendChild(cell); });
+    panel.appendChild(weekdays);
+    var grid = document.createElement('div'); grid.className = 'touch-date-day-grid';
+    var firstDow = new Date(touchDateState_.year, touchDateState_.month, 1).getDay();
+    var days = new Date(touchDateState_.year, touchDateState_.month + 1, 0).getDate();
+    var selected = touchDateParseIso_(input.value);
+    var now = new Date();
+    for (var i = 0; i < 42; i++) {
+      var day = i - firstDow + 1;
+      if (day < 1 || day > days) { var blank=document.createElement('span'); blank.className='touch-date-day blank'; grid.appendChild(blank); continue; }
+      (function (d) {
+        var iso = touchDateIso_(touchDateState_.year, touchDateState_.month, d);
+        var cls = 'touch-date-day';
+        if (selected && selected.year === touchDateState_.year && selected.month === touchDateState_.month && selected.day === d) cls += ' is-selected';
+        if (now.getFullYear() === touchDateState_.year && now.getMonth() === touchDateState_.month && now.getDate() === d) cls += ' is-today';
+        var btn = touchDateMakeButton_(String(d), cls, function () {
+          if (!touchDateWithinBounds_(iso, input)) return;
+          input.value = iso;
+          refreshTouchDate_(input);
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+          closeTouchDatePicker_();
+        });
+        btn.disabled = !touchDateWithinBounds_(iso, input);
+        grid.appendChild(btn);
+      })(day);
+    }
+    panel.appendChild(grid);
+  }
+
+  function openTouchDatePicker_(input) {
+    if (!input || !touchDateShouldEnhance_() || input.disabled) return;
+    closeTouchSelect_();
+    if (touchDateState_.input === input && touchDateState_.panel && !touchDateState_.panel.hidden) { closeTouchDatePicker_(); return; }
+    closeTouchDatePicker_();
+    var parsed = touchDateParseIso_(input.value);
+    var d = parsed ? new Date(parsed.year, parsed.month, parsed.day) : new Date();
+    touchDateState_.input = input;
+    touchDateState_.trigger = input._touchDateTrigger;
+    touchDateState_.panel = touchDateGetPanel_();
+    touchDateState_.year = d.getFullYear();
+    touchDateState_.month = d.getMonth();
+    touchDateState_.view = 'days';
+    if (touchDateState_.trigger) touchDateState_.trigger.setAttribute('aria-expanded', 'true');
+    touchDateState_.panel.hidden = false;
+    renderTouchDatePicker_();
+    touchDateState_.panel.style.visibility = 'hidden';
+    touchDatePosition_(touchDateState_.trigger, touchDateState_.panel);
+    touchDateState_.panel.style.visibility = '';
+  }
+
+  function closeTouchDatePicker_(restoreFocus) {
+    var panel = touchDateState_.panel || document.getElementById('touchDatePickerGlobal');
+    var trigger = touchDateState_.trigger;
+    if (trigger) trigger.setAttribute('aria-expanded', 'false');
+    if (panel) { panel.hidden = true; panel.innerHTML = ''; }
+    touchDateState_.input = null; touchDateState_.trigger = null; touchDateState_.panel = panel || null; touchDateState_.view = 'days';
+    if (restoreFocus && trigger && document.contains(trigger)) trigger.focus();
+  }
+
+
+  /* ---------------- Shared compact row Actions menu ---------------- */
+  var rowActionMenuState_ = { trigger: null, onAction: null };
+
+  function closeRowActionMenu_() {
+    var menu = document.getElementById('rowActionMenuGlobal');
+    if (rowActionMenuState_.trigger) rowActionMenuState_.trigger.setAttribute('aria-expanded', 'false');
+    if (menu) { menu.hidden = true; menu.innerHTML = ''; }
+    rowActionMenuState_.trigger = null;
+    rowActionMenuState_.onAction = null;
+  }
+
+  function openRowActionMenu_(trigger, items, onAction) {
+    var menu = document.getElementById('rowActionMenuGlobal');
+    if (!menu) {
+      menu = document.createElement('div');
+      menu.id = 'rowActionMenuGlobal';
+      menu.className = 'action-menu';
+      menu.setAttribute('role', 'menu');
+      menu.hidden = true;
+      document.body.appendChild(menu);
+      menu.addEventListener('click', function (e) {
+        var btn = e.target.closest('button[data-row-action]');
+        if (!btn || btn.disabled) return;
+        var action = btn.dataset.rowAction;
+        var handler = rowActionMenuState_.onAction;
+        closeRowActionMenu_();
+        if (handler) handler(action);
+      });
+    }
+    if (rowActionMenuState_.trigger === trigger && !menu.hidden) { closeRowActionMenu_(); return; }
+    closeRowActionMenu_();
+    rowActionMenuState_.trigger = trigger;
+    rowActionMenuState_.onAction = onAction;
+    trigger.setAttribute('aria-expanded', 'true');
+    menu.innerHTML = '';
+    (items || []).forEach(function (item) {
+      if (!item || item.hidden) return;
+      if (item.divider) {
+        var divider = document.createElement('div');
+        divider.className = 'action-menu-divider';
+        divider.setAttribute('role', 'separator');
+        menu.appendChild(divider);
+        return;
+      }
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'action-menu-item' + (item.danger ? ' danger' : '');
+      btn.setAttribute('role', 'menuitem');
+      btn.dataset.rowAction = item.action;
+      btn.textContent = item.label;
+      btn.disabled = !!item.disabled;
+      if (item.title) btn.title = item.title;
+      menu.appendChild(btn);
+    });
+    menu.hidden = false;
+    if (isPhoneViewport_()) {
+      menu.style.left = '12px';
+      menu.style.right = '12px';
+      menu.style.top = 'auto';
+      menu.style.bottom = 'calc(12px + env(safe-area-inset-bottom))';
+      var firstMobile = menu.querySelector('button:not([disabled])');
+      if (firstMobile) firstMobile.focus();
+      return;
+    }
+    menu.style.right = '';
+    menu.style.bottom = '';
+    var r = trigger.getBoundingClientRect();
+    var m = menu.getBoundingClientRect();
+    var left = Math.max(8, Math.min(window.innerWidth - m.width - 8, r.right - m.width));
+    var top = r.bottom + 6;
+    if (top + m.height > window.innerHeight - 8 && r.top - m.height - 6 >= 8) top = r.top - m.height - 6;
+    menu.style.left = Math.round(left) + 'px';
+    menu.style.top = Math.round(Math.max(8, top)) + 'px';
+    var first = menu.querySelector('button:not([disabled])');
+    if (first) first.focus();
+  }
+
+  document.addEventListener('click', function (e) {
+    var menu = document.getElementById('rowActionMenuGlobal');
+    if (!menu || menu.hidden) return;
+    if (menu.contains(e.target) || (rowActionMenuState_.trigger && rowActionMenuState_.trigger.contains(e.target))) return;
+    closeRowActionMenu_();
+  });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeRowActionMenu_(); });
+  window.addEventListener('resize', closeRowActionMenu_);
+  window.addEventListener('scroll', closeRowActionMenu_, true);
+
+</script>

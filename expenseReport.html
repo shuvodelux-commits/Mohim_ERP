@@ -1,0 +1,104 @@
+<!-- ================= Report ================= -->
+<div class="toolbar">
+  <label style="margin:0 4px 0 0;">From</label>
+  <input id="expReportDateFrom" type="date" style="max-width:150px;">
+  <label style="margin:0 4px 0 0;">To</label>
+  <input id="expReportDateTo" type="date" style="max-width:150px;">
+  <div class="toolbar-spacer"></div>
+  <button class="btn" id="expReportRefreshBtn">Refresh</button>
+</div>
+
+<div class="stat-grid">
+  <div class="stat-card"><div class="stat-label">Today's Expense</div><div class="stat-value" id="expRepToday">--</div></div>
+  <div class="stat-card"><div class="stat-label">This Month's Expense</div><div class="stat-value" id="expRepMonth">--</div></div>
+  <div class="stat-card"><div class="stat-label">Period Total</div><div class="stat-value" id="expRepPeriodTotal">--</div></div>
+  <div class="stat-card"><div class="stat-label">Period Entries</div><div class="stat-value" id="expRepPeriodCount">--</div></div>
+</div>
+
+<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px,1fr)); gap:16px;">
+  <div class="card" style="padding:0;">
+    <h3 style="font-size:14px; padding:16px 16px 0;">By Category <span class="bn-hint" style="display:inline;">— খরচের ধরন অনুযায়ী</span></h3>
+    <table><thead><tr><th>Category</th><th class="num">Amount</th></tr></thead><tbody id="expRepByCategoryBody"></tbody></table>
+    <div class="empty-state" id="expRepByCategoryEmpty" hidden>No data for this period.</div>
+  </div>
+  <div class="card" style="padding:0;">
+    <h3 style="font-size:14px; padding:16px 16px 0;">By Payee <span class="bn-hint" style="display:inline;">— কাকে কত খরচ</span></h3>
+    <table><thead><tr><th>Payee</th><th class="num">Amount</th></tr></thead><tbody id="expRepByPayeeBody"></tbody></table>
+    <div class="empty-state" id="expRepByPayeeEmpty" hidden>No data for this period.</div>
+  </div>
+  <div class="card" style="padding:0;">
+    <h3 style="font-size:14px; padding:16px 16px 0;">By Payment Method <span class="bn-hint" style="display:inline;">— কীভাবে টাকা দেওয়া হয়েছে</span></h3>
+    <table><thead><tr><th>Method</th><th class="num">Amount</th></tr></thead><tbody id="expRepByMethodBody"></tbody></table>
+    <div class="empty-state" id="expRepByMethodEmpty" hidden>No data for this period.</div>
+  </div>
+</div>
+
+<script>
+  var expRepState = { list: [] };
+
+  function expRepToday_() {
+    var d = new Date();
+    var m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + m + '-' + day;
+  }
+
+  function expRepLoad() {
+    return withLoader(serverCall('getExpenseList', authToken)).then(function (list) {
+      expRepState.list = list;
+      expRenderReports_();
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  function expRenderReports_() {
+    var active = expRepState.list.filter(function (e) { return e.status !== 'Cancelled'; });
+    var today = expRepToday_();
+    var thisMonth = today.slice(0, 7);
+
+    var todayTotal = active.filter(function (e) { return e.date === today; }).reduce(function (s, e) { return s + e.amount; }, 0);
+    var monthTotal = active.filter(function (e) { return String(e.date).slice(0, 7) === thisMonth; }).reduce(function (s, e) { return s + e.amount; }, 0);
+    document.getElementById('expRepToday').textContent = formatMoney(todayTotal);
+    document.getElementById('expRepMonth').textContent = formatMoney(monthTotal);
+
+    var from = document.getElementById('expReportDateFrom').value;
+    var to = document.getElementById('expReportDateTo').value;
+    var period = active.filter(function (e) {
+      return (!from || e.date >= from) && (!to || e.date <= to);
+    });
+
+    document.getElementById('expRepPeriodTotal').textContent = formatMoney(period.reduce(function (s, e) { return s + e.amount; }, 0));
+    document.getElementById('expRepPeriodCount').textContent = period.length;
+
+    expRenderBreakdown_(period, function (e) { return e.category || 'Uncategorized'; }, 'expRepByCategoryBody', 'expRepByCategoryEmpty');
+    expRenderBreakdown_(period, function (e) { return e.payeeName || 'Unassigned'; }, 'expRepByPayeeBody', 'expRepByPayeeEmpty');
+    expRenderBreakdown_(period, function (e) { return e.paymentMethod; }, 'expRepByMethodBody', 'expRepByMethodEmpty');
+  }
+
+  function expRenderBreakdown_(rows, keyFn, bodyId, emptyId) {
+    var totals = {};
+    rows.forEach(function (e) {
+      var k = keyFn(e);
+      totals[k] = (totals[k] || 0) + e.amount;
+    });
+    var keys = Object.keys(totals).sort(function (a, b) { return totals[b] - totals[a]; });
+    var body = document.getElementById(bodyId);
+    body.innerHTML = '';
+    keys.forEach(function (k) {
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + escapeHtml(k) + '</td><td class="num mono">' + formatMoney(totals[k]) + '</td>';
+      body.appendChild(tr);
+    });
+    document.getElementById(emptyId).hidden = keys.length > 0;
+  }
+
+  document.getElementById('expReportRefreshBtn').addEventListener('click', expRepLoad);
+  document.getElementById('expReportDateFrom').addEventListener('change', expRenderReports_);
+  document.getElementById('expReportDateTo').addEventListener('change', expRenderReports_);
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var origGoToPage = goToPage;
+    goToPage = function (key) {
+      origGoToPage(key);
+      if (key === 'expenseReports' && !expRepState._loaded) { expRepState._loaded = true; expRepLoad(); }
+    };
+  });
+</script>

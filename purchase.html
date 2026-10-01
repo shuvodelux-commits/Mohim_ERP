@@ -1,0 +1,1776 @@
+<div class="tabs">
+  <button class="tab-btn active" data-tab="purNew">New Purchase<span class="bn-hint">নতুন মাল কেনা</span></button>
+  <button class="tab-btn" data-tab="purHistory">Purchase Invoice<span class="bn-hint">কেনার তালিকা</span></button>
+  <button class="tab-btn" data-tab="purReturn">Purchase Return<span class="bn-hint">কেনা মাল ফেরত</span></button>
+</div>
+
+<!-- ================= New Purchase ================= -->
+<div class="tab-panel" id="purNew">
+  <div id="purUpdateBanner" class="session-banner is-closed" hidden style="margin-bottom: 12px">
+    <div>Updating purchase <span class="bn-hint" style="display:inline;">— কেনা পরিবর্তন হচ্ছে</span> <strong class="mono" id="purUpdateBannerId"></strong></div>
+    <div class="toolbar-spacer"></div>
+    <button class="btn" id="purCancelUpdateBtn" type="button">Cancel Update</button>
+  </div>
+  <div class="card">
+    <div class="form-grid" style="margin-bottom: 16px">
+      <div>
+        <label>Supplier * <span class="bn-hint" style="display:inline;">— সাপ্লায়ার</span></label>
+        <div style="display: flex; gap: 8px">
+          <select id="purSupplier" style="flex: 1">
+            <option value="">Select supplier...</option>
+          </select>
+          <button type="button" class="btn" id="purQuickSupplierBtn">
+            + New
+          </button>
+        </div>
+        <div
+          id="purQuickSupplierRow"
+          style="display: none; gap: 8px; margin-top: 8px"
+        >
+          <input
+            id="purQuickSupplierName"
+            type="text"
+            placeholder="New supplier name"
+            style="flex: 1"
+          />
+          <button
+            type="button"
+            class="btn btn-primary"
+            id="purQuickSupplierSave"
+          >
+            Save
+          </button>
+        </div>
+      </div>
+      <div>
+        <label>Purchase Date <span class="bn-hint" style="display:inline;">— কেনার তারিখ</span></label>
+        <input id="purDate" type="date" />
+      </div>
+      <div id="purBackdatedReasonRow" style="display: none">
+        <label>Reason for Backdating * <span class="bn-hint" style="display:inline;">— পুরনো তারিখের কারণ</span></label>
+        <input
+          id="purBackdatedReason"
+          type="text"
+          placeholder="Why is this dated in the past?"
+        />
+      </div>
+    </div>
+
+    <section class="purchase-cart-section" aria-label="Purchase products">
+      <div class="purchase-cart-head">
+        <h3>Products <span class="purchase-cart-count" id="purCartCount">0</span></h3>
+        <div class="purchase-cart-actions">
+          <button type="button" class="btn btn-primary" id="purAddProductBtn">+ Add Product</button>
+          <button type="button" class="btn-link purchase-clear-cart" id="purClearCartBtn">Clear Cart</button>
+        </div>
+      </div>
+      <div class="purchase-cart-columns" aria-hidden="true">
+        <span>#</span>
+        <span>Product</span>
+        <span class="num">Qty</span>
+        <span class="num">Purchase Price</span>
+        <span class="num">Sell Price</span>
+        <span class="num">Total</span>
+        <span></span>
+      </div>
+      <div class="purchase-cart-list" id="purCartList"></div>
+    </section>
+
+    <div style="max-width: 320px; margin-left: auto; margin-top: 16px">
+      <div class="totals-row">
+        <span>Subtotal <span class="bn-hint" style="display:inline;">— মোট টাকা</span></span><span class="v" id="purSubtotal">0</span>
+      </div>
+      <div class="totals-row">
+        <span>Discount <span class="bn-hint" style="display:inline;">— ডিস্কাউন্ট</span></span>
+        <input
+          id="purDiscount"
+          type="number"
+          min="0"
+          step="0.01"
+          value="0"
+          style="width: 110px; text-align: right"
+        />
+      </div>
+      <div class="totals-row grand">
+        <span>Grand Total <span class="bn-hint" style="display:inline;">— সর্বমোট টাকা</span></span><span class="v" id="purGrandTotal">0</span>
+      </div>
+      <div class="totals-row">
+        <span>Paid Now <span class="bn-hint" style="display:inline;">— এখন কত দিলেন</span></span>
+        <input
+          id="purPaidAmount"
+          type="number"
+          min="0"
+          step="0.01"
+          value="0"
+          style="width: 110px; text-align: right"
+        />
+      </div>
+      <div class="totals-row">
+        <span>Due to Supplier <span class="bn-hint" style="display:inline;">— সাপ্লায়ারকে বাকি</span></span><span class="v" id="purDueAmount">0</span>
+      </div>
+    </div>
+
+    <div class="form-grid" style="margin-top: 16px; border-top: 1px solid var(--color-border); padding-top: 16px">
+      <div class="full">
+        <label>Notes <span class="bn-hint" style="display:inline;">— নোট</span></label>
+        <input id="purNotes" type="text" placeholder="Optional" />
+      </div>
+      <div>
+        <label>Payment Method * <span class="bn-hint" style="display:inline;">— কীভাবে টাকা দিলেন</span></label>
+        <select id="purPaymentMethod">
+          <option value="Cash">Cash</option>
+          <option value="Bank">Bank</option>
+          <option value="Mobile Banking">Mobile Banking</option>
+        </select>
+      </div>
+      <div id="purBankAccountRow" style="display: none">
+        <label id="purBankAccountLabel">Bank Account *</label><span class="bn-hint" style="display:inline;">— ব্যাংক হিসাব</span>
+        <select id="purBankAccount">
+          <option value="">Select bank account...</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field-error" id="purFormError"></div>
+    <div style="text-align: right; margin-top: 14px">
+      <button class="btn btn-primary btn-lg" id="purSubmitBtn">
+        Complete Purchase
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= Purchase Invoice (Purchase History) ================= -->
+<div class="tab-panel" id="purHistory" hidden>
+  <div class="toolbar">
+    <input class="search-input" id="purHistSearch" type="text" placeholder="Search purchase #, supplier..." />
+    <div class="toolbar-spacer"></div>
+    <button class="btn" id="purHistRefreshBtn">Refresh</button>
+  </div>
+  <div class="card" style="padding: 0">
+    <div class="table-scroll">
+      <table class="mobile-card-table">
+        <thead>
+          <tr>
+            <th>Purchase ID</th>
+            <th>Date</th>
+            <th>Supplier</th>
+            <th class="num">Total</th>
+            <th class="num">Paid</th>
+            <th class="num">Due</th>
+            <th class="num">Returned</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="purHistoryBody"></tbody>
+      </table>
+    </div>
+    <div class="empty-state" id="purHistoryEmpty" hidden>
+      No purchases recorded yet.
+    </div>
+  </div>
+</div>
+
+<!-- ===== View Purchase popup ===== -->
+<div class="modal-overlay" id="purViewModal" hidden>
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3>Purchase <span class="bn-hint" style="display:inline;">— কেনার বিস্তারিত</span> <span id="purViewId" class="mono"></span></h3>
+      <button class="modal-close" onclick="closeModal('purViewModal')">&#10005;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid" style="margin-bottom: 14px">
+        <div><label>Supplier <span class="bn-hint" style="display:inline;">— সাপ্লায়ার</span></label><div id="purViewSupplier"></div></div>
+        <div><label>Date <span class="bn-hint" style="display:inline;">— তারিখ</span></label><div id="purViewDate"></div></div>
+        <div><label>Payment Method <span class="bn-hint" style="display:inline;">— কীভাবে টাকা দিলেন</span></label><div id="purViewPaymentMethod"></div></div>
+        <div class="full"><label>Notes <span class="bn-hint" style="display:inline;">— নোট</span></label><div id="purViewNotes"></div></div>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Product</th><th class="num">Qty</th><th class="num">Purchase Price</th><th class="num">Sell Price</th><th class="num">Line Total</th></tr>
+        </thead>
+        <tbody id="purViewItemsBody"></tbody>
+      </table>
+      <div style="max-width: 320px; margin-left: auto; margin-top: 14px">
+        <div class="totals-row"><span>Subtotal <span class="bn-hint" style="display:inline;">— মোট টাকা</span></span><span class="v" id="purViewSubtotal"></span></div>
+        <div class="totals-row"><span>Discount <span class="bn-hint" style="display:inline;">— ডিস্কাউন্ট</span></span><span class="v" id="purViewDiscount"></span></div>
+        <div class="totals-row grand"><span>Grand Total <span class="bn-hint" style="display:inline;">— সর্বমোট টাকা</span></span><span class="v" id="purViewGrandTotal"></span></div>
+        <div class="totals-row"><span>Paid <span class="bn-hint" style="display:inline;">— কত দিলেন</span></span><span class="v" id="purViewPaid"></span></div>
+        <div class="totals-row"><span>Due <span class="bn-hint" style="display:inline;">— বাকি</span></span><span class="v" id="purViewDue"></span></div>
+        <div class="totals-row"><span>Returned <span class="bn-hint" style="display:inline;">— ফেরত দেওয়া</span></span><span class="v" id="purViewReturned"></span></div>
+        <div class="totals-row grand"><span>Net Purchase <span class="bn-hint" style="display:inline;">— প্রকৃত কেনা</span></span><span class="v" id="purViewNetPurchase"></span></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('purViewModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= Purchase Return ================= -->
+<div class="tab-panel" id="purReturn" hidden>
+  <div class="card" id="prtSearchCard" style="margin-bottom: 16px">
+    <label>Find Purchase by Purchase ID or Supplier Name <span class="bn-hint" style="display:inline;">— কেনার নম্বর বা সাপ্লায়ারের নাম দিয়ে খুঁজুন</span></label>
+    <div style="display: flex; gap: 8px">
+      <input
+        id="prtSearchInput"
+        type="text"
+        placeholder="e.g. PUR-000012 or RFL Plastic"
+        style="flex: 1"
+      />
+      <button class="btn btn-primary" id="prtFindBtn">Find Purchase</button>
+      <button class="btn" id="prtClearBtn">Clear</button>
+    </div>
+    <div id="prtSearchResults" style="margin-top: 12px"></div>
+    <div class="empty-state" id="prtSearchEmpty" hidden>
+      Purchase not found.
+    </div>
+  </div>
+
+  <div id="prtPurchaseArea" hidden>
+    <div class="card" style="margin-bottom: 16px">
+      <div class="form-grid">
+        <div>
+          <label>Purchase <span class="bn-hint" style="display:inline;">— কেনার নম্বর</span></label>
+          <div class="mono" id="prtPurId"></div>
+        </div>
+        <div>
+          <label>Date <span class="bn-hint" style="display:inline;">— তারিখ</span></label>
+          <div id="prtPurDate"></div>
+        </div>
+        <div>
+          <label>Supplier <span class="bn-hint" style="display:inline;">— সাপ্লায়ার</span></label>
+          <div id="prtPurSupplier"></div>
+        </div>
+      </div>
+      <div
+        style="
+          display: flex;
+          gap: 24px;
+          flex-wrap: wrap;
+          margin-top: 14px;
+          border-top: 1px solid var(--color-border);
+          padding-top: 12px;
+        "
+      >
+        <div>
+          <div class="stat-label">Original Total <span class="bn-hint" style="display:inline;">— মূল মোট টাকা</span></div>
+          <div class="mono" id="prtPurGrandTotal"></div>
+        </div>
+        <div>
+          <div class="stat-label">Paid <span class="bn-hint" style="display:inline;">— কত দিলেন</span></div>
+          <div class="mono" id="prtPurPaid"></div>
+        </div>
+        <div>
+          <div class="stat-label">Due <span class="bn-hint" style="display:inline;">— বাকি</span></div>
+          <div class="mono" id="prtPurDue"></div>
+        </div>
+        <div>
+          <div class="stat-label">Previously Returned <span class="bn-hint" style="display:inline;">— আগে ফেরত দেওয়া</span></div>
+          <div class="mono" id="prtPurPrevReturned"></div>
+        </div>
+        <div>
+          <div class="stat-label">Net Purchase <span class="bn-hint" style="display:inline;">— প্রকৃত কেনা</span></div>
+          <div class="mono" id="prtPurNetPurchase"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size: 14px; margin-bottom: 10px">Return Cart <span class="bn-hint" style="display:inline;">— ফেরত দেওয়া মাল</span></h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th class="num">Bought</th>
+            <th class="num">Returned</th>
+            <th class="num">Available</th>
+            <th class="num">Return Qty</th>
+            <th class="num">Return Price</th>
+            <th class="num">Line Total</th>
+          </tr>
+        </thead>
+        <tbody id="prtCartBody"></tbody>
+      </table>
+
+      <div class="form-grid" style="margin-top: 18px">
+        <div>
+          <label>Refund Method * <span class="bn-hint" style="display:inline;">— কীভাবে টাকা ফেরত নেবেন</span></label>
+          <select id="prtRefundMethod">
+            <option value="Cash">Cash Refund</option>
+            <option value="Supplier Credit">
+              Adjust Supplier Due (Supplier Credit)
+            </option>
+          </select>
+        </div>
+        <div>
+          <label>Return Reason <span class="bn-hint" style="display:inline;">— ফেরতের কারণ</span></label
+          ><input id="prtReason" type="text" placeholder="Optional" />
+        </div>
+        <div class="full">
+          <label>Note <span class="bn-hint" style="display:inline;">— নোট</span></label
+          ><input id="prtNote" type="text" placeholder="Optional" />
+        </div>
+        <div>
+          <label>Return Date <span class="bn-hint" style="display:inline;">— ফেরতের তারিখ</span></label>
+          <input id="prtDate" type="date" />
+        </div>
+        <div id="prtBackdatedReasonRow" class="full" style="display: none">
+          <label>Reason for Backdating * <span class="bn-hint" style="display:inline;">— পুরনো তারিখের কারণ</span></label>
+          <input
+            id="prtBackdatedReason"
+            type="text"
+            placeholder="Why is this dated in the past?"
+          />
+        </div>
+      </div>
+
+      <div style="max-width: 320px; margin-left: auto; margin-top: 14px">
+        <div class="totals-row grand">
+          <span>Total Return Amount <span class="bn-hint" style="display:inline;">— মোট ফেরতের টাকা</span></span
+          ><span class="v" id="prtTotalReturn">0</span>
+        </div>
+      </div>
+
+      <div class="field-error" id="prtFormError"></div>
+      <div style="text-align: right; margin-top: 14px">
+        <button class="btn" id="prtCancelBtn">Cancel</button>
+        <button class="btn btn-primary btn-lg" id="prtCompleteBtn">
+          Complete Return
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top: 20px; padding: 0">
+    <div
+      style="
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 16px 16px 0;
+      "
+    >
+      <h3 style="font-size: 14px; margin: 0">Purchase Return History <span class="bn-hint" style="display:inline;">— আগের ফেরতের তালিকা</span></h3>
+      <div class="toolbar-spacer"></div>
+      <input
+        class="search-input"
+        id="prtHistSearch"
+        type="text"
+        placeholder="Search return #, purchase #, supplier..."
+        style="max-width: 280px"
+      />
+      <button class="btn" id="prtHistRefreshBtn" style="margin: 0 16px">
+        Refresh
+      </button>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Return #</th>
+            <th>Date</th>
+            <th>Purchase</th>
+            <th>Supplier</th>
+            <th class="num">Amount</th>
+            <th>Processed By</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="prtHistBody"></tbody>
+      </table>
+    </div>
+    <div class="empty-state" id="prtHistEmpty" hidden>
+      No purchase returns yet.
+    </div>
+  </div>
+</div>
+
+<!-- Purchase Return detail popup -->
+<div class="modal-overlay" id="prtDetailModal" hidden>
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Return <span class="bn-hint" style="display:inline;">— ফেরতের বিস্তারিত</span> <span id="prtDetailId" class="mono"></span></h3>
+      <button class="modal-close" onclick="closeModal('prtDetailModal')">
+        &#10005;
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid" style="margin-bottom: 12px">
+        <div>
+          <label>Purchase <span class="bn-hint" style="display:inline;">— কেনার নম্বর</span></label>
+          <div class="mono" id="prtDetailPurchase"></div>
+        </div>
+        <div>
+          <label>Date <span class="bn-hint" style="display:inline;">— তারিখ</span></label>
+          <div id="prtDetailDate"></div>
+        </div>
+        <div>
+          <label>Supplier <span class="bn-hint" style="display:inline;">— সাপ্লায়ার</span></label>
+          <div id="prtDetailSupplier"></div>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th class="num">Qty</th>
+            <th class="num">Price</th>
+            <th class="num">Total</th>
+          </tr>
+        </thead>
+        <tbody id="prtDetailItemsBody"></tbody>
+      </table>
+      <div style="max-width: 280px; margin-left: auto; margin-top: 10px">
+        <div class="totals-row grand">
+          <span>Total Return <span class="bn-hint" style="display:inline;">— মোট ফেরত</span></span><span class="v" id="prtDetailTotal"></span>
+        </div>
+      </div>
+      <p style="font-size: 13px; margin-top: 12px">
+        <strong>Reason: <span class="bn-hint" style="display:inline;">— কারণ</span></strong> <span id="prtDetailReason"></span>
+      </p>
+      <p style="font-size: 13px">
+        <strong>Note: <span class="bn-hint" style="display:inline;">— নোট</span></strong> <span id="prtDetailNote"></span>
+      </p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('prtDetailModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  var purState = {
+    products: [], suppliers: [], categories: [], bankAccounts: [], cart: [], currencySymbol: "",
+    history: [], updatePurchaseId: null, updateReason: null,
+    cartEntryIndex: null, cartEditIndex: null
+  };
+
+  document.querySelectorAll("#page-purchase .tab-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      document
+        .querySelectorAll("#page-purchase .tab-btn")
+        .forEach(function (b) {
+          b.classList.toggle("active", b === btn);
+        });
+      document
+        .querySelectorAll("#page-purchase .tab-panel")
+        .forEach(function (p) {
+          p.hidden = p.id !== btn.dataset.tab;
+        });
+    });
+  });
+
+  function purLoad() {
+    return withLoader(serverCall("getPurchaseBootstrap", authToken))
+      .then(function (data) {
+        purState.products = data.products;
+        smartIndexProducts_(purState.products);
+        purState.suppliers = data.suppliers;
+        purState.categories = data.categories || [];
+        purState.bankAccounts = data.bankAccounts || [];
+        purState.currencySymbol = data.currencySymbol;
+        purFillSupplierSelect_();
+        purRenderLines_();
+        purRefreshCartEntryAvailability_();
+        purSyncAddProductPermission_();
+        fillBankAccountSelect_(document.getElementById("purBankAccount"), purState.bankAccounts, document.getElementById("purPaymentMethod").value);
+        if (!document.getElementById("purDate").value)
+          document.getElementById("purDate").value = purToday_();
+        return purMgmtLoad();
+      })
+      .catch(function (err) {
+        showToast(err.message, "error");
+      });
+  }
+
+  // ---------------- Purchase Invoice (full, live list — View/Edit/Delete) ----------------
+  function purMgmtLoad() {
+    return withLoader(serverCall("getPurchaseManagementList", authToken))
+      .then(function (list) {
+        purState.history = list;
+        purRenderHistoryList_();
+      })
+      .catch(function (err) {
+        showToast(err.message, "error");
+      });
+  }
+
+  function purRenderHistoryList_() {
+    var q = (document.getElementById("purHistSearch").value || "").toLowerCase();
+    var rows = purState.history.filter(function (p) {
+      return !q ||
+        p.purchaseId.toLowerCase().indexOf(q) !== -1 ||
+        String(p.supplierName).toLowerCase().indexOf(q) !== -1;
+    });
+    var body = document.getElementById("purHistoryBody");
+    body.innerHTML = "";
+    rows.forEach(function (p) {
+      var statusBadge =
+        p.paymentStatus === "Paid" ? "badge-success" : p.paymentStatus === "Partial" ? "badge-warning" : "badge-danger";
+      var retBadge = p.returnStatus === "No Return" ? "" : (p.returnStatus === "Fully Returned" ? "badge-danger" : "badge-warning");
+      var tr = document.createElement("tr");
+      tr.innerHTML =
+        '<td class="mono">' + p.purchaseId + "</td>" +
+        "<td>" + escapeHtml(formatDateShort_(p.date)) + "</td>" +
+        "<td>" + escapeHtml(p.supplierName) + "</td>" +
+        '<td class="num mono">' + formatMoney(p.grandTotal) + "</td>" +
+        '<td class="num mono">' + formatMoney(p.paidAmount) + "</td>" +
+        '<td class="num mono">' + formatMoney(p.dueAmount) + "</td>" +
+        '<td class="num mono">' + formatMoney(p.returnedAmount) + "</td>" +
+        '<td><span class="badge ' + statusBadge + '">' + p.paymentStatus + "</span>" +
+        (retBadge ? ' <span class="badge ' + retBadge + '">' + p.returnStatus + "</span>" : "") +
+        "</td>" +
+        '<td style="white-space:nowrap;"><button class="btn" data-act="menu" data-id="' + p.purchaseId + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button></td>';
+      body.appendChild(tr);
+    });
+    document.getElementById("purHistoryEmpty").hidden = rows.length > 0;
+  }
+
+  document.getElementById("purHistSearch").addEventListener("input", purRenderHistoryList_);
+  document.getElementById("purHistRefreshBtn").addEventListener("click", purMgmtLoad);
+
+  document.getElementById("purHistoryBody").addEventListener("click", function (e) {
+    var btn = e.target.closest("button[data-act]");
+    if (!btn || btn.dataset.act !== 'menu') return;
+    var id = btn.dataset.id;
+    var row = purState.history.filter(function (x) { return x.purchaseId === id; })[0];
+    if (!row) return;
+    openRowActionMenu_(btn, [
+      { action: 'view', label: 'View' },
+      { action: 'edit', label: 'Edit', disabled: !row.editable, title: row.editable ? '' : 'This purchase is no longer available for editing' },
+      { divider: true },
+      { action: 'delete', label: 'Delete', danger: true }
+    ], function (action) {
+      if (action === 'view') purOpenView_(id);
+      if (action === 'edit') purEdit_(id);
+      if (action === 'delete') purDelete_(id);
+    });
+  });
+
+  function purOpenView_(purchaseId) {
+    withLoader(serverCall("getPurchaseDetail", authToken, purchaseId))
+      .then(function (p) {
+        document.getElementById("purViewId").textContent = p.purchaseId;
+        document.getElementById("purViewSupplier").textContent = p.supplierName || "—";
+        document.getElementById("purViewDate").textContent = p.date;
+        document.getElementById("purViewPaymentMethod").textContent = p.paymentMethod + (p.bankAccountName ? " — " + p.bankAccountName : "");
+        document.getElementById("purViewNotes").textContent = p.notes || "—";
+
+        var body = document.getElementById("purViewItemsBody");
+        body.innerHTML = "";
+        p.items.forEach(function (i) {
+          var tr = document.createElement("tr");
+          tr.innerHTML =
+            "<td>" + escapeHtml(i.name) + "</td>" +
+            '<td class="num">' + i.qty + "</td>" +
+            '<td class="num mono">' + formatMoney(i.unitPrice) + "</td>" +
+            '<td class="num mono">' + formatMoney(i.sellingPrice) + "</td>" +
+            '<td class="num mono">' + formatMoney(i.lineTotal) + "</td>";
+          body.appendChild(tr);
+        });
+
+        document.getElementById("purViewSubtotal").textContent = formatMoney(p.subtotal);
+        document.getElementById("purViewDiscount").textContent = formatMoney(p.discount);
+        document.getElementById("purViewGrandTotal").textContent = formatMoney(p.grandTotal);
+        document.getElementById("purViewPaid").textContent = formatMoney(p.paidAmount);
+        document.getElementById("purViewDue").textContent = formatMoney(p.dueAmount);
+        document.getElementById("purViewReturned").textContent = formatMoney(p.returnedAmount);
+        document.getElementById("purViewNetPurchase").textContent = formatMoney(p.netPurchase);
+
+        openModal("purViewModal");
+      })
+      .catch(function (err) {
+        showToast(err.message, "error");
+      });
+  }
+
+  /** Deletes a purchase - reverses its stock, cash/bank and supplier due. */
+  function purDelete_(purchaseId) {
+    var p = purState.history.filter(function (x) { return x.purchaseId === purchaseId; })[0];
+    confirmDelete({
+      title: "Delete purchase " + purchaseId,
+      summary: "<p><b>" + escapeHtml(purchaseId) + "</b>" + (p ? " &mdash; " + escapeHtml(p.supplierName) + "<br>" + formatMoney(p.grandTotal) : "") + "</p>",
+      fn: "deletePurchase", args: [purchaseId], reloadPages: ["purchase", "dashboard"]
+    });
+  }
+
+  function purPopulateUpdateForm_(p, mode, reason) {
+    document.querySelector('#page-purchase .tab-btn[data-tab="purNew"]').click();
+    document.getElementById('purSupplier').value = p.supplierId;
+    purFillProductPicker_();
+    document.getElementById('purDate').value = p.date;
+    document.getElementById('purDate').disabled = true;
+    document.getElementById('purBackdatedReasonRow').style.display = 'none';
+    document.getElementById('purNotes').value = p.notes || '';
+    document.getElementById('purDiscount').value = p.discount || 0;
+    document.getElementById('purPaidAmount').value = p.paidAmount || 0;
+    document.getElementById('purPaymentMethod').value = p.paymentMethod || 'Cash';
+    document.getElementById('purBankAccountRow').style.display = paymentMethodNeedsAccount_(p.paymentMethod) ? '' : 'none';
+    document.getElementById('purBankAccountLabel').textContent = (p.paymentMethod === 'Mobile Banking' ? 'Mobile Banking Account *' : 'Bank Account *');
+    fillBankAccountSelect_(document.getElementById('purBankAccount'), purState.bankAccounts, p.paymentMethod);
+    document.getElementById('purBankAccount').value = p.bankAccountId || '';
+    purState.cart = (p.items || []).map(function (i) {
+      return { productId: i.productId, name: i.name, qty: i.qty, unitPrice: i.unitPrice, sellingPrice: i.sellingPrice };
+    });
+    purState.cartEntryIndex = null;
+    purState.cartEditIndex = null;
+    purRenderLines_();
+    purState.updatePurchaseId = p.purchaseId;
+    purState.updateReason = reason || '';
+    purEnterUpdateMode_();
+  }
+
+  function purEdit_(purchaseId) {
+    var reason = promptForUpdateReason_();
+    if (!reason) return;
+    withLoader(serverCall('getPurchaseForUpdate', authToken, purchaseId)).then(function (p) {
+      purPopulateUpdateForm_(p, 'legacy', reason);
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  function purEnterUpdateMode_() {
+    document.getElementById("purUpdateBanner").hidden = false;
+    document.getElementById("purUpdateBannerId").textContent = purState.updatePurchaseId;
+    document.getElementById("purSubmitBtn").textContent = "Save Update";
+  }
+
+  function purExitUpdateMode_() {
+    purState.updatePurchaseId = null;
+    purState.updateReason = null;
+    document.getElementById("purUpdateBanner").hidden = true;
+    document.getElementById("purSubmitBtn").textContent = "Complete Purchase";
+    document.getElementById("purDate").disabled = false;
+  }
+
+  document.getElementById("purCancelUpdateBtn").addEventListener("click", function () {
+    purExitUpdateMode_();
+    purState.cart = [];
+    purState.cartEntryIndex = null;
+    purState.cartEditIndex = null;
+    document.getElementById("purSupplier").value = "";
+    purFillProductPicker_();
+    document.getElementById("purNotes").value = "";
+    document.getElementById("purDiscount").value = 0;
+    document.getElementById("purPaidAmount").value = 0;
+    document.getElementById("purPaymentMethod").value = "Cash";
+    document.getElementById("purBankAccountRow").style.display = "none";
+    document.getElementById("purDate").value = purToday_();
+    purRenderLines_();
+  });
+
+  function purSyncAddProductPermission_() {
+    var button = document.getElementById('purAddProductBtn');
+    if (!button) return;
+    button.hidden = typeof hasActionPermission_ === 'function'
+      ? !hasActionPermission_('products', 'add')
+      : false;
+  }
+
+  function purRefreshProductCatalog_() {
+    return serverCall('getPurchaseBootstrap', authToken).then(function (data) {
+      purState.products = data.products || [];
+      smartIndexProducts_(purState.products);
+      purState.categories = data.categories || purState.categories || [];
+      purRenderLines_();
+      return purState.products;
+    }).catch(function (err) {
+      showToast(err.message || 'Could not refresh Purchase products.', 'error');
+      return [];
+    });
+  }
+
+  function purOpenAddProduct_() {
+    if (typeof hasActionPermission_ === 'function' && !hasActionPermission_('products', 'add')) {
+      showToast('You do not have permission to add products.', 'error');
+      return Promise.resolve(false);
+    }
+
+    var modal = document.getElementById('prodModal');
+    if (!modal || typeof prodLoad !== 'function' || typeof prodOpenAddModal_ !== 'function') {
+      showToast('Product form is not available.', 'error');
+      return Promise.resolve(false);
+    }
+
+    if (modal.parentNode !== document.body) document.body.appendChild(modal);
+
+    return Promise.resolve(prodLoad()).then(function () {
+      prodOpenAddModal_('purchase');
+      return true;
+    }).catch(function (err) {
+      showToast(err.message || 'Could not open Add Product.', 'error');
+      return false;
+    });
+  }
+
+  function purFillSupplierSelect_() {
+    var sel = document.getElementById("purSupplier");
+    var current = sel.value;
+    sel.innerHTML = '<option value="">Select supplier...</option>';
+    purState.suppliers.forEach(function (s) {
+      sel.innerHTML +=
+        '<option value="' + s.id + '">' + escapeHtml(s.name) + "</option>";
+    });
+    if (current) sel.value = current;
+  }
+
+  function purProductById_(productId) {
+    return purState.products.filter(function (product) { return product.id === productId; })[0] || null;
+  }
+
+  function purCreateCartLine_(product) {
+    return {
+      productId: product.id,
+      name: product.name,
+      qty: 1,
+      unitPrice: Number(product.purchasePrice) || 0,
+      sellingPrice: Number(product.sellingPrice) || 0
+    };
+  }
+
+  function purCartProductMatches_(query, replaceIndex) {
+    var q = String(query || '').trim();
+    if (!q) return [];
+    var hasReplaceIndex = replaceIndex !== null && replaceIndex !== undefined && replaceIndex !== '' && isFinite(Number(replaceIndex));
+    var currentIndex = hasReplaceIndex ? Number(replaceIndex) : -1;
+    return smartSearchProducts_(purState.products, q, 10).filter(function (product) {
+      return !purState.cart.some(function (line, i) {
+        return line.productId === product.id && (!hasReplaceIndex || i !== currentIndex);
+      });
+    });
+  }
+
+  function purCartProductResultsHtml_(query, mode, index) {
+    return purCartProductMatches_(query, index).map(function (product) {
+      var category = product.category || 'Uncategorized';
+      var stock = Number(product.stock) || 0;
+      var unit = product.unit || '';
+      var purchasePrice = Number(product.purchasePrice) || 0;
+      var sellingPrice = Number(product.sellingPrice) || 0;
+      return '<button type="button" class="pos-cart-product-option purchase-cart-product-option" role="option" data-pur-product-pick="' + escapeHtml(product.id) + '" data-pur-product-mode="' + mode + '"' +
+        (index === null || index === undefined ? '' : ' data-i="' + index + '"') + '>' +
+          '<span class="purchase-product-result-name">' + escapeHtml(product.name) + '</span>' +
+          '<small>' + escapeHtml(category) + ' · Buy ' + formatMoney(purchasePrice) + ' · Sell ' + formatMoney(sellingPrice) + ' · Stock ' + escapeHtml(String(stock) + (unit ? ' ' + unit : '')) + '</small>' +
+        '</button>';
+    }).join('');
+  }
+
+  function purCartProductPopup_() {
+    var popup = document.getElementById('purCartProductPopup');
+    if (popup) return popup;
+    popup = document.createElement('div');
+    popup.id = 'purCartProductPopup';
+    popup.className = 'pos-cart-product-popup purchase-cart-product-popup';
+    popup.setAttribute('role', 'listbox');
+    popup.hidden = true;
+    document.body.appendChild(popup);
+    popup.addEventListener('mousedown', function (e) {
+      if (e.target.closest('[data-pur-product-pick]')) e.preventDefault();
+    });
+    popup.addEventListener('click', function (e) {
+      var option = e.target.closest('[data-pur-product-pick]');
+      if (!option) return;
+      var product = purProductById_(option.dataset.purProductPick);
+      if (product && purChooseCartProduct_(product, option.dataset.i, option.dataset.purProductMode || 'add')) {
+        purCloseCartProductPopup_();
+      }
+    });
+    return popup;
+  }
+
+  function purCloseCartProductPopup_() {
+    var popup = document.getElementById('purCartProductPopup');
+    if (!popup) return;
+    popup.hidden = true;
+    popup.innerHTML = '';
+  }
+
+  function purPlaceCartProductResults_(input, popup) {
+    if (!input || !popup || popup.hidden) return;
+    var rect = input.getBoundingClientRect();
+    var viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+    var viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+    var margin = 8;
+    var gap = 4;
+    var width = Math.min(Math.max(rect.width, 360), Math.max(180, viewportWidth - (margin * 2)));
+    var left = Math.max(margin, Math.min(rect.left, viewportWidth - width - margin));
+    popup.style.width = Math.round(width) + 'px';
+    popup.style.left = Math.round(left) + 'px';
+    popup.style.right = 'auto';
+    popup.style.bottom = 'auto';
+
+    var resultHeight = Math.min(popup.scrollHeight || 240, 240);
+    var roomBelow = viewportHeight - rect.bottom - margin;
+    var roomAbove = rect.top - margin;
+    var openAbove = roomBelow < Math.min(resultHeight, 120) && roomAbove > roomBelow;
+    var top = openAbove
+      ? Math.max(margin, rect.top - resultHeight - gap)
+      : Math.min(viewportHeight - resultHeight - margin, rect.bottom + gap);
+    popup.style.top = Math.max(margin, Math.round(top)) + 'px';
+  }
+
+  function purRenderCartProductResults_(input, mode, index) {
+    if (!input || input.disabled) return;
+    var popup = purCartProductPopup_();
+    var html = purCartProductResultsHtml_(input.value, mode, index);
+    popup.innerHTML = html;
+    popup.hidden = !html;
+    popup.dataset.activeIndex = html ? '0' : '-1';
+    if (!html) return;
+    Array.prototype.forEach.call(popup.querySelectorAll('[data-pur-product-pick]'), function (option, optionIndex) {
+      var active = optionIndex === 0;
+      option.classList.toggle('is-active', active);
+      option.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+    purPlaceCartProductResults_(input, popup);
+  }
+
+  function purMoveCartProductActive_(delta) {
+    var popup = document.getElementById('purCartProductPopup');
+    if (!popup || popup.hidden) return null;
+    var options = popup.querySelectorAll('[data-pur-product-pick]');
+    if (!options.length) return null;
+    var activeIndex = Number(popup.dataset.activeIndex);
+    if (!isFinite(activeIndex) || activeIndex < 0) activeIndex = 0;
+    activeIndex = Math.max(0, Math.min(options.length - 1, activeIndex + Number(delta || 0)));
+    popup.dataset.activeIndex = String(activeIndex);
+    Array.prototype.forEach.call(options, function (option, optionIndex) {
+      var active = optionIndex === activeIndex;
+      option.classList.toggle('is-active', active);
+      option.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+    var selected = options[activeIndex];
+    if (selected && selected.scrollIntoView) selected.scrollIntoView({ block: 'nearest' });
+    return selected || null;
+  }
+
+  function purActiveCartProductOption_() {
+    var popup = document.getElementById('purCartProductPopup');
+    if (!popup || popup.hidden) return null;
+    var options = popup.querySelectorAll('[data-pur-product-pick]');
+    if (!options.length) return null;
+    var activeIndex = Number(popup.dataset.activeIndex);
+    if (!isFinite(activeIndex) || activeIndex < 0 || activeIndex >= options.length) activeIndex = 0;
+    return options[activeIndex] || options[0] || null;
+  }
+
+  function purReplaceCartProduct_(index, product) {
+    index = Number(index);
+    if (!product || isNaN(index) || index < 0 || index >= purState.cart.length) return false;
+    var current = purState.cart[index];
+    if (current && current.productId === product.id) {
+      purState.cartEditIndex = null;
+      purRenderLines_();
+      return true;
+    }
+    var already = purState.cart.some(function (line, i) {
+      return i !== index && line.productId === product.id;
+    });
+    if (already) {
+      showToast(product.name + ' is already in the list.', 'error');
+      return false;
+    }
+    purState.cart[index] = purCreateCartLine_(product);
+    purState.cartEditIndex = null;
+    purRenderLines_();
+    return true;
+  }
+
+  function purStartCartEntry_(product) {
+    if (!product) return false;
+    if (!document.getElementById('purSupplier').value) {
+      showToast('Choose a supplier first.', 'error');
+      return false;
+    }
+    if (purState.cart.some(function (line) { return line.productId === product.id; })) {
+      showToast(product.name + ' is already in the list.', 'error');
+      return false;
+    }
+    purState.cart.push(purCreateCartLine_(product));
+    purState.cartEntryIndex = purState.cart.length - 1;
+    purState.cartEditIndex = null;
+    purRenderLines_();
+    purFocusCartEntryQty_();
+    return true;
+  }
+
+  function purChangeCartEntryProduct_(product) {
+    var index = Number(purState.cartEntryIndex);
+    if (!product || isNaN(index) || index < 0 || index >= purState.cart.length) return false;
+    var already = purState.cart.some(function (line, i) {
+      return i !== index && line.productId === product.id;
+    });
+    if (already) {
+      showToast(product.name + ' is already in the list.', 'error');
+      return false;
+    }
+    purState.cart[index] = purCreateCartLine_(product);
+    purRenderLines_();
+    purFocusCartEntryQty_();
+    return true;
+  }
+
+  function purChooseCartProduct_(product, replaceIndex, mode) {
+    if (!product) return false;
+    if (mode === 'entry') return purChangeCartEntryProduct_(product);
+    if (mode === 'replace' || (replaceIndex !== null && replaceIndex !== undefined && replaceIndex !== '')) {
+      return purReplaceCartProduct_(Number(replaceIndex), product);
+    }
+    return purStartCartEntry_(product);
+  }
+
+  function purCartProductKeydown_(event) {
+    var input = event.target;
+    var mode = input.dataset.purProductMode || 'add';
+    var index = (mode === 'replace' || mode === 'entry') ? Number(input.dataset.i) : null;
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      purMoveCartProductActive_(1);
+      return;
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      purMoveCartProductActive_(-1);
+      return;
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      purCloseCartProductPopup_();
+      if (mode === 'replace') {
+        purState.cartEditIndex = null;
+        purRenderLines_();
+      }
+      return;
+    }
+    if (event.key !== 'Enter') return;
+
+    event.preventDefault();
+    purRenderCartProductResults_(input, mode, index);
+    var option = purActiveCartProductOption_();
+    var product = option ? purProductById_(option.dataset.purProductPick) : null;
+    if (product && purChooseCartProduct_(product, option.dataset.i, option.dataset.purProductMode || mode)) {
+      purCloseCartProductPopup_();
+    }
+  }
+
+  function purFocusCartEntryProduct_() {
+    var input = document.querySelector('#purCartList .purchase-cart-entry-row [data-pur-product-input][data-pur-product-mode="add"]');
+    if (input) input.focus();
+  }
+
+  function purFocusCartEntryQty_() {
+    var input = document.querySelector('#purCartList [data-pur-entry-qty]');
+    if (input) { input.focus(); input.select(); }
+  }
+
+  function purFinishCartEntry_(focusNext) {
+    if (purState.cartEntryIndex === null) return false;
+    purState.cartEntryIndex = null;
+    purRenderLines_();
+    if (focusNext !== false) purFocusCartEntryProduct_();
+    return true;
+  }
+
+  function purCartEntryOutsideClick_(event) {
+    if (purState.cartEntryIndex === null && purState.cartEditIndex === null) return;
+    var list = document.getElementById('purCartList');
+    if (!list) return;
+    var popup = document.getElementById('purCartProductPopup');
+    if (popup && popup.contains(event.target)) return;
+
+    if (purState.cartEntryIndex !== null) {
+      var activeRow = list.querySelector('.purchase-cart-entry-row.is-active');
+      if (activeRow && activeRow.contains(event.target)) return;
+      var nextAddInput = event.target && event.target.closest
+        ? event.target.closest('[data-pur-product-input][data-pur-product-mode="add"]')
+        : null;
+      purFinishCartEntry_(!!nextAddInput);
+      purCloseCartProductPopup_();
+      return;
+    }
+
+    if (purState.cartEditIndex !== null) {
+      var editInput = list.querySelector('[data-pur-product-input][data-pur-product-mode="replace"]');
+      if (editInput && editInput.closest('.purchase-cart-row').contains(event.target)) return;
+      purState.cartEditIndex = null;
+      purRenderLines_();
+      purCloseCartProductPopup_();
+    }
+  }
+
+  function purRefreshCartEntryAvailability_() {
+    var supplierId = document.getElementById('purSupplier').value;
+    var input = document.querySelector('#purCartList [data-pur-product-input][data-pur-product-mode="add"]');
+    if (!input) return;
+    input.disabled = !supplierId;
+    input.placeholder = supplierId ? 'Add product…' : 'Choose supplier first…';
+    if (!supplierId) purCloseCartProductPopup_();
+  }
+
+  // Keep the old helper name for internal update/cancel paths while the UI
+  // now uses the inline cart picker instead of a separate top picker.
+  function purFillProductPicker_() {
+    purRefreshCartEntryAvailability_();
+  }
+
+  document.getElementById('purSupplier').addEventListener('change', purRefreshCartEntryAvailability_);
+
+  document
+    .getElementById("purQuickSupplierBtn")
+    .addEventListener("click", function () {
+      var row = document.getElementById("purQuickSupplierRow");
+      row.style.display = row.style.display === "flex" ? "none" : "flex";
+    });
+  document
+    .getElementById("purQuickSupplierSave")
+    .addEventListener("click", function () {
+      var name = document.getElementById("purQuickSupplierName").value.trim();
+      if (!name) return;
+      withLoader(serverCall("addSupplier", authToken, { name: name }))
+        .then(function (res) {
+          purState.suppliers.push({ id: res.id, name: name });
+          purFillSupplierSelect_();
+          document.getElementById("purSupplier").value = res.id;
+          purFillProductPicker_();
+          document.getElementById("purQuickSupplierName").value = "";
+          document.getElementById("purQuickSupplierRow").style.display = "none";
+          showToast("Supplier added", "success");
+        })
+        .catch(function (err) {
+          showToast(err.message, "error");
+        });
+    });
+
+  /** Add one product to the purchase. Supplier is selected once for the whole purchase. */
+  function purAddProductLine_(productId) {
+    return purStartCartEntry_(purProductById_(productId));
+  }
+
+  function purProductMetaHtml_(line) {
+    var product = purProductById_(line.productId);
+    if (!product) return '';
+    var pieces = [];
+    if (product.category) pieces.push(product.category);
+    if (product.brand) pieces.push(product.brand);
+    var stockText = 'Stock ' + String(Number(product.stock) || 0) + (product.unit ? ' ' + product.unit : '');
+    pieces.push(stockText);
+    return pieces.map(function (piece) {
+      return '<span>' + escapeHtml(piece) + '</span>';
+    }).join('<span class="sep" aria-hidden="true">|</span>');
+  }
+
+  function purRenderLines_() {
+    var list = document.getElementById('purCartList');
+    if (!list) return;
+    list.innerHTML = '';
+
+    if (purState.cartEditIndex !== null && (purState.cartEditIndex < 0 || purState.cartEditIndex >= purState.cart.length)) purState.cartEditIndex = null;
+    if (purState.cartEntryIndex !== null && (purState.cartEntryIndex < 0 || purState.cartEntryIndex >= purState.cart.length)) purState.cartEntryIndex = null;
+
+    purState.cart.forEach(function (line, i) {
+      var lineTotal = (Number(line.qty) || 0) * (Number(line.unitPrice) || 0);
+      var editingProduct = purState.cartEditIndex === i;
+      var activeEntry = purState.cartEntryIndex === i;
+      var productMode = activeEntry ? 'entry' : 'replace';
+      var productCell = (editingProduct || activeEntry)
+        ? '<div class="purchase-product-cell is-editing"><div class="purchase-cart-inline-picker"><input type="search" autocomplete="off" data-pur-product-input data-pur-product-mode="' + productMode + '" data-i="' + i + '" value="' + escapeHtml(line.name) + '" aria-label="' + (activeEntry ? 'Product' : 'Replace ' + escapeHtml(line.name)) + '"></div></div>'
+        : '<div class="purchase-product-cell"><button type="button" class="purchase-product-title" data-pur-product-edit data-i="' + i + '" title="Change product">' + escapeHtml(line.name) + '</button><div class="purchase-product-meta">' + purProductMetaHtml_(line) + '</div></div>';
+
+      var row = document.createElement('div');
+      row.className = 'purchase-cart-row' + (activeEntry ? ' purchase-cart-entry-row is-active' : '');
+      row.innerHTML =
+        '<div class="purchase-line-no">' + (i + 1) + '</div>' +
+        productCell +
+        '<div class="purchase-qty-wrap"><span class="purchase-mobile-label">Qty</span><input type="number" min="1" step="1" value="' + line.qty + '" data-i="' + i + '" data-f="qty"' + (activeEntry ? ' data-pur-entry-qty' : '') + ' aria-label="Quantity"></div>' +
+        '<div class="purchase-price-wrap"><span class="purchase-mobile-label">Purchase Price</span><input type="number" min="0" step="0.01" value="' + line.unitPrice + '" data-i="' + i + '" data-f="unitPrice" aria-label="Purchase price"></div>' +
+        '<div class="purchase-sell-wrap"><span class="purchase-mobile-label">Sell Price</span><input type="number" min="0" step="0.01" value="' + line.sellingPrice + '" data-i="' + i + '" data-f="sellingPrice" aria-label="Sell price"></div>' +
+        '<div class="purchase-line-total-wrap"><span class="purchase-mobile-label">Total</span><div class="purchase-line-total">' + formatMoney(lineTotal) + '</div></div>' +
+        '<button type="button" class="cart-remove" data-i="' + i + '" title="Remove" aria-label="Remove item">&#10005;</button>';
+      list.appendChild(row);
+    });
+
+    var supplierId = document.getElementById('purSupplier').value;
+    var entryRow = document.createElement('div');
+    entryRow.className = 'purchase-cart-row purchase-cart-entry-row';
+    entryRow.innerHTML =
+      '<div class="purchase-line-no is-empty">#</div>' +
+      '<div class="purchase-product-cell is-editing"><div class="purchase-cart-inline-picker"><input type="search" autocomplete="off" data-pur-product-input data-pur-product-mode="add" placeholder="' + (supplierId ? 'Add product…' : 'Choose supplier first…') + '" aria-label="Add product to purchase"' + (supplierId ? '' : ' disabled') + '></div></div>' +
+      '<div class="purchase-qty-wrap"><span class="purchase-mobile-label">Qty</span><input type="number" disabled tabindex="-1" aria-label="Quantity"></div>' +
+      '<div class="purchase-price-wrap"><span class="purchase-mobile-label">Purchase Price</span><input type="number" disabled tabindex="-1" aria-label="Purchase price"></div>' +
+      '<div class="purchase-sell-wrap"><span class="purchase-mobile-label">Sell Price</span><input type="number" disabled tabindex="-1" aria-label="Sell price"></div>' +
+      '<div class="purchase-line-total-wrap"><span class="purchase-mobile-label">Total</span><div class="purchase-line-total">&nbsp;</div></div>' +
+      '<span class="purchase-remove-placeholder" aria-hidden="true"></span>';
+    list.appendChild(entryRow);
+
+    document.getElementById('purCartCount').textContent = purState.cart.length;
+    document.getElementById('purClearCartBtn').disabled = purState.cart.length === 0;
+    purRefreshCartEntryAvailability_();
+    purRecalcTotals_();
+  }
+
+  document.getElementById('purAddProductBtn').addEventListener('click', purOpenAddProduct_);
+
+  document.addEventListener('shererp:product-saved', function (event) {
+    var detail = event && event.detail || {};
+    if (detail.source !== 'purchase') return;
+    purRefreshProductCatalog_().then(function () {
+      purFocusCartEntryProduct_();
+    });
+  });
+
+  document.getElementById('purClearCartBtn').addEventListener('click', function () {
+    if (!purState.cart.length) return;
+    purState.cart = [];
+    purState.cartEntryIndex = null;
+    purState.cartEditIndex = null;
+    purCloseCartProductPopup_();
+    purRenderLines_();
+  });
+
+  document.getElementById('purCartList').addEventListener('focusin', function (e) {
+    if (!e.target.hasAttribute('data-pur-product-input')) return;
+    var mode = e.target.dataset.purProductMode || 'replace';
+    var index = (mode === 'replace' || mode === 'entry') ? Number(e.target.dataset.i) : null;
+    purRenderCartProductResults_(e.target, mode, index);
+  });
+
+  document.getElementById('purCartList').addEventListener('input', function (e) {
+    if (e.target.hasAttribute('data-pur-product-input')) {
+      var pickerMode = e.target.dataset.purProductMode || 'replace';
+      var pickerIndex = (pickerMode === 'replace' || pickerMode === 'entry') ? Number(e.target.dataset.i) : null;
+      purRenderCartProductResults_(e.target, pickerMode, pickerIndex);
+      return;
+    }
+    if (e.target.tagName !== 'INPUT') return;
+    var i = Number(e.target.dataset.i);
+    var f = e.target.dataset.f;
+    if (!isFinite(i) || !f || !purState.cart[i]) return;
+
+    var value = Number(e.target.value);
+    if (f === 'qty') purState.cart[i][f] = (!isFinite(value) || value < 1) ? 1 : value;
+    else purState.cart[i][f] = (!isFinite(value) || value < 0) ? 0 : value;
+
+    var row = e.target.closest('.purchase-cart-row');
+    if (row) {
+      var total = (Number(purState.cart[i].qty) || 0) * (Number(purState.cart[i].unitPrice) || 0);
+      var totalEl = row.querySelector('.purchase-line-total');
+      if (totalEl) totalEl.textContent = formatMoney(total);
+    }
+    purRecalcTotals_();
+  });
+
+  document.getElementById('purCartList').addEventListener('keydown', function (e) {
+    if (e.target.hasAttribute('data-pur-product-input')) {
+      purCartProductKeydown_(e);
+      return;
+    }
+    if (e.key !== 'Enter' || !e.target.matches('input[data-f]')) return;
+    var row = e.target.closest('.purchase-cart-row');
+    if (!row) return;
+    e.preventDefault();
+    if (e.target.dataset.f === 'qty') {
+      var buy = row.querySelector('input[data-f="unitPrice"]');
+      if (buy) { buy.focus(); buy.select(); }
+    } else if (e.target.dataset.f === 'unitPrice') {
+      var sell = row.querySelector('input[data-f="sellingPrice"]');
+      if (sell) { sell.focus(); sell.select(); }
+    } else if (e.target.dataset.f === 'sellingPrice' && row.classList.contains('is-active')) {
+      purFinishCartEntry_(true);
+    }
+  });
+
+  document.getElementById('purCartList').addEventListener('click', function (e) {
+    var edit = e.target.closest('[data-pur-product-edit]');
+    if (edit) {
+      e.stopPropagation();
+      purState.cartEditIndex = Number(edit.dataset.i);
+      purState.cartEntryIndex = null;
+      purCloseCartProductPopup_();
+      purRenderLines_();
+      var input = document.querySelector('#purCartList [data-pur-product-input][data-pur-product-mode="replace"][data-i="' + edit.dataset.i + '"]');
+      if (input) { input.focus(); input.select(); }
+      return;
+    }
+
+    var remove = e.target.closest('.cart-remove');
+    if (!remove) return;
+    var removeIndex = Number(remove.dataset.i);
+    purState.cart.splice(removeIndex, 1);
+    if (purState.cartEntryIndex !== null) {
+      if (purState.cartEntryIndex === removeIndex) purState.cartEntryIndex = null;
+      else if (purState.cartEntryIndex > removeIndex) purState.cartEntryIndex -= 1;
+    }
+    if (purState.cartEditIndex !== null) {
+      if (purState.cartEditIndex === removeIndex) purState.cartEditIndex = null;
+      else if (purState.cartEditIndex > removeIndex) purState.cartEditIndex -= 1;
+    }
+    purCloseCartProductPopup_();
+    purRenderLines_();
+  });
+
+  document.addEventListener('click', purCartEntryOutsideClick_);
+
+  document
+    .getElementById("purDiscount")
+    .addEventListener("input", purRecalcTotals_);
+  document
+    .getElementById("purPaidAmount")
+    .addEventListener("input", purRecalcTotals_);
+  document
+    .getElementById("purDate")
+    .addEventListener("change", purUpdateBackdatedRowVisibility_);
+  document
+    .getElementById("purPaymentMethod")
+    .addEventListener("change", function () {
+      document.getElementById("purBankAccountRow").style.display = paymentMethodNeedsAccount_(this.value) ? "" : "none";
+      document.getElementById("purBankAccountLabel").textContent = (this.value === "Mobile Banking" ? "Mobile Banking Account *" : "Bank Account *");
+      fillBankAccountSelect_(document.getElementById("purBankAccount"), purState.bankAccounts, this.value);
+    });
+
+  function purToday_() {
+    var d = new Date();
+    var m = String(d.getMonth() + 1).padStart(2, "0"),
+      day = String(d.getDate()).padStart(2, "0");
+    return d.getFullYear() + "-" + m + "-" + day;
+  }
+
+  function purUpdateBackdatedRowVisibility_() {
+    var val = document.getElementById("purDate").value;
+    document.getElementById("purBackdatedReasonRow").style.display =
+      val && val < purToday_() ? "" : "none";
+  }
+
+  function purRecalcTotals_() {
+    var subtotal = purState.cart.reduce(function (s, l) {
+      return s + (Number(l.qty) || 0) * (Number(l.unitPrice) || 0);
+    }, 0);
+    var discount = Number(document.getElementById("purDiscount").value) || 0;
+    var grandTotal = Math.max(0, subtotal - discount);
+    var paid = Number(document.getElementById("purPaidAmount").value) || 0;
+    if (paid > grandTotal) paid = grandTotal;
+    var due = grandTotal - paid;
+    document.getElementById("purSubtotal").textContent = formatMoney(subtotal);
+    document.getElementById("purGrandTotal").textContent =
+      formatMoney(grandTotal);
+    document.getElementById("purDueAmount").textContent = formatMoney(due);
+  }
+
+  document
+    .getElementById("purSubmitBtn")
+    .addEventListener("click", function () {
+      var errEl = document.getElementById("purFormError");
+      errEl.style.display = "none";
+      var targetPurchaseId = purState.updatePurchaseId || '';
+      var isUpdate = !!targetPurchaseId;
+      var purDate = document.getElementById("purDate").value || purToday_();
+      var backdatedReason = document
+        .getElementById("purBackdatedReason")
+        .value.trim();
+      // updatePurchase() never changes the purchase's Date (see purEdit_'s
+      // comment), so the backdate-reason requirement only applies when
+      // actually creating a new purchase.
+      if (!isUpdate && purDate < purToday_() && !backdatedReason) {
+        errEl.textContent =
+          "A reason is required when dating a purchase in the past.";
+        errEl.style.display = "block";
+        return;
+      }
+      var payload = {
+        supplierId: document.getElementById("purSupplier").value,
+        items: purState.cart.map(function (l) {
+          var item = {
+            productId: l.productId,
+            name: l.name,
+            qty: l.qty,
+            unitPrice: l.unitPrice,
+            sellingPrice: l.sellingPrice,
+          };
+          return item;
+        }),
+        discount: document.getElementById("purDiscount").value,
+        paidAmount: document.getElementById("purPaidAmount").value,
+        paymentMethod: document.getElementById("purPaymentMethod").value,
+        bankAccountId: document.getElementById("purBankAccount").value,
+        notes: document.getElementById("purNotes").value.trim(),
+        date: purDate,
+        backdatedReason: backdatedReason,
+      };
+      function finishPurchaseSave_(purchaseId) {
+        purState.cart = [];
+        purState.cartEntryIndex = null;
+        purState.cartEditIndex = null;
+        document.getElementById('purDiscount').value = 0;
+        document.getElementById('purPaidAmount').value = 0;
+        document.getElementById('purPaymentMethod').value = 'Cash';
+        document.getElementById('purBankAccountRow').style.display = 'none';
+        if (isUpdate) document.getElementById('purSupplier').value = '';
+        document.getElementById('purNotes').value = '';
+        document.getElementById('purDate').value = purToday_();
+        document.getElementById('purBackdatedReason').value = '';
+        document.getElementById('purBackdatedReasonRow').style.display = 'none';
+        purRenderLines_();
+        if (isUpdate) purExitUpdateMode_();
+        purMgmtLoad();
+        reloadPage_('pos');
+        if (purchaseId) showToast('Purchase ' + purchaseId + (isUpdate ? ' updated' : ' recorded'), 'success');
+      }
+
+      if (isUpdate) payload.reason = purState.updateReason;
+      var purchaseSubtotal = purState.cart.reduce(function (sum, line) { return sum + (Number(line.qty) || 0) * (Number(line.unitPrice) || 0); }, 0);
+      var purchaseDiscount = Number(payload.discount) || 0;
+      var purchaseTotal = Math.max(0, purchaseSubtotal - purchaseDiscount);
+      var purchasePaid = Math.min(purchaseTotal, Math.max(0, Number(payload.paidAmount) || 0));
+      var purchaseDue = purchaseTotal - purchasePaid;
+      runConfirmedAction({
+        type: 'financial',
+        title: isUpdate ? 'Update Purchase?' : 'Complete Purchase?',
+        message: isUpdate ? 'This will update the posted purchase and its stock/accounting effects.' : 'Review the purchase before posting it.',
+        details: [
+          { label: 'Supplier', value: selectedOptionText_('purSupplier'), emphasis: true },
+          { label: 'Purchase Total', value: formatMoney(purchaseTotal), emphasis: true },
+          { label: 'In words', value: banglaAmountInWords_(purchaseTotal) },
+          { label: 'Paid Now', value: formatMoney(purchasePaid) },
+          { label: 'Due', value: formatMoney(purchaseDue) },
+          { label: 'Item Count', value: String(payload.items.length) },
+          { label: 'Method', value: payload.paymentMethod },
+          { label: 'Account', value: payload.bankAccountId ? selectedOptionText_('purBankAccount') : '' },
+          { label: 'Date', value: payload.date },
+          { label: 'Update Reason', value: isUpdate ? (purState.updateReason || '') : '' }
+        ],
+        confirmLabel: isUpdate ? 'Update Purchase' : 'Complete Purchase',
+        loadingLabel: isUpdate ? 'Updating...' : 'Completing...',
+        trigger: document.getElementById('purSubmitBtn')
+      }, function () {
+        var call = isUpdate
+          ? serverCall('updatePurchase', authToken, targetPurchaseId, payload)
+          : serverCall('createPurchase', authToken, payload);
+        return withLoader(call).then(function (res) { finishPurchaseSave_(res.purchaseId); });
+      }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+    });
+
+  function formatDateShort_(val) {
+    var d = new Date(val);
+    if (isNaN(d.getTime())) return String(val);
+    return d.toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  }
+
+  // ---------------- Purchase Return ----------------
+  var prtState = { purchase: null, editingReturnId: null, editQtyByProduct: {} };
+
+  document.getElementById("prtFindBtn").addEventListener("click", prtSearch_);
+  document
+    .getElementById("prtSearchInput")
+    .addEventListener("keydown", function (e) {
+      if (e.key === "Enter") prtSearch_();
+    });
+
+  function prtSearch_() {
+    var q = document.getElementById("prtSearchInput").value.trim();
+    if (!q) return;
+    withLoader(serverCall("searchPurchasesForReturn", authToken, q))
+      .then(function (matches) {
+        var box = document.getElementById("prtSearchResults");
+        box.innerHTML = "";
+        document.getElementById("prtSearchEmpty").hidden = matches.length > 0;
+        if (!matches.length) return;
+        if (
+          matches.length === 1 &&
+          matches[0].purchaseId.toLowerCase() === q.toLowerCase()
+        ) {
+          prtLoadPurchaseById_(matches[0].purchaseId);
+          return;
+        }
+        var table = document.createElement("table");
+        table.innerHTML =
+          '<thead><tr><th>Purchase</th><th>Date</th><th>Supplier</th><th class="num">Total</th><th>Status</th><th></th></tr></thead>';
+        var tbody = document.createElement("tbody");
+        matches.forEach(function (m) {
+          var tr = document.createElement("tr");
+          tr.innerHTML =
+            '<td class="mono">' +
+            m.purchaseId +
+            "</td><td>" +
+            escapeHtml(m.date) +
+            "</td>" +
+            "<td>" +
+            escapeHtml(m.supplierName) +
+            '</td><td class="num mono">' +
+            formatMoney(m.grandTotal) +
+            "</td>" +
+            "<td>" +
+            escapeHtml(m.paymentStatus) +
+            '</td><td><button class="btn" data-id="' +
+            m.purchaseId +
+            '">Load</button></td>';
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        box.appendChild(table);
+        box.querySelectorAll("button[data-id]").forEach(function (b) {
+          b.addEventListener("click", function () {
+            prtLoadPurchaseById_(b.dataset.id);
+          });
+        });
+      })
+      .catch(function (err) {
+        showToast(err.message, "error");
+      });
+  }
+
+  document.getElementById("prtClearBtn").addEventListener("click", prtReset_);
+
+  function prtReset_() {
+    prtState.purchase = null;
+    prtState.editingReturnId = null;
+    prtState.editQtyByProduct = {};
+    document.getElementById("prtSearchCard").hidden = false;
+    document.getElementById("prtCompleteBtn").textContent = "Complete Return";
+    document.getElementById("prtSearchInput").value = "";
+    document.getElementById("prtSearchResults").innerHTML = "";
+    document.getElementById("prtSearchEmpty").hidden = true;
+    document.getElementById("prtPurchaseArea").hidden = true;
+    document.getElementById("prtDate").value = prtToday_();
+    document.getElementById("prtBackdatedReason").value = "";
+    document.getElementById("prtBackdatedReasonRow").style.display = "none";
+  }
+
+  function prtToday_() {
+    var d = new Date();
+    var m = String(d.getMonth() + 1).padStart(2, "0"),
+      day = String(d.getDate()).padStart(2, "0");
+    return d.getFullYear() + "-" + m + "-" + day;
+  }
+
+  document
+    .getElementById("prtDate")
+    .addEventListener("change", function () {
+      var val = document.getElementById("prtDate").value;
+      document.getElementById("prtBackdatedReasonRow").style.display =
+        val && val < prtToday_() ? "" : "none";
+    });
+  if (!document.getElementById("prtDate").value)
+    document.getElementById("prtDate").value = prtToday_();
+
+  function prtLoadPurchaseById_(purchaseId) {
+    return withLoader(serverCall("getPurchaseForReturn", authToken, purchaseId))
+      .then(function (pur) {
+        prtState.purchase = pur;
+        document.getElementById("prtSearchResults").innerHTML = "";
+        document.getElementById("prtSearchEmpty").hidden = true;
+
+        document.getElementById("prtPurId").textContent = pur.purchaseId;
+        document.getElementById("prtPurDate").textContent = pur.date;
+        document.getElementById("prtPurSupplier").textContent =
+          pur.supplierName || "\u2014";
+        document.getElementById("prtPurGrandTotal").textContent = formatMoney(
+          pur.grandTotal,
+        );
+        document.getElementById("prtPurPaid").textContent = formatMoney(
+          pur.paidAmount,
+        );
+        document.getElementById("prtPurDue").textContent = formatMoney(
+          pur.dueAmount,
+        );
+        document.getElementById("prtPurPrevReturned").textContent = formatMoney(
+          pur.previouslyReturnedAmount,
+        );
+        document.getElementById("prtPurNetPurchase").textContent = formatMoney(
+          pur.netPurchase,
+        );
+
+        prtRenderCart_();
+        document.getElementById("prtPurchaseArea").hidden = false;
+      })
+      .catch(function (err) {
+        showToast(err.message, "error");
+      });
+  }
+
+  function prtRenderCart_() {
+    var body = document.getElementById("prtCartBody");
+    body.innerHTML = "";
+    prtState.purchase.items.forEach(function (item, i) {
+      var tr = document.createElement("tr");
+      var existingQty = Number(prtState.editQtyByProduct[String(item.productId)] || 0);
+      var maxQty = Number(item.availableQty || 0) + existingQty;
+      item._editMaxQty = maxQty;
+      item._returnQty = existingQty;
+      var disabled = maxQty <= 0;
+      var otherReturnedQty = Math.max(0, Number(item.previouslyReturnedQty || 0) - existingQty);
+      tr.innerHTML =
+        "<td>" +
+        escapeHtml(item.name) +
+        "</td>" +
+        '<td class="num mono">' +
+        item.boughtQty +
+        "</td>" +
+        '<td class="num mono">' +
+        (prtState.editingReturnId ? otherReturnedQty : item.previouslyReturnedQty) +
+        "</td>" +
+        '<td class="num mono">' +
+        maxQty +
+        "</td>" +
+        '<td class="num"><input type="number" min="0" max="' +
+        maxQty +
+        '" value="' + existingQty + '" ' +
+        (disabled ? "disabled" : "") +
+        ' data-i="' +
+        i +
+        '" data-f="qty" style="width:70px; text-align:right;"></td>' +
+        '<td class="num mono">' +
+        formatMoney(item.unitPrice) +
+        '</td>' +
+        '<td class="num mono" id="prtLineTotal' +
+        i +
+        '">' + formatMoney(existingQty * item.unitPrice) + '</td>';
+      body.appendChild(tr);
+    });
+    prtRecalcTotal_();
+  }
+
+  document
+    .getElementById("prtCartBody")
+    .addEventListener("input", function (e) {
+      if (e.target.tagName !== "INPUT") return;
+      var i = Number(e.target.dataset.i);
+      var item = prtState.purchase.items[i];
+      var q = Number(e.target.value);
+      item._returnQty =
+        isNaN(q) || q < 0 ? 0 : Math.min(q, item._editMaxQty === undefined ? item.availableQty : item._editMaxQty);
+      document.getElementById("prtLineTotal" + i).textContent = formatMoney(
+        (item._returnQty || 0) * item.unitPrice,
+      );
+      prtRecalcTotal_();
+    });
+
+  function prtRecalcTotal_() {
+    var total = prtState.purchase.items.reduce(function (sum, item) {
+      return (
+        sum +
+        (item._returnQty || 0) * item.unitPrice
+      );
+    }, 0);
+    document.getElementById("prtTotalReturn").textContent = formatMoney(total);
+  }
+
+  document.getElementById("prtCancelBtn").addEventListener("click", prtReset_);
+
+  document
+    .getElementById("prtCompleteBtn")
+    .addEventListener("click", function () {
+      var errEl = document.getElementById("prtFormError");
+      errEl.style.display = "none";
+
+      var items = prtState.purchase.items
+        .filter(function (item) {
+          return (item._returnQty || 0) > 0;
+        })
+        .map(function (item) {
+          return {
+            productId: item.productId,
+            name: item.name,
+            qty: item._returnQty,
+          };
+        });
+
+      if (!items.length) {
+        errEl.textContent = "Enter a return quantity for at least one product.";
+        errEl.style.display = "block";
+        return;
+      }
+
+      var prtDateVal = document.getElementById("prtDate").value || prtToday_();
+      var prtBackdatedReason = document
+        .getElementById("prtBackdatedReason")
+        .value.trim();
+      if (!prtState.editingReturnId && prtDateVal < prtToday_() && !prtBackdatedReason) {
+        errEl.textContent =
+          "A reason is required when dating a return in the past.";
+        errEl.style.display = "block";
+        return;
+      }
+
+      var payload = {
+        purchaseId: prtState.purchase.purchaseId,
+        items: items,
+        refundMethod: document.getElementById("prtRefundMethod").value,
+        reason: document.getElementById("prtReason").value.trim(),
+        notes: document.getElementById("prtNote").value.trim(),
+        date: prtDateVal,
+        backdatedReason: prtBackdatedReason,
+      };
+
+      var purchaseReturnTotal = prtState.purchase.items.reduce(function (sum, item) {
+        return sum + ((Number(item._returnQty) || 0) * (Number(item.unitPrice) || 0));
+      }, 0);
+      runConfirmedAction({
+        type: 'financial',
+        title: prtState.editingReturnId ? 'Update Purchase Return?' : 'Complete Purchase Return?',
+        message: 'This will change stock and supplier accounting.',
+        details: [
+          { label: 'Purchase', value: prtState.purchase.purchaseId, emphasis: true },
+          { label: 'Supplier', value: prtState.purchase.supplierName || '' },
+          { label: 'Return Amount', value: formatMoney(purchaseReturnTotal), emphasis: true },
+          { label: 'In words', value: banglaAmountInWords_(purchaseReturnTotal) },
+          { label: 'Items Returning', value: String(items.length) },
+          { label: 'Refund Method', value: payload.refundMethod },
+          { label: 'Reason', value: payload.reason },
+          { label: 'Date', value: payload.date }
+        ],
+        confirmLabel: prtState.editingReturnId ? 'Update Return' : 'Complete Return',
+        loadingLabel: prtState.editingReturnId ? 'Updating...' : 'Completing...',
+        trigger: document.getElementById('prtCompleteBtn')
+      }, function () {
+        return withLoader(serverCall("completePurchaseReturn", authToken, payload))
+          .then(function (res) {
+            showToast("Return " + res.returnId + " completed — " + formatMoney(res.totalReturnAmount) + " recorded", "success");
+            prtReset_();
+            prtHistLoad();
+          });
+      }).catch(function (err) {
+        errEl.textContent = err.message;
+        errEl.style.display = "block";
+      });
+    });
+
+  var prtHistState = { returns: [] };
+
+  function prtHistLoad() {
+    return withLoader(serverCall("getPurchaseReturnHistory", authToken))
+      .then(function (returns) {
+        prtHistState.returns = returns;
+        prtHistRender_();
+      })
+      .catch(function (err) {
+        showToast(err.message, "error");
+      });
+  }
+
+  function prtHistRender_() {
+    var q = (
+      document.getElementById("prtHistSearch").value || ""
+    ).toLowerCase();
+    var rows = prtHistState.returns.filter(function (r) {
+      return (
+        !q ||
+        String(r["Return ID"]).toLowerCase().indexOf(q) !== -1 ||
+        String(r["Purchase ID"]).toLowerCase().indexOf(q) !== -1 ||
+        String(r["Supplier Name"]).toLowerCase().indexOf(q) !== -1
+      );
+    });
+    var body = document.getElementById("prtHistBody");
+    body.innerHTML = "";
+    rows.forEach(function (r) {
+      var tr = document.createElement("tr");
+      tr.innerHTML =
+        '<td class="mono">' +
+        r["Return ID"] +
+        "</td>" +
+        "<td>" +
+        escapeHtml(formatDateShort_(r["Date"])) +
+        "</td>" +
+        '<td class="mono">' +
+        r["Purchase ID"] +
+        "</td>" +
+        "<td>" +
+        escapeHtml(r["Supplier Name"] || "") +
+        "</td>" +
+        '<td class="num mono">' +
+        formatMoney(r["Total Return Amount"]) +
+        "</td>" +
+        "<td>" +
+        escapeHtml(r["Processed By"] || "") +
+        "</td>" +
+        '<td><button class="btn" data-act="menuPurchaseReturn" data-id="' +
+        r["Return ID"] +
+        '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button></td>';
+      body.appendChild(tr);
+    });
+    document.getElementById("prtHistEmpty").hidden = rows.length > 0;
+  }
+
+  document
+    .getElementById("prtHistSearch")
+    .addEventListener("input", prtHistRender_);
+  document
+    .getElementById("prtHistRefreshBtn")
+    .addEventListener("click", prtHistLoad);
+
+  /** Global entry point \u2014 also jumped to directly from Day Book's "Open Original" on a Purchase Return row. */
+  function prtOpenDetailById_(returnId) {
+    return withLoader(serverCall("getPurchaseReturnDetail", authToken, returnId))
+      .then(function (data) {
+        document.getElementById("prtDetailId").textContent =
+          data.header["Return ID"];
+        document.getElementById("prtDetailPurchase").textContent =
+          data.header["Purchase ID"];
+        document.getElementById("prtDetailDate").textContent =
+          formatDateShort_(data.header["Date"]);
+        document.getElementById("prtDetailSupplier").textContent =
+          data.header["Supplier Name"] || "";
+        document.getElementById("prtDetailTotal").textContent = formatMoney(
+          data.header["Total Return Amount"],
+        );
+        document.getElementById("prtDetailReason").textContent =
+          data.header["Reason"] || "\u2014";
+        document.getElementById("prtDetailNote").textContent =
+          data.header["Notes"] || "\u2014";
+
+        var body = document.getElementById("prtDetailItemsBody");
+        body.innerHTML = "";
+        data.items.forEach(function (i) {
+          var tr = document.createElement("tr");
+          tr.innerHTML =
+            "<td>" +
+            escapeHtml(i["Product Name"]) +
+            '</td><td class="num">' +
+            i["Return Quantity"] +
+            '</td><td class="num mono">' +
+            formatMoney(i["Return Price"]) +
+            '</td><td class="num mono">' +
+            formatMoney(i["Line Total"]) +
+            "</td>";
+          body.appendChild(tr);
+        });
+        openModal("prtDetailModal");
+      })
+      .catch(function (err) {
+        showToast(err.message, "error");
+      });
+  }
+  document
+    .getElementById("prtHistBody")
+    .addEventListener("click", function (e) {
+      var btn = e.target.closest('button[data-act="menuPurchaseReturn"]');
+      if (!btn) return;
+      var id = btn.dataset.id;
+      openRowActionMenu_(btn, [
+        { action: 'view', label: 'View' }
+      ], function (action) {
+        if (action === 'view') prtOpenDetailById_(id);
+      });
+    });
+
+  document
+    .querySelector('#page-purchase .tab-btn[data-tab="purReturn"]')
+    .addEventListener("click", function () {
+      prtHistLoad();
+    });
+
+  document.addEventListener("DOMContentLoaded", function () {
+    var origGoToPage = goToPage;
+    goToPage = function (key) {
+      origGoToPage(key);
+      if (key === "purchase" && !purState._loaded) {
+        purState._loaded = true;
+        purLoad();
+      }
+    };
+  });
+</script>

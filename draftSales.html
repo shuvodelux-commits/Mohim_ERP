@@ -1,0 +1,106 @@
+<div class="toolbar draft-sales-toolbar">
+  <input class="search-input" id="draftSalesSearch" type="search" placeholder="Search draft no, customer, phone, creator...">
+  <div class="toolbar-spacer"></div>
+  <button class="btn" type="button" id="draftSalesRefreshBtn">Refresh</button>
+</div>
+<div class="card" style="padding:0">
+  <div class="table-scroll">
+    <table class="mobile-card-table draft-sales-table">
+      <thead><tr><th>Draft No</th><th>Updated</th><th>Customer</th><th>Phone</th><th class="num">Amount</th><th>Created By</th><th>Actions</th></tr></thead>
+      <tbody id="draftSalesBody"></tbody>
+    </table>
+  </div>
+  <div class="empty-state" id="draftSalesEmpty" hidden>No draft invoices found.</div>
+</div>
+<script>
+  var draftSalesState_ = { rows: [], query: '' };
+
+  function draftSalesLoad() {
+    return withLoader(serverCall('getSalesDraftList', authToken)).then(function (rows) {
+      draftSalesState_.rows = rows || [];
+      draftSalesRender_();
+      return rows;
+    }).catch(function (err) { showToast(err.message, 'error'); throw err; });
+  }
+
+  function draftSalesRender_() {
+    var q=(draftSalesState_.query||'').trim().toLowerCase();
+    var rows=(draftSalesState_.rows||[]).filter(function(r){
+      if(!q)return true;
+      return [r.draftNo,r.customerName,r.createdByName].join(' ').toLowerCase().indexOf(q)>=0 || phoneSearchMatches_(r.customerPhone, q);
+    });
+    var body=document.getElementById('draftSalesBody'); if(!body)return;
+    body.innerHTML=rows.map(function(r){
+      return '<tr data-draft-id="'+escapeHtml(r.draftId)+'">'+
+        '<td data-label="Draft No"><strong class="mono">'+escapeHtml(r.draftNo)+'</strong></td>'+
+        '<td data-label="Updated">'+escapeHtml(String(r.updatedAt||''))+'</td>'+
+        '<td data-label="Customer">'+escapeHtml(r.customerName||'Not selected')+'</td>'+
+        '<td data-label="Phone">'+escapeHtml(r.customerPhone||'')+'</td>'+
+        '<td data-label="Amount" class="num">'+formatMoney(r.grandTotal)+'</td>'+
+        '<td data-label="Created By">'+escapeHtml(r.createdByName||'')+'</td>'+
+        '<td data-label="Actions"><button class="btn btn-sm" data-act="menu" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button></td></tr>';
+    }).join('');
+    document.getElementById('draftSalesEmpty').hidden=rows.length>0;
+    if (typeof enhanceMobileCardTables_ === 'function') enhanceMobileCardTables_();
+  }
+
+  function draftSalesFindRow_(id){return (draftSalesState_.rows||[]).filter(function(r){return r.draftId===id;})[0]||null;}
+  function draftSalesOpen_(draftId){ if(typeof posOpenDraft_==='function') return posOpenDraft_(draftId); showToast('POS draft loader is not available.','error'); }
+  function draftSalesPreview_(draftId,action){
+    return withLoader(serverCall('getSalesDraftPreview',authToken,draftId)).then(function(preview){
+      posRenderInvoice_(preview); openModal('invoiceModal');
+      if(action==='print') setTimeout(function(){printInvoice_(false,preview);},150);
+      if(action==='jpg') downloadInvoiceJpg_(preview);
+      return preview;
+    }).catch(function(err){showToast(err.message,'error');});
+  }
+  function draftSalesDuplicate_(draftId){
+    return withLoader(serverCall('getSalesDraft',authToken,draftId)).then(function(draft){
+      goToPage('pos');
+      return posLoadDuplicateInvoice_(draft);
+    }).then(function(){
+      showToast('Loaded into POS — adjust and complete the sale','success');
+    }).catch(function(err){showToast(err.message,'error');throw err;});
+  }
+  function draftSalesDelete_(row){
+    var summary='Draft: '+escapeHtml(row.draftNo)+'<br>Customer: '+escapeHtml(row.customerName||'Not selected')+'<br>Amount: '+formatMoney(row.grandTotal);
+    if(typeof confirmAction === 'function'){
+      confirmAction({
+        type:'danger', title:'Delete Draft?',
+        message:'This removes the unfinished draft only. No posted sale or accounting entry exists.',
+        details:[{label:'Draft',value:row.draftNo},{label:'Customer',value:row.customerName||'Not selected'},{label:'Amount',value:formatMoney(row.grandTotal)}],
+        confirmLabel:'Delete Draft', cancelLabel:'Cancel',
+        reason:{required:true,label:'Reason',placeholder:'Why are you deleting this draft?'}
+      }).then(function(result){
+        if(!result||!result.confirmed)return;
+        return withLoader(serverCall('deleteSalesDraft',authToken,row.draftId,row.version,result.reason)).then(function(){showToast('Draft deleted.','success');return draftSalesLoad();});
+      }).catch(function(err){showToast(err.message,'error');});
+      return;
+    }
+    confirmDelete({title:'Delete Draft?',summary:summary+'<br><br>This removes the unfinished draft only. No posted sale or accounting entry exists.',fn:'deleteSalesDraft',args:[row.draftId,row.version],reloadPages:['draftSales'],successMessage:'Draft deleted.'});
+  }
+
+  document.getElementById('draftSalesSearch').addEventListener('input',function(){draftSalesState_.query=this.value;draftSalesRender_();});
+  document.getElementById('draftSalesRefreshBtn').addEventListener('click',draftSalesLoad);
+  document.getElementById('draftSalesBody').addEventListener('click',function(e){
+    var btn=e.target.closest('button[data-act]'); if(!btn)return;
+    var tr=btn.closest('tr[data-draft-id]'), row=draftSalesFindRow_(tr.dataset.draftId); if(!row)return;
+    if(btn.dataset.act!=='menu')return;
+    var canOpen=hasActionPermission_('pos','view');
+    var canDuplicate=hasActionPermission_('pos','add');
+    openRowActionMenu_(btn,[
+      {action:'open',label:'Open',hidden:!canOpen},
+      {action:'duplicate',label:'Duplicate',hidden:!canDuplicate},
+      {action:'preview',label:'Print / Preview'},
+      {action:'jpg',label:'Save JPG'},
+      {divider:true},
+      {action:'delete',label:'Delete',danger:true}
+    ],function(action){
+      if(action==='open')draftSalesOpen_(row.draftId);
+      else if(action==='duplicate')draftSalesDuplicate_(row.draftId);
+      else if(action==='preview')draftSalesPreview_(row.draftId,'preview');
+      else if(action==='jpg')draftSalesPreview_(row.draftId,'jpg');
+      else if(action==='delete')draftSalesDelete_(row);
+    });
+  });
+</script>

@@ -1,0 +1,2443 @@
+<div id="posCashMismatchAlert" class="cash-mismatch-alert" hidden>
+  <span id="posCashMismatchText"></span>
+  <button type="button" class="cash-mismatch-dismiss" id="posCashMismatchDismiss" aria-label="Dismiss cash session adjustment warning" title="Dismiss">&#10005;</button>
+</div>
+
+<!-- ===== Main POS layout ===== -->
+<div class="pos-layout">
+  <div class="card pos-product-card">
+    <div class="pos-section-head"><h3>Add Product</h3></div>
+    <div class="pos-search-drafts-row">
+      <div class="smart-search-box pos-product-search-box">
+        <input class="search-input" id="posSearch" type="search" autocomplete="off" spellcheck="false"
+          placeholder="Search by name, barcode, brand or category" aria-label="Search products" style="max-width:none;">
+        <button type="button" class="smart-search-clear" id="posSearchClear" aria-label="Clear product search" title="Clear search" hidden>&#10005;</button>
+      </div>
+      <aside class="pos-recent-drafts" id="posRecentDrafts" aria-label="Recent draft invoices" hidden>
+        <div class="pos-recent-drafts-meta">
+          <span>Recent Drafts</span>
+          <button type="button" class="btn-link" id="posRecentDraftsViewAll">View All &#8250;</button>
+        </div>
+        <div class="pos-recent-drafts-list" id="posRecentDraftsList"></div>
+      </aside>
+    </div>
+    <div class="pos-product-filters">
+      <select id="posCategoryFilter" aria-label="Product category"><option value="">All Categories</option></select>
+      <select id="posBrandFilter" aria-label="Product brand"><option value="">All Brands</option></select>
+    </div>
+    <div class="product-grid mobile-search-idle" id="posProductGrid" role="listbox" aria-label="Product search results"></div>
+    <div class="empty-state" id="posProductEmpty" hidden>No products found.</div>
+    <div class="pos-reprint-row">
+      <input id="posReprintId" type="text" placeholder="Invoice ID to reprint">
+      <button class="btn" id="posReprintBtn">Find & Print</button>
+    </div>
+  </div>
+
+  <div class="card pos-sale-card">
+    <section class="pos-customer-section">
+      <div class="pos-section-head">
+        <h3>Customer</h3>
+        <button type="button" class="btn-link pos-clear-link" id="posClearCustomerBtn">Clear Customer</button>
+      </div>
+
+      <label>Customer Name <span class="bn-hint" style="display:inline;">— কাস্টমারের নাম</span></label>
+      <div class="pos-customer-input-wrap">
+        <svg class="pos-customer-input-icon" data-pos-icon="search" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <circle cx="11" cy="11" r="8"></circle>
+          <path d="m21 21-4.35-4.35"></path>
+        </svg>
+        <input id="posCustomerName" type="text" data-search-clear="on" list="posCustomerList" placeholder="Enter customer name — কাস্টমারের নাম" aria-label="Customer Name — কাস্টমারের নাম" autocomplete="off" required>
+        <div id="posCustomerNameResults" class="counter-combo-results" hidden></div>
+      </div>
+      <datalist id="posCustomerList"></datalist>
+
+      <label>Phone Number <span class="bn-hint" style="display:inline;">— ফোন নম্বর</span></label>
+      <div class="pos-customer-input-wrap">
+        <svg class="pos-customer-input-icon" data-pos-icon="phone" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.69 2.8a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.33 1.84.56 2.8.69A2 2 0 0 1 22 16.92z"></path>
+        </svg>
+        <input id="posCustomerPhone" type="text" data-search-clear="on" list="posCustomerPhoneList" placeholder="Enter phone number — ফোন নম্বর" aria-label="Phone Number — ফোন নম্বর" autocomplete="off" required>
+        <div id="posCustomerPhoneResults" class="counter-combo-results" hidden></div>
+      </div>
+      <datalist id="posCustomerPhoneList"></datalist>
+
+      <div id="posCustomerDueRow" class="totals-row pos-outstanding-due" hidden>
+        <span>Outstanding Due <span class="bn-hint" style="display:inline;">— আগের বাকি</span></span><span class="v mono" id="posCustomerDueValue"></span>
+      </div>
+
+      <div class="pos-customer-actions">
+        <button type="button" class="btn" id="posCustomerMoreToggle">+ Father Name / Address</button>
+        <button type="button" class="btn" id="posHistoryBtn">Sales History</button>
+      </div>
+      <div id="posCustomerMoreFields" hidden class="pos-customer-more-fields">
+        <label>Father Name <span class="bn-hint" style="display:inline;">— বাবার নাম</span></label>
+        <input id="posCustomerFatherName" type="text" placeholder="Optional">
+        <label>Address <span class="bn-hint" style="display:inline;">— ঠিকানা</span></label>
+        <input id="posCustomerAddress" type="text" placeholder="Optional, but useful for returns later">
+      </div>
+
+      <div id="posUpdateBanner" class="session-banner is-closed" hidden>
+        <div>Updating invoice <strong class="mono" id="posUpdateBannerId"></strong></div>
+        <div class="toolbar-spacer"></div>
+        <button class="btn" id="posCancelUpdateBtn" type="button">Cancel Update</button>
+      </div>
+      <div id="posDraftBanner" class="session-banner is-open pos-draft-banner" hidden>
+        <div>Editing <strong class="mono" id="posDraftBannerNo"></strong></div>
+        <div class="toolbar-spacer"></div>
+        <button class="btn" id="posExitDraftBtn" type="button">Exit Draft</button>
+      </div>
+      <div id="posDraftConflict" class="pos-draft-conflict" hidden>
+        <span>This draft changed on another screen.</span>
+        <button class="btn btn-sm" type="button" id="posDraftReloadLatestBtn">Reload Latest</button>
+        <button class="btn btn-sm" type="button" id="posDraftKeepMineBtn">Keep My Screen</button>
+      </div>
+    </section>
+
+    <section class="pos-cart-section">
+      <div class="pos-section-head pos-cart-head">
+        <h3>Cart <span class="pos-cart-count" id="posCartCount">0</span></h3>
+        <button type="button" class="btn-link pos-clear-link danger" id="posClearCartBtn">Clear Cart</button>
+      </div>
+      <div class="pos-cart-columns" aria-hidden="true"><span>Product</span><span>Qty</span><span class="pos-cart-col-unit">Unit</span><span>Price (৳)</span><span>Total (৳)</span><span></span></div>
+      <div class="cart-list" id="posCartList"></div>
+
+      <div class="pos-checkout-summary">
+        <div class="pos-checkout-fields">
+          <div class="totals-row"><span>Discount</span><input id="posDiscount" type="number" min="0" step="0.01" placeholder="0"></div>
+          <div class="totals-row pos-inline-field"><span>Amount Received</span><input id="posAmountReceived" type="number" min="0" step="0.01" placeholder="Enter amount"></div>
+          <div id="posPaymentMethodRow" class="totals-row pos-inline-field">
+            <span>Payment Method</span>
+            <select id="posPaymentMethod">
+              <option value="Cash">Cash</option>
+              <option value="Bank">Bank</option>
+              <option value="Mobile Banking">Mobile Banking</option>
+            </select>
+          </div>
+          <div id="posBankAccountRow" class="pos-bank-account-row" style="display:none;">
+            <label id="posBankAccountLabel">Bank Account *</label>
+            <select id="posBankAccount"><option value="">Select bank account...</option></select>
+          </div>
+        </div>
+        <div class="pos-checkout-totals">
+          <div class="totals-row"><span>Subtotal</span><span class="v" id="posSubtotal">0</span></div>
+          <div class="totals-row grand"><span>Grand Total</span><span class="v" id="posGrandTotal">0</span></div>
+          <div class="totals-row" id="posChangeRow" style="display:none;"><span>Change Due</span><span class="v mono" id="posChangeDue">0</span></div>
+          <div class="totals-row" id="posDueRow" style="display:none;"><span>Due Amount</span><span class="v mono" id="posDueAmountDisplay">0</span></div>
+        </div>
+      </div>
+
+      <div class="field-error" id="posFormError"></div>
+      <div class="pos-checkout-actions">
+        <button class="btn" id="posSaveDraftBtn" type="button">Save Draft</button>
+        <button class="btn btn-primary" id="posCompleteBtn">Complete Sale</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+
+<button type="button" class="btn btn-primary pos-tablet-jump-btn" id="posTabletJumpBtn" hidden aria-label="Jump to cart">Cart 0 ↓</button>
+
+<!-- ===== Sales History lookup (for returns) ===== -->
+<div class="modal-overlay" id="posHistoryModal" hidden>
+  <div class="modal">
+    <div class="modal-header"><h3>Sales History <span class="bn-hint" style="display:inline;">— আগের বিক্রির তালিকা</span> &mdash; <span id="posHistoryPhone"></span></h3><button class="modal-close" onclick="closeModal('posHistoryModal')">&#10005;</button></div>
+    <div class="modal-body">
+      <table class="mobile-card-table pos-history-table">
+        <thead><tr><th>Invoice</th><th>Date</th><th class="num">Total</th><th>Status</th><th></th></tr></thead>
+        <tbody id="posHistoryBody"></tbody>
+      </table>
+      <div class="empty-state" id="posHistoryEmpty" hidden>No past sales found for this phone number.</div>
+    </div>
+    <div class="modal-footer"><button class="btn" onclick="closeModal('posHistoryModal')">Close</button></div>
+  </div>
+</div>
+
+<!-- ===== Invoice modal (printable) ===== -->
+<div class="modal-overlay" id="invoiceModal" hidden>
+  <div class="modal">
+    <div class="modal-header"><h3>Invoice <span class="bn-hint" style="display:inline;">— রশিদ</span></h3><button class="modal-close" onclick="closeModal('invoiceModal')">&#10005;</button></div>
+    <div class="modal-body">
+      <div class="invoice-paper" id="invoicePaper"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" id="posNewSaleBtn">New Sale</button>
+      <button class="btn" id="posDownloadJpgBtn">Download JPG</button>
+      <button class="btn" id="posThermalPrintBtn">Thermal Print</button>
+      <button class="btn btn-primary" onclick="printInvoice_()">Print</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Manage Vendors (Vendor/Consignment Sourcing) — same shared-list pattern as finance.html's Manage Owners/Lenders modal ===== -->
+<div class="modal-overlay" id="posManageVendorsModal" hidden>
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Manage Vendors <span class="bn-hint" style="display:inline;">— ভেন্ডার তালিকা</span></h3>
+      <button class="modal-close" onclick="closeModal('posManageVendorsModal')">&#10005;</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12px; color:var(--color-text-muted); margin:0 0 10px;">Vendors are a separate list from Suppliers — used only to source a POS shortage at the register.</p>
+      <div style="display:flex; gap:8px;">
+        <input id="posVendorNewName" type="text" placeholder="Name" style="flex:1;">
+        <input id="posVendorNewPhone" type="text" placeholder="Phone (optional)" style="max-width:160px;">
+        <button type="button" class="btn btn-primary" id="posVendorAddBtn">Add</button>
+      </div>
+      <div class="field-error" id="posVendorManageError"></div>
+      <div style="height:12px;"></div>
+      <table>
+        <thead><tr><th>Name</th><th>Phone</th><th class="num">Current Due</th><th>Status</th><th></th></tr></thead>
+        <tbody id="posVendorManageBody"></tbody>
+      </table>
+      <div class="empty-state" id="posVendorManageEmpty" hidden>None yet &mdash; add one above.</div>
+    </div>
+    <div class="modal-footer"><button class="btn" onclick="closeModal('posManageVendorsModal')">Close</button></div>
+  </div>
+</div>
+
+<script>
+  var posState = { products: [], productStockById: {}, productCostById: {}, showCost: false, customers: [], bankAccounts: [], vendors: [], vendorsAll: [], cart: [], cartEditIndex: null, cartEntryIndex: null, activeSession: null, openingCashMismatch: null, dismissedCashMismatchKey: '', closeSessionSummary: null, updateInvoiceId: null, updateReason: null, draftId: null, draftNo: '', draftVersion: null, recentDrafts: [], searchResults: [], searchActiveIndex: -1 };
+
+
+  // POS uses the shared touch-select presentation layer. The native select
+  // stays authoritative and all existing change handlers/data flow are preserved.
+  function posRefreshTabletSelect_(select) {
+    if (typeof refreshTouchSelect_ === 'function') refreshTouchSelect_(select);
+  }
+
+  function posEnhanceTabletSelects_() {
+    if (typeof enhanceTouchSelects_ === 'function') {
+      enhanceTouchSelects_(document.getElementById('page-pos') || document);
+    }
+  }
+
+  function posLoad() {
+    return withLoader(serverCall('getPosBootstrap', authToken)).then(function (data) {
+      posState.products = data.products;
+      smartIndexProducts_(posState.products);
+      posFillProductFilters_();
+      posState.productStockById = {};
+      // Purchase Price Visibility. The server has already decided whether
+      // this user gets cost data at all (Settings switch + 'posCost' view —
+      // see getPosBootstrap); when it says no, purchasePrice simply isn't in
+      // the payload and this map stays empty. Nothing here re-checks the
+      // permission, because nothing here could be trusted to.
+      posState.showCost = !!data.showPurchasePrice;
+      posState.productCostById = {};
+      posState.products.forEach(function (p) {
+        posState.productStockById[p.id] = Number(p.stock) || 0;
+        if (posState.showCost && p.purchasePrice !== undefined) posState.productCostById[p.id] = Number(p.purchasePrice) || 0;
+      });
+      posState.customers = data.customers;
+      posState.bankAccounts = data.bankAccounts;
+      posState.vendors = data.vendors || [];
+      posState.vendorsAll = data.vendorsAll || [];
+      posState.activeSession = data.activeSession;
+      posRenderSessionUI_();
+      posRenderProductGrid_();
+      posRenderCart_();
+      posFillCustomerList_();
+      fillBankAccountSelect_(document.getElementById('posBankAccount'), posState.bankAccounts, document.getElementById('posPaymentMethod').value);
+      posEnhanceTabletSelects_();
+      posRefreshTabletSelect_(document.getElementById('posBankAccount'));
+      posSetCustomerMoreExpanded_(false); // keep optional Father Name / Address collapsed until the user expands it
+      posLoadRecentDrafts_();
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  function posFormatDraftTime_(value) {
+    if (!value) return '';
+    var date = new Date(value);
+    if (isNaN(date.getTime())) return '';
+    try { return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
+    catch (e) { return date.toLocaleTimeString(); }
+  }
+
+  function posRenderRecentDrafts_() {
+    var host = document.getElementById('posRecentDrafts');
+    var list = document.getElementById('posRecentDraftsList');
+    if (!host || !list) return;
+    var rows = (posState.recentDrafts || []).slice(0, 3);
+    list.innerHTML = rows.map(function (row) {
+      var customer = row.customerName || 'Walk-in';
+      return '<button type="button" class="pos-recent-draft-card" data-draft-id="' + escapeHtml(String(row.draftId || '')) + '" title="Open ' + escapeHtml(row.draftNo || 'draft') + '">' +
+        '<span>' + escapeHtml(customer) + '</span>' +
+        '<strong>' + escapeHtml(formatMoney(Number(row.grandTotal) || 0)) + '</strong>' +
+        '<small>' + escapeHtml(posFormatDraftTime_(row.updatedAt)) + '</small>' +
+      '</button>';
+    }).join('');
+    host.hidden = rows.length === 0;
+  }
+
+  function posLoadRecentDrafts_() {
+    var host = document.getElementById('posRecentDrafts');
+    return serverCall('getSalesDraftList', authToken).then(function (rows) {
+      posState.recentDrafts = (rows || []).slice(0, 3);
+      posRenderRecentDrafts_();
+      return posState.recentDrafts;
+    }).catch(function () {
+      posState.recentDrafts = [];
+      if (host) host.hidden = true;
+      return [];
+    });
+  }
+
+  // ---------------- Cash session ----------------
+  function posSetGlobalSessionStatus_(status) {
+    var button = document.getElementById('cashSessionToggleBtn');
+    var statusEl = document.getElementById('cashSessionTopbarStatus');
+    if (!button || !statusEl) return;
+
+    var normalized = status === 'Closing' ? 'Closing' : (status === 'Open' ? 'Open' : 'Closed');
+    statusEl.textContent = normalized;
+    statusEl.className = 'topbar-cash-session-status ' +
+      (normalized === 'Open' ? 'is-open' : (normalized === 'Closing' ? 'is-closing' : 'is-closed'));
+    button.title = 'Cash Session — ' + normalized;
+    button.setAttribute('aria-label', 'Cash Session — ' + normalized);
+  }
+
+  function posCanManageCashSession_() {
+    return typeof hasActionPermission_ !== 'function' || hasActionPermission_('pos', 'add');
+  }
+
+  function posRenderSessionModalState_(summary) {
+    var has = !!summary;
+    var noSession = document.getElementById('posNoSessionCard');
+    var banner = document.getElementById('posSessionBanner');
+    var startBtn = document.getElementById('posStartSessionBtn');
+    var closeBtn = document.getElementById('posCloseSessionBtn');
+    if (noSession) noSession.hidden = has;
+    if (banner) banner.hidden = !has;
+    if (startBtn) startBtn.hidden = !posCanManageCashSession_();
+    if (closeBtn) closeBtn.hidden = !has || !posCanManageCashSession_();
+  }
+
+  function posApplySessionSummary_(summary) {
+    if (!summary) return null;
+    posState.closeSessionSummary = summary;
+    document.getElementById('posBannerOpenedAt').textContent = summary.openedAt ? new Date(summary.openedAt).toLocaleTimeString() : '';
+    document.getElementById('posBannerOpening').textContent = formatMoney(summary.openingCash);
+    document.getElementById('posBannerIn').textContent = formatMoney(summary.cashIn);
+    document.getElementById('posBannerOut').textContent = formatMoney(summary.cashOut);
+    document.getElementById('posBannerExpected').textContent = formatMoney(summary.expectedCash);
+    document.getElementById('posSessionDetailStatus').textContent = summary.status || 'Open';
+    document.getElementById('posSessionDetailNote').textContent = summary.notes || '—';
+    posRenderCashMismatchAlert_(summary.cashMismatch || posState.openingCashMismatch);
+    return summary;
+  }
+
+  function posRenderSessionUI_() {
+    var has = !!posState.activeSession;
+    var status = has ? (posState.activeSession.Status === 'Closing' ? 'Closing' : 'Open') : 'Closed';
+    var canPost = has && posState.activeSession.Status !== 'Closing';
+
+    posSetGlobalSessionStatus_(status);
+    posRenderSessionModalState_(has ? { status: status } : null);
+
+    document.getElementById('posCompleteBtn').disabled = !canPost;
+    document.getElementById('posCompleteBtn').title = canPost ? '' : (has ? 'Finish closing the cash session before taking a sale.' : 'Start your cash session from the top bar before taking a sale.');
+    var draftBtn = document.getElementById('posSaveDraftBtn');
+    if (draftBtn) draftBtn.disabled = posState.cart.length === 0;
+    if (has) posRefreshSessionSummary_();
+    else {
+      posState.closeSessionSummary = null;
+      posRenderCashMismatchAlert_(null);
+    }
+  }
+
+  function posRefreshSessionSummary_() {
+    return serverCall('getCashSessionSummary', authToken).then(function (summary) {
+      posState.activeSession = summary ? {
+        'Session ID': summary.sessionId || '',
+        Status: summary.status || 'Open'
+      } : null;
+      posSetGlobalSessionStatus_(summary ? summary.status : 'Closed');
+      posRenderSessionModalState_(summary);
+
+      var completeBtn = document.getElementById('posCompleteBtn');
+      if (completeBtn) {
+        var canPost = !!summary && summary.status !== 'Closing';
+        completeBtn.disabled = !canPost;
+        completeBtn.title = canPost ? '' : (summary ? 'Finish closing the cash session before taking a sale.' : 'Start your cash session from the top bar before taking a sale.');
+      }
+
+      if (!summary) {
+        posState.closeSessionSummary = null;
+        posRenderCashMismatchAlert_(null);
+        return null;
+      }
+      return posApplySessionSummary_(summary);
+    }).catch(function (err) {
+      showToast(err.message, 'error');
+      return null;
+    });
+  }
+
+  function posRefreshGlobalSessionStatus_(quiet) {
+    var button = document.getElementById('cashSessionToggleBtn');
+    if (!button) return Promise.resolve(null);
+
+    var canView = typeof hasActionPermission_ !== 'function' || hasActionPermission_('pos', 'view');
+    button.hidden = !canView;
+    if (!canView || !authToken) return Promise.resolve(null);
+
+    return serverCall('getCashSessionSummary', authToken).then(function (summary) {
+      posState.activeSession = summary ? {
+        'Session ID': summary.sessionId || '',
+        Status: summary.status || 'Open'
+      } : null;
+      posSetGlobalSessionStatus_(summary ? summary.status : 'Closed');
+      posRenderSessionModalState_(summary);
+
+      var completeBtn = document.getElementById('posCompleteBtn');
+      if (completeBtn) {
+        var canPost = !!summary && summary.status !== 'Closing';
+        completeBtn.disabled = !canPost;
+        completeBtn.title = canPost ? '' : (summary ? 'Finish closing the cash session before taking a sale.' : 'Start your cash session from the top bar before taking a sale.');
+      }
+
+      if (!summary) {
+        posState.closeSessionSummary = null;
+        posRenderCashMismatchAlert_(null);
+        return null;
+      }
+      return posApplySessionSummary_(summary);
+    }).catch(function (err) {
+      if (!quiet) showToast(err.message || 'Could not load cash session.', 'error');
+      return null;
+    });
+  }
+
+  function posOpenSessionModal_() {
+    openModal('posSessionModal');
+    return posRefreshGlobalSessionStatus_(false);
+  }
+
+  // Stays visible across refreshes until the Cash Book balance is brought
+  // back in line with the opening cash — the server re-checks that
+  // condition on every getCashSessionSummary call, so once the user logs
+  // the transaction that explains the gap, it just stops coming back.
+  function posCashMismatchMessage_(mismatch) {
+    if (!mismatch) return '';
+    return mismatch.direction === 'less'
+      ? 'Opening cash is ' + formatMoney(mismatch.amount) + ' less than the previous close. Record the actual transaction, then explain it in Cash Reconciliation.'
+      : 'Opening cash is ' + formatMoney(mismatch.amount) + ' more than the previous close. Record the actual transaction, then explain it in Cash Reconciliation.';
+  }
+
+  function posCashMismatchKey_(mismatch) {
+    if (!mismatch) return '';
+    var sessionId = posState.activeSession && (posState.activeSession['Session ID'] || posState.activeSession.sessionId) || '';
+    return [sessionId, mismatch.direction || '', Number(mismatch.amount) || 0].join('|');
+  }
+
+  function posRenderCashMismatchAlert_(mismatch) {
+    var el = document.getElementById('posCashMismatchAlert');
+    if (!mismatch) { el.hidden = true; return; }
+    var key = posCashMismatchKey_(mismatch);
+    if (key && key === posState.dismissedCashMismatchKey) { el.hidden = true; return; }
+    document.getElementById('posCashMismatchText').textContent = posCashMismatchMessage_(mismatch);
+    el.dataset.mismatchKey = key;
+    el.hidden = false;
+  }
+
+  function posDismissCashMismatchAlert_() {
+    var el = document.getElementById('posCashMismatchAlert');
+    posState.dismissedCashMismatchKey = el.dataset.mismatchKey || posCashMismatchKey_(posState.openingCashMismatch);
+    el.hidden = true;
+  }
+
+  function posHandleStartedSession_(started) {
+    var mismatch = started && started.cashMismatch ? started.cashMismatch : null;
+    posState.openingCashMismatch = mismatch;
+    return posLoad().then(function () {
+      if (mismatch) {
+        posRenderCashMismatchAlert_(mismatch);
+        showToast(posCashMismatchMessage_(mismatch), 'error');
+      } else {
+        showToast('Cash session started', 'success');
+      }
+    });
+  }
+
+  function posCloseCountedDefault_(summary) {
+    if (summary && summary.status === 'Closing' && summary.countedCash !== '' && summary.countedCash !== undefined) {
+      return Number(summary.countedCash) || 0;
+    }
+    return Number(summary && summary.expectedCash) || 0;
+  }
+
+  function posCloseNoteDefault_(summary) {
+    return summary && summary.status === 'Closing' ? String(summary.notes || '') : '';
+  }
+
+  document.getElementById('cashSessionToggleBtn').addEventListener('click', posOpenSessionModal_);
+  document.getElementById('posCashMismatchDismiss').addEventListener('click', posDismissCashMismatchAlert_);
+
+  document.getElementById('posStartSessionBtn').addEventListener('click', function () {
+    var errEl = document.getElementById('posStartSessionError');
+    errEl.style.display = 'none';
+    var openingCash = Number(document.getElementById('posOpeningCash').value);
+    var openingNote = document.getElementById('posOpeningNote').value.trim();
+    if (!isFinite(openingCash) || openingCash < 0) { errEl.textContent = 'Enter a valid opening cash amount.'; errEl.style.display = 'block'; return; }
+    var startPayload = { openingCash: openingCash, openingNote: openingNote };
+    runConfirmedAction({
+      type: 'financial',
+      title: 'Start Cash Session?',
+      message: 'Confirm the opening cash before starting this cash session.',
+      details: [
+        { label: 'Opening Cash', value: formatMoney(openingCash), emphasis: true },
+        { label: 'In words', value: banglaAmountInWords_(openingCash) },
+        { label: 'Note', value: openingNote }
+      ],
+      confirmLabel: 'Start Session',
+      loadingLabel: 'Starting...',
+      trigger: document.getElementById('posStartSessionBtn')
+    }, function () {
+      return withLoader(serverCall('startCashSession', authToken, startPayload.openingCash, startPayload.openingNote)).then(posHandleStartedSession_);
+    }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+  });
+
+  document.getElementById('posCloseSessionBtn').addEventListener('click', function () {
+    closeModal('posSessionModal');
+    serverCall('getCashSessionSummary', authToken).then(function (summary) {
+      posState.closeSessionSummary = summary;
+      document.getElementById('posCloseExpected').textContent = formatMoney(summary.expectedCash);
+      document.getElementById('posCountedCash').value = posCloseCountedDefault_(summary);
+      document.getElementById('posCloseNote').value = posCloseNoteDefault_(summary);
+      document.getElementById('posCloseError').style.display = 'none';
+      openModal('posCloseModal');
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  });
+
+  document.getElementById('posCloseConfirmBtn').addEventListener('click', function () {
+    var errEl = document.getElementById('posCloseError');
+    errEl.style.display = 'none';
+    var countedCash = Number(document.getElementById('posCountedCash').value);
+    var closeNote = document.getElementById('posCloseNote').value.trim();
+    var summary = posState.closeSessionSummary || {};
+    var expectedCash = Number(summary.expectedCash) || 0;
+    if (!isFinite(countedCash) || countedCash < 0) { errEl.textContent = 'Enter a valid counted cash amount.'; errEl.style.display = 'block'; return; }
+    var closePayload = { countedCash: countedCash, closeNote: closeNote };
+    var difference = countedCash - expectedCash;
+    runConfirmedAction({
+      type: 'financial',
+      title: 'Close Cash Session?',
+      message: 'Review the expected and counted cash before closing this session.',
+      details: [
+        { label: 'Expected Cash', value: formatMoney(expectedCash), emphasis: true },
+        { label: 'Counted Cash', value: formatMoney(countedCash), emphasis: true },
+        { label: 'Difference', value: formatMoney(difference), emphasis: difference !== 0 },
+        { label: 'In words', value: banglaAmountInWords_(countedCash) },
+        { label: 'Note', value: closeNote }
+      ],
+      confirmLabel: 'Close Session',
+      loadingLabel: 'Closing...',
+      trigger: document.getElementById('posCloseConfirmBtn')
+    }, function () {
+      return withLoader(serverCall('closeCashSession', authToken, closePayload.countedCash, closePayload.closeNote)).then(function (res) {
+        closeModal('posCloseModal');
+        var msg = res.variance === 0 ? 'Day closed, cash matched exactly.' : ('Day closed. Variance: ' + formatMoney(res.variance));
+        showToast(msg, res.variance === 0 ? 'success' : 'error');
+        posLoad();
+      });
+    }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+  });
+
+  // ---------------- Product grid / smart search ----------------
+  var posSearchEl_ = document.getElementById('posSearch');
+  var posSearchClearEl_ = document.getElementById('posSearchClear');
+  var posCategoryFilterEl_ = document.getElementById('posCategoryFilter');
+  var posBrandFilterEl_ = document.getElementById('posBrandFilter');
+
+  function posFillProductFilters_() {
+    function fill(select, values, allLabel) {
+      var current = select.value || '';
+      var unique = [];
+      values.forEach(function (v) {
+        var text = String(v || '').trim();
+        if (text && unique.indexOf(text) === -1) unique.push(text);
+      });
+      unique.sort(function (a, b) { return a.localeCompare(b); });
+      select.innerHTML = '<option value="">' + allLabel + '</option>';
+      unique.forEach(function (value) {
+        var option = document.createElement('option');
+        option.value = value; option.textContent = value; select.appendChild(option);
+      });
+      if (unique.indexOf(current) !== -1) select.value = current;
+    }
+    fill(posCategoryFilterEl_, posState.products.map(function (p) { return p.category; }), 'All Categories');
+    fill(posBrandFilterEl_, posState.products.map(function (p) { return p.brand; }), 'All Brands');
+  }
+
+  function posProductFilterChanged_() {
+    posState.searchActiveIndex = posSearchEl_.value ? 0 : -1;
+    posRenderProductGrid_();
+  }
+  posCategoryFilterEl_.addEventListener('change', posProductFilterChanged_);
+  posBrandFilterEl_.addEventListener('change', posProductFilterChanged_);
+
+  posSearchEl_.addEventListener('input', function () {
+    posState.searchActiveIndex = posSearchEl_.value ? 0 : -1;
+    posRenderProductGrid_();
+  });
+
+  posSearchClearEl_.addEventListener('click', function () {
+    posClearProductSearch_();
+    posSearchEl_.focus();
+  });
+
+  posSearchEl_.addEventListener('keydown', function (e) {
+    var count = posState.searchResults.length;
+    if (e.key === 'ArrowDown') {
+      if (!count) return;
+      e.preventDefault();
+      posState.searchActiveIndex = Math.min(Math.max(posState.searchActiveIndex, -1) + 1, count - 1);
+      posApplySearchHighlight_();
+    } else if (e.key === 'ArrowUp') {
+      if (!count) return;
+      e.preventDefault();
+      posState.searchActiveIndex = Math.max(posState.searchActiveIndex - 1, 0);
+      posApplySearchHighlight_();
+    } else if (e.key === 'Enter') {
+      if (!count || !smartSearchNormalize_(posSearchEl_.value)) return;
+      e.preventDefault();
+      var selected = posState.searchResults[posState.searchActiveIndex] || posState.searchResults[0];
+      if (!selected) return;
+      var clearAfterPick = smartProductHasExactCode_(selected, posSearchEl_.value);
+      posAddToCart_(selected);
+      // Hardware barcode scanners normally finish with Enter. Clearing only
+      // exact barcode picks keeps the field ready for the next scan while
+      // normal typed searches stay visible for repeated manual selection.
+      if (clearAfterPick) posClearProductSearch_();
+    } else if (e.key === 'Escape') {
+      posClearProductSearch_();
+    }
+  });
+
+  function posClearProductSearch_() {
+    posSearchEl_.value = '';
+    posState.searchActiveIndex = -1;
+    posRenderProductGrid_();
+  }
+
+  function posApplySearchHighlight_() {
+    var tiles = document.querySelectorAll('#posProductGrid .product-tile');
+    Array.prototype.forEach.call(tiles, function (tile, i) {
+      var active = i === posState.searchActiveIndex;
+      tile.classList.toggle('search-active', active);
+      tile.setAttribute('aria-selected', active ? 'true' : 'false');
+      if (active) tile.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    });
+  }
+
+  function posRenderProductGrid_() {
+    var grid = document.getElementById('posProductGrid');
+    var q = posSearchEl_.value || '';
+    var category = posCategoryFilterEl_.value || '';
+    var brand = posBrandFilterEl_.value || '';
+    var hasSearchFilter = !!(String(q).trim() || category || brand);
+    // Search is local and instant. The index on every product was built once
+    // in posLoad(), not reconstructed on each keypress.
+    var list = smartSearchProducts_(posState.products, q, q ? 80 : undefined).filter(function (p) {
+      if (category && String(p.category || '') !== category) return false;
+      if (brand && String(p.brand || '') !== brand) return false;
+      return true;
+    });
+    posState.searchResults = list;
+    grid.classList.toggle('mobile-search-idle', !hasSearchFilter);
+    if (!hasSearchFilter || !list.length) posState.searchActiveIndex = -1;
+    else if (posState.searchActiveIndex < 0) posState.searchActiveIndex = 0;
+    else posState.searchActiveIndex = Math.min(posState.searchActiveIndex, list.length - 1);
+    posSearchClearEl_.hidden = !q;
+
+    grid.innerHTML = '';
+    list.forEach(function (p, idx) {
+      var tile = document.createElement('button');
+      tile.type = 'button';
+      tile.className = 'product-tile' + (idx === posState.searchActiveIndex ? ' search-active' : '');
+      tile.setAttribute('role', 'option');
+      tile.setAttribute('aria-selected', idx === posState.searchActiveIndex ? 'true' : 'false');
+      var stock = Number(p.stock) || 0;
+      var stockColor = stock <= 0 ? 'color:var(--color-danger); font-weight:700;' : '';
+      var meta = [p.brand || '', p.category || ''].filter(Boolean).join(' · ');
+      tile.innerHTML =
+        '<div class="p-name">' + escapeHtml(p.name) + '</div>' +
+        (meta ? '<div class="p-search-meta">' + escapeHtml(meta) + '</div>' : '') +
+        '<div class="p-price">' + formatMoney(p.autoSellingPrice !== undefined ? p.autoSellingPrice : p.sellingPrice) + '</div>' +
+        '<div class="p-stock" style="' + stockColor + '">' + stock + ' ' + escapeHtml(p.unit || '') + ' in stock</div>';
+      tile.addEventListener('mouseenter', function () { posState.searchActiveIndex = idx; posApplySearchHighlight_(); });
+      tile.addEventListener('click', function () {
+        posState.searchActiveIndex = idx;
+        posAddToCart_(p);
+        if (isPhoneViewport_()) posClearProductSearch_();
+      });
+      grid.appendChild(tile);
+    });
+    document.getElementById('posProductEmpty').hidden = !hasSearchFilter || list.length > 0;
+  }
+
+  /**
+   * Pure automatic pricing helper. The visible Unit Price is rounded to two
+   * decimals, while Line Total stays the exact 2-decimal sum of FIFO lot
+   * selling prices. No lot breakdown is rendered to the customer.
+   */
+  function posComputeAutoPricing_(product, qty) {
+    var quantity = Number(qty) || 0;
+    if (quantity <= 0) return { unitPrice: 0, lineTotal: 0 };
+    var need = quantity;
+    var total = 0;
+    var segments = (product && product.lotPricing) || [];
+    for (var i = 0; i < segments.length && need > 0; i++) {
+      var available = Number(segments[i].qty) || 0;
+      var take = Math.min(available, need);
+      if (take <= 0) continue;
+      total += take * (Number(segments[i].sellPrice) || 0);
+      need -= take;
+    }
+    if (need > 0) {
+      var fallback = product && product.fallbackSellPrice !== undefined
+        ? Number(product.fallbackSellPrice) || 0
+        : (product ? Number(product.sellingPrice) || 0 : 0);
+      total += need * fallback;
+    }
+    var lineTotal = Math.round((total + Number.EPSILON) * 100) / 100;
+    var unitPrice = Math.round(((lineTotal / quantity) + Number.EPSILON) * 100) / 100;
+    return { unitPrice: unitPrice, lineTotal: lineTotal };
+  }
+
+  function posProductById_(productId) {
+    return posState.products.filter(function (p) { return p.id === productId; })[0] || null;
+  }
+
+  function posApplyAutomaticPricing_(line) {
+    if (!line || line.priceMode !== 'auto') return;
+    var pricing = posComputeAutoPricing_(posProductById_(line.productId), line.qty);
+    line.unitPrice = pricing.unitPrice;
+    line.lineTotal = pricing.lineTotal;
+  }
+
+  function posApplyManualLineTotal_(line) {
+    line.lineTotal = Math.round((((Number(line.qty) || 0) * (Number(line.unitPrice) || 0)) + Number.EPSILON) * 100) / 100;
+  }
+
+  function posCreateCartLine_(product) {
+    var pricing = posComputeAutoPricing_(product, 1);
+    return {
+      productId: product.id,
+      name: product.name,
+      unit: product.unit,
+      unitPrice: pricing.unitPrice,
+      lineTotal: pricing.lineTotal,
+      priceMode: 'auto',
+      qty: 1,
+      shortageResolution: 'negative',
+      vendorId: '', vendorName: '', vendorUnitCost: '',
+      editAvailableBoost: 0
+    };
+  }
+
+  function posAddToCart_(product) {
+    posState.cartEntryIndex = null;
+    var line = posState.cart.filter(function (l) { return l.productId === product.id; })[0];
+    if (line) {
+      line.qty += 1;
+      if (line.priceMode === 'auto') posApplyAutomaticPricing_(line);
+      else { if (line.priceMode === 'fixed') line.priceMode = 'manual'; posApplyManualLineTotal_(line); }
+    } else {
+      posState.cart.push(posCreateCartLine_(product));
+    }
+    posRenderCart_();
+  }
+
+  function posCartProductMatches_(query) {
+    var q = String(query || '').trim();
+    if (!q) return [];
+    return smartSearchProducts_(posState.products, q, 8);
+  }
+
+  function posCartProductResultsHtml_(query, mode, index) {
+    return posCartProductMatches_(query).map(function (product) {
+      var stock = Number(product.stock) || 0;
+      return '<button type="button" class="pos-cart-product-option" role="option" data-cart-product-pick="' + escapeHtml(product.id) + '" data-cart-product-mode="' + mode + '"' +
+        (index === null || index === undefined ? '' : ' data-i="' + index + '"') + '>' +
+          '<span>' + escapeHtml(product.name) + '</span>' +
+          '<small>' + escapeHtml(product.unit || '') + ' · Stock ' + stock + ' · ' + formatMoney(product.autoSellingPrice !== undefined ? product.autoSellingPrice : product.sellingPrice) + '</small>' +
+        '</button>';
+    }).join('');
+  }
+
+  function posCartProductPopup_() {
+    var popup = document.getElementById('posCartProductPopup');
+    if (popup) return popup;
+    popup = document.createElement('div');
+    popup.id = 'posCartProductPopup';
+    popup.className = 'pos-cart-product-popup';
+    popup.setAttribute('role', 'listbox');
+    popup.hidden = true;
+    document.body.appendChild(popup);
+    popup.addEventListener('mousedown', function (e) {
+      if (e.target.closest('[data-cart-product-pick]')) e.preventDefault();
+    });
+    popup.addEventListener('click', function (e) {
+      var option = e.target.closest('[data-cart-product-pick]');
+      if (!option) return;
+      var product = posProductById_(option.dataset.cartProductPick);
+      if (product && posChooseCartProduct_(product, option.dataset.i, option.dataset.cartProductMode || 'add')) {
+        posCloseCartProductPopup_();
+      }
+    });
+    return popup;
+  }
+
+  function posCloseCartProductPopup_() {
+    var popup = document.getElementById('posCartProductPopup');
+    if (!popup) return;
+    popup.hidden = true;
+    popup.innerHTML = '';
+  }
+
+  function posPlaceCartProductResults_(input, host) {
+    if (!input || !host || host.hidden) return;
+    var inputRect = input.getBoundingClientRect();
+    var viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+    var viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+    var margin = 8;
+    var gap = 4;
+    var width = Math.min(Math.max(inputRect.width, 300), Math.max(160, viewportWidth - (margin * 2)));
+    var left = Math.max(margin, Math.min(inputRect.left, viewportWidth - width - margin));
+    host.style.width = Math.round(width) + 'px';
+    host.style.left = Math.round(left) + 'px';
+    host.style.right = 'auto';
+    host.style.bottom = 'auto';
+
+    var resultHeight = Math.min(host.scrollHeight || 220, 220);
+    var roomBelow = viewportHeight - inputRect.bottom - margin;
+    var roomAbove = inputRect.top - margin;
+    var openAbove = roomBelow < Math.min(resultHeight, 120) && roomAbove > roomBelow;
+    var top = openAbove
+      ? Math.max(margin, inputRect.top - resultHeight - gap)
+      : Math.min(viewportHeight - resultHeight - margin, inputRect.bottom + gap);
+    host.style.top = Math.max(margin, Math.round(top)) + 'px';
+  }
+
+  function posRenderCartProductResults_(input, host, mode, index) {
+    if (!input) return;
+    if (host) { host.hidden = true; host.innerHTML = ''; }
+    var popup = posCartProductPopup_();
+    var html = posCartProductResultsHtml_(input.value, mode, index);
+    popup.innerHTML = html;
+    popup.hidden = !html;
+    popup.dataset.activeIndex = html ? '0' : '-1';
+    if (!html) return;
+    Array.prototype.forEach.call(popup.querySelectorAll('[data-cart-product-pick]'), function (option, optionIndex) {
+      var active = optionIndex === 0;
+      option.classList.toggle('is-active', active);
+      option.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+    posPlaceCartProductResults_(input, popup);
+  }
+
+  function posMoveCartProductActive_(delta) {
+    var popup = document.getElementById('posCartProductPopup');
+    if (!popup || popup.hidden) return null;
+    var options = popup.querySelectorAll('[data-cart-product-pick]');
+    if (!options.length) return null;
+    var activeIndex = Number(popup.dataset.activeIndex);
+    if (!isFinite(activeIndex) || activeIndex < 0) activeIndex = 0;
+    activeIndex = Math.max(0, Math.min(options.length - 1, activeIndex + Number(delta || 0)));
+    popup.dataset.activeIndex = String(activeIndex);
+    Array.prototype.forEach.call(options, function (option, optionIndex) {
+      var active = optionIndex === activeIndex;
+      option.classList.toggle('is-active', active);
+      option.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+    var selected = options[activeIndex];
+    if (selected && selected.scrollIntoView) selected.scrollIntoView({ block: 'nearest' });
+    return selected || null;
+  }
+
+  function posActiveCartProductOption_() {
+    var popup = document.getElementById('posCartProductPopup');
+    if (!popup || popup.hidden) return null;
+    var options = popup.querySelectorAll('[data-cart-product-pick]');
+    if (!options.length) return null;
+    var activeIndex = Number(popup.dataset.activeIndex);
+    if (!isFinite(activeIndex) || activeIndex < 0 || activeIndex >= options.length) activeIndex = 0;
+    return options[activeIndex] || options[0] || null;
+  }
+
+  function posReplaceCartProduct_(index, product) {
+    index = Number(index);
+    if (!product || isNaN(index) || index < 0 || index >= posState.cart.length) return false;
+    var current = posState.cart[index];
+    if (current && current.productId === product.id) {
+      posState.cartEditIndex = null;
+      posRenderCart_();
+      return true;
+    }
+    var already = posState.cart.some(function (line, i) {
+      return i !== index && line.productId === product.id;
+    });
+    if (already) {
+      showToast(product.name + ' is already in cart.', 'error');
+      return false;
+    }
+    posState.cart[index] = posCreateCartLine_(product);
+    posState.cartEditIndex = null;
+    posState._addVendorForLineIndex = null;
+    posRenderCart_();
+    return true;
+  }
+
+  function posFocusCartEntryProduct_() {
+    var input = document.querySelector('#posCartList .pos-cart-entry-row [data-cart-product-input][data-cart-product-mode="add"]');
+    if (input) input.focus();
+  }
+
+  function posFocusCartEntryQty_() {
+    var input = document.querySelector('#posCartList [data-cart-entry-qty]');
+    if (input) { input.focus(); input.select(); }
+  }
+
+  function posStartCartEntry_(product) {
+    if (!product) return false;
+    var already = posState.cart.some(function (line) { return line.productId === product.id; });
+    if (already) {
+      showToast(product.name + ' is already in cart.', 'error');
+      return false;
+    }
+    posState.cart.push(posCreateCartLine_(product));
+    posState.cartEntryIndex = posState.cart.length - 1;
+    posState.cartEditIndex = null;
+    posRenderCart_();
+    posFocusCartEntryQty_();
+    return true;
+  }
+
+  function posChangeCartEntryProduct_(product) {
+    var index = Number(posState.cartEntryIndex);
+    if (!product || isNaN(index) || index < 0 || index >= posState.cart.length) return false;
+    var already = posState.cart.some(function (line, i) {
+      return i !== index && line.productId === product.id;
+    });
+    if (already) {
+      showToast(product.name + ' is already in cart.', 'error');
+      return false;
+    }
+    posState.cart[index] = posCreateCartLine_(product);
+    posRenderCart_();
+    posFocusCartEntryQty_();
+    return true;
+  }
+
+  function posFinishCartEntry_(focusNext) {
+    if (posState.cartEntryIndex === null) return false;
+    posState.cartEntryIndex = null;
+    posRenderCart_();
+    if (focusNext !== false) posFocusCartEntryProduct_();
+    return true;
+  }
+
+  function posCartEntryOutsideClick_(event) {
+    if (posState.cartEntryIndex === null) return;
+    var list = document.getElementById('posCartList');
+    if (!list) return;
+    var activeRow = list.querySelector('.pos-cart-entry-row.is-active');
+    if (!activeRow || activeRow.contains(event.target)) return;
+
+    var popup = document.getElementById('posCartProductPopup');
+    if (popup && popup.contains(event.target)) return;
+
+    var nextAddInput = event.target && event.target.closest
+      ? event.target.closest('[data-cart-product-input][data-cart-product-mode="add"]')
+      : null;
+    posFinishCartEntry_(!!nextAddInput);
+  }
+
+  function posChooseCartProduct_(product, replaceIndex, mode) {
+    if (!product) return false;
+    if (mode === 'entry') return posChangeCartEntryProduct_(product);
+    if (mode === 'replace' || (replaceIndex !== null && replaceIndex !== undefined && replaceIndex !== '')) {
+      return posReplaceCartProduct_(Number(replaceIndex), product);
+    }
+    return posStartCartEntry_(product);
+  }
+
+  /** The product's total Current Stock — see posLoad(). Never a (product, supplier) row's own scoped figure. */
+  function posProductStock_(productId) {
+    return posState.productStockById[productId] || 0;
+  }
+
+  /** Live stock for this cart line's product, plus any Update-Mode boost — see posAddToCart_. */
+  function posLineAvailableStock_(line) {
+    return posProductStock_(line.productId) + (Number(line.editAvailableBoost) || 0);
+  }
+
+  function posIsValidNonNegNum_(v) {
+    var n = Number(v);
+    return v !== '' && v !== null && v !== undefined && !isNaN(n) && n >= 0;
+  }
+
+  // ---------------- Manage Vendors (Vendor/Consignment Sourcing) ----------------
+  // The Manage Vendors button is optional in the current POS layout.
+  // Do not let its absence stop the rest of the POS script from wiring up.
+  var posManageVendorsBtn = document.getElementById('posManageVendorsBtn');
+  if (posManageVendorsBtn) {
+    posManageVendorsBtn.addEventListener('click', function () {
+      document.getElementById('posVendorNewName').value = '';
+      document.getElementById('posVendorNewPhone').value = '';
+      document.getElementById('posVendorManageError').style.display = 'none';
+      posRenderVendorManageList_();
+      openModal('posManageVendorsModal');
+    });
+  }
+
+  function posRenderVendorManageList_() {
+    var body = document.getElementById('posVendorManageBody');
+    body.innerHTML = '';
+    posState.vendorsAll.forEach(function (v) {
+      var statusBadge = v.status === 'Active' ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-danger">Inactive</span>';
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td>' + escapeHtml(v.name) + '</td>' +
+        '<td>' + escapeHtml(v.phone || '') + '</td>' +
+        '<td class="num mono">' + formatMoney(v.currentDue) + '</td>' +
+        '<td>' + statusBadge + '</td>' +
+        '<td style="text-align:right;"><button class="btn" data-act="toggle" data-id="' + v.id + '" data-status="' + v.status + '">' + (v.status === 'Active' ? 'Deactivate' : 'Activate') + '</button></td>';
+      body.appendChild(tr);
+    });
+    document.getElementById('posVendorManageEmpty').hidden = posState.vendorsAll.length > 0;
+  }
+
+  document.getElementById('posVendorAddBtn').addEventListener('click', function () {
+    var name = document.getElementById('posVendorNewName').value.trim();
+    var errEl = document.getElementById('posVendorManageError');
+    errEl.style.display = 'none';
+    if (!name) return;
+    var phone = document.getElementById('posVendorNewPhone').value.trim();
+    withLoader(serverCall('addVendor', authToken, { name: name, phone: phone })).then(function (res) {
+      var v = { id: res.id, name: name, phone: phone, currentDue: 0, status: 'Active' };
+      posState.vendorsAll.push(v);
+      posState.vendors.push(v);
+      document.getElementById('posVendorNewName').value = '';
+      document.getElementById('posVendorNewPhone').value = '';
+      posRenderVendorManageList_();
+      showToast('Vendor added', 'success');
+    }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+  });
+
+  document.getElementById('posVendorManageBody').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-act="toggle"]');
+    if (!btn) return;
+    var next = btn.dataset.status === 'Active' ? 'Inactive' : 'Active';
+    var vendor = posState.vendorsAll.filter(function (x) { return x.id === btn.dataset.id; })[0];
+    runConfirmedAction({type:'state-change',title:(next === 'Inactive' ? 'Deactivate Vendor?' : 'Activate Vendor?'),message:'This changes whether the vendor can be selected for POS shortage sourcing.',details:[{label:'Vendor',value:vendor ? vendor.name : btn.dataset.id,emphasis:true},{label:'New Status',value:next}],confirmLabel:(next === 'Inactive' ? 'Deactivate' : 'Activate'),loadingLabel:'Updating...',trigger:btn}, function () {
+      return withLoader(serverCall('setVendorStatus', authToken, btn.dataset.id, next)).then(function () {
+        if (vendor) vendor.status = next;
+        posState.vendors = posState.vendorsAll.filter(function (x) { return x.status !== 'Inactive'; });
+        posRenderVendorManageList_();
+        posRenderCart_(); // any open shortage panel's vendor dropdown needs to reflect the change
+        showToast('Vendor updated', 'success');
+      });
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  });
+
+  // ---------------- Cart ----------------
+  /**
+   * Vendor/Consignment Sourcing shortage chooser, rendered inline right
+   * under a cart row whenever that line's qty exceeds what's actually
+   * available (see posLineAvailableStock_). Returns '' when there's no
+   * shortfall, so callers can just conditionally append the result.
+   */
+  function posShortagePanelHtml_(line, i) {
+    var available = posLineAvailableStock_(line);
+    var shortfall = line.qty - available;
+    if (shortfall <= 0) return '';
+    var res = line.shortageResolution || 'negative';
+
+    var vendorSection = '';
+    if (res === 'vendor') {
+      var vendorOptions = '<option value="">Select vendor...</option>' + posState.vendors.map(function (v) {
+        return '<option value="' + v.id + '"' + (v.id === line.vendorId ? ' selected' : '') + '>' + escapeHtml(v.name) + '</option>';
+      }).join('');
+      var total = shortfall * (Number(line.vendorUnitCost) || 0);
+      var quickOpen = posState._addVendorForLineIndex === i;
+      vendorSection =
+        '<div class="shortage-vendor-grid">' +
+          '<div class="shortage-vendor-field"><label style="font-size:11px; margin:0;">Vendor</label><select data-shortage-f="vendorId" data-i="' + i + '">' + vendorOptions + '</select></div>' +
+          '<div class="shortage-cost-field"><label style="font-size:11px; margin:0;">Unit Cost</label><input type="number" min="0" step="0.01" value="' + (line.vendorUnitCost === '' ? '' : line.vendorUnitCost) + '" data-shortage-f="vendorUnitCost" data-i="' + i + '"></div>' +
+          '<button type="button" class="btn" data-shortage-act="quickvendor" data-i="' + i + '">+ New</button>' +
+          '<div class="shortage-total" style="font-size:12px; color:var(--color-text-muted); white-space:nowrap;">Total: ' + formatMoney(total) + '</div>' +
+        '</div>' +
+        (quickOpen
+          ? '<div class="shortage-quick-vendor">' +
+              '<input type="text" placeholder="Name" data-shortage-quick="name" data-i="' + i + '" style="flex:1;">' +
+              '<input type="text" placeholder="Phone (optional)" data-shortage-quick="phone" data-i="' + i + '" style="max-width:140px;">' +
+              '<button type="button" class="btn btn-primary" data-shortage-act="quickvendorsave" data-i="' + i + '">Save</button>' +
+            '</div>'
+          : '');
+    }
+
+    return (
+      '<div class="cart-shortage-row" data-i="' + i + '" style="background:var(--color-danger-light); border-radius:8px; padding:8px 10px; margin-top:-2px;">' +
+        '<div style="font-size:12px; color:var(--color-danger); font-weight:600;">Shortfall: ' + shortfall + ' ' + escapeHtml(line.unit || '') + ' &mdash; choose how to cover it:</div>' +
+        '<div class="shortage-choice-row">' +
+          '<button type="button" class="btn" data-shortage-act="own" data-i="' + i + '">Own Stock (' + available + ')</button>' +
+          '<button type="button" class="btn' + (res === 'vendor' ? ' btn-primary' : '') + '" data-shortage-act="vendor" data-i="' + i + '">Vendor / Consignment</button>' +
+          '<button type="button" class="btn' + (res === 'negative' ? ' btn-primary' : '') + '" data-shortage-act="negative" data-i="' + i + '">Negative Stock Sale</button>' +
+        '</div>' +
+        vendorSection +
+      '</div>'
+    );
+  }
+
+  /**
+   * Purchase Price Visibility marker for a cart line — '' when this user
+   * isn't receiving cost data, or when this product has none on file.
+   *
+   * Renders a deliberately meaningless dot, never a label and never a
+   * title/tooltip: at a glance it reads as punctuation next to the unit, so
+   * a customer facing the screen has nothing to read. The figure itself is
+   * NOT in the markup — no data- attribute, no hidden span. It is looked up
+   * from posState.productCostById only when the dot is actually clicked
+   * (see the posCartList click handler), so it can't be lifted out of the
+   * DOM while hidden, and it leaves the screen again on its own.
+   */
+  function posCostEyeSvg_() {
+    return '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"></path><circle cx="12" cy="12" r="2.5"></circle></svg>';
+  }
+
+  function posCostMarkerHtml_(line, i) {
+    if (!posState.showCost) return '';
+    if (posState.productCostById[line.productId] === undefined) return '';
+    return ' <button type="button" class="c-cost" data-cost-i="' + i + '" aria-label="Show purchase price">' + posCostEyeSvg_() + '</button>';
+  }
+
+  function posRenderCart_() {
+    var list = document.getElementById('posCartList');
+    list.innerHTML = '';
+    if (posState.cartEditIndex !== null && (posState.cartEditIndex < 0 || posState.cartEditIndex >= posState.cart.length)) posState.cartEditIndex = null;
+    if (posState.cartEntryIndex !== null && (posState.cartEntryIndex < 0 || posState.cartEntryIndex >= posState.cart.length)) posState.cartEntryIndex = null;
+
+    posState.cart.forEach(function (line, i) {
+      if (line.priceMode === 'auto') posApplyAutomaticPricing_(line);
+      else if (line.priceMode === 'fixed') { /* preserve exact saved draft total */ }
+      else if (line.lineTotal === undefined) posApplyManualLineTotal_(line);
+
+      var lineTotal = Number(line.lineTotal) || 0;
+      var editingProduct = posState.cartEditIndex === i;
+      var activeEntry = posState.cartEntryIndex === i;
+      var productMode = activeEntry ? 'entry' : 'replace';
+      var productCell = (editingProduct || activeEntry)
+        ? '<div class="c-name is-editing"><div class="pos-cart-inline-picker"><input type="search" autocomplete="off" data-cart-product-input data-cart-product-mode="' + productMode + '" data-i="' + i + '" value="' + escapeHtml(line.name) + '" aria-label="' + (activeEntry ? 'Product' : 'Replace ' + escapeHtml(line.name)) + '"><div class="pos-cart-product-results" data-cart-product-results data-i="' + i + '" role="listbox" hidden></div></div></div>'
+        : '<div class="c-name"><div class="c-name-main"><button type="button" class="c-name-title c-product-edit" data-cart-product-edit data-i="' + i + '" title="Change product">' + escapeHtml(line.name) + '</button>' + posCostMarkerHtml_(line, i) + '</div><div class="c-name-meta">' + escapeHtml(line.unit || '') + '</div></div>';
+
+      var entryAttrs = activeEntry ? ' data-cart-entry-qty' : '';
+      var entryPriceAttrs = activeEntry ? ' data-cart-entry-price' : '';
+      var row = document.createElement('div');
+      row.className = 'cart-row' + (activeEntry ? ' pos-cart-entry-row is-active' : '');
+      row.innerHTML =
+        productCell +
+        '<div class="c-qty-wrap"><span class="c-mobile-label">Qty</span><input type="number" min="1" value="' + line.qty + '" data-i="' + i + '" data-f="qty"' + entryAttrs + ' aria-label="Quantity"></div>' +
+        '<div class="c-unit-wrap"><span class="c-mobile-label">Unit</span><div class="c-unit">' + escapeHtml(line.unit || '') + '</div></div>' +
+        '<div class="c-price-wrap"><span class="c-mobile-label">Price</span><input type="number" min="0" step="1" value="' + line.unitPrice + '" data-i="' + i + '" data-f="price"' + entryPriceAttrs + ' style="width:90px;" aria-label="Unit price">' +
+        (((line.priceMode === 'manual' || line.priceMode === 'fixed') && !posState.updateInvoiceId) ? '<button type="button" class="btn-link c-reset-lot-price" data-i="' + i + '" data-act="resetlot" title="Reset to Lot Price">Reset to Lot Price</button>' : '') + '</div>' +
+        '<div class="c-line-total-wrap"><span class="c-mobile-label">Total</span><div class="c-line-total">' + formatMoney(lineTotal) + '</div></div>' +
+        '<button class="cart-remove" data-i="' + i + '" title="Remove" aria-label="Remove item">&#10005;</button>';
+      list.appendChild(row);
+
+      var panelHtml = posShortagePanelHtml_(line, i);
+      if (panelHtml) list.insertAdjacentHTML('beforeend', panelHtml);
+    });
+
+    var entryRow = document.createElement('div');
+    entryRow.className = 'cart-row pos-cart-entry-row';
+    entryRow.innerHTML =
+      '<div class="c-name is-editing"><div class="pos-cart-inline-picker"><input type="search" autocomplete="off" data-cart-product-input data-cart-product-mode="add" placeholder="Add product…" aria-label="Add product to cart"><div class="pos-cart-product-results" data-cart-product-results role="listbox" hidden></div></div></div>' +
+      '<div class="c-qty-wrap"><span class="c-mobile-label">Qty</span><input type="number" aria-label="Quantity" disabled tabindex="-1"></div>' +
+      '<div class="c-unit-wrap"><span class="c-mobile-label">Unit</span><div class="c-unit">&nbsp;</div></div>' +
+      '<div class="c-price-wrap"><span class="c-mobile-label">Price</span><input type="number" aria-label="Unit price" disabled tabindex="-1"></div>' +
+      '<div class="c-line-total-wrap"><span class="c-mobile-label">Total</span><div class="c-line-total">&nbsp;</div></div>' +
+      '<span class="cart-remove-placeholder" aria-hidden="true"></span>';
+    list.appendChild(entryRow);
+
+    document.getElementById('posCartCount').textContent = posState.cart.length;
+    document.getElementById('posClearCartBtn').disabled = posState.cart.length === 0;
+    var draftBtn = document.getElementById('posSaveDraftBtn'); if (draftBtn) draftBtn.disabled = posState.cart.length === 0;
+    posEnhanceTabletSelects_();
+    posRecalcTotals_();
+  }
+
+  /** Rebuilds just line i's shortage panel in place — used after a qty keystroke so the qty input itself never loses focus (see the input listener below). */
+  function posSyncShortagePanel_(i) {
+    var list = document.getElementById('posCartList');
+    var existing = list.querySelector('.cart-shortage-row[data-i="' + i + '"]');
+    var html = posShortagePanelHtml_(posState.cart[i], i);
+    if (existing) existing.remove();
+    if (html) {
+      var rows = list.querySelectorAll('.cart-row');
+      rows[i].insertAdjacentHTML('afterend', html);
+    }
+    posEnhanceTabletSelects_();
+  }
+
+  document.getElementById('posClearCartBtn').addEventListener('click', function () {
+    if (!posState.cart.length) return;
+    posState.cart = [];
+    posState.cartEditIndex = null;
+    posState.cartEntryIndex = null;
+    posRenderCart_();
+  });
+
+  document.getElementById('posCartList').addEventListener('focusin', function (e) {
+    if (!e.target.hasAttribute('data-cart-product-input')) return;
+    var host = e.target.parentNode.querySelector('[data-cart-product-results]');
+    var mode = e.target.dataset.cartProductMode || 'replace';
+    var index = (mode === 'replace' || mode === 'entry') ? Number(e.target.dataset.i) : null;
+    posRenderCartProductResults_(e.target, host, mode, index);
+  });
+
+  document.getElementById('posCartList').addEventListener('input', function (e) {
+    if (e.target.tagName !== 'INPUT') return;
+    if (e.target.hasAttribute('data-cart-product-input')) {
+      var pickerHost = e.target.parentNode.querySelector('[data-cart-product-results]');
+      var pickerMode = e.target.dataset.cartProductMode || 'replace';
+      var pickerIndex = pickerMode === 'replace' ? Number(e.target.dataset.i) : null;
+      posRenderCartProductResults_(e.target, pickerHost, pickerMode, pickerIndex);
+      return;
+    }
+    var i = Number(e.target.dataset.i);
+    if (e.target.dataset.f === 'qty') {
+      var line = posState.cart[i];
+      var q = Number(e.target.value);
+      // No upper clamp — selling past recorded stock is allowed on purpose
+      // (see completeSale in Sales.gs).
+      line.qty = (isNaN(q) || q < 1) ? 1 : q;
+      if (line.priceMode === 'auto') posApplyAutomaticPricing_(line);
+      else posApplyManualLineTotal_(line);
+      // Update just this row's price/total and the summary in place — do NOT
+      // rebuild the cart list here, or the input the user is typing into
+      // gets recreated and loses focus after every single keystroke.
+      var row = e.target.closest('.cart-row');
+      var priceInput = row.querySelector('input[data-f="price"]');
+      if (priceInput) priceInput.value = line.unitPrice;
+      row.querySelector('.c-line-total').textContent = formatMoney(line.lineTotal);
+      posSyncShortagePanel_(i);
+      posRecalcTotals_();
+    } else if (e.target.dataset.f === 'price') {
+      var line2 = posState.cart[i];
+      var p = Number(e.target.value);
+      line2.unitPrice = (isNaN(p) || p < 0) ? 0 : p;
+      line2.priceMode = 'manual';
+      posApplyManualLineTotal_(line2);
+      var row2 = e.target.closest('.cart-row');
+      row2.querySelector('.c-line-total').textContent = formatMoney(line2.lineTotal);
+      posRecalcTotals_();
+    } else if (e.target.dataset.shortageF === 'vendorUnitCost') {
+      var vLine = posState.cart[i];
+      vLine.vendorUnitCost = e.target.value;
+      // Just the Total display needs to move — full posSyncShortagePanel_
+      // would rebuild the input the user is typing into and drop focus.
+      var totalEl = e.target.closest('.cart-shortage-row').querySelector('.shortage-total');
+      var shortfall = vLine.qty - posLineAvailableStock_(vLine);
+      if (totalEl) totalEl.textContent = 'Total: ' + formatMoney(shortfall * (Number(vLine.vendorUnitCost) || 0));
+    }
+  });
+
+  document.getElementById('posCartList').addEventListener('change', function (e) {
+    if (e.target.dataset.f !== 'qty' && e.target.dataset.f !== 'price') return;
+    // On blur, snap the field back to the stored value (e.g. if they typed something non-numeric or below 1).
+    var line = posState.cart[Number(e.target.dataset.i)];
+    e.target.value = e.target.dataset.f === 'qty' ? line.qty : line.unitPrice;
+    if (e.target.dataset.f === 'price' && line.priceMode === 'manual' && !posState.updateInvoiceId) posRenderCart_();
+  });
+
+  /** How long a revealed purchase price stays on screen before hiding itself again. */
+  var POS_COST_REVEAL_MS = 4000;
+
+  /**
+   * Puts a revealed cost marker back to its dot. Safe to call on a button
+   * that has since been removed by a cart re-render — the node is detached
+   * by then, so this is a no-op on nothing anyone can see.
+   */
+  function posHideCost_(btn) {
+    if (btn._costTimer) { clearTimeout(btn._costTimer); btn._costTimer = null; }
+    btn.classList.remove('is-revealed');
+    btn.innerHTML = posCostEyeSvg_();
+  }
+
+  document.getElementById('posCartList').addEventListener('click', function (e) {
+    var editProductBtn = e.target.closest('[data-cart-product-edit]');
+    if (editProductBtn) {
+      var editIndex = Number(editProductBtn.dataset.i);
+      posState.cartEntryIndex = null;
+      posState.cartEditIndex = editIndex;
+      posRenderCart_();
+      setTimeout(function () {
+        var input = document.querySelector('#posCartList [data-cart-product-input][data-cart-product-mode="replace"][data-i="' + editIndex + '"]');
+        if (!input) return;
+        var host = input.parentNode.querySelector('[data-cart-product-results]');
+        posRenderCartProductResults_(input, host, 'replace', editIndex);
+        input.focus();
+        input.select();
+      }, 0);
+      return;
+    }
+
+    var productPickBtn = e.target.closest('[data-cart-product-pick]');
+    if (productPickBtn) {
+      var pickedProduct = posProductById_(productPickBtn.dataset.cartProductPick);
+      if (pickedProduct) posChooseCartProduct_(pickedProduct, productPickBtn.dataset.i, productPickBtn.dataset.cartProductMode || 'add');
+      return;
+    }
+
+    // Purchase Price Visibility: click reveals, click again (or four
+    // seconds) hides. Read straight from posState at click time rather than
+    // from the row, so the number exists in the page only while shown.
+    var costBtn = e.target.closest('.c-cost');
+    if (costBtn) {
+      if (costBtn.classList.contains('is-revealed')) { posHideCost_(costBtn); return; }
+      var costLine = posState.cart[Number(costBtn.dataset.costI)];
+      var cost = costLine ? posState.productCostById[costLine.productId] : undefined;
+      if (cost === undefined) return;   // feature off, or no cost for this product
+      costBtn.textContent = formatMoney(cost);
+      costBtn.classList.add('is-revealed');
+      costBtn._costTimer = setTimeout(function () { posHideCost_(costBtn); }, POS_COST_REVEAL_MS);
+      return;
+    }
+
+    var resetBtn = e.target.closest('.c-reset-lot-price');
+    if (resetBtn) {
+      var resetLine = posState.cart[Number(resetBtn.dataset.i)];
+      if (resetLine && !posState.updateInvoiceId) {
+        resetLine.priceMode = 'auto';
+        posApplyAutomaticPricing_(resetLine);
+        posRenderCart_();
+      }
+      return;
+    }
+
+    var removeBtn = e.target.closest('.cart-remove');
+    if (removeBtn) {
+      posState.cart.splice(Number(removeBtn.dataset.i), 1);
+      posState.cartEditIndex = null;
+      posState.cartEntryIndex = null;
+      posRenderCart_();
+      return;
+    }
+    var actBtn = e.target.closest('button[data-shortage-act]');
+    if (!actBtn) return;
+    var i = Number(actBtn.dataset.i);
+    var line = posState.cart[i];
+    var act = actBtn.dataset.shortageAct;
+    if (act === 'own') {
+      var avail = posLineAvailableStock_(line);
+      if (avail <= 0) {
+        posState.cart.splice(i, 1);
+        posState.cartEditIndex = null;
+        posState.cartEntryIndex = null;
+        showToast(line.name + ' removed — no stock available.', 'error');
+      } else {
+        line.qty = avail;
+        if (line.priceMode === 'auto') posApplyAutomaticPricing_(line); else { if (line.priceMode === 'fixed') line.priceMode = 'manual'; posApplyManualLineTotal_(line); }
+        line.shortageResolution = 'negative';
+        line.vendorId = ''; line.vendorName = ''; line.vendorUnitCost = '';
+      }
+      posRenderCart_();
+    } else if (act === 'negative') {
+      line.shortageResolution = 'negative';
+      line.vendorId = ''; line.vendorName = ''; line.vendorUnitCost = '';
+      posState._addVendorForLineIndex = null;
+      posRenderCart_();
+    } else if (act === 'vendor') {
+      line.shortageResolution = 'vendor';
+      posRenderCart_();
+    } else if (act === 'quickvendor') {
+      posState._addVendorForLineIndex = (posState._addVendorForLineIndex === i) ? null : i;
+      posRenderCart_();
+    } else if (act === 'quickvendorsave') {
+      var panel = actBtn.closest('.cart-shortage-row');
+      var name = panel.querySelector('[data-shortage-quick="name"]').value.trim();
+      var phone = panel.querySelector('[data-shortage-quick="phone"]').value.trim();
+      if (!name) return;
+      withLoader(serverCall('addVendor', authToken, { name: name, phone: phone })).then(function (res) {
+        var v = { id: res.id, name: name, phone: phone, currentDue: 0, status: 'Active' };
+        posState.vendors.push(v);
+        posState.vendorsAll.push(v);
+        line.vendorId = res.id; line.vendorName = name;
+        posState._addVendorForLineIndex = null;
+        posRenderCart_();
+        showToast('Vendor added', 'success');
+      }).catch(function (err) { showToast(err.message, 'error'); });
+    }
+  });
+
+  document.getElementById('posCartList').addEventListener('change', function (e) {
+    if (e.target.dataset.shortageF !== 'vendorId') return;
+    var line = posState.cart[Number(e.target.dataset.i)];
+    line.vendorId = e.target.value;
+    var opt = e.target.selectedOptions[0];
+    line.vendorName = opt ? opt.textContent : '';
+  });
+  document.getElementById('posCartList').addEventListener('keydown', function (e) {
+    if (e.target.hasAttribute('data-cart-entry-qty') && e.key === 'Enter') {
+      e.preventDefault();
+      posFinishCartEntry_();
+      return;
+    }
+
+    if (!e.target.hasAttribute('data-cart-product-input')) return;
+    var pickerMode = e.target.dataset.cartProductMode || 'replace';
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      posMoveCartProductActive_(1);
+      return;
+    }
+
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      posMoveCartProductActive_(-1);
+      return;
+    }
+
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      posCloseCartProductPopup_();
+      if (pickerMode === 'replace') {
+        posState.cartEditIndex = null;
+        posRenderCart_();
+      } else if (pickerMode === 'entry') {
+        posState.cart.splice(Number(posState.cartEntryIndex), 1);
+        posState.cartEntryIndex = null;
+        posRenderCart_();
+        posFocusCartEntryProduct_();
+      } else {
+        e.target.value = '';
+        var host = e.target.parentNode.querySelector('[data-cart-product-results]');
+        if (host) { host.innerHTML = ''; host.hidden = true; }
+      }
+      return;
+    }
+
+    if (e.key !== 'Enter') return;
+    var option = posActiveCartProductOption_();
+    if (!option) return;
+    var match = posProductById_(option.dataset.cartProductPick);
+    if (!match) return;
+    e.preventDefault();
+    var replaceIndex = (pickerMode === 'replace' || pickerMode === 'entry') ? Number(e.target.dataset.i) : null;
+    if (posChooseCartProduct_(match, replaceIndex, pickerMode)) posCloseCartProductPopup_();
+  });
+
+  document.getElementById('posCartList').addEventListener('scroll', posCloseCartProductPopup_);
+  window.addEventListener('resize', posCloseCartProductPopup_);
+  document.addEventListener('mousedown', function (e) {
+    var popup = document.getElementById('posCartProductPopup');
+    if (!popup || popup.hidden) return;
+    if (e.target.closest('#posCartProductPopup') || e.target.closest('[data-cart-product-input]')) return;
+    posCloseCartProductPopup_();
+  });
+
+  document.addEventListener('click', posCartEntryOutsideClick_);
+
+  document.getElementById('posDiscount').addEventListener('input', posRecalcTotals_);
+  document.getElementById('posAmountReceived').addEventListener('input', posRecalcTotals_);
+  document.getElementById('posPaymentMethod').addEventListener('change', function () {
+    document.getElementById('posBankAccountRow').style.display = paymentMethodNeedsAccount_(this.value) ? '' : 'none';
+    document.getElementById('posBankAccountLabel').textContent = (this.value === 'Mobile Banking' ? 'Mobile Banking Account *' : 'Bank Account *');
+    fillBankAccountSelect_(document.getElementById('posBankAccount'), posState.bankAccounts, this.value);
+    posRefreshTabletSelect_(document.getElementById('posBankAccount'));
+  });
+
+  /**
+   * Amount Received is now the single source of truth for payment status —
+   * received > grand total shows Change Due (full Cash sale); received between
+   * 0 and grand total shows Due Amount (Partial); received left blank/0 is a
+   * full Due sale. posDeriveSaleTerms_() below turns this same number back
+   * into the paymentType/paidAmount pair completeSale() already expects.
+   */
+  function posRecalcTotals_() {
+    var subtotal = posState.cart.reduce(function (s, l) { return s + (Number(l.lineTotal) || 0); }, 0);
+    var discount = Number(document.getElementById('posDiscount').value) || 0;
+    var grandTotal = Math.max(0, subtotal - discount);
+    document.getElementById('posSubtotal').textContent = formatMoney(subtotal);
+    document.getElementById('posGrandTotal').textContent = formatMoney(grandTotal);
+
+    var terms = posDeriveSaleTerms_(grandTotal);
+    var changeRow = document.getElementById('posChangeRow');
+    var dueRow = document.getElementById('posDueRow');
+    if (terms.paymentType === 'Cash' && terms.change > 0) {
+      changeRow.style.display = 'flex';
+      dueRow.style.display = 'none';
+      document.getElementById('posChangeDue').textContent = formatMoney(terms.change);
+    } else if (terms.dueAmount > 0) {
+      changeRow.style.display = 'none';
+      dueRow.style.display = 'flex';
+      document.getElementById('posDueAmountDisplay').textContent = formatMoney(terms.dueAmount);
+    } else {
+      changeRow.style.display = 'none';
+      dueRow.style.display = 'none';
+    }
+  }
+
+  /** received<=0 -> full Due; 0<received<grandTotal -> Partial; received>=grandTotal -> Cash (with change). */
+  function posDeriveSaleTerms_(grandTotal) {
+    var received = Number(document.getElementById('posAmountReceived').value) || 0;
+    if (received <= 0) return { paymentType: 'Due', paidAmount: 0, dueAmount: grandTotal, change: 0 };
+    if (received < grandTotal) return { paymentType: 'Partial', paidAmount: received, dueAmount: grandTotal - received, change: 0 };
+    return { paymentType: 'Cash', paidAmount: grandTotal, dueAmount: 0, change: received - grandTotal };
+  }
+
+  function posFillCustomerList_() {
+    var list = document.getElementById('posCustomerList');
+    var phoneList = document.getElementById('posCustomerPhoneList');
+    list.innerHTML = '';
+    phoneList.innerHTML = '';
+    posState.customers.forEach(function (c) {
+      list.innerHTML += '<option value="' + escapeHtml(c.name) + ' (' + escapeHtml(c.phone) + ')"></option>';
+      phoneList.innerHTML += '<option value="' + escapeHtml(c.phone) + '">' + escapeHtml(c.name) + '</option>';
+    });
+  }
+
+  function posResponsiveMode_() {
+    var w = window.innerWidth || document.documentElement.clientWidth || 0;
+    if (w < 500) return 'mobile';
+    if (w < 1024) return 'tablet';
+    return 'desktop';
+  }
+
+  function posCustomerUsesStructuredPicker_() {
+    return posResponsiveMode_() !== 'mobile';
+  }
+
+  function posCustomerBalanceMeta_(customer) {
+    var due = Number(customer && customer.due) || 0;
+    if (due < -0.004) return 'Credit ' + formatMoney(Math.abs(due));
+    return 'Due ' + formatMoney(Math.max(0, due));
+  }
+
+  var posCustomerCombos_ = [];
+
+  function posCloseCustomerCombos_(except) {
+    posCustomerCombos_.forEach(function (combo) {
+      if (combo !== except) combo.close();
+    });
+  }
+
+  function posCreateCustomerCombobox_(inputId, resultsId, mobileListId) {
+    var input = document.getElementById(inputId);
+    var results = document.getElementById(resultsId);
+    if (!input || !results) return null;
+    var matches = [];
+    var activeIndex = -1;
+
+    function usingCustom_() { return posCustomerUsesStructuredPicker_(); }
+
+    function syncMode_() {
+      if (usingCustom_()) input.removeAttribute('list');
+      else input.setAttribute('list', mobileListId);
+      if (!usingCustom_()) close_();
+    }
+
+    function close_() {
+      results.hidden = true;
+      results.innerHTML = '';
+      activeIndex = -1;
+    }
+
+    function filtered_() {
+      var query = String(input.value || '').trim();
+      var nameQuery = typeof smartSearchNormalize_ === 'function' ? smartSearchNormalize_(query) : query.toLowerCase();
+      return (posState.customers || []).filter(function (customer) {
+        if (!query) return true;
+        var name = typeof smartSearchNormalize_ === 'function' ? smartSearchNormalize_(customer.name || '') : String(customer.name || '').toLowerCase();
+        return (nameQuery && name.indexOf(nameQuery) !== -1) || phoneSearchMatches_(customer.phone, query);
+      });
+    }
+
+    function render_() {
+      syncMode_();
+      if (!usingCustom_()) return;
+      matches = filtered_();
+      results.innerHTML = '';
+      matches.forEach(function (customer, index) {
+        var row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'counter-combo-option' + (index === activeIndex ? ' active' : '');
+        row.dataset.id = customer.id || '';
+        row.innerHTML = '<span><strong>' + escapeHtml(customer.name || '') + '</strong>' +
+          (customer.phone ? '<small>' + escapeHtml(customer.phone) + '</small>' : '') + '</span>' +
+          '<span class="counter-combo-meta">' + escapeHtml(posCustomerBalanceMeta_(customer)) + '</span>';
+        row.addEventListener('mousedown', function (e) {
+          e.preventDefault();
+          select_(customer);
+        });
+        results.appendChild(row);
+      });
+      results.hidden = matches.length === 0;
+    }
+
+    function select_(customer) {
+      posApplyCustomerSelection_(customer);
+      close_();
+      posCloseCustomerCombos_(api);
+    }
+
+    input.addEventListener('input', function () {
+      activeIndex = -1;
+      render_();
+    });
+    input.addEventListener('focus', function () {
+      if (!usingCustom_()) return;
+      posCloseCustomerCombos_(api);
+      render_();
+    });
+    input.addEventListener('keydown', function (e) {
+      if (!usingCustom_()) return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (!matches.length || results.hidden) render_();
+        if (matches.length) activeIndex = Math.min(activeIndex + 1, matches.length - 1);
+        render_();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (!matches.length || results.hidden) render_();
+        if (matches.length) activeIndex = Math.max(activeIndex - 1, 0);
+        render_();
+      } else if (e.key === 'Enter') {
+        if (!results.hidden && matches.length) {
+          e.preventDefault();
+          select_(matches[activeIndex >= 0 ? activeIndex : 0]);
+        }
+      } else if (e.key === 'Escape') {
+        close_();
+      }
+    });
+    input.addEventListener('blur', function () { setTimeout(close_, 120); });
+
+    var api = { close: close_, syncMode: syncMode_, render: render_ };
+    syncMode_();
+    posCustomerCombos_.push(api);
+    return api;
+  }
+
+  function posClearCustomer_() {
+    var nameEl = document.getElementById('posCustomerName');
+    nameEl.value = '';
+    nameEl.dataset.customerId = '';
+    document.getElementById('posCustomerPhone').value = '';
+    document.getElementById('posCustomerFatherName').value = '';
+    document.getElementById('posCustomerAddress').value = '';
+    posSetCustomerMoreExpanded_(false);
+    posUpdateCustomerDueDisplay_(0);
+  }
+
+  document.getElementById('posClearCustomerBtn').addEventListener('click', posClearCustomer_);
+
+  function posResolveCustomerSelection_(nameValue, phoneValue) {
+    var name = String(nameValue || '').trim();
+    var phone = String(phoneValue || '').trim();
+    var nameLower = name.toLowerCase();
+    return posState.customers.filter(function (c) {
+      var cName = String(c.name || '').trim();
+      var cPhone = String(c.phone || '').trim();
+      var composite = (cName + ' (' + cPhone + ')').toLowerCase();
+      if (nameLower && composite === nameLower) return true;
+      if (phone && phoneNumbersEqualClient_(cPhone, phone) && (!nameLower || cName.toLowerCase() === nameLower)) return true;
+      if (nameLower && cName.toLowerCase() === nameLower && (!phone || phoneNumbersEqualClient_(cPhone, phone))) return true;
+      return false;
+    })[0] || null;
+  }
+
+  function posApplyCustomerSelection_(match) {
+    if (!match) return;
+    var nameEl = document.getElementById('posCustomerName');
+    nameEl.value = match.name;
+    nameEl.dataset.customerId = match.id;
+    document.getElementById('posCustomerPhone').value = match.phone;
+    document.getElementById('posCustomerAddress').value = match.address || '';
+    document.getElementById('posCustomerFatherName').value = match.fatherName || '';
+    posUpdateCustomerDueDisplay_(match.due);
+  }
+
+
+  // A restored draft can carry a historical customer phone snapshot. The
+  // selected Customer ID is the authoritative identity, so immediately before
+  // posting use the current customer-master name/phone. The server still
+  // validates the ID/phone pair, which keeps the duplicate-customer guard
+  // intact while avoiding stale-draft mismatches.
+  function posCanonicalSelectedCustomerForPost_() {
+    var nameEl = document.getElementById('posCustomerName');
+    var phoneEl = document.getElementById('posCustomerPhone');
+    var customerId = nameEl.dataset.customerId || '';
+    if (!customerId) return null;
+    var selected = (posState.customers || []).filter(function (c) { return String(c.id) === String(customerId); })[0] || null;
+    if (!selected) return null;
+    nameEl.value = selected.name || nameEl.value;
+    phoneEl.value = selected.phone || phoneEl.value;
+    return selected;
+  }
+
+  function posResetSelectedCustomer_(changedField) {
+    var nameEl = document.getElementById('posCustomerName');
+    if (!nameEl.dataset.customerId) {
+      posUpdateCustomerDueDisplay_(0);
+      return;
+    }
+    var selected = posState.customers.filter(function (c) { return c.id === nameEl.dataset.customerId; })[0];
+    if (!selected) {
+      nameEl.dataset.customerId = '';
+      posUpdateCustomerDueDisplay_(0);
+      return;
+    }
+    var nameNow = nameEl.value.trim();
+    var phoneEl = document.getElementById('posCustomerPhone');
+    var phoneNow = phoneEl.value.trim();
+    var changed = changedField === 'name' ? nameNow !== String(selected.name || '') : !phoneNumbersEqualClient_(phoneNow, selected.phone || '');
+    if (!changed) return;
+
+    nameEl.dataset.customerId = '';
+    posUpdateCustomerDueDisplay_(0);
+    document.getElementById('posCustomerFatherName').value = '';
+    document.getElementById('posCustomerAddress').value = '';
+    if (changedField === 'name') phoneEl.value = '';
+    if (changedField === 'phone') nameEl.value = '';
+  }
+
+  document.getElementById('posCustomerName').addEventListener('input', function () {
+    posResetSelectedCustomer_('name');
+  });
+  document.getElementById('posCustomerPhone').addEventListener('input', function () {
+    posResetSelectedCustomer_('phone');
+  });
+  document.getElementById('posCustomerName').addEventListener('focus', function () {
+    if (this.dataset.customerId && typeof this.select === 'function') this.select();
+  });
+  document.getElementById('posCustomerPhone').addEventListener('focus', function () {
+    if (document.getElementById('posCustomerName').dataset.customerId && typeof this.select === 'function') this.select();
+  });
+
+  document.getElementById('posCustomerName').addEventListener('change', function () {
+    var match = posResolveCustomerSelection_(this.value, document.getElementById('posCustomerPhone').value);
+    if (match) posApplyCustomerSelection_(match);
+    else { this.dataset.customerId = ''; posUpdateCustomerDueDisplay_(0); }
+  });
+  document.getElementById('posCustomerPhone').addEventListener('change', function () {
+    var match = posResolveCustomerSelection_(document.getElementById('posCustomerName').value, this.value);
+    if (!match) {
+      var phone = this.value.trim();
+      match = posState.customers.filter(function (c) { return phoneNumbersEqualClient_(c.phone, phone); })[0] || null;
+    }
+    if (match) posApplyCustomerSelection_(match);
+    else { document.getElementById('posCustomerName').dataset.customerId = ''; posUpdateCustomerDueDisplay_(0); }
+  });
+
+  var posCustomerNameCombo_ = posCreateCustomerCombobox_('posCustomerName', 'posCustomerNameResults', 'posCustomerList');
+  var posCustomerPhoneCombo_ = posCreateCustomerCombobox_('posCustomerPhone', 'posCustomerPhoneResults', 'posCustomerPhoneList');
+  window.addEventListener('resize', function () {
+    if (posCustomerNameCombo_) posCustomerNameCombo_.syncMode();
+    if (posCustomerPhoneCombo_) posCustomerPhoneCombo_.syncMode();
+  });
+  window.addEventListener('orientationchange', function () {
+    if (posCustomerNameCombo_) posCustomerNameCombo_.syncMode();
+    if (posCustomerPhoneCombo_) posCustomerPhoneCombo_.syncMode();
+  });
+
+  function posResetSaleForm_() {
+    posState.cart = [];
+    posState.cartEditIndex = null;
+    posState.cartEntryIndex = null;
+    posState._addVendorForLineIndex = null;
+    document.getElementById('posDiscount').value = '';
+    document.getElementById('posAmountReceived').value = '';
+    document.getElementById('posPaymentMethod').value = 'Cash';
+    document.getElementById('posBankAccount').value = '';
+    document.getElementById('posBankAccountRow').style.display = 'none';
+    posClearCustomer_();
+    document.getElementById('posChangeRow').style.display = 'none';
+    document.getElementById('posDueRow').style.display = 'none';
+    posSetCustomerMoreExpanded_(false);
+    posUpdateCustomerDueDisplay_(0);
+    posRenderCart_();
+  }
+
+  function posBuildDraftPayload_() {
+    var subtotal = posState.cart.reduce(function (sum, line) { return sum + (Number(line.lineTotal) || 0); }, 0);
+    var discount = Number(document.getElementById('posDiscount').value) || 0;
+    return {
+      customerId: document.getElementById('posCustomerName').dataset.customerId || '',
+      customerName: document.getElementById('posCustomerName').value.trim(),
+      customerPhone: document.getElementById('posCustomerPhone').value.trim(),
+      customerFatherName: document.getElementById('posCustomerFatherName').value.trim(),
+      customerAddress: document.getElementById('posCustomerAddress').value.trim(),
+      items: posState.cart.map(function (line) {
+        return { productId: line.productId, name: line.name, unit: line.unit || '', qty: Number(line.qty)||0,
+          unitPrice: Number(line.unitPrice)||0, lineTotal: Number(line.lineTotal)||0,
+          savedPriceMode: line.savedPriceMode || line.priceMode || 'manual', shortageResolution: line.shortageResolution || 'negative',
+          vendorId: line.vendorId || '', vendorName: line.vendorName || '', vendorUnitCost: line.vendorUnitCost === '' ? '' : Number(line.vendorUnitCost),
+          serialSelections: Array.isArray(line.serialSelections) ? line.serialSelections : [], warrantyData: line.warrantyData || null };
+      }),
+      payment: { amountReceived: document.getElementById('posAmountReceived').value, paymentMethod: document.getElementById('posPaymentMethod').value, bankAccountId: document.getElementById('posBankAccount').value },
+      notes: '', subtotal: subtotal, discount: discount, grandTotal: Math.max(0, subtotal-discount)
+    };
+  }
+
+  function posExitDraftMode_(clearForm) {
+    posState.draftId = null; posState.draftNo = ''; posState.draftVersion = null;
+    document.getElementById('posDraftBanner').hidden = true;
+    document.getElementById('posDraftConflict').hidden = true;
+    document.getElementById('posSaveDraftBtn').textContent = 'Save Draft';
+    if (clearForm) posResetSaleForm_();
+  }
+
+  function posSaveDraft_() {
+    var errEl=document.getElementById('posFormError'); errEl.style.display='none';
+    if(!posState.cart.length){errEl.textContent='Cart is empty.';errEl.style.display='block';return;}
+    var payload=posBuildDraftPayload_();
+    var call=posState.draftId ? serverCall('updateSalesDraft',authToken,posState.draftId,posState.draftVersion,payload) : serverCall('saveSalesDraft',authToken,payload);
+    return withLoader(call).then(function(res){
+      showToast((posState.draftId?'Draft updated: ':'Draft saved: ')+(res.draftNo||posState.draftNo),'success');
+      posExitDraftMode_(false); posResetSaleForm_();
+      posLoadRecentDrafts_();
+      if(typeof reloadPage_==='function') reloadPage_('draftSales');
+    }).catch(function(err){
+      if(err.message==='This draft was changed by another user. Reload the latest version.') posShowDraftConflict_(posState.draftId);
+      else {errEl.textContent=err.message;errEl.style.display='block';}
+    });
+  }
+
+  function posHasUnsavedSale_() {
+    return !!(posState.cart.length || posState.updateInvoiceId || posState.draftId ||
+      document.getElementById('posCustomerName').value.trim() ||
+      document.getElementById('posCustomerPhone').value.trim() ||
+      document.getElementById('posCustomerFatherName').value.trim() ||
+      document.getElementById('posCustomerAddress').value.trim() ||
+      Number(document.getElementById('posDiscount').value) > 0 ||
+      document.getElementById('posAmountReceived').value.trim());
+  }
+
+  function posOpenDraft_(draftId) {
+    var targetPage = arguments.length > 1 && arguments[1] ? arguments[1] : 'pos';
+    function loadDraft_() {
+      goToPage(targetPage);
+      return withLoader(Promise.all([posLoad(),serverCall('getSalesDraft',authToken,draftId)])).then(function(results){ posRestoreDraft_(results[1]); }).catch(function(err){showToast(err.message,'error');});
+    }
+    if (!posHasUnsavedSale_()) return loadDraft_();
+    var row = (posState.recentDrafts || []).filter(function (item) { return String(item.draftId) === String(draftId); })[0] || null;
+    return confirmAction({
+      type: 'state-change',
+      title: 'Open Draft Invoice?',
+      message: 'Your current POS cart or customer details will be replaced by this draft.',
+      details: [
+        { label: 'Draft', value: row ? row.draftNo : '' },
+        { label: 'Customer', value: row ? (row.customerName || 'Walk-in') : '' },
+        { label: 'Amount', value: row ? formatMoney(Number(row.grandTotal) || 0) : '' }
+      ],
+      confirmLabel: 'Open Draft',
+      trigger: document.activeElement
+    }).then(function (result) {
+      if (!result.confirmed) return null;
+      return loadDraft_();
+    });
+  }
+
+  function posRestoreDraft_(draft) {
+    posExitUpdateMode_();
+    posState.cartEditIndex = null;
+    posState.cartEntryIndex = null;
+    posState.cart=(draft.items||[]).map(function(item){
+      var product=posState.products.filter(function(p){return p.id===item.productId;})[0]||null;
+      return {productId:item.productId,name:item.name,unit:item.unit||(product?product.unit:''),qty:Number(item.qty)||1,unitPrice:Number(item.unitPrice)||0,lineTotal:Number(item.lineTotal)||0,
+        priceMode:'fixed',savedPriceMode:item.savedPriceMode||'manual',shortageResolution:item.shortageResolution||'negative',vendorId:item.vendorId||'',vendorName:item.vendorName||'',vendorUnitCost:item.vendorUnitCost,
+        serialSelections:Array.isArray(item.serialSelections)?item.serialSelections:[],warrantyData:item.warrantyData||null,unavailable:!product};
+    });
+    document.getElementById('posCustomerName').value=draft.customerName||''; document.getElementById('posCustomerName').dataset.customerId=draft.customerId||'';
+    document.getElementById('posCustomerPhone').value=draft.customerPhone||''; document.getElementById('posCustomerFatherName').value=draft.customerFatherName||''; document.getElementById('posCustomerAddress').value=draft.customerAddress||'';
+    document.getElementById('posDiscount').value=Number(draft.discount)>0?draft.discount:'';
+    var payment=draft.payment||{}; document.getElementById('posAmountReceived').value=payment.amountReceived||''; document.getElementById('posPaymentMethod').value=payment.paymentMethod||'Cash';
+    document.getElementById('posBankAccountRow').style.display=paymentMethodNeedsAccount_(payment.paymentMethod)?'':'none'; fillBankAccountSelect_(document.getElementById('posBankAccount'),posState.bankAccounts,payment.paymentMethod||'Cash'); document.getElementById('posBankAccount').value=payment.bankAccountId||'';
+    posState.draftId=draft.draftId; posState.draftNo=draft.draftNo; posState.draftVersion=draft.version;
+    document.getElementById('posDraftBanner').hidden=false; document.getElementById('posDraftBannerNo').textContent=draft.draftNo; document.getElementById('posSaveDraftBtn').textContent='Update Draft';
+    posSetCustomerMoreExpanded_(!!(draft.customerFatherName||draft.customerAddress)); posRenderCart_(); posRenderSessionUI_();
+  }
+
+  function posShowDraftConflict_(draftId){ posState.draftId=draftId||posState.draftId; document.getElementById('posDraftConflict').hidden=false; }
+  function posReloadDraftLatest_(){ if(!posState.draftId)return; return withLoader(serverCall('getSalesDraft',authToken,posState.draftId)).then(posRestoreDraft_).catch(function(err){showToast(err.message,'error');}); }
+
+  function posInstallDraftRpcGuard_() {
+    if (posInstallDraftRpcGuard_._done || typeof serverCall !== 'function') return;
+    var baseServerCall = serverCall;
+    serverCall = function (name) {
+      var request = baseServerCall.apply(this, arguments);
+      if (name === 'completeSale' && posState && posState.draftId && request && typeof request.catch === 'function') {
+        return request.catch(function (err) {
+          if (err && err.message === 'This draft was changed by another user. Reload the latest version.') posShowDraftConflict_(posState.draftId);
+          throw err;
+        });
+      }
+      return request;
+    };
+    posInstallDraftRpcGuard_._done = true;
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', posInstallDraftRpcGuard_);
+  else setTimeout(posInstallDraftRpcGuard_, 0);
+
+  document.getElementById('posSaveDraftBtn').addEventListener('click',posSaveDraft_);
+  document.getElementById('posExitDraftBtn').addEventListener('click',function(){posExitDraftMode_(true);});
+  document.getElementById('posDraftReloadLatestBtn').addEventListener('click',posReloadDraftLatest_);
+  document.getElementById('posDraftKeepMineBtn').addEventListener('click',function(){document.getElementById('posDraftConflict').hidden=true;});
+  document.getElementById('posRecentDraftsList').addEventListener('click', function (event) {
+    var card = event.target.closest('.pos-recent-draft-card');
+    if (!card) return;
+    posOpenDraft_(card.dataset.draftId);
+  });
+  document.getElementById('posRecentDraftsViewAll').addEventListener('click', function () { goToPage('draftSales'); });
+
+  document.getElementById('posCompleteBtn').addEventListener('click', function () {
+    var errEl = document.getElementById('posFormError');
+    errEl.style.display = 'none';
+    if (!posState.activeSession) { errEl.textContent = 'Start your cash session first.'; errEl.style.display = 'block'; return; }
+    if (!posState.cart.length) { errEl.textContent = 'Cart is empty.'; errEl.style.display = 'block'; return; }
+
+    var customerNameEl = document.getElementById('posCustomerName');
+    var selectedCustomerId = customerNameEl.dataset.customerId || '';
+    var canonicalCustomer = posCanonicalSelectedCustomerForPost_();
+    if (selectedCustomerId && !canonicalCustomer) {
+      errEl.textContent = 'Selected customer is no longer available. Clear Customer and select the customer again.';
+      errEl.style.display = 'block';
+      return;
+    }
+    var custName = customerNameEl.value.trim();
+    var custPhone = document.getElementById('posCustomerPhone').value.trim();
+    if (canonicalCustomer) {
+      custName = canonicalCustomer.name || custName;
+      custPhone = canonicalCustomer.phone || custPhone;
+    }
+    if (!custName || !custPhone) { errEl.textContent = 'Customer name and phone are required for every sale.'; errEl.style.display = 'block'; return; }
+
+    // Vendor/Consignment Sourcing: every line whose shortfall is resolved
+    // as "vendor" needs a chosen vendor and a valid unit cost before this
+    // sale can go through — server re-validates the same thing, this is
+    // just so the error shows up immediately instead of round-tripping.
+    var shortageError = null;
+    posState.cart.forEach(function (l) {
+      var shortfall = l.qty - posLineAvailableStock_(l);
+      if (shortfall > 0 && l.shortageResolution === 'vendor') {
+        if (!l.vendorId) shortageError = l.name + ': choose a vendor for the shortage, or pick Own Stock / Negative Stock Sale instead.';
+        else if (!posIsValidNonNegNum_(l.vendorUnitCost)) shortageError = l.name + ': enter a valid vendor unit cost.';
+      }
+    });
+    if (shortageError) { errEl.textContent = shortageError; errEl.style.display = 'block'; return; }
+
+    var subtotal = posState.cart.reduce(function (s, l) { return s + (Number(l.lineTotal) || 0); }, 0);
+    var discount = Number(document.getElementById('posDiscount').value) || 0;
+    var grandTotal = Math.max(0, subtotal - discount);
+    var terms = posDeriveSaleTerms_(grandTotal);
+
+    var payload = {
+      customerId: document.getElementById('posCustomerName').dataset.customerId || '',
+      customerName: custName,
+      customerPhone: custPhone,
+      customerFatherName: document.getElementById('posCustomerFatherName').value.trim(),
+      customerAddress: document.getElementById('posCustomerAddress').value.trim(),
+      items: posState.cart.map(function (l) {
+        var item = { productId: l.productId, name: l.name, qty: l.qty, unitPrice: l.unitPrice, priceMode: l.priceMode || 'manual', shortageResolution: l.shortageResolution || 'negative' };
+        var shortfall = l.qty - posLineAvailableStock_(l);
+        if (shortfall > 0 && l.shortageResolution === 'vendor' && l.vendorId) {
+          item.vendorId = l.vendorId;
+          item.vendorUnitCost = Number(l.vendorUnitCost) || 0;
+        }
+        return item;
+      }),
+      discount: discount,
+      paymentType: terms.paymentType,
+      paidAmount: terms.paidAmount,
+      paymentMethod: document.getElementById('posPaymentMethod').value,
+      bankAccountId: document.getElementById('posBankAccount').value
+    };
+    
+    if (posState.draftId) {
+      payload.sourceDraftId = posState.draftId;
+      payload.sourceDraftVersion = posState.draftVersion;
+      payload.items.forEach(function(item,i){ item.lineTotal = Number(posState.cart[i].lineTotal)||0; });
+    }
+
+    var targetInvoiceId = posState.updateInvoiceId || '';
+    var isUpdate = !!targetInvoiceId;
+
+    function finishSave_(invoice) {
+      posRenderInvoice_(invoice);
+      openModal('invoiceModal');
+      if (isUpdate) { showToast('Invoice updated', 'success'); posExitUpdateMode_(); }
+      if (posState.draftId) posExitDraftMode_(false);
+      posResetSaleForm_();
+      posLoad();
+    }
+
+
+    if (isUpdate) payload.reason = posState.updateReason;
+    var paidNow = Number(terms.paidAmount) || 0;
+    var dueNow = Math.max(0, grandTotal - paidNow);
+    var saleConfirmDetails = [
+      { label: 'Customer', value: custName, emphasis: true },
+      { label: 'Grand Total', value: formatMoney(grandTotal), emphasis: true },
+      { label: 'In words', value: banglaAmountInWords_(grandTotal) },
+      { label: 'Paid Now', value: formatMoney(paidNow) },
+      { label: 'Due', value: formatMoney(dueNow) },
+      { label: 'Item Count', value: String(payload.items.length) },
+      { label: 'Method', value: payload.paymentMethod },
+      { label: 'Account', value: payload.bankAccountId ? selectedOptionText_('posBankAccount') : '' },
+      { label: 'Update Reason', value: isUpdate ? (posState.updateReason || '') : '' }
+    ];
+    runConfirmedAction({
+      type: 'financial',
+      title: isUpdate ? 'Update Sale?' : 'Complete Sale?',
+      message: isUpdate ? 'This will update the posted sale and its accounting/stock effects.' : 'Review the sale before posting it.',
+      details: saleConfirmDetails,
+      confirmLabel: isUpdate ? 'Update Sale' : 'Complete Sale',
+      loadingLabel: isUpdate ? 'Updating...' : 'Completing...',
+      trigger: document.getElementById('posCompleteBtn')
+    }, function () {
+      var call = isUpdate
+        ? serverCall('updateSale', authToken, targetInvoiceId, payload)
+        : serverCall('completeSale', authToken, payload);
+      return withLoader(call).then(finishSave_);
+    }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+  });
+
+  document.getElementById('posNewSaleBtn').addEventListener('click', function () { closeModal('invoiceModal'); });
+
+  document.getElementById('posThermalPrintBtn').addEventListener('click', function () {
+    // thermal print renders its own narrow layout from the invoice data —
+    // it does not clone the on-screen A4 preview (see printInvoice_).
+    printInvoice_(true, posState._lastInvoice);
+  });
+
+  document.getElementById('posDownloadJpgBtn').addEventListener('click', function () {
+    if (!posState._lastInvoice) { showToast('Nothing to download yet.', 'error'); return; }
+    downloadInvoiceJpg_(posState._lastInvoice);
+  });
+
+  document.getElementById('posHistoryBtn').addEventListener('click', function () {
+    var phone = document.getElementById('posCustomerPhone').value.trim();
+    var customerId = document.getElementById('posCustomerName').dataset.customerId || '';
+    if (!phone) { showToast('Enter a phone number first.', 'error'); return; }
+    withLoader(serverCall('findSalesByPhone', authToken, phone, customerId)).then(function (sales) {
+      document.getElementById('posHistoryPhone').textContent = phone;
+      var body = document.getElementById('posHistoryBody');
+      body.innerHTML = '';
+      sales.forEach(function (s) {
+        var statusBadge = s.paymentStatus === 'Paid' ? 'badge-success' : (s.paymentStatus === 'Partial' ? 'badge-warning' : 'badge-danger');
+        var tr = document.createElement('tr');
+        var integrityBadge = s.duplicateInvoiceId
+          ? ' <span class="badge badge-danger" title="Duplicate historical invoice ID. Repair data before using invoice actions.">Duplicate ID</span>'
+          : '';
+        tr.innerHTML =
+          '<td class="mono" data-label="Invoice">' + s.invoiceId + integrityBadge + '</td>' +
+          '<td data-label="Date">' + escapeHtml(s.date) + ' ' + escapeHtml(s.time || '') + '</td>' +
+          '<td class="num mono" data-label="Total">' + formatMoney(s.grandTotal) + '</td>' +
+          '<td data-label="Status"><span class="badge ' + statusBadge + '">' + s.paymentStatus + '</span></td>' +
+          '<td><button class="btn" data-act="historyMenu" data-id="' + s.invoiceId + '" aria-haspopup="menu" aria-expanded="false"' + (s.duplicateInvoiceId ? ' disabled title="Duplicate invoice ID must be repaired before actions can continue"' : '') + '>Actions &#9662;</button></td>';
+
+        body.appendChild(tr);
+      });
+      document.getElementById('posHistoryEmpty').hidden = sales.length > 0;
+      openModal('posHistoryModal');
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  });
+
+  function posRunHistoryAction_(action, invoiceId) {
+    if (action === 'view' || action === 'print') {
+      closeModal('posHistoryModal');
+      posFetchAndShowInvoice_(invoiceId, action === 'print').catch(function (err) { showToast(err.message, 'error'); });
+      return;
+    }
+    if (action === 'update') {
+      var reason = promptForUpdateReason_();
+      if (!reason) return;
+      withLoader(serverCall('getSaleForUpdate', authToken, invoiceId)).then(function (inv) {
+        closeModal('posHistoryModal');
+        posLoadUpdateInvoice_(inv, reason);
+        showToast('Loaded into POS for update — adjust and save', 'success');
+      }).catch(function (err) { showToast(err.message, 'error'); });
+      return;
+    }
+    if (action === 'return') {
+      closeModal('posHistoryModal');
+      goToPage('returns');
+      returnsLoadInvoiceById_(invoiceId);
+    }
+  }
+
+  document.getElementById('posHistoryBody').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-act="historyMenu"]');
+    if (!btn) return;
+    var invoiceId = btn.dataset.id;
+    openRowActionMenu_(btn, [
+      { action: 'view', label: 'View' },
+      { action: 'print', label: 'Print' },
+      { action: 'update', label: 'Update' },
+      { action: 'return', label: 'Sales Return' }
+    ], function (action) { posRunHistoryAction_(action, invoiceId); });
+  });
+
+  document.getElementById('posReprintBtn').addEventListener('click', function () {
+    var id = document.getElementById('posReprintId').value.trim();
+    if (!id) return;
+    posFetchAndShowInvoice_(id).catch(function (err) { showToast(err.message, 'error'); });
+  });
+
+  // ---------------- Invoice rendering ----------------
+  function posRenderInvoice_(inv) {
+    posState._lastInvoiceId = inv.invoiceId;
+    posState._lastInvoice = inv;
+    document.getElementById('invoicePaper').innerHTML = renderInvoiceHtml_(inv);
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    posExitUpdateMode_();
+    var origGoToPage = goToPage;
+    goToPage = function (key) {
+      origGoToPage(key);
+      if (key === 'pos' || key === 'posv2') {
+        if (!posState._loadPromise) posState._loadPromise = posLoad();
+        else { posRefreshSessionSummary_(); posLoadRecentDrafts_(); } // keep drawer and drafts fresh
+      }
+    };
+  });
+
+  /**
+   * Duplicate Sale entry point (called from the Sales Management page).
+   * Loads a past invoice's items into the cart as a fresh, editable sale —
+   * the original invoice is never touched, this only starts a new one.
+   * Always waits on the same load promise POS itself uses, so this works
+   * correctly whether POS has already loaded or is loading for the first
+   * time right nowl.
+   */
+  function posLoadDuplicateInvoice_(inv) {
+    // Duplicate always starts a brand-new sale. Never carry customer/payment,
+    // draft identity, update mode, or any other state from the current POS.
+    posExitUpdateMode_();
+    posExitDraftMode_(false);
+    posResetSaleForm_();
+    posState._loadPromise = posLoad(); // always fresh, so stock caps below are accurate
+
+    return posState._loadPromise.then(function () {
+      posState.cart = [];
+      posState.cartEntryIndex = null;
+      var skipped = [];
+      // Carries over the original quantity regardless of current stock —
+      // selling past what's on hand is allowed (see completeSale in
+      // Sales.gs), so a duplicate is never silently short-filled or
+      // skipped just because stock has since run low or negative.
+      inv.items.forEach(function (item) {
+        var product = posState.products.filter(function (p) { return p.id === item.productId; })[0];
+        if (!product) { skipped.push(item.name); return; }
+        var qty = Number(item.qty) || 1;
+        var duplicatePrice = Number(item.unitPrice) || Number(product.sellingPrice) || 0;
+        posState.cart.push({
+          productId: product.id,
+          name: product.name, unit: product.unit, unitPrice: duplicatePrice, lineTotal: Math.round((qty * duplicatePrice + Number.EPSILON) * 100) / 100, priceMode: 'manual', qty: qty,
+          // A duplicate is a brand-new sale — vendor sourcing (if any) on
+          // the original invoice is never carried over; it's a fresh
+          // decision against today's own stock, same as any new cart line.
+          shortageResolution: 'negative', vendorId: '', vendorName: '', vendorUnitCost: '', editAvailableBoost: 0
+        });
+      });
+      posRenderCart_();
+      if (skipped.length) showToast('Skipped (no longer available): ' + skipped.join(', '), 'error');
+    });
+  }
+
+  /** Fetches an invoice by ID and shows it in the print/preview modal, optionally opening the browser print dialog right after. Shared by the reprint box and the Sales History popup's View/Print actions. */
+function posFetchAndShowInvoice_(invoiceId, thenPrint) {
+  return withLoader(serverCall('findInvoice', authToken, invoiceId)).then(function (invoice) {
+    posRenderInvoice_(invoice);
+    openModal('invoiceModal');
+     if (thenPrint) setTimeout(function () { printInvoice_(); }, 150);
+  });
+}
+  /**
+ * Update Invoice entry point (called from Sales Management's "Update" button).
+ * Loads a still-open-session invoice into the cart for editing in place —
+ * unlike Duplicate, saving this goes through updateSale() and overwrites the
+ * same invoice rather than creating a new one. No stock cap to reconcile
+ * here — selling past what's on hand is allowed (see completeSale in
+ * Sales.gs), so editing back up to (or beyond) the original qty is never
+ * blocked either way.
+ */
+function posLoadUpdateInvoice_(inv, reason, mode) {
+  posState._loadPromise = posLoad();
+
+  posState._loadPromise.then(function () {
+    posState.cart = [];
+    posState.cartEntryIndex = null;
+    var skipped = [];
+    // Carries over the original quantity as-is — selling past what's on
+    // hand is allowed (see completeSale in Sales.gs), so there's no longer
+    // a stock cap to reconcile against this invoice's own consumption.
+    inv.items.forEach(function (item) {
+      var product = posState.products.filter(function (p) { return p.id === item.productId; })[0];
+      if (!product) { skipped.push(item.name); return; }
+      var qty = Number(item.qty) || 1;
+      var vendorQty = Number(item.vendorQty) || 0;
+      var storedPrice = Number(item.unitPrice) || Number(product.sellingPrice) || 0;
+      var storedLineTotal = (item.lineTotal !== '' && item.lineTotal !== null && item.lineTotal !== undefined && !isNaN(Number(item.lineTotal)))
+        ? Number(item.lineTotal) : Math.round((qty * storedPrice + Number.EPSILON) * 100) / 100;
+      posState.cart.push({
+        productId: product.id,
+        name: product.name, unit: product.unit, unitPrice: storedPrice, lineTotal: storedLineTotal, priceMode: 'manual', qty: qty,
+        // Vendor/Consignment Sourcing state already on file for this line
+        // (getSaleForUpdate returns it) — pre-fills the shortage chooser so
+        // editing shows what's already there instead of looking new.
+        // editAvailableBoost is this line's own already-on-file real stock
+        // draw (qty minus whatever was vendor-sourced), added back onto
+        // live stock so re-loading the SAME invoice unchanged never shows a
+        // false shortage against its own history — see posLineAvailableStock_.
+        shortageResolution: vendorQty > 0 ? 'vendor' : 'negative',
+        vendorId: item.vendorId || '', vendorName: item.vendorName || '',
+        vendorUnitCost: item.vendorUnitCost || '', editAvailableBoost: qty - vendorQty
+      });
+    });
+    posRenderCart_();
+    if (skipped.length) showToast('Skipped (no longer available): ' + skipped.join(', '), 'error');
+    var custMatch = inv.customerId ? posState.customers.filter(function (c) { return c.id === inv.customerId; })[0] : null;
+
+    document.getElementById('posCustomerName').value = inv.customerName || '';
+    document.getElementById('posCustomerName').dataset.customerId = inv.customerId || '';
+    document.getElementById('posCustomerPhone').value = inv.customerPhone || '';
+    document.getElementById('posCustomerAddress').value = inv.customerAddress || '';
+    document.getElementById('posCustomerFatherName').value = custMatch ? (custMatch.fatherName || '') : '';
+    document.getElementById('posDiscount').value = Number(inv.discount) > 0 ? inv.discount : '';
+    document.getElementById('posAmountReceived').value = inv.paidAmount > 0 ? inv.paidAmount : '';
+    document.getElementById('posPaymentMethod').value = inv.paymentMethod || 'Cash';
+    document.getElementById('posBankAccountRow').style.display = paymentMethodNeedsAccount_(inv.paymentMethod) ? '' : 'none';
+    document.getElementById('posBankAccountLabel').textContent = (inv.paymentMethod === 'Mobile Banking' ? 'Mobile Banking Account *' : 'Bank Account *');
+    fillBankAccountSelect_(document.getElementById('posBankAccount'), posState.bankAccounts, inv.paymentMethod);
+    document.getElementById('posBankAccount').value = inv.bankAccountId || '';
+    posRefreshTabletSelect_(document.getElementById('posPaymentMethod'));
+    posRefreshTabletSelect_(document.getElementById('posBankAccount'));
+    posSetCustomerMoreExpanded_(!!(document.getElementById('posCustomerFatherName').value || inv.customerAddress));
+    posUpdateCustomerDueDisplay_(custMatch ? custMatch.due : 0);
+
+    posState.updateInvoiceId = inv.invoiceId;
+    posState.updateReason = reason;
+    posEnterUpdateMode_();
+  });
+}
+
+function posEnterUpdateMode_() {
+  if (posState.draftId) posExitDraftMode_(false);
+  document.getElementById('posUpdateBanner').hidden = false;
+  document.getElementById('posUpdateBannerId').textContent = posState.updateInvoiceId;
+  var btn = document.getElementById('posCompleteBtn');
+  btn.textContent = 'Save Update';
+}
+
+function posExitUpdateMode_() {
+  posState.updateInvoiceId = null;
+  posState.updateReason = null;
+  posState._addVendorForLineIndex = null;
+  document.getElementById('posUpdateBanner').hidden = true;
+  document.getElementById('posCompleteBtn').textContent = 'Complete Sale';
+  posRenderSessionUI_();
+}
+
+function posSetCustomerMoreExpanded_(expanded) {
+  document.getElementById('posCustomerMoreFields').hidden = !expanded;
+  document.getElementById('posCustomerMoreToggle').textContent = expanded ? '− Father Name / Address' : '+ Father Name / Address';
+}
+
+function posUpdateCustomerDueDisplay_(due) {
+  var row = document.getElementById('posCustomerDueRow');
+  var val = document.getElementById('posCustomerDueValue');
+  var d = Number(due) || 0;
+  if (d > 0) {
+    val.textContent = formatMoney(d);
+    row.hidden = false;
+  } else {
+    row.hidden = true;
+  }
+}
+
+document.getElementById('posCustomerMoreToggle').addEventListener('click', function () {
+  var fields = document.getElementById('posCustomerMoreFields');
+  posSetCustomerMoreExpanded_(fields.hidden); // hidden===true means currently collapsed, so this toggles correctly
+});
+
+document.getElementById('posCancelUpdateBtn').addEventListener('click', function () {
+  posExitUpdateMode_();
+  posResetSaleForm_();
+  showToast('Update cancelled', 'success');
+});
+
+// ---------------- Tablet POS navigation helper ----------------
+function posResolveScrollHost_() {
+  return document.querySelector('.content') || document.scrollingElement || document.documentElement;
+}
+
+function posSyncTabletLayout_() {
+  var page = document.getElementById('page-pos');
+  var productCard = page && page.querySelector('.pos-product-card');
+  var saleCard = page && page.querySelector('.pos-sale-card');
+  if (!page || !productCard || !saleCard) return false;
+
+  var mode = posResponsiveMode_();
+
+  if (mode !== 'tablet' || page.hidden) {
+    page.classList.remove('pos-is-stacked');
+    return false;
+  }
+
+  // First measure the natural tablet layout. The class only changes scrolling
+  // behavior after CSS auto-fit has already decided whether one or two columns fit.
+  page.classList.remove('pos-is-stacked');
+  var productRect = productCard.getBoundingClientRect();
+  var saleRect = saleCard.getBoundingClientRect();
+  if (!productRect.width || !saleRect.width) return false;
+
+  var sameRow = Math.abs(productRect.top - saleRect.top) < 24;
+  var stacked = !sameRow;
+  page.classList.toggle('pos-is-stacked', stacked);
+  return stacked;
+}
+
+function posScrollTabletTarget_(target) {
+  if (!target) return;
+  var host = posResolveScrollHost_();
+  var targetRect = target.getBoundingClientRect();
+  var topbar = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--topbar-height')) || 56;
+  var isDocumentHost = host === document.documentElement ||
+    host === document.body ||
+    host === document.scrollingElement;
+
+  if (!isDocumentHost && host) {
+    var hostRect = host.getBoundingClientRect();
+    var targetTop = host.scrollTop + targetRect.top - hostRect.top - 12;
+    host.scrollTop = Math.max(0, targetTop);
+  } else {
+    var currentPageTop = window.scrollY || window.pageYOffset || 0;
+    var pageTop = currentPageTop + targetRect.top - topbar - 12;
+    window.scrollTo(0, Math.max(0, pageTop));
+  }
+
+  requestAnimationFrame(posSyncTabletJump_);
+}
+
+var posTabletJumpLockUntil_ = 0;
+
+function posSetTabletJumpTarget_(target) {
+  var jumpBtn = document.getElementById('posTabletJumpBtn');
+  var cartCount = document.getElementById('posCartCount');
+  if (!jumpBtn || !cartCount) return;
+  if (target === 'products') {
+    jumpBtn.dataset.target = 'products';
+    jumpBtn.textContent = 'Products ↑';
+    jumpBtn.setAttribute('aria-label', 'Jump to products');
+  } else {
+    var count = cartCount.textContent || '0';
+    jumpBtn.dataset.target = 'cart';
+    jumpBtn.textContent = 'Cart ' + count + ' ↓';
+    jumpBtn.setAttribute('aria-label', 'Jump to cart, ' + count + ' items');
+  }
+}
+
+function posSyncTabletJump_() {
+  var jumpBtn = document.getElementById('posTabletJumpBtn');
+  var page = document.getElementById('page-pos');
+  var productCard = page && page.querySelector('.pos-product-card');
+  var cartSection = page && page.querySelector('.pos-cart-section');
+  var cartHead = cartSection && cartSection.querySelector('.pos-cart-head');
+  var cartCount = document.getElementById('posCartCount');
+  if (!jumpBtn || !page || !productCard || !cartSection || !cartHead || !cartCount) return;
+
+  var mode = posResponsiveMode_();
+  var stacked = mode === 'tablet' && page.classList.contains('pos-is-stacked');
+
+  if (!stacked) {
+    jumpBtn.hidden = true;
+    return;
+  }
+
+  jumpBtn.hidden = false;
+  if (Date.now() < posTabletJumpLockUntil_) return;
+
+  var scrollHost = posResolveScrollHost_();
+  var cartRect = cartSection.getBoundingClientRect();
+  var topbar = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--topbar-height')) || 56;
+  var hostIsDocument = scrollHost === document.documentElement ||
+    scrollHost === document.body ||
+    scrollHost === document.scrollingElement;
+  var hostRect = hostIsDocument
+    ? { top: 0, bottom: window.innerHeight }
+    : scrollHost.getBoundingClientRect();
+  var visibleTop = Math.max(topbar, hostRect.top || 0);
+  var visibleBottom = Math.min(window.innerHeight, hostRect.bottom || window.innerHeight);
+  var visibleHeight = Math.max(1, visibleBottom - visibleTop);
+  var cartVisible = cartRect.top < visibleTop + visibleHeight * 0.72 && cartRect.bottom > visibleTop + 24;
+  var atBottom = hostIsDocument
+    ? ((window.scrollY || window.pageYOffset || 0) + window.innerHeight >= Math.max(document.documentElement.scrollHeight, document.body.scrollHeight) - 24)
+    : (scrollHost.scrollTop + scrollHost.clientHeight >= scrollHost.scrollHeight - 24);
+
+  if (cartVisible || atBottom) posSetTabletJumpTarget_('products');
+  else posSetTabletJumpTarget_('cart');
+
+  if (!jumpBtn._posJumpClickBound) {
+    jumpBtn._posJumpClickBound = true;
+    jumpBtn.addEventListener('click', function () {
+      var targetMode = jumpBtn.dataset.target === 'products' ? 'products' : 'cart';
+      var target = targetMode === 'products' ? productCard : cartHead;
+      posTabletJumpLockUntil_ = Date.now() + 300;
+      posScrollTabletTarget_(target);
+      if (targetMode === 'cart') posSetTabletJumpTarget_('products');
+      else posSetTabletJumpTarget_('cart');
+    });
+  }
+}
+
+function posRefreshTabletPresentation_() {
+  posSyncTabletLayout_();
+  posSyncTabletJump_();
+}
+
+function posInitTabletJump_() {
+  if (posInitTabletJump_._bound) {
+    posRefreshTabletPresentation_();
+    return;
+  }
+
+  var jumpBtn = document.getElementById('posTabletJumpBtn');
+  var cartCount = document.getElementById('posCartCount');
+  var page = document.getElementById('page-pos');
+  if (!jumpBtn || !cartCount || !page) return;
+
+  posInitTabletJump_._bound = true;
+  var scrollHost = posResolveScrollHost_();
+  if (scrollHost && scrollHost.addEventListener) {
+    scrollHost.addEventListener('scroll', posSyncTabletJump_, { passive: true });
+  }
+  window.addEventListener('scroll', posSyncTabletJump_, { passive: true });
+  window.addEventListener('resize', function () {
+    requestAnimationFrame(posRefreshTabletPresentation_);
+  });
+  window.addEventListener('orientationchange', function () {
+    setTimeout(posRefreshTabletPresentation_, 80);
+  });
+
+  if (window.MutationObserver) {
+    new MutationObserver(posSyncTabletJump_).observe(cartCount, {
+      childList: true,
+      characterData: true,
+      subtree: true
+    });
+    new MutationObserver(function () {
+      if (!page.hidden) requestAnimationFrame(posRefreshTabletPresentation_);
+    }).observe(page, { attributes: true, attributeFilter: ['hidden'] });
+  }
+  requestAnimationFrame(posRefreshTabletPresentation_);
+}
+
+posInitTabletJump_();
+
+</script>

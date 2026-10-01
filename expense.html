@@ -1,0 +1,318 @@
+<!-- ================= Add Expense ================= -->
+<div class="card">
+  <h3 style="font-size:14px; margin-bottom:12px;">Add Expense <span class="bn-hint" style="display:inline;">— নতুন খরচ লিখুন</span></h3>
+  <div class="form-grid">
+    <div>
+      <label>Expense Date *<br><span class="bn-hint" style="display:inline;">খরচের তারিখ</span></label>
+      <input id="expDate" type="date">
+    </div>
+    <div id="expBackdatedReasonRow" style="display:none;">
+      <label>Reason for Backdating *<br><span class="bn-hint" style="display:inline;">পুরনো তারিখ কেন</span></label>
+      <input id="expBackdatedReason" type="text" placeholder="Why is this dated in the past?">
+    </div>
+    <div>
+      <label>Payment Method *<br><span class="bn-hint" style="display:inline;">টাকা দেওয়ার মাধ্যম</span></label>
+      <select id="expPaymentMethod">
+        <option value="Cash">Cash</option>
+        <option value="Bank">Bank</option>
+        <option value="Mobile Banking">Mobile Banking</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+    <div id="expBankAccountRow" style="display:none;">
+      <label id="expBankAccountLabel">Bank Account *<br><span class="bn-hint" style="display:inline;">ব্যাংক হিসাব</span></label>
+      <select id="expBankAccount"><option value="">Select bank account...</option></select>
+    </div>
+    <div>
+      <label>Expense Category *<br><span class="bn-hint" style="display:inline;">খরচের ধরন</span></label>
+      <div style="display:flex; gap:8px;">
+        <select id="expCategory" aria-label="Expense Category" data-touch-select-internal-scroll="true" style="flex:1;"><option value="">Select category...</option></select>
+        <button type="button" class="btn" id="expQuickCatBtn">+ New</button>
+      </div>
+      <div id="expQuickCatRow" style="display:none; gap:8px; margin-top:8px;">
+        <input id="expQuickCatName" type="text" placeholder="New category name" style="flex:1;">
+        <button type="button" class="btn btn-primary" id="expQuickCatSave">Save</button>
+      </div>
+    </div>
+    <div>
+      <label>Payee *<br><span class="bn-hint" style="display:inline;">কাকে টাকা দেওয়া হলো / যার খতিয়ানে যাবে</span></label>
+      <div style="display:flex; gap:8px;">
+        <select id="expPayee" aria-label="Payee" data-touch-select-internal-scroll="true" style="flex:1;"><option value="">Select payee...</option></select>
+        <button type="button" class="btn" id="expQuickPayeeBtn">+ New</button>
+        <button type="button" class="btn" id="expManagePayeesBtn">Manage</button>
+      </div>
+      <div id="expQuickPayeeRow" style="display:none; gap:8px; margin-top:8px;">
+        <input id="expQuickPayeeName" type="text" placeholder="Payee name" style="flex:1;">
+        <input id="expQuickPayeePhone" type="text" placeholder="Phone (optional)" style="max-width:150px;">
+        <button type="button" class="btn btn-primary" id="expQuickPayeeSave">Save</button>
+      </div>
+    </div>
+    <div>
+      <label>Amount *<br><span class="bn-hint" style="display:inline;">পরিমাণ</span></label>
+      <input id="expAmount" type="number" min="0" step="0.01">
+    </div>
+    <div>
+      <label>Reference No.<br><span class="bn-hint" style="display:inline;">রেফারেন্স নম্বর</span></label>
+      <input id="expReferenceNo" type="text" placeholder="Optional">
+    </div>
+    <div class="full">
+      <label>Description / Remarks<br><span class="bn-hint" style="display:inline;">বিবরণ</span></label>
+      <input id="expDescription" type="text" placeholder="What is this expense for?">
+    </div>
+    <div class="full">
+      <label>Notes<br><span class="bn-hint" style="display:inline;">মন্তব্য</span></label>
+      <input id="expNotes" type="text" placeholder="Optional">
+    </div>
+  </div>
+  <div class="field-error" id="expFormError"></div>
+  <div style="text-align:right; margin-top:14px;">
+    <button class="btn btn-primary btn-lg" id="expSaveBtn">Save Expense</button>
+  </div>
+</div>
+
+<!-- ===== Manage Expense Payees ===== -->
+<div class="modal-overlay" id="expPayeeManageModal" hidden>
+  <div class="modal modal-lg">
+    <div class="modal-header"><div><h3>Manage Payees</h3><span class="bn-hint">Payee edit, activate/deactivate or delete</span></div><button class="modal-close" onclick="closeModal('expPayeeManageModal')">&#10005;</button></div>
+    <div class="modal-body">
+      <p class="bn-hint" style="margin:0 0 10px;">Deleting a payee only removes it from future expense entry. Historical expenses will be preserved.</p>
+      <div class="table-scroll"><table><thead><tr><th>Payee</th><th>Phone</th><th>Notes</th><th>Status</th><th></th></tr></thead><tbody id="expPayeeManageBody"></tbody></table></div>
+      <div class="empty-state" id="expPayeeManageEmpty" hidden>No payees yet.</div>
+    </div>
+    <div class="modal-footer"><button class="btn" onclick="closeModal('expPayeeManageModal')">Close</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="expPayeeEditModal" hidden>
+  <div class="modal">
+    <div class="modal-header"><h3>Edit Payee</h3><button class="modal-close" onclick="closeModal('expPayeeEditModal')">&#10005;</button></div>
+    <div class="modal-body"><div class="form-grid">
+      <div class="full"><label>Payee Name *</label><input id="expPayeeEditName" type="text"></div>
+      <div><label>Phone</label><input id="expPayeeEditPhone" type="text"></div>
+      <div class="full"><label>Notes</label><input id="expPayeeEditNotes" type="text"></div>
+    </div><div class="field-error" id="expPayeeEditError"></div></div>
+    <div class="modal-footer"><button class="btn" onclick="closeModal('expPayeeEditModal')">Cancel</button><button class="btn btn-primary" id="expPayeeEditSaveBtn">Save Changes</button></div>
+  </div>
+</div>
+
+<script>
+  var expState = { categories: [], payees: [], bankAccounts: [], currencySymbol: '', payeesManagement: [], editingPayeeId: null };
+
+  function expLoad() {
+    return withLoader(serverCall('getExpenseBootstrap', authToken)).then(function (data) {
+      expState.categories = data.categories;
+      expState.payees = data.payees || [];
+      expState.bankAccounts = data.bankAccounts;
+      expState.currencySymbol = data.currencySymbol;
+      expFillCategorySelect_();
+      expFillPayeeSelect_();
+      expFillBankAccountSelect_(document.getElementById('expPaymentMethod').value);
+      if (!document.getElementById('expDate').value) document.getElementById('expDate').value = expToday_();
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  function expToday_() {
+    var d = new Date();
+    var m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + m + '-' + day;
+  }
+
+  function expFillCategorySelect_() {
+    var sel = document.getElementById('expCategory');
+    var current = sel.value;
+    sel.innerHTML = '<option value="">Select category...</option>';
+    expState.categories.forEach(function (c) { sel.innerHTML += '<option value="' + c.id + '">' + escapeHtml(c.name) + '</option>'; });
+    if (current) sel.value = current;
+  }
+  function expFillPayeeSelect_() {
+    var sel = document.getElementById('expPayee');
+    var current = sel.value;
+    sel.innerHTML = '<option value="">Select payee...</option>';
+    expState.payees.forEach(function (p) {
+      var label = p.name + (p.phone ? ' — ' + p.phone : '');
+      sel.innerHTML += '<option value="' + escapeHtml(p.id) + '">' + escapeHtml(label) + '</option>';
+    });
+    if (current) sel.value = current;
+  }
+
+  function expFillBankAccountSelect_(paymentMethod) {
+    fillBankAccountSelect_(document.getElementById('expBankAccount'), expState.bankAccounts, paymentMethod);
+  }
+
+  // ---------------- Quick-add category ----------------
+  document.getElementById('expQuickCatBtn').addEventListener('click', function () {
+    var row = document.getElementById('expQuickCatRow');
+    row.style.display = row.style.display === 'flex' ? 'none' : 'flex';
+  });
+  document.getElementById('expQuickCatSave').addEventListener('click', function () {
+    var name = document.getElementById('expQuickCatName').value.trim();
+    if (!name) return;
+    withLoader(serverCall('addExpenseCategory', authToken, { name: name })).then(function (res) {
+      expState.categories.push({ id: res.id, name: name });
+      expFillCategorySelect_();
+      document.getElementById('expCategory').value = res.id;
+      document.getElementById('expQuickCatName').value = '';
+      document.getElementById('expQuickCatRow').style.display = 'none';
+      showToast('Category added', 'success');
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  });
+
+  // ---------------- Quick-add payee ----------------
+  document.getElementById('expQuickPayeeBtn').addEventListener('click', function () {
+    var row = document.getElementById('expQuickPayeeRow');
+    row.style.display = row.style.display === 'flex' ? 'none' : 'flex';
+  });
+  document.getElementById('expQuickPayeeSave').addEventListener('click', function () {
+    var name = document.getElementById('expQuickPayeeName').value.trim();
+    var phone = document.getElementById('expQuickPayeePhone').value.trim();
+    if (!name) { showToast('Enter payee name.', 'error'); return; }
+    withLoader(serverCall('addExpensePayee', authToken, { name: name, phone: phone })).then(function (res) {
+      expState.payees.push({ id: res.id, name: name, phone: phone });
+      expState.payees.sort(function (a, b) { return String(a.name).localeCompare(String(b.name)); });
+      expFillPayeeSelect_();
+      document.getElementById('expPayee').value = res.id;
+      document.getElementById('expQuickPayeeName').value = '';
+      document.getElementById('expQuickPayeePhone').value = '';
+      document.getElementById('expQuickPayeeRow').style.display = 'none';
+      showToast('Payee added', 'success');
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  });
+
+  // ---------------- Manage Payees ----------------
+  function expLoadPayeeManagement_() {
+    return withLoader(serverCall('getExpensePayeesManagement', authToken)).then(function (rows) {
+      expState.payeesManagement = rows || [];
+      expRenderPayeeManagement_();
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  function expRenderPayeeManagement_() {
+    var body = document.getElementById('expPayeeManageBody');
+    body.innerHTML = '';
+    expState.payeesManagement.forEach(function (p) {
+      var statusBadge = p.status === 'Inactive' ? '<span class="badge badge-danger">Inactive</span>' : '<span class="badge badge-success">Active</span>';
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + escapeHtml(p.name) + '</td>' +
+        '<td>' + escapeHtml(p.phone || '') + '</td>' +
+        '<td>' + escapeHtml(p.notes || '') + '</td>' +
+        '<td>' + statusBadge + '</td>' +
+        '<td style="white-space:nowrap;"><button class="btn" data-payee-act="menu" data-id="' + escapeHtml(p.id) + '">Actions &#9662;</button></td>';
+      body.appendChild(tr);
+    });
+    document.getElementById('expPayeeManageEmpty').hidden = expState.payeesManagement.length > 0;
+  }
+
+  document.getElementById('expManagePayeesBtn').addEventListener('click', function () {
+    expLoadPayeeManagement_().then(function () { openModal('expPayeeManageModal'); });
+  });
+
+  document.getElementById('expPayeeManageBody').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-payee-act="menu"]');
+    if (!btn) return;
+    var p = expState.payeesManagement.filter(function (x) { return x.id === btn.dataset.id; })[0];
+    if (!p) return;
+    openRowActionMenu_(btn, [
+      { action: 'edit', label: 'Edit' },
+      { action: 'toggle', label: p.status === 'Active' ? 'Deactivate' : 'Activate' },
+      { divider: true },
+      { action: 'delete', label: 'Delete', danger: true }
+    ], function (action) {
+      if (action === 'edit') {
+        expState.editingPayeeId = p.id;
+        document.getElementById('expPayeeEditName').value = p.name || '';
+        document.getElementById('expPayeeEditPhone').value = p.phone || '';
+        document.getElementById('expPayeeEditNotes').value = p.notes || '';
+        document.getElementById('expPayeeEditError').style.display = 'none';
+        openModal('expPayeeEditModal');
+      }
+      if (action === 'toggle') {
+        var next = p.status === 'Active' ? 'Inactive' : 'Active';
+        withLoader(serverCall('setExpensePayeeStatus', authToken, p.id, next)).then(function () {
+          showToast(next === 'Active' ? 'Payee activated' : 'Payee deactivated', 'success');
+          return Promise.all([expLoadPayeeManagement_(), expLoad()]);
+        }).catch(function (err) { showToast(err.message, 'error'); });
+      }
+      if (action === 'delete') {
+        confirmDelete({
+          title: 'Delete payee',
+          summary: '<p><b>' + escapeHtml(p.name) + '</b></p><p>Historical expenses will be preserved.</p>',
+          fn: 'deleteExpensePayee', args: [p.id], reloadPages: ['expense', 'expenseList'],
+          successMessage: 'Payee deleted. Historical expenses were preserved.',
+          onDone: function () { expLoadPayeeManagement_(); expLoad(); }
+        });
+      }
+    });
+  });
+
+  document.getElementById('expPayeeEditSaveBtn').addEventListener('click', function () {
+    var errEl = document.getElementById('expPayeeEditError');
+    errEl.style.display = 'none';
+    var id = expState.editingPayeeId;
+    var payload = {
+      name: document.getElementById('expPayeeEditName').value.trim(),
+      phone: document.getElementById('expPayeeEditPhone').value.trim(),
+      notes: document.getElementById('expPayeeEditNotes').value.trim()
+    };
+    if (!payload.name) { errEl.textContent = 'Payee name is required.'; errEl.style.display = 'block'; return; }
+    withLoader(serverCall('updateExpensePayee', authToken, id, payload)).then(function () {
+      closeModal('expPayeeEditModal');
+      showToast('Payee updated', 'success');
+      return Promise.all([expLoadPayeeManagement_(), expLoad()]);
+    }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+  });
+
+  // ---------------- Add Expense ----------------
+  document.getElementById('expPaymentMethod').addEventListener('change', function () {
+    document.getElementById('expBankAccountRow').style.display = paymentMethodNeedsAccount_(this.value) ? '' : 'none';
+    document.getElementById('expBankAccountLabel').innerHTML = (this.value === 'Mobile Banking' ?
+      'Mobile Banking Account *<br><span class="bn-hint" style="display:inline;">মোবাইল ব্যাংকিং হিসাব</span>' :
+      'Bank Account *<br><span class="bn-hint" style="display:inline;">ব্যাংক হিসাব</span>');
+    expFillBankAccountSelect_(this.value);
+  });
+  document.getElementById('expDate').addEventListener('change', function () {
+    var val = document.getElementById('expDate').value;
+    document.getElementById('expBackdatedReasonRow').style.display = (val && val < expToday_()) ? '' : 'none';
+  });
+  document.getElementById('expSaveBtn').addEventListener('click', function () {
+    var errEl = document.getElementById('expFormError');
+    errEl.style.display = 'none';
+    var expDateVal = document.getElementById('expDate').value || expToday_();
+    var backdatedReason = document.getElementById('expBackdatedReason').value.trim();
+    if (expDateVal < expToday_() && !backdatedReason) { errEl.textContent = 'A reason is required when dating an expense in the past.'; errEl.style.display = 'block'; return; }
+    if (!document.getElementById('expPayee').value) { errEl.textContent = 'Choose a payee.'; errEl.style.display = 'block'; return; }
+    var payload = {
+      date: expDateVal,
+      categoryId: document.getElementById('expCategory').value,
+      payeeId: document.getElementById('expPayee').value,
+      amount: document.getElementById('expAmount').value,
+      paymentMethod: document.getElementById('expPaymentMethod').value,
+      bankAccountId: document.getElementById('expBankAccount').value,
+      description: document.getElementById('expDescription').value.trim(),
+      referenceNo: document.getElementById('expReferenceNo').value.trim(),
+      notes: document.getElementById('expNotes').value.trim(),
+      backdatedReason: backdatedReason
+    };
+    runConfirmedAction({type:'financial',title:'Add Expense?',message:'This will record an expense and move money from the selected payment source.',details:[
+      {label:'Category',value:selectedOptionText_('expCategory'),emphasis:true},
+      {label:'Payee',value:selectedOptionText_('expPayee')},
+      {label:'Amount',value:formatMoney(Number(payload.amount)||0),emphasis:true},
+      {label:'In words',value:banglaAmountInWords_(payload.amount)},
+      {label:'Method',value:payload.paymentMethod},
+      {label:'Account',value:paymentMethodNeedsAccount_(payload.paymentMethod)?selectedOptionText_('expBankAccount'):''},
+      {label:'Date',value:payload.date}
+    ],confirmLabel:'Add Expense ' + formatMoney(Number(payload.amount)||0),loadingLabel:'Saving...',trigger:document.getElementById('expSaveBtn')}, function () {
+      return withLoader(serverCall('addExpense', authToken, payload)).then(function () {
+        showToast('Expense saved', 'success');
+        document.getElementById('expPayee').value = ''; document.getElementById('expAmount').value = ''; document.getElementById('expDescription').value = ''; document.getElementById('expReferenceNo').value = ''; document.getElementById('expNotes').value = ''; document.getElementById('expBackdatedReason').value = ''; document.getElementById('expBackdatedReasonRow').style.display = 'none';
+      });
+    }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+  });
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var origGoToPage = goToPage;
+    goToPage = function (key) {
+      origGoToPage(key);
+      if (key === 'expense' && !expState._loaded) { expState._loaded = true; expLoad(); }
+    };
+  });
+</script>

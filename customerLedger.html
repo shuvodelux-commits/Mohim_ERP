@@ -1,0 +1,662 @@
+<div class="party-ledger-workspace" id="customerLedgerWorkspace">
+  <div class="party-ledger-toolbar card">
+    <div class="party-ledger-selector-wrap">
+      <label for="customerLedgerSelector">Customer</label>
+      <div class="counter-combobox party-ledger-combobox">
+        <input id="customerLedgerSelector" type="search" data-search-clear="on" autocomplete="off" spellcheck="false" placeholder="Search customer by name or phone...">
+        <div id="customerLedgerPartyResults" class="counter-combo-results party-ledger-party-results" role="listbox" hidden></div>
+      </div>
+    </div>
+    <div class="party-ledger-toolbar-actions">
+      <button class="btn btn-primary" id="customerLedgerReceiveBtn" type="button" disabled>Receive Payment</button>
+      <button class="btn" id="customerLedgerAdvanceRefundBtn" type="button" disabled>Refund Credit</button>
+      <button class="btn" id="customerLedgerPrintBtn" type="button" disabled>Print Ledger</button>
+    </div>
+  </div>
+
+  <div class="party-ledger-empty card" id="customerLedgerSelectEmpty">Select a customer to view ledger.</div>
+
+  <div id="customerLedgerSelected" hidden>
+    <div class="party-ledger-party-card card">
+      <div class="party-ledger-party-copy">
+        <h3 id="customerLedgerPartyName"></h3>
+        <div class="party-ledger-party-meta" id="customerLedgerPartyMeta"></div>
+        <div class="party-ledger-status" id="customerLedgerPartyStatus"></div>
+      </div>
+      <div class="party-ledger-balance-box">
+        <span>Current Due</span>
+        <strong id="customerLedgerBalance">0</strong>
+        <span style="margin-top:6px">Customer Credit</span>
+        <strong id="customerLedgerAdvance">0</strong>
+      </div>
+    </div>
+
+    <div class="party-ledger-list-card card">
+      <div class="party-ledger-list-head">
+        <div>
+          <h3>Transactions</h3>
+          <span class="bn-hint" style="display:inline;">সর্বশেষ লেনদেন আগে</span>
+        </div>
+        <div class="party-ledger-list-controls">
+          <label class="party-ledger-corrections-toggle" id="customerLedgerCorrectionsWrap" hidden>
+            <input id="customerLedgerCorrectionsToggle" type="checkbox"> Show corrections
+          </label>
+          <label class="party-ledger-page-size">Show
+            <select id="customerLedgerPageSize">
+              <option value="50" selected>50</option>
+              <option value="100">100</option>
+              <option value="200">200</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div class="table-scroll party-ledger-table-scroll">
+        <table class="mobile-card-table party-ledger-table">
+          <thead><tr><th>Date</th><th>Type</th><th>Reference</th><th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th><th></th></tr></thead>
+          <tbody id="customerLedgerBody"></tbody>
+        </table>
+      </div>
+      <div class="empty-state" id="customerLedgerEmpty" hidden>No transactions yet.</div>
+      <div class="party-ledger-pagination">
+        <button class="btn" id="customerLedgerPrevBtn" type="button" disabled>&larr; Previous</button>
+        <span id="customerLedgerPageLabel">Page 1</span>
+        <button class="btn" id="customerLedgerNextBtn" type="button" disabled>Next &rarr;</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Receive Payment -->
+<div class="modal-overlay" id="customerLedgerPayModal" hidden>
+  <div class="modal party-ledger-action-modal">
+    <div class="modal-header"><div><h3>Receive Payment</h3><span class="bn-hint">কাস্টমারের বাকি জমা</span></div><button class="modal-close" type="button" onclick="closeModal('customerLedgerPayModal')">&#10005;</button></div>
+    <div class="modal-body">
+      <div class="party-ledger-modal-balance"><span>Current Due</span><strong id="customerLedgerPayCurrentDue">0</strong></div>
+      <div class="form-grid party-ledger-payment-grid">
+        <div class="full"><label for="customerLedgerPayInvoice">Apply to invoice (optional)</label><select id="customerLedgerPayInvoice"><option value="">Auto — oldest due first</option></select></div>
+        <div><label>Payment Amount *</label><input id="customerLedgerPayAmount" type="number" min="0" step="0.01"></div>
+        <div><label>Discount Given</label><input id="customerLedgerPayDiscount" type="number" min="0" step="0.01" value="0"></div>
+        <div class="full" id="customerLedgerPayDiscountReasonRow" hidden><label>Discount Reason *</label><input id="customerLedgerPayDiscountReason" type="text"></div>
+        <div><label>Payment Method</label><select id="customerLedgerPayMethod"><option value="Cash">Cash</option><option value="Bank">Bank</option><option value="Mobile Banking">Mobile Banking</option></select></div>
+        <div id="customerLedgerPayBankRow" hidden><label id="customerLedgerPayBankLabel">Bank Account *</label><select id="customerLedgerPayBank"><option value="">Select bank account...</option></select></div>
+        <div><label>Payment Date</label><input id="customerLedgerPayDate" type="date"></div>
+        <div class="full" id="customerLedgerPayBackdatedRow" hidden><label>Reason for Backdating *</label><input id="customerLedgerPayBackdatedReason" type="text"></div>
+        <div class="full"><label>Note</label><input id="customerLedgerPayNote" type="text"></div>
+      </div>
+      <button type="button" class="btn party-ledger-settle-btn" id="customerLedgerSettleFullBtn">Settle Full Balance</button>
+      <div class="party-ledger-settlement-summary">
+        <div><span>Total Settled</span><strong id="customerLedgerPayTotalSettled">0</strong></div>
+        <div><span>Balance After</span><strong id="customerLedgerPayBalanceAfter">0</strong></div>
+      </div>
+      <div class="field-error" id="customerLedgerPayError"></div>
+    </div>
+    <div class="modal-footer"><button class="btn" type="button" onclick="closeModal('customerLedgerPayModal')">Cancel</button><button class="btn btn-primary" id="customerLedgerPaySaveBtn" type="button">Receive Payment</button></div>
+  </div>
+</div>
+
+<!-- Customer Credit Refund -->
+<div class="modal-overlay" id="customerLedgerAdvanceRefundModal" hidden>
+  <div class="modal party-ledger-action-modal">
+    <div class="modal-header"><div><h3>Refund Credit</h3><span class="bn-hint">কাস্টমার ক্রেডিট ফেরত</span></div><button class="modal-close" type="button" onclick="closeModal('customerLedgerAdvanceRefundModal')">&#10005;</button></div>
+    <div class="modal-body">
+      <div class="party-ledger-modal-balance"><span>Available Customer Credit</span><strong id="customerLedgerAdvanceRefundAvailable">0</strong></div>
+      <div class="form-grid party-ledger-payment-grid">
+        <div><label>Refund Amount *</label><input id="customerLedgerAdvanceRefundAmount" type="number" min="0" step="0.01"></div>
+        <div><label>Refund Method</label><select id="customerLedgerAdvanceRefundMethod"><option value="Cash">Cash</option><option value="Bank">Bank</option><option value="Mobile Banking">Mobile Banking</option></select></div>
+        <div id="customerLedgerAdvanceRefundBankRow" hidden><label id="customerLedgerAdvanceRefundBankLabel">Bank Account *</label><select id="customerLedgerAdvanceRefundBank"><option value="">Select bank account...</option></select></div>
+        <div><label>Refund Date</label><input id="customerLedgerAdvanceRefundDate" type="date"></div>
+        <div class="full" id="customerLedgerAdvanceRefundBackdatedRow" hidden><label>Reason for Backdating *</label><input id="customerLedgerAdvanceRefundBackdatedReason" type="text"></div>
+        <div class="full"><label>Note</label><input id="customerLedgerAdvanceRefundNote" type="text"></div>
+      </div>
+      <div class="field-error" id="customerLedgerAdvanceRefundError"></div>
+    </div>
+    <div class="modal-footer"><button class="btn" type="button" onclick="closeModal('customerLedgerAdvanceRefundModal')">Cancel</button><button class="btn btn-primary" id="customerLedgerAdvanceRefundSaveBtn" type="button">Refund Credit</button></div>
+  </div>
+</div>
+
+<!-- Edit Customer Payment -->
+<div class="modal-overlay" id="customerLedgerEditModal" hidden>
+  <div class="modal party-ledger-action-modal">
+    <div class="modal-header"><h3>Edit Payment</h3><button class="modal-close" type="button" onclick="closeModal('customerLedgerEditModal')">&#10005;</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div><label>Date *</label><input id="customerLedgerEditDate" type="date"></div>
+        <div><label>Payment Amount *</label><input id="customerLedgerEditAmount" type="number" min="0" step="0.01"></div>
+        <div><label>Discount Given</label><input id="customerLedgerEditDiscount" type="number" min="0" step="0.01"></div>
+        <div class="full"><label>Discount Reason</label><input id="customerLedgerEditDiscountReason" type="text"></div>
+        <div><label>Payment Method</label><select id="customerLedgerEditMethod"><option value="Cash">Cash</option><option value="Bank">Bank</option><option value="Mobile Banking">Mobile Banking</option><option value="Other">Other</option></select></div>
+        <div id="customerLedgerEditBankRow" hidden><label id="customerLedgerEditBankLabel">Bank Account *</label><select id="customerLedgerEditBank"><option value="">Select bank account...</option></select></div>
+        <div class="full"><label>Note</label><input id="customerLedgerEditNote" type="text"></div>
+      </div>
+      <div class="field-error" id="customerLedgerEditError"></div>
+    </div>
+    <div class="modal-footer"><button class="btn" type="button" onclick="closeModal('customerLedgerEditModal')">Cancel</button><button class="btn btn-primary" id="customerLedgerEditSaveBtn" type="button">Save Changes</button></div>
+  </div>
+</div>
+
+<!-- Print Ledger -->
+<div class="modal-overlay" id="customerLedgerPrintModal" hidden>
+  <div class="modal party-ledger-print-modal">
+    <div class="modal-header"><h3>Print Customer Ledger</h3><button class="modal-close" type="button" onclick="closeModal('customerLedgerPrintModal')">&#10005;</button></div>
+    <div class="modal-body">
+      <div class="party-ledger-print-party" id="customerLedgerPrintParty"></div>
+      <div class="form-grid">
+        <div><label>From Date</label><input id="customerLedgerPrintFrom" type="date"></div>
+        <div><label>To Date</label><input id="customerLedgerPrintTo" type="date"></div>
+      </div>
+      <div class="field-error" id="customerLedgerPrintError"></div>
+    </div>
+    <div class="modal-footer"><button class="btn" type="button" onclick="closeModal('customerLedgerPrintModal')">Cancel</button><button class="btn btn-primary" id="customerLedgerPrintConfirmBtn" type="button">Preview / Print</button></div>
+  </div>
+</div>
+
+<script>
+  var customerLedgerState = {
+    partyId: '', pageSize: 50, pageNumber: 1, cursor: '', cursorStack: [],
+    parties: [], bankAccounts: [], party: null, rows: [], page: null,
+    currencySymbol: '', editingLedgerId: '', paymentContext: null, partyCombo: null, _loaded: false,
+    showCorrections: false, canViewCorrections: false
+  };
+
+  function customerLedgerCan_(moduleKey, action) {
+    if (userPermissions === null) return true;
+    var mod = userPermissions && userPermissions[moduleKey];
+    if (!mod) return false;
+    if (action === 'delete') return !!mod.delete && mod.delete !== 'disabled';
+    return !!mod[action];
+  }
+
+  function customerLedgerCanDiscount_() {
+    if (userPermissions === null) return true;
+    return !!(userPermissions && userPermissions.settlementDiscount && userPermissions.settlementDiscount.edit);
+  }
+
+  function customerLedgerCanOpeningEdit_() {
+    if (userPermissions === null) return true;
+    return !!(userPermissions && userPermissions.openingBalance && userPermissions.openingBalance.edit) && customerLedgerCan_('customers', 'edit');
+  }
+
+  function customerLedgerToday_() {
+    var d = new Date();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + m + '-' + day;
+  }
+
+  function customerLedgerPartyDisplay_(party) {
+    if (!party) return '';
+    return party.name + (party.phone ? ' (' + party.phone + ')' : '');
+  }
+
+  function customerLedgerResetPaging_() {
+    customerLedgerState.cursor = '';
+    customerLedgerState.cursorStack = [];
+    customerLedgerState.pageNumber = 1;
+  }
+
+  function customerLedgerSelectParty_(customerId) {
+    closeRowActionMenu_();
+    customerLedgerState.partyId = String(customerId || '');
+    customerLedgerState.showCorrections = false;
+    var correctionsToggle = document.getElementById('customerLedgerCorrectionsToggle'); if (correctionsToggle) correctionsToggle.checked = false;
+    customerLedgerResetPaging_();
+    customerLedgerClearPaymentForms_();
+    return customerLedgerLoad();
+  }
+
+  function customerLedgerEnsurePartyCombo_() {
+    if (customerLedgerState.partyCombo) return customerLedgerState.partyCombo;
+    if (typeof createPartySearchCombobox_ !== 'function') return null;
+    customerLedgerState.partyCombo = createPartySearchCombobox_({
+      input: document.getElementById('customerLedgerSelector'),
+      results: document.getElementById('customerLedgerPartyResults'),
+      getItems: function () { return customerLedgerState.parties || []; },
+      displayText: customerLedgerPartyDisplay_,
+      emptyText: 'No matching customers',
+      limit: 20,
+      onSelect: function (party) { customerLedgerSelectParty_(party.id); },
+      onClear: function () { if (customerLedgerState.partyId) customerLedgerSelectParty_(''); }
+    });
+    return customerLedgerState.partyCombo;
+  }
+
+  function customerLedgerOnPageEnter_(pendingCustomerId) {
+    customerLedgerEnsurePartyCombo_();
+    customerLedgerState.partyId = String(pendingCustomerId || '');
+    customerLedgerState.showCorrections = false;
+    var correctionsToggle = document.getElementById('customerLedgerCorrectionsToggle'); if (correctionsToggle) correctionsToggle.checked = false;
+    customerLedgerResetPaging_();
+    customerLedgerClearPaymentForms_();
+    return customerLedgerLoad();
+  }
+
+  function customerLedgerFillInvoiceSelect_() {
+    var select = document.getElementById('customerLedgerPayInvoice');
+    var current = select.value;
+    select.innerHTML = '<option value="">Auto — oldest due first</option>';
+    var invoices = (customerLedgerState.paymentContext && customerLedgerState.paymentContext.invoices) || [];
+    invoices.forEach(function (inv) {
+      var option = document.createElement('option');
+      option.value = inv.invoiceId;
+      option.textContent = inv.invoiceId + ' · ' + (inv.date || '') + ' · Due ' + formatMoney(inv.remainingDue || 0);
+      select.appendChild(option);
+    });
+    if (Array.prototype.some.call(select.options, function (o) { return o.value === current; })) select.value = current;
+  }
+
+  function customerLedgerApplyPaymentContext_(ctx) {
+    customerLedgerState.paymentContext = ctx || null;
+    var credit = Number(ctx && ctx.customerCredit) || 0;
+    document.getElementById('customerLedgerAdvance').textContent = formatMoney(credit);
+    document.getElementById('customerLedgerAdvanceRefundBtn').disabled = !customerLedgerState.party || credit <= 0.004 || !customerLedgerCan_('customers', 'edit');
+    customerLedgerFillInvoiceSelect_();
+  }
+
+  function customerLedgerLoadPaymentContext_() {
+    customerLedgerApplyPaymentContext_(null);
+    if (!customerLedgerState.partyId || !customerLedgerCan_('customers', 'edit')) return Promise.resolve(null);
+    var customerId = customerLedgerState.partyId;
+    return serverCall('getCustomerPaymentContext', authToken, customerId).then(function (ctx) {
+      if (String(customerLedgerState.partyId) !== String(customerId)) return null;
+      customerLedgerApplyPaymentContext_(ctx);
+      return ctx;
+    }).catch(function (err) {
+      if (String(customerLedgerState.partyId) === String(customerId)) showToast(err.message || 'Could not load customer payment details.', 'error');
+      return null;
+    });
+  }
+
+  function customerLedgerLoad() {
+    return withLoader(serverCall('getCustomerLedgerWorkspaceBootstrap', authToken, customerLedgerState.partyId, customerLedgerState.pageSize, customerLedgerState.showCorrections)).then(function (data) {
+      customerLedgerState._loaded = true;
+      customerLedgerState.parties = data.parties || [];
+      customerLedgerState.bankAccounts = data.bankAccounts || [];
+      customerLedgerState.currencySymbol = data.currencySymbol || '';
+      customerLedgerState.canViewCorrections = !!data.canViewCorrections;
+      if (!customerLedgerState.canViewCorrections) customerLedgerState.showCorrections = false;
+      customerLedgerState.party = data.party || null;
+      customerLedgerState.rows = (data.page && data.page.rows) || [];
+      customerLedgerState.page = (data.page && data.page.page) || {pageSize: customerLedgerState.pageSize, hasOlder:false, olderCursor:'', hasNewer:false};
+      customerLedgerRender_();
+      customerLedgerLoadPaymentContext_();
+      return data;
+    }).catch(function (err) {
+      showToast(err.message, 'error');
+      throw err;
+    });
+  }
+
+  function customerLedgerLoadPage_(cursor) {
+    return withLoader(serverCall('getCustomerLedgerPage', authToken, customerLedgerState.partyId, customerLedgerState.pageSize, cursor || '', customerLedgerState.showCorrections)).then(function (data) {
+      customerLedgerState.rows = data.rows || [];
+      customerLedgerState.page = data.page || {};
+      customerLedgerRenderRows_();
+      customerLedgerRenderPagination_();
+      return data;
+    }).catch(function (err) {
+      showToast(err.message, 'error');
+      throw err;
+    });
+  }
+
+  function customerLedgerRender_() {
+    var party = customerLedgerState.party;
+    document.getElementById('customerLedgerSelectEmpty').hidden = !!party;
+    document.getElementById('customerLedgerSelected').hidden = !party;
+    if (!party) {
+      if (customerLedgerState.partyCombo) customerLedgerState.partyCombo.setSelected(null);
+      document.getElementById('customerLedgerReceiveBtn').disabled = true;
+      document.getElementById('customerLedgerAdvanceRefundBtn').disabled = true;
+      document.getElementById('customerLedgerAdvance').textContent = formatMoney(0);
+      document.getElementById('customerLedgerPrintBtn').disabled = true;
+      return;
+    }
+    if (customerLedgerState.partyCombo) customerLedgerState.partyCombo.setSelected(party);
+    document.getElementById('customerLedgerPartyName').textContent = party.name || '';
+    document.getElementById('customerLedgerPartyMeta').textContent = [party.phone, party.address].filter(Boolean).join(' · ');
+    var statusEl = document.getElementById('customerLedgerPartyStatus');
+    statusEl.textContent = party.status && party.status !== 'Active' ? party.status : '';
+    statusEl.hidden = !statusEl.textContent;
+    var balance = Number(party.balance) || 0;
+    document.getElementById('customerLedgerBalance').textContent = formatMoney(Math.max(0, balance));
+    document.getElementById('customerLedgerReceiveBtn').disabled = !party.canPay || !customerLedgerCan_('customers', 'edit');
+    document.getElementById('customerLedgerPrintBtn').disabled = customerLedgerState.rows.length === 0 && !(customerLedgerState.page && customerLedgerState.page.hasOlder);
+    document.getElementById('customerLedgerPageSize').value = String(customerLedgerState.pageSize);
+    var correctionWrap = document.getElementById('customerLedgerCorrectionsWrap');
+    var correctionToggle = document.getElementById('customerLedgerCorrectionsToggle');
+    if (correctionWrap) correctionWrap.hidden = !customerLedgerState.canViewCorrections;
+    if (correctionToggle) correctionToggle.checked = !!customerLedgerState.showCorrections;
+    customerLedgerRenderRows_();
+    customerLedgerRenderPagination_();
+  }
+
+  function customerLedgerActionAllowed_(row, action) {
+    if (row.sourceModule === 'customerPayment') {
+      return action === 'edit' ? customerLedgerCan_('customers', 'edit') : action === 'delete' ? customerLedgerCan_('customers', 'delete') : false;
+    }
+    if (row.sourceModule === 'sales') {
+      if (action === 'view' || action === 'print') return customerLedgerCan_('sales', 'view');
+      if (action === 'edit') return customerLedgerCan_('sales', 'edit');
+      if (action === 'return') return customerLedgerCan_('returns', 'add');
+      if (action === 'delete') return customerLedgerCan_('sales', 'delete');
+    }
+    if (row.sourceModule === 'salesReturn') return action === 'view' && customerLedgerCan_('returns', 'view');
+    if (row.sourceModule === 'customerOpeningBalance') return action === 'edit' && customerLedgerCanOpeningEdit_();
+    return false;
+  }
+
+  function customerLedgerActionLabel_(action) {
+    return {view:'View', print:'Print Invoice', edit:'Edit', return:'Sales Return', delete:'Delete'}[action] || action;
+  }
+
+  function customerLedgerRenderRows_() {
+    var body = document.getElementById('customerLedgerBody');
+    body.innerHTML = '';
+    customerLedgerState.rows.forEach(function (row, index) {
+      var credit = row['Credit'] ? formatMoney(row['Credit']) : '';
+      var displayType = row['Type'] === 'Advance Refund' ? 'Credit Refund' : (row['Type'] || '');
+      var displayReference = row['Reference'] === 'ADVANCE REFUND' ? 'CREDIT REFUND' : (row['Reference'] || '');
+      var discount = Number(row['Discount Amount']) || 0;
+      var payment = (row['Payment Amount'] === '' || row['Payment Amount'] == null) ? (Number(row['Credit']) || 0) : (Number(row['Payment Amount']) || 0);
+      if (row.sourceModule === 'customerPayment' && discount > 0) {
+        credit += '<div class="party-ledger-row-note">Payment ' + escapeHtml(formatMoney(payment)) + ' + Discount ' + escapeHtml(formatMoney(discount)) + '</div>';
+      }
+      var actions = (row.availableActions || []).filter(function (action) { return customerLedgerActionAllowed_(row, action); });
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td data-label="Date">' + escapeHtml(String(row['Date'] || '').slice(0,10)) + '</td>' +
+        '<td data-label="Type">' + escapeHtml(displayType) + '</td>' +
+        '<td class="mono" data-label="Reference">' + escapeHtml(displayReference) + '</td>' +
+        '<td class="num mono" data-label="Debit">' + (row['Debit'] ? escapeHtml(formatMoney(row['Debit'])) : '') + '</td>' +
+        '<td class="num mono" data-label="Credit">' + credit + '</td>' +
+        '<td class="num mono" data-label="Balance">' + escapeHtml(formatMoney(Number(row['Balance']) || 0)) + '</td>' +
+        '<td>' + (actions.length ? '<button class="btn" type="button" data-customer-ledger-action-index="' + index + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button>' : '') + '</td>';
+      body.appendChild(tr);
+    });
+    document.getElementById('customerLedgerEmpty').hidden = customerLedgerState.rows.length > 0;
+    enhanceMobileCardTables_(document.getElementById('customerLedgerWorkspace'));
+  }
+
+  function customerLedgerRenderPagination_() {
+    var page = customerLedgerState.page || {};
+    document.getElementById('customerLedgerPageLabel').textContent = 'Page ' + customerLedgerState.pageNumber;
+    document.getElementById('customerLedgerPrevBtn').disabled = customerLedgerState.cursorStack.length === 0;
+    document.getElementById('customerLedgerNextBtn').disabled = !page.hasOlder || !page.olderCursor;
+  }
+
+
+  document.getElementById('customerLedgerCorrectionsToggle').addEventListener('change', function () {
+    if (!customerLedgerState.canViewCorrections) { this.checked = false; return; }
+    customerLedgerState.showCorrections = !!this.checked;
+    customerLedgerResetPaging_();
+    customerLedgerLoadPage_('');
+  });
+
+  document.getElementById('customerLedgerPageSize').addEventListener('change', function () {
+    customerLedgerState.pageSize = Number(this.value) || 50;
+    customerLedgerResetPaging_();
+    customerLedgerLoadPage_('');
+  });
+
+  document.getElementById('customerLedgerNextBtn').addEventListener('click', function () {
+    var olderCursor = customerLedgerState.page && customerLedgerState.page.olderCursor;
+    if (!olderCursor) return;
+    customerLedgerState.cursorStack.push(customerLedgerState.cursor);
+    customerLedgerState.cursor = olderCursor;
+    customerLedgerState.pageNumber += 1;
+    customerLedgerLoadPage_(customerLedgerState.cursor);
+  });
+
+  document.getElementById('customerLedgerPrevBtn').addEventListener('click', function () {
+    if (!customerLedgerState.cursorStack.length) return;
+    customerLedgerState.cursor = customerLedgerState.cursorStack.pop() || '';
+    customerLedgerState.pageNumber = Math.max(1, customerLedgerState.pageNumber - 1);
+    customerLedgerLoadPage_(customerLedgerState.cursor);
+  });
+
+  document.getElementById('customerLedgerBody').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-customer-ledger-action-index]');
+    if (!btn) return;
+    var row = customerLedgerState.rows[Number(btn.dataset.customerLedgerActionIndex)];
+    if (!row) return;
+    var actions = (row.availableActions || []).filter(function (action) { return customerLedgerActionAllowed_(row, action); });
+    var items = actions.map(function (action) { return {action:action, label:customerLedgerActionLabel_(action), danger:action === 'delete'}; });
+    openRowActionMenu_(btn, items, function (action) {
+      if (row.sourceModule === 'customerPayment') {
+        if (action === 'edit') customerLedgerOpenPaymentEdit_(row.sourceId);
+        if (action === 'delete') customerLedgerDeletePayment_(row.sourceId);
+        return;
+      }
+      partyLedgerRouteSourceAction_('customer', row, action, customerLedgerRefreshNewest_);
+    });
+  });
+
+  function customerLedgerClearPaymentForms_() {
+    var ids = ['customerLedgerPayAmount','customerLedgerPayDiscountReason','customerLedgerPayBackdatedReason','customerLedgerPayNote'];
+    ids.forEach(function (id) { var el=document.getElementById(id); if (el) el.value=''; });
+    var discount=document.getElementById('customerLedgerPayDiscount'); if (discount) discount.value='0';
+    var invoice=document.getElementById('customerLedgerPayInvoice'); if (invoice) invoice.value='';
+  }
+
+  function customerLedgerFillBank_(selectId, method) {
+    fillBankAccountSelect_(document.getElementById(selectId), customerLedgerState.bankAccounts, method);
+  }
+
+  function customerLedgerPaymentRecalc_() {
+    var due = customerLedgerState.party ? Number(customerLedgerState.party.balance) || 0 : 0;
+    var payment = Number(document.getElementById('customerLedgerPayAmount').value) || 0;
+    var discount = Number(document.getElementById('customerLedgerPayDiscount').value) || 0;
+    var total = Math.round((payment + discount) * 100) / 100;
+    var after = Math.round((due - total) * 100) / 100;
+    document.getElementById('customerLedgerPayTotalSettled').textContent = formatMoney(total);
+    document.getElementById('customerLedgerPayBalanceAfter').textContent = after < 0 ? ('Credit ' + formatMoney(Math.abs(after))) : formatMoney(after);
+    document.getElementById('customerLedgerPayDiscountReasonRow').hidden = discount <= 0;
+    var canDiscount = customerLedgerCanDiscount_() && due > 0;
+    document.getElementById('customerLedgerPayDiscount').disabled = !canDiscount;
+    document.getElementById('customerLedgerSettleFullBtn').disabled = !canDiscount || payment <= 0 || payment > due;
+  }
+
+  function customerLedgerOpenPayment_() {
+    if (!customerLedgerState.party || !customerLedgerState.party.canPay) return;
+    customerLedgerClearPaymentForms_();
+    document.getElementById('customerLedgerPayCurrentDue').textContent = formatMoney(Math.max(0, Number(customerLedgerState.party.balance) || 0));
+    document.getElementById('customerLedgerPayMethod').value = 'Cash';
+    document.getElementById('customerLedgerPayBankRow').hidden = true;
+    customerLedgerFillBank_('customerLedgerPayBank', 'Cash');
+    document.getElementById('customerLedgerPayDate').value = customerLedgerToday_();
+    document.getElementById('customerLedgerPayBackdatedRow').hidden = true;
+    document.getElementById('customerLedgerPayError').style.display = 'none';
+    customerLedgerPaymentRecalc_();
+    openModal('customerLedgerPayModal');
+  }
+
+  document.getElementById('customerLedgerReceiveBtn').addEventListener('click', customerLedgerOpenPayment_);
+  document.getElementById('customerLedgerPayAmount').addEventListener('input', customerLedgerPaymentRecalc_);
+  document.getElementById('customerLedgerPayDiscount').addEventListener('input', customerLedgerPaymentRecalc_);
+  document.getElementById('customerLedgerPayMethod').addEventListener('change', function () {
+    var need = paymentMethodNeedsAccount_(this.value);
+    document.getElementById('customerLedgerPayBankRow').hidden = !need;
+    document.getElementById('customerLedgerPayBankLabel').textContent = this.value === 'Mobile Banking' ? 'Mobile Banking Account *' : 'Bank Account *';
+    customerLedgerFillBank_('customerLedgerPayBank', this.value);
+  });
+  document.getElementById('customerLedgerPayDate').addEventListener('change', function () {
+    document.getElementById('customerLedgerPayBackdatedRow').hidden = !(this.value && this.value < customerLedgerToday_());
+  });
+  document.getElementById('customerLedgerSettleFullBtn').addEventListener('click', function () {
+    var due = customerLedgerState.party ? Number(customerLedgerState.party.balance) || 0 : 0;
+    var payment = Number(document.getElementById('customerLedgerPayAmount').value) || 0;
+    if (!customerLedgerCanDiscount_() || payment <= 0 || due <= 0 || payment > due) return;
+    document.getElementById('customerLedgerPayDiscount').value = (Math.round((due - payment) * 100) / 100).toFixed(2);
+    customerLedgerPaymentRecalc_();
+    if (Number(document.getElementById('customerLedgerPayDiscount').value) > 0) document.getElementById('customerLedgerPayDiscountReason').focus();
+  });
+
+  document.getElementById('customerLedgerPaySaveBtn').addEventListener('click', function () {
+    var errEl = document.getElementById('customerLedgerPayError'); errEl.style.display='none';
+    var amount = document.getElementById('customerLedgerPayAmount').value;
+    var discount = Number(document.getElementById('customerLedgerPayDiscount').value) || 0;
+    var discountReason = document.getElementById('customerLedgerPayDiscountReason').value.trim();
+    var method = document.getElementById('customerLedgerPayMethod').value;
+    var bankId = document.getElementById('customerLedgerPayBank').value;
+    var payDate = document.getElementById('customerLedgerPayDate').value || customerLedgerToday_();
+    var backdatedReason = document.getElementById('customerLedgerPayBackdatedReason').value.trim();
+    var allocatedInvoiceId = document.getElementById('customerLedgerPayInvoice').value || '';
+    var due = customerLedgerState.party ? Number(customerLedgerState.party.balance) || 0 : 0;
+    if ((Number(amount) || 0) <= 0) { errEl.textContent='Enter a valid payment amount.'; errEl.style.display='block'; return; }
+    if (payDate < customerLedgerToday_() && !backdatedReason) { errEl.textContent='A reason is required when dating a payment in the past.'; errEl.style.display='block'; return; }
+    if (discount > 0 && !discountReason) { errEl.textContent='Discount Reason is required.'; errEl.style.display='block'; return; }
+    if (discount > 0 && ((Number(amount) || 0) + discount) - due > 0.004) { errEl.textContent='Payment plus discount cannot exceed the current due.'; errEl.style.display='block'; return; }
+    if (paymentMethodNeedsAccount_(method) && !bankId) { errEl.textContent='Choose a bank account.'; errEl.style.display='block'; return; }
+    var partyName = customerLedgerState.party ? (customerLedgerState.party.name || customerLedgerState.party['Customer Name'] || 'Customer') : 'Customer';
+    var customerId = customerLedgerState.partyId;
+    var payNote = document.getElementById('customerLedgerPayNote').value.trim();
+    runConfirmedAction({type:'financial',title:'Receive Payment?',message:partyName + '-এর কাছ থেকে পেমেন্ট গ্রহণ করছেন।',
+      details:settlementConfirmDetails_({partyLabel:'Customer',partyName:partyName,directionLabel:'Receive',amount:Number(amount)||0,discount:discount,discountLabel:'Discount Given',method:method,accountName:paymentMethodNeedsAccount_(method)?selectedOptionText_('customerLedgerPayBank'):'',date:payDate}),
+      confirmLabel:'Receive ' + formatMoney(Number(amount)||0),loadingLabel:'Receiving...',trigger:document.getElementById('customerLedgerPaySaveBtn')}, function () {
+      return withLoader(serverCall('receivePayment', authToken, customerId, amount, method, bankId, payNote, payDate, backdatedReason, discount, discountReason, allocatedInvoiceId)).then(function () {
+        closeModal('customerLedgerPayModal'); showToast('Payment recorded', 'success'); customerLedgerRefreshNewest_(); reloadPage_('customers'); reloadPage_('daybook'); reloadPage_('dashboard');
+      });
+    }).catch(function (err) { errEl.textContent=err.message; errEl.style.display='block'; });
+  });
+
+  function customerLedgerAdvanceRefundFillBank_() {
+    var method = document.getElementById('customerLedgerAdvanceRefundMethod').value;
+    var need = paymentMethodNeedsAccount_(method);
+    document.getElementById('customerLedgerAdvanceRefundBankRow').hidden = !need;
+    document.getElementById('customerLedgerAdvanceRefundBankLabel').textContent = method === 'Mobile Banking' ? 'Mobile Banking Account *' : 'Bank Account *';
+    customerLedgerFillBank_('customerLedgerAdvanceRefundBank', method);
+  }
+
+  function customerLedgerOpenAdvanceRefund_() {
+    if (!customerLedgerState.party || !customerLedgerState.paymentContext) return;
+    var credit = Number(customerLedgerState.paymentContext.customerCredit) || 0;
+    if (credit <= 0.004) { showToast('No refundable customer advance is available.', 'error'); return; }
+    document.getElementById('customerLedgerAdvanceRefundAvailable').textContent = formatMoney(credit);
+    document.getElementById('customerLedgerAdvanceRefundAmount').value = '';
+    document.getElementById('customerLedgerAdvanceRefundAmount').max = String(credit);
+    document.getElementById('customerLedgerAdvanceRefundMethod').value = 'Cash';
+    document.getElementById('customerLedgerAdvanceRefundDate').value = customerLedgerToday_();
+    document.getElementById('customerLedgerAdvanceRefundNote').value = '';
+    document.getElementById('customerLedgerAdvanceRefundBackdatedReason').value = '';
+    document.getElementById('customerLedgerAdvanceRefundBackdatedRow').hidden = true;
+    document.getElementById('customerLedgerAdvanceRefundError').style.display = 'none';
+    customerLedgerAdvanceRefundFillBank_();
+    openModal('customerLedgerAdvanceRefundModal');
+  }
+
+  function customerLedgerSaveAdvanceRefund_() {
+    if (!customerLedgerState.party || !customerLedgerState.paymentContext) return;
+    var errEl = document.getElementById('customerLedgerAdvanceRefundError'); errEl.style.display = 'none';
+    var amount = Number(document.getElementById('customerLedgerAdvanceRefundAmount').value) || 0;
+    var available = Number(customerLedgerState.paymentContext.customerCredit) || 0;
+    var method = document.getElementById('customerLedgerAdvanceRefundMethod').value;
+    var bankId = document.getElementById('customerLedgerAdvanceRefundBank').value;
+    var date = document.getElementById('customerLedgerAdvanceRefundDate').value || customerLedgerToday_();
+    var note = document.getElementById('customerLedgerAdvanceRefundNote').value.trim();
+    var backdatedReason = document.getElementById('customerLedgerAdvanceRefundBackdatedReason').value.trim();
+    if (amount <= 0) { errEl.textContent='Enter a valid refund amount.'; errEl.style.display='block'; return; }
+    if (amount > available + 0.004) { errEl.textContent='Refund cannot exceed available Customer Credit.'; errEl.style.display='block'; return; }
+    if (date < customerLedgerToday_() && !backdatedReason) { errEl.textContent='A reason is required when dating a refund in the past.'; errEl.style.display='block'; return; }
+    if (paymentMethodNeedsAccount_(method) && !bankId) { errEl.textContent='Choose a bank account.'; errEl.style.display='block'; return; }
+    var partyName = customerLedgerState.party.name || 'Customer';
+    var refundCustomerId = customerLedgerState.partyId;
+    runConfirmedAction({type:'financial',title:'Refund Customer Credit?',message:'This refunds available Customer Credit and increases the customer balance by the same amount.',
+      details:[{label:'Customer',value:partyName,emphasis:true},{label:'Refund',value:formatMoney(amount),emphasis:true},{label:'Method',value:method},{label:'Date',value:date}],
+      confirmLabel:'Refund ' + formatMoney(amount),loadingLabel:'Refunding...',trigger:document.getElementById('customerLedgerAdvanceRefundSaveBtn')}, function () {
+      return withLoader(serverCall('refundCustomerAdvance', authToken, refundCustomerId, amount, method, bankId, note, date, backdatedReason)).then(function () {
+        closeModal('customerLedgerAdvanceRefundModal'); showToast('Customer Credit refunded','success'); customerLedgerRefreshNewest_(); reloadPage_('customers'); reloadPage_('daybook'); reloadPage_('dashboard');
+      });
+    }).catch(function (err) { errEl.textContent=err.message; errEl.style.display='block'; });
+  }
+
+  document.getElementById('customerLedgerAdvanceRefundBtn').addEventListener('click', customerLedgerOpenAdvanceRefund_);
+  document.getElementById('customerLedgerAdvanceRefundMethod').addEventListener('change', customerLedgerAdvanceRefundFillBank_);
+  document.getElementById('customerLedgerAdvanceRefundDate').addEventListener('change', function () {
+    document.getElementById('customerLedgerAdvanceRefundBackdatedRow').hidden = !(this.value && this.value < customerLedgerToday_());
+  });
+  document.getElementById('customerLedgerAdvanceRefundSaveBtn').addEventListener('click', customerLedgerSaveAdvanceRefund_);
+
+  function customerLedgerOpenPaymentEdit_(ledgerId) {
+    withLoader(serverCall('getCustomerPaymentForEdit', authToken, ledgerId)).then(function (data) {
+      var p = data || {};
+      customerLedgerState.editingLedgerId = ledgerId;
+      document.getElementById('customerLedgerEditDate').value = p.date || '';
+      document.getElementById('customerLedgerEditAmount').value = p.amount;
+      document.getElementById('customerLedgerEditDiscount').value = p.discountAmount || 0;
+      document.getElementById('customerLedgerEditDiscountReason').value = p.discountReason || '';
+      document.getElementById('customerLedgerEditDiscount').disabled = !customerLedgerCanDiscount_();
+      document.getElementById('customerLedgerEditDiscountReason').disabled = !customerLedgerCanDiscount_();
+      document.getElementById('customerLedgerEditMethod').value = p.method || 'Cash';
+      document.getElementById('customerLedgerEditBankRow').hidden = !paymentMethodNeedsAccount_(p.method);
+      document.getElementById('customerLedgerEditBankLabel').textContent = p.method === 'Mobile Banking' ? 'Mobile Banking Account *' : 'Bank Account *';
+      customerLedgerFillBank_('customerLedgerEditBank', p.method || 'Cash');
+      document.getElementById('customerLedgerEditBank').value = p.bankAccountId || '';
+      document.getElementById('customerLedgerEditNote').value = p.notes || '';
+      document.getElementById('customerLedgerEditError').style.display='none';
+      openModal('customerLedgerEditModal');
+    }).catch(function (err) { showToast(err.message,'error'); });
+  }
+
+  document.getElementById('customerLedgerEditMethod').addEventListener('change', function () {
+    document.getElementById('customerLedgerEditBankRow').hidden = !paymentMethodNeedsAccount_(this.value);
+    document.getElementById('customerLedgerEditBankLabel').textContent = this.value === 'Mobile Banking' ? 'Mobile Banking Account *' : 'Bank Account *';
+    customerLedgerFillBank_('customerLedgerEditBank', this.value);
+  });
+
+  document.getElementById('customerLedgerEditSaveBtn').addEventListener('click', function () {
+    var errEl=document.getElementById('customerLedgerEditError'); errEl.style.display='none';
+    var payload={
+      date:document.getElementById('customerLedgerEditDate').value,
+      amount:document.getElementById('customerLedgerEditAmount').value,
+      discountAmount:document.getElementById('customerLedgerEditDiscount').value,
+      discountReason:document.getElementById('customerLedgerEditDiscountReason').value.trim(),
+      method:document.getElementById('customerLedgerEditMethod').value,
+      bankAccountId:document.getElementById('customerLedgerEditBank').value,
+      notes:document.getElementById('customerLedgerEditNote').value.trim()
+    };
+    var partyName = customerLedgerState.party ? (customerLedgerState.party.name || 'Customer') : 'Customer';
+    var paymentLedgerId = customerLedgerState.editingLedgerId;
+    runConfirmedAction({type:'financial',title:'Update Customer Payment?',message:'This will update the customer ledger and Cash/Bank accounting.',details:settlementConfirmDetails_({partyLabel:'Customer',partyName:partyName,directionLabel:'New Amount',amount:Number(payload.amount)||0,discount:Number(payload.discountAmount)||0,discountLabel:'Discount Given',method:payload.method,accountName:paymentMethodNeedsAccount_(payload.method)?selectedOptionText_('customerLedgerEditBank'):'',date:payload.date}),confirmLabel:'Update Payment',loadingLabel:'Updating...',trigger:document.getElementById('customerLedgerEditSaveBtn')}, function () {
+      return withLoader(serverCall('updateCustomerPayment', authToken, paymentLedgerId, payload)).then(function () {
+        closeModal('customerLedgerEditModal'); showToast('Payment updated','success'); customerLedgerRefreshNewest_(); reloadPage_('customers'); reloadPage_('daybook'); reloadPage_('dashboard');
+      });
+    }).catch(function (err) { errEl.textContent=err.message; errEl.style.display='block'; });
+  });
+
+  function customerLedgerDeletePayment_(ledgerId) {
+    confirmDelete({
+      title:'Delete customer payment',
+      summary:'<p>This will reverse the payment and restore the customer balance.</p>',
+      fn:'deleteCustomerPayment', args:[ledgerId], reloadPages:['customers','customerLedger','daybook','dashboard'],
+      onDone:customerLedgerRefreshNewest_
+    });
+  }
+
+  function customerLedgerRefreshNewest_() {
+    customerLedgerResetPaging_();
+    return customerLedgerLoad();
+  }
+
+  document.getElementById('customerLedgerPrintBtn').addEventListener('click', function () {
+    if (!customerLedgerState.party) return;
+    var today=customerLedgerToday_();
+    document.getElementById('customerLedgerPrintParty').textContent=customerLedgerState.party.name || '';
+    document.getElementById('customerLedgerPrintFrom').value=today.slice(0,8)+'01';
+    document.getElementById('customerLedgerPrintTo').value=today;
+    document.getElementById('customerLedgerPrintError').style.display='none';
+    openModal('customerLedgerPrintModal');
+  });
+
+  document.getElementById('customerLedgerPrintConfirmBtn').addEventListener('click', function () {
+    var errEl=document.getElementById('customerLedgerPrintError'); errEl.style.display='none';
+    var from=document.getElementById('customerLedgerPrintFrom').value;
+    var to=document.getElementById('customerLedgerPrintTo').value;
+    if (!from || !to) { errEl.textContent='Choose both From and To dates.'; errEl.style.display='block'; return; }
+    if (from > to) { errEl.textContent='From date cannot be after To date.'; errEl.style.display='block'; return; }
+    if (to > customerLedgerToday_()) { errEl.textContent='To date cannot be after today.'; errEl.style.display='block'; return; }
+    withLoader(serverCall('getCustomerLedgerStatement', authToken, customerLedgerState.partyId, from, to)).then(function (statement) {
+      closeModal('customerLedgerPrintModal');
+      partyLedgerPrintStatement_(statement);
+    }).catch(function (err) { errEl.textContent=err.message; errEl.style.display='block'; });
+  });
+</script>

@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0d5bd7">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <?!= include('style'); ?>
+</head>
+<body>
+  <!--
+    The login card. It sits OUTSIDE #app so it can cover the whole window
+    before the shell is ready. javascript.html shows or hides it depending
+    on whether a valid session token exists.
+
+    This include was missing before, which is why login.html existed as
+    complete markup that never appeared on screen.
+  -->
+  <?!= include('login'); ?>
+
+  <!-- ===== Global Cash Session overlays =====
+       Kept outside #app so hidden SPA pages cannot hide the session workflow. -->
+  <!-- ===== Cash Session details / start modal ===== -->
+  <div class="modal-overlay" id="posSessionModal" hidden>
+    <div class="modal pos-session-modal">
+      <div class="modal-header">
+        <h3>Cash Session <span class="bn-hint" style="display:inline;">— ক্যাশ সেশন</span></h3>
+        <button class="modal-close" onclick="closeModal('posSessionModal')">&#10005;</button>
+      </div>
+      <div class="modal-body">
+        <div id="posNoSessionCard" class="pos-session-start-card" hidden>
+          <div class="pos-session-modal-status is-closed"><strong>Closed</strong></div>
+          <p class="pos-session-help">Enter the opening drawer cash, add an optional note, then start the day.</p>
+          <div class="pos-session-start-grid">
+            <div><label>Opening Cash <span class="bn-hint" style="display:inline;">— শুরুর টাকা</span></label><input id="posOpeningCash" type="number" min="0" step="0.01" value="0"></div>
+            <div><label>Note <span class="bn-hint" style="display:inline;">— নোট</span></label><input id="posOpeningNote" type="text" placeholder="Optional"></div>
+            <button class="btn btn-primary" id="posStartSessionBtn">Start Day</button>
+          </div>
+          <div class="field-error" id="posStartSessionError"></div>
+        </div>
+  
+        <div id="posSessionBanner" class="pos-session-detail-panel" hidden>
+          <div class="session-mobile-head">
+            <div class="session-mobile-status">
+              <span class="session-status-dot"></span>
+              <strong id="posSessionDetailStatus">Open</strong>
+              <span id="posBannerOpenedAt"></span>
+            </div>
+          </div>
+          <div class="session-mobile-metrics">
+            <div><span>Opening</span><strong id="posBannerOpening"></strong></div>
+            <div><span>Cash In</span><strong id="posBannerIn"></strong></div>
+            <div><span>Cash Out</span><strong id="posBannerOut"></strong></div>
+            <div><span>Expected</span><strong id="posBannerExpected"></strong></div>
+          </div>
+          <div class="pos-session-note-row"><span>Note</span><strong id="posSessionDetailNote">—</strong></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeModal('posSessionModal')">Close</button>
+        <button class="btn btn-primary" id="posCloseSessionBtn" hidden>Close Day</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- ===== Close Day modal ===== -->
+  <div class="modal-overlay" id="posCloseModal" hidden>
+    <div class="modal">
+      <div class="modal-header"><h3>Close Cash Session <span class="bn-hint" style="display:inline;">— দিনের হিসাব বন্ধ করুন</span></h3><button class="modal-close" onclick="closeModal('posCloseModal')">&#10005;</button></div>
+      <div class="modal-body">
+        <p style="font-size:13px; color:var(--color-text-muted);">Expected in drawer <span class="bn-hint" style="display:inline;">— ড্রয়ারে থাকার কথা</span>: <strong class="mono" id="posCloseExpected"></strong></p>
+        <label>Counted Cash (what you actually count in the drawer) <span class="bn-hint" style="display:inline;">— গুনে দেখা টাকা</span></label>
+        <input id="posCountedCash" type="number" min="0" step="0.01">
+        <div style="height:10px;"></div>
+        <label>Note <span class="bn-hint" style="display:inline;">— নোট</span></label>
+        <input id="posCloseNote" type="text" placeholder="Optional">
+        <div class="field-error" id="posCloseError"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeModal('posCloseModal')">Cancel</button>
+        <button class="btn btn-primary" id="posCloseConfirmBtn">Close Day</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="app" style="visibility:hidden;">
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo-mark" id="logoMark">HS</div>
+        <div class="shop-name" id="shopNameLabel">Hardware Store ERP</div>
+        <button id="sidebarCollapseBtn" class="icon-btn sidebar-collapse-btn" type="button" aria-label="Collapse sidebar" title="Collapse sidebar">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M15 18l-6-6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+      <nav class="nav-list" id="navList"><!-- built by javascript.html from UI.gs's NAV_ITEMS -->
+      </nav>
+      <!-- javascript.html replaces this with the signed-in user + Sign out button -->
+      <div class="sidebar-footer">Hardware ERP</div>
+    </aside>
+    <button id="sidebarBackdrop" class="sidebar-backdrop" type="button" aria-label="Collapse sidebar" tabindex="-1"></button>
+
+    <div class="main">
+      <header class="topbar">
+        <button id="menuToggle" class="icon-btn" aria-label="Toggle menu">
+          <svg viewBox="0 0 24 24" width="22" height="22"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+        </button>
+        <div class="topbar-title" id="pageTitle">Dashboard</div>
+        <div class="topbar-date" id="topbarDate">
+          <button class="topbar-date-toggle" id="topbarDateToggle" type="button" aria-label="Show Bangla and Hijri dates" aria-haspopup="true" aria-expanded="false">
+            <span id="englishDateView"></span>
+            <svg class="topbar-date-chevron" viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M5 7.5 10 12l5-4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="topbar-date-popover" id="topbarDatePopover" role="dialog" aria-label="Bangla and Hijri dates" hidden>
+            <div class="topbar-date-row"><span class="topbar-date-label">বাংলা</span><strong id="banglaDateView"></strong></div>
+            <div class="topbar-date-row"><span class="topbar-date-label">হিজরি</span><strong id="arabicDateView"></strong></div>
+          </div>
+        </div>
+        <!-- Global Cash Session control. The dialog lives outside #app so it
+             remains available from every module, not only POS. -->
+        <button id="cashSessionToggleBtn" class="icon-btn topbar-cash-session-btn" type="button"
+                title="Cash Session" aria-label="Cash Session" aria-haspopup="dialog"
+                aria-controls="posSessionModal" hidden>
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path d="M4 7h16v12H4zM7 4h10v3M8 12h8M8 15h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="topbar-cash-session-label">Cash Session</span>
+          <span class="topbar-cash-session-status is-closed" id="cashSessionTopbarStatus">Closed</span>
+        </button>
+        <!-- Scratchpad calculator, opened over whichever page is on screen.
+             wireCalcPanel_() in javascript.html owns the toggle/outside-click/
+             Escape wiring; #calcPanel below is the panel it shows. -->
+        <button id="calcToggleBtn" class="icon-btn" title="Calculator" aria-haspopup="true" aria-expanded="false">
+          <svg viewBox="0 0 24 24" width="18" height="18"><rect x="4" y="2" width="16" height="20" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7 6h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="7.5" cy="11" r="1" fill="currentColor"/><circle cx="12" cy="11" r="1" fill="currentColor"/><circle cx="16.5" cy="11" r="1" fill="currentColor"/><circle cx="7.5" cy="15" r="1" fill="currentColor"/><circle cx="12" cy="15" r="1" fill="currentColor"/><circle cx="16.5" cy="15" r="1" fill="currentColor"/><circle cx="7.5" cy="19" r="1" fill="currentColor"/><circle cx="12" cy="19" r="1" fill="currentColor"/><rect x="14.3" y="17" width="3.5" height="4" rx="0.6" fill="currentColor"/></svg>
+        </button>
+        <!-- One Refresh button for the whole app. Each page registers its own
+             loader via registerPageReload(), so this works everywhere without
+             a button being added to every page file. -->
+        <button id="refreshBtn" class="icon-btn" title="Refresh this page" onclick="refreshCurrentPage()">
+          <svg viewBox="0 0 24 24" width="18" height="18"><path d="M20 11a8 8 0 1 0-.6 3M20 5v6h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>Refresh</span>
+        </button>
+      </header>
+
+      <main class="content" id="content">
+        <!-- Sub-tabs for grouped modules (Sales > Invoices/Returns,
+             Settings > General/Users/Roles). javascript.html fills this in
+             from NAV_ITEMS on every page change and hides it when the
+             current module has no children, so no page file needs to know
+             it exists. -->
+        <div class="tabs" id="subNav" hidden></div>
+
+        <section class="page" id="page-noAccess" data-page="noAccess" hidden>
+          <div class="card"><h3>No access</h3><p>You do not have permission to open any module. Ask an administrator to assign a role permission.</p></div>
+        </section>
+        <section class="page" id="page-dashboard" data-page="dashboard">
+          <?!= include('dashboard'); ?>
+        </section>
+        <section class="page" id="page-pos" data-page="pos" hidden>
+          <?!= include('pos'); ?>
+        </section>
+        <section class="page" id="page-posv2" data-page="posv2" hidden>
+          <?!= include('posv2'); ?>
+        </section>
+        <section class="page" id="page-counter" data-page="counter" hidden>
+          <?!= include('counter'); ?>
+        </section>
+        <section class="page" id="page-sales" data-page="sales" hidden>
+          <?!= include('sales'); ?>
+        </section>
+        <section class="page" id="page-draftSales" data-page="draftSales" hidden>
+          <?!= include('draftSales'); ?>
+        </section>
+        <section class="page" id="page-returns" data-page="returns" hidden>
+          <?!= include('returns'); ?>
+        </section>
+        <section class="page" id="page-returnHistory" data-page="returnHistory" hidden>
+          <?!= include('returnHistory'); ?>
+        </section>
+        <section class="page" id="page-purchase" data-page="purchase" hidden>
+          <?!= include('purchase'); ?>
+        </section>
+        <section class="page" id="page-suppliers" data-page="suppliers" hidden>
+          <?!= include('suppliers'); ?>
+        </section>
+        <section class="page" id="page-supplierLedger" data-page="supplierLedger" hidden>
+          <?!= include('supplierLedger'); ?>
+        </section>
+        <section class="page" id="page-vendorWorkspace" data-page="vendorWorkspace" hidden>
+          <?!= include('vendorWorkspace'); ?>
+        </section>
+        <section class="page" id="page-vendors" data-page="vendors" hidden>
+          <?!= include('vendors'); ?>
+        </section>
+        <section class="page" id="page-products" data-page="products" hidden>
+          <?!= include('products'); ?>
+        </section>
+        <section class="page" id="page-customers" data-page="customers" hidden>
+          <?!= include('customers'); ?>
+        </section>
+        <section class="page" id="page-customerLedger" data-page="customerLedger" hidden>
+          <?!= include('customerLedger'); ?>
+        </section>
+        <section class="page" id="page-reports" data-page="reports" hidden>
+          <?!= include('reports'); ?>
+        </section>
+        <section class="page" id="page-settings" data-page="settings" hidden>
+          <?!= include('settings'); ?>
+        </section>
+        <section class="page" id="page-invoiceDesign" data-page="invoiceDesign" hidden>
+          <?!= include('invoiceDesign'); ?>
+        </section>
+        <section class="page" id="page-bank" data-page="bank" hidden>
+          <?!= include('bank'); ?>
+        </section>
+        <section class="page" id="page-expense" data-page="expense" hidden>
+          <?!= include('expense'); ?>
+        </section>
+        <section class="page" id="page-expenseList" data-page="expenseList" hidden>
+          <?!= include('expenseList'); ?>
+        </section>
+        <section class="page" id="page-expenseCategories" data-page="expenseCategories" hidden>
+          <?!= include('expenseCategory'); ?>
+        </section>
+        <section class="page" id="page-expenseReports" data-page="expenseReports" hidden>
+          <?!= include('expenseReport'); ?>
+        </section>
+        <section class="page" id="page-finance" data-page="finance" hidden>
+          <?!= include('finance'); ?>
+        </section>
+        <section class="page" id="page-financeLedger" data-page="financeLedger" hidden>
+          <?!= include('financeLedger'); ?>
+        </section>
+        <section class="page" id="page-daybook" data-page="daybook" hidden>
+          <?!= include('daybook'); ?>
+        </section>
+        <section class="page" id="page-cashReconciliation" data-page="cashReconciliation" hidden>
+          <?!= include('cashReconciliation'); ?>
+        </section>
+        <!-- Users and Roles: complete since the Phase 1 permission work, but
+             they had no section here, so there was no way to reach them. -->
+        <section class="page" id="page-users" data-page="users" hidden>
+          <?!= include('users'); ?>
+        </section>
+        <section class="page" id="page-roles" data-page="roles" hidden>
+          <?!= include('roles'); ?>
+        </section>
+      </main>
+    </div>
+
+
+    <!-- Phone/PWA navigation. Visibility is CSS-controlled and the actual
+         destinations are permission-filtered from the same NAV_ITEMS as the
+         desktop sidebar. -->
+    <nav id="mobileBottomNav" class="mobile-bottom-nav" aria-label="Primary mobile navigation">
+      <button type="button" class="mobile-nav-item" data-mobile-page="dashboard" onclick="goToPage('dashboard')"><span class="mobile-nav-icon" data-mobile-icon="dashboard"></span><span>Dashboard</span></button>
+      <button type="button" class="mobile-nav-item" data-mobile-page="pos" onclick="goToPage('pos')"><span class="mobile-nav-icon" data-mobile-icon="pos"></span><span>POS</span></button>
+      <button type="button" class="mobile-nav-item" data-mobile-page="sales" onclick="goToPage('sales')"><span class="mobile-nav-icon" data-mobile-icon="sales"></span><span>Sales</span></button>
+      <button type="button" class="mobile-nav-item" data-mobile-page="products" onclick="goToPage('products')"><span class="mobile-nav-icon" data-mobile-icon="products"></span><span>Products</span></button>
+      <button type="button" class="mobile-nav-item" data-mobile-page="more" onclick="openMobileMore_()"><span class="mobile-nav-more-icon" aria-hidden="true">•••</span><span>More</span></button>
+    </nav>
+
+    <div id="mobileMoreSheet" class="mobile-more-overlay" hidden>
+      <button type="button" class="mobile-more-backdrop" aria-label="Close menu" onclick="closeMobileMore_()"></button>
+      <section class="mobile-more-sheet" role="dialog" aria-modal="true" aria-labelledby="mobileMoreTitle">
+        <div class="mobile-sheet-handle" aria-hidden="true"></div>
+        <div class="mobile-more-header">
+          <div><h3 id="mobileMoreTitle">More</h3><span class="bn-hint">সব মডিউল</span></div>
+          <button type="button" class="modal-close mobile-sheet-close" onclick="closeMobileMore_()" aria-label="Close">&#10005;</button>
+        </div>
+        <div id="mobileMoreList" class="mobile-more-list"></div>
+      </section>
+    </div>
+
+  </div>
+
+  <!-- Global confirmation safety layer. Lives outside #app so it remains
+       visible regardless of which SPA page section is hidden. -->
+  <div class="confirm-action-overlay" id="confirmActionModal" hidden>
+    <section class="confirm-action-dialog" role="dialog" aria-modal="true" aria-labelledby="confirmActionTitle">
+      <div class="confirm-action-header">
+        <h3 id="confirmActionTitle">Confirm action</h3>
+        <button type="button" class="modal-close" id="confirmActionClose" aria-label="Cancel">&#10005;</button>
+      </div>
+      <div class="confirm-action-body">
+        <p id="confirmActionMessage" class="confirm-action-message"></p>
+        <div id="confirmActionDetails" class="confirm-action-details"></div>
+        <label class="field confirm-action-reason" id="confirmActionReasonRow" hidden>
+          <span id="confirmActionReasonLabel">Reason</span>
+          <textarea id="confirmActionReason" rows="3" maxlength="200" placeholder="Enter reason..."></textarea>
+          <span class="field-error" id="confirmActionReasonError"></span>
+        </label>
+      </div>
+      <div class="confirm-action-footer">
+        <button type="button" class="btn" id="confirmActionCancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="confirmActionConfirm">Confirm</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- Off-screen host for one-page printing (invoices and ledger ranges). -->
+  <div id="printHost"></div>
+
+  <!-- Desktop-friendly floating horizontal scrollbar. It is synced by javascript.html
+       with the currently relevant wide table/list so horizontal scrolling never
+       requires reaching the bottom of a long page. -->
+  <div id="floatingHScroll" class="floating-hscroll" hidden aria-label="Horizontal scroll">
+    <div id="floatingHScrollInner"></div>
+  </div>
+
+  <!-- Scratchpad calculator panel. Lives outside #app, like the other shared
+       overlays below, so it floats above whichever page is on screen instead
+       of being one more thing every page file has to include. -->
+  <div id="calcPanel" class="calc-panel" hidden>
+    <div class="calc-panel-header">
+      <h3>Calculator</h3>
+      <div class="calc-panel-actions">
+        <button type="button" class="calc-clear-btn" id="calcClearBtn" title="Clear all lines">Clear</button>
+        <button type="button" class="modal-close" id="calcCloseBtn" aria-label="Close calculator">&#10005;</button>
+      </div>
+    </div>
+    <div class="calc-lines" id="calcLines"></div>
+    <div class="calc-total-row">
+      <span>Total</span>
+      <span class="calc-total-value" id="calcTotalValue">0</span>
+    </div>
+    <!-- Touch keypad. A single delegated listener in wireCalcKeypad_() (javascript.html)
+         reads data-action/data-value off whichever button was tapped, so this grid
+         never needs per-button wiring or a rebuild. Typing on a real keyboard still
+         works on the line inputs above — this is an alternative input, not a replacement. -->
+    <div class="calc-keypad" id="calcKeypad">
+      <button type="button" class="calc-key calc-key-fn" data-action="paren-open">(</button>
+      <button type="button" class="calc-key calc-key-fn" data-action="paren-close">)</button>
+      <button type="button" class="calc-key calc-key-fn" data-action="backspace" aria-label="Backspace">&#9003;</button>
+      <button type="button" class="calc-key calc-key-fn" data-action="clear-line">C</button>
+
+      <button type="button" class="calc-key" data-action="digit" data-value="7">7</button>
+      <button type="button" class="calc-key" data-action="digit" data-value="8">8</button>
+      <button type="button" class="calc-key" data-action="digit" data-value="9">9</button>
+      <button type="button" class="calc-key calc-key-op" data-action="op" data-value="&#247;">&#247;</button>
+
+      <button type="button" class="calc-key" data-action="digit" data-value="4">4</button>
+      <button type="button" class="calc-key" data-action="digit" data-value="5">5</button>
+      <button type="button" class="calc-key" data-action="digit" data-value="6">6</button>
+      <button type="button" class="calc-key calc-key-op" data-action="op" data-value="&#215;">&#215;</button>
+
+      <button type="button" class="calc-key" data-action="digit" data-value="1">1</button>
+      <button type="button" class="calc-key" data-action="digit" data-value="2">2</button>
+      <button type="button" class="calc-key" data-action="digit" data-value="3">3</button>
+      <button type="button" class="calc-key calc-key-op" data-action="op" data-value="-">&#8722;</button>
+
+      <button type="button" class="calc-key calc-key-fn" data-action="percent">%</button>
+      <button type="button" class="calc-key" data-action="digit" data-value="0">0</button>
+      <button type="button" class="calc-key" data-action="digit" data-value=".">.</button>
+      <button type="button" class="calc-key calc-key-op" data-action="op" data-value="+">+</button>
+
+      <button type="button" class="calc-key calc-key-equals" data-action="equals">=</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+  <div id="loader" class="loader-overlay" hidden><div class="spinner"></div></div>
+
+  <?!= include('javascript'); ?>
+</body>
+</html>

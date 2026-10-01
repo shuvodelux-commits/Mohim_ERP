@@ -1,0 +1,12 @@
+const fs=require('fs'),path=require('path'),assert=require('assert');
+const root=path.resolve(__dirname,'..'); const read=n=>fs.readFileSync(path.join(root,n),'utf8');
+const sales=read('Sales.gs'), draft=read('DraftSales.gs');
+assert.match(sales,/sourceDraftId/); assert.match(sales,/sourceDraftVersion/); assert.match(sales,/Source Draft ID/);
+assert.match(sales,/priceMode\s*===\s*['"]fixed['"]/); assert.match(sales,/findPostedInvoiceByDraftId_/); assert.match(sales,/removeSalesDraftAfterPost_/);
+assert.match(draft,/POST_CLEANUP_RETRY/); assert.match(draft,/findPostedDraftAudit_/);
+const linkedPos=sales.indexOf('findPostedInvoiceByDraftId_'); const invoiceIdPos=sales.indexOf("generateId_('SALES')");
+assert(linkedPos>=0 && invoiceIdPos>linkedPos,'linked-sale check must precede new invoice ID generation');
+const firstSaleAppend=sales.indexOf("appendRow_('SALES'"); const sourceWrite=sales.indexOf("'Source Draft ID'",firstSaleAppend);
+assert(sourceWrite>firstSaleAppend,'sale row must stamp Source Draft ID');
+assert.match(sales,/requireActiveCashSession_\(\)/);
+console.log('PASS draft conversion/idempotency contract');

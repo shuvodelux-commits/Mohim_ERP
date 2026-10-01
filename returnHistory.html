@@ -1,0 +1,182 @@
+<!-- ================= Return History ================= -->
+<div class="toolbar">
+  <input class="search-input" id="rhSearch" type="text" placeholder="Search return #, invoice #, customer, or phone...">
+  <div class="toolbar-spacer"></div>
+  <button class="btn" id="rhRefreshBtn">Refresh</button>
+</div>
+<div class="card" style="padding:0;">
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Return #</th><th>Batch</th><th>Date</th><th>Invoice</th><th>Customer</th><th>Refund Method</th><th class="num">Amount</th><th>Processed By</th><th></th></tr></thead>
+    <tbody id="rhTableBody"></tbody>
+  </table>
+</div>
+  <div class="empty-state" id="rhEmpty" hidden>No returns yet.</div>
+</div>
+
+<!-- ===== Return detail popup ===== -->
+<div class="modal-overlay" id="rhDetailModal" hidden>
+  <div class="modal">
+    <div class="modal-header"><h3>Return <span class="bn-hint" style="display:inline;">— ফেরতের বিস্তারিত</span> <span id="rhDetailId" class="mono"></span></h3><button class="modal-close" onclick="closeModal('rhDetailModal')">&#10005;</button></div>
+    <div class="modal-body">
+      <div class="form-grid" style="margin-bottom:12px;">
+        <div><label>Invoice</label><div class="mono" id="rhDetailInvoice"></div></div>
+        <div><label>Date</label><div id="rhDetailDate"></div></div>
+        <div><label>Customer</label><div id="rhDetailCustomer"></div></div>
+        <div><label>Refund Method</label><div id="rhDetailMethod"></div></div>
+      </div>
+      <table>
+        <thead><tr><th>Product</th><th class="num">Qty</th><th class="num">Price</th><th class="num">Total</th></tr></thead>
+        <tbody id="rhDetailItemsBody"></tbody>
+      </table>
+      <div style="max-width:280px; margin-left:auto; margin-top:10px;">
+        <div class="totals-row grand"><span>Total Return</span><span class="v" id="rhDetailTotal"></span></div>
+      </div>
+      <p style="font-size:13px; margin-top:12px;"><strong>Reason:</strong> <span id="rhDetailReason"></span></p>
+      <p style="font-size:13px;"><strong>Note:</strong> <span id="rhDetailNote"></span></p>
+    </div>
+    <div class="modal-footer"><button class="btn" onclick="closeModal('rhDetailModal')">Close</button></div>
+  </div>
+</div>
+
+<!-- ===== Batch detail popup ===== -->
+<div class="modal-overlay" id="rhBatchDetailModal" hidden>
+  <div class="modal" style="max-width:900px;">
+    <div class="modal-header"><h3>Return Batch <span id="rhBatchDetailId" class="mono"></span></h3><button class="modal-close" onclick="closeModal('rhBatchDetailModal')">&#10005;</button></div>
+    <div class="modal-body">
+      <div class="form-grid" style="margin-bottom:12px;">
+        <div><label>Date</label><div id="rhBatchDetailDate"></div></div>
+        <div><label>Customer</label><div id="rhBatchDetailCustomer"></div></div>
+        <div><label>Refund Method</label><div id="rhBatchDetailMethod"></div></div>
+        <div><label>Batch Total</label><div id="rhBatchDetailTotal" class="mono"></div></div>
+      </div>
+      <div id="rhBatchChildren"></div>
+    </div>
+    <div class="modal-footer"><button class="btn" onclick="closeModal('rhBatchDetailModal')">Close</button></div>
+  </div>
+</div>
+
+<script>
+  var rhState = { returns: [] };
+
+  function rhLoad() {
+    return withLoader(serverCall('getReturnHistory', authToken)).then(function (returns) {
+      rhState.returns = returns;
+      rhRender_();
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  function rhRender_() {
+    var q = (document.getElementById('rhSearch').value || '').toLowerCase();
+    var rows = rhState.returns.filter(function (r) {
+      return !q ||
+        String(r['Return ID']).toLowerCase().indexOf(q) !== -1 ||
+        String(r['Batch ID'] || '').toLowerCase().indexOf(q) !== -1 ||
+        String(r['Invoice ID']).toLowerCase().indexOf(q) !== -1 ||
+        String(r['Customer Name']).toLowerCase().indexOf(q) !== -1 ||
+        phoneSearchMatches_(r['Customer Phone'], q);
+    });
+    var body = document.getElementById('rhTableBody');
+    body.innerHTML = '';
+    rows.forEach(function (r) {
+      var tr = document.createElement('tr');
+      var batchId = r['Batch ID'] || '';
+      tr.innerHTML =
+        '<td class="mono">' + escapeHtml(r['Return ID']) + '</td>' +
+        '<td class="mono">' + escapeHtml(batchId || '—') + '</td>' +
+        '<td>' + escapeHtml(formatDateShort_(r['Date'])) + '</td>' +
+        '<td class="mono">' + escapeHtml(r['Invoice ID']) + '</td>' +
+        '<td>' + escapeHtml(r['Customer Name'] || '') + '</td>' +
+        '<td>' + escapeHtml(r['Refund Method']) + '</td>' +
+        '<td class="num mono">' + formatMoney(r['Total Return Amount']) + '</td>' +
+        '<td>' + escapeHtml(r['Processed By'] || '') + '</td>' +
+        '<td><button class="btn" data-act="menuReturn" data-id="' + escapeHtml(r['Return ID']) + '" data-batch="' + escapeHtml(batchId) + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button></td>';
+      body.appendChild(tr);
+    });
+    document.getElementById('rhEmpty').hidden = rows.length > 0;
+  }
+
+  function formatDateShort_(val) {
+    var d = new Date(val);
+    if (isNaN(d.getTime())) return String(val);
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+
+  document.getElementById('rhSearch').addEventListener('input', rhRender_);
+  document.getElementById('rhRefreshBtn').addEventListener('click', rhLoad);
+
+  function rhOpenDetailById_(returnId) {
+    return withLoader(serverCall('getReturnDetail', authToken, returnId)).then(function (data) {
+      document.getElementById('rhDetailId').textContent = data.header['Return ID'];
+      document.getElementById('rhDetailInvoice').textContent = data.header['Invoice ID'];
+      document.getElementById('rhDetailDate').textContent = formatDateShort_(data.header['Date']);
+      document.getElementById('rhDetailCustomer').textContent = (data.header['Customer Name'] || '') + (data.header['Customer Phone'] ? ' — ' + data.header['Customer Phone'] : '');
+      document.getElementById('rhDetailMethod').textContent = data.header['Refund Method'];
+      document.getElementById('rhDetailTotal').textContent = formatMoney(data.header['Total Return Amount']);
+      document.getElementById('rhDetailReason').textContent = data.header['Reason'] || '—';
+      document.getElementById('rhDetailNote').textContent = data.header['Notes'] || '—';
+
+      var body = document.getElementById('rhDetailItemsBody');
+      body.innerHTML = '';
+      data.items.forEach(function (i) {
+        var tr = document.createElement('tr');
+        tr.innerHTML = '<td>' + escapeHtml(i['Product Name']) + '</td><td class="num">' + i['Return Quantity'] + '</td><td class="num mono">' + formatMoney(i['Return Price']) + '</td><td class="num mono">' + formatMoney(i['Line Total']) + '</td>';
+        body.appendChild(tr);
+      });
+      openModal('rhDetailModal');
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  function rhOpenBatchById_(batchId) {
+    return withLoader(serverCall('getReturnBatchDetail', authToken, batchId)).then(function (data) {
+      document.getElementById('rhBatchDetailId').textContent = data.batchId;
+      document.getElementById('rhBatchDetailDate').textContent = formatDateShort_(data.date);
+      document.getElementById('rhBatchDetailCustomer').textContent = (data.customerName || '') + (data.customerPhone ? ' — ' + data.customerPhone : '');
+      document.getElementById('rhBatchDetailMethod').textContent = data.refundMethod || '';
+      document.getElementById('rhBatchDetailTotal').textContent = formatMoney(data.batchTotal || 0);
+      var wrap = document.getElementById('rhBatchChildren');
+      wrap.innerHTML = '';
+      data.children.forEach(function (child) {
+        var card = document.createElement('div');
+        card.className = 'card';
+        card.style.marginBottom = '12px';
+        var html = '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px;">' +
+          '<div><strong>Return ID:</strong> <span class="mono">' + escapeHtml(child.header['Return ID']) + '</span></div>' +
+          '<div><strong>Invoice:</strong> <span class="mono">' + escapeHtml(child.header['Invoice ID']) + '</span></div>' +
+          '<div><strong>Total:</strong> <span class="mono">' + formatMoney(child.header['Total Return Amount']) + '</span></div>' +
+          '</div><table><thead><tr><th>Product</th><th class="num">Qty</th><th class="num">Price</th><th class="num">Total</th></tr></thead><tbody>';
+        child.items.forEach(function (item) {
+          html += '<tr><td>' + escapeHtml(item['Product Name']) + '</td><td class="num">' + item['Return Quantity'] + '</td><td class="num mono">' + formatMoney(item['Return Price']) + '</td><td class="num mono">' + formatMoney(item['Line Total']) + '</td></tr>';
+        });
+        html += '</tbody></table>';
+        card.innerHTML = html;
+        wrap.appendChild(card);
+      });
+      openModal('rhBatchDetailModal');
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  document.getElementById('rhTableBody').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-act="menuReturn"]');
+    if (!btn) return;
+    var id = btn.dataset.id;
+    var batchId = btn.dataset.batch || '';
+    var actions = [{ action: 'view', label: 'View' }];
+    if (batchId) actions.push({ action: 'viewBatch', label: 'View Batch' });
+    openRowActionMenu_(btn, actions, function (action) {
+      if (action === 'view') rhOpenDetailById_(id);
+      if (action === 'viewBatch') rhOpenBatchById_(batchId);
+    });
+  });
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var origGoToPage = goToPage;
+    goToPage = function (key) {
+      origGoToPage(key);
+      if (key === 'returnHistory' && !rhState._loaded) {
+        rhState._loaded = true;
+        rhLoad();
+      }
+    };
+  });
+</script>

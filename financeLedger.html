@@ -1,0 +1,476 @@
+<!-- ================= Finance Ledger ================= -->
+<style>
+  .finance-ledger-person-combobox > input { padding-right: 72px !important; }
+  .finance-ledger-person-combobox .erp-search-clear { right: 36px; }
+  .finance-ledger-person-toggle {
+    position:absolute; right:5px; top:50%; transform:translateY(-50%); z-index:2;
+    width:30px; height:30px; min-height:0; padding:0; border:0; border-radius:6px;
+    background:transparent; color:var(--color-text-muted); cursor:pointer;
+    font:600 18px/1 var(--font-sans); box-shadow:none;
+  }
+  .finance-ledger-person-toggle:hover, .finance-ledger-person-toggle:focus {
+    background:var(--color-primary-light); color:var(--color-primary-dark); box-shadow:none;
+  }
+  .finance-ledger-person-toggle:focus-visible { outline:1px solid var(--color-primary); outline-offset:-3px; }
+  .finance-selected-person-balance {
+    margin-bottom:16px; border:1px solid color-mix(in srgb, var(--color-primary) 28%, var(--color-border));
+    background:color-mix(in srgb, var(--color-primary-light) 52%, var(--color-surface));
+  }
+  .finance-selected-person-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .finance-selected-person-name { font-size:18px; font-weight:700; color:var(--color-primary-dark); }
+  .finance-selected-person-balances { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
+  .finance-selected-person-balance-item {
+    min-width:165px; padding:10px 12px; border-radius:10px; background:var(--color-surface);
+    border:1px solid var(--color-border);
+  }
+  .finance-selected-person-balance-item .label { font-size:11px; font-weight:700; text-transform:uppercase; color:var(--color-text-muted); }
+  .finance-selected-person-balance-item .value { margin-top:3px; font-size:19px; font-weight:750; }
+</style>
+<div class="toolbar">
+  <input id="finLedDateFrom" type="date" style="max-width:150px;">
+  <input id="finLedDateTo" type="date" style="max-width:150px;">
+  <select id="finLedTypeFilter" style="max-width:190px;"><option value="">All transaction types</option></select>
+  <div class="counter-combobox finance-ledger-person-combobox" style="max-width:250px; min-width:210px;">
+    <input id="finLedPersonSearch" type="search" data-search-clear="on" autocomplete="off" spellcheck="false" placeholder="Select or search person..." aria-label="Select or search finance person">
+    <button id="finLedPersonToggle" class="finance-ledger-person-toggle" type="button" aria-label="Show finance people" title="Show people" tabindex="-1">⌄</button>
+    <div id="finLedPersonResults" class="counter-combo-results" role="listbox" hidden></div>
+  </div>
+  <input class="search-input" id="finLedSearch" type="search" data-search-clear="on" placeholder="Search ID, reference, notes...">
+  <div class="toolbar-spacer"></div>
+  <button class="btn" id="finLedExportBtn">Export</button>
+  <button class="btn" id="finLedPrintBtn">Print</button>
+  <button class="btn" id="finLedRefreshBtn">Refresh</button>
+</div>
+
+<div class="card finance-selected-person-balance" id="finLedSelectedPersonCard" hidden>
+  <div class="finance-selected-person-head">
+    <div>
+      <div class="stat-label">Selected Person Balance</div>
+      <div class="finance-selected-person-name" id="finLedSelectedPersonName"></div>
+    </div>
+    <div class="badge">Complete history</div>
+  </div>
+  <div class="finance-selected-person-balances" id="finLedSelectedPersonBalances"></div>
+</div>
+
+<div class="stat-grid" style="margin-bottom:16px;">
+  <div class="stat-card"><div class="stat-label">Owner Capital</div><div class="stat-value" id="finLedCapital">--</div></div>
+  <div class="stat-card"><div class="stat-label">Owner Advance</div><div class="stat-value" id="finLedOwnerAdvance">--</div></div>
+  <div class="stat-card"><div class="stat-label">Outstanding Loan</div><div class="stat-value" id="finLedLoan">--</div></div>
+  <div class="stat-card"><div class="stat-label">Lender Credit</div><div class="stat-value" id="finLedLenderCredit">--</div></div>
+  <div class="stat-card"><div class="stat-label">Borrower Receivable</div><div class="stat-value" id="finLedBorrowerReceivable">--</div></div>
+  <div class="stat-card"><div class="stat-label">Borrower Credit</div><div class="stat-value" id="finLedBorrowerCredit">--</div></div>
+  <div class="stat-card"><div class="stat-label">Entries Shown</div><div class="stat-value" id="finLedCount">--</div></div>
+</div>
+
+<div class="card" style="padding:0;">
+  <div class="table-scroll">
+    <table class="mobile-card-table">
+      <thead>
+        <tr>
+          <th>Date</th><th>Finance ID</th><th>Type</th><th>Account</th><th>Party</th><th>Method</th>
+          <th class="num">Debit<br><span class="bn-hint" style="display:inline;">খরচ</span></th>
+          <th class="num">Credit<br><span class="bn-hint" style="display:inline;">জমা</span></th>
+          <th class="num">Balance</th><th>By</th><th></th>
+        </tr>
+      </thead>
+      <tbody id="finLedTableBody"></tbody>
+    </table>
+  </div>
+  <div class="empty-state" id="finLedEmpty" hidden>No finance transactions match these filters.</div>
+</div>
+
+<!-- View modal -->
+<div class="modal-overlay" id="finLedViewModal" hidden>
+  <div class="modal">
+    <div class="modal-header"><h3>Finance Transaction <span class="bn-hint" style="display:inline;">— লেনদেনের বিস্তারিত</span> <span id="finLedViewId" class="mono"></span></h3><button class="modal-close" onclick="closeModal('finLedViewModal')">&#10005;</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div><label>Date</label><div id="finLedViewDate"></div></div>
+        <div><label>Status</label><div id="finLedViewStatus"></div></div>
+        <div><label>Transaction Type</label><div id="finLedViewType"></div></div>
+        <div><label>Relationship Account</label><div id="finLedViewAccount"></div></div>
+        <div><label>Party</label><div id="finLedViewPerson"></div></div>
+        <div><label>Payment Method</label><div id="finLedViewMethod"></div></div>
+        <div id="finLedViewBankRow" style="display:none;"><label>Account</label><div id="finLedViewBank"></div></div>
+        <div><label>Amount</label><div class="mono" id="finLedViewAmount"></div></div>
+        <div><label>Balance After</label><div class="mono" id="finLedViewBalance"></div></div>
+        <div><label>Reference No.</label><div id="finLedViewReferenceNo"></div></div>
+        <div><label>Created By</label><div id="finLedViewBy"></div></div>
+        <div class="full"><label>Notes</label><div id="finLedViewNotes"></div></div>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn" onclick="closeModal('finLedViewModal')">Close</button><button class="btn" id="finLedViewEditBtn">Edit</button></div>
+  </div>
+</div>
+
+<!-- Edit modal -->
+<div class="modal-overlay" id="finLedEditModal" hidden>
+  <div class="modal">
+    <div class="modal-header"><h3>Edit Finance Transaction <span class="bn-hint" style="display:inline;">— লেনদেন ঠিক করুন</span> <span id="finLedEditId" class="mono"></span></h3><button class="modal-close" onclick="closeModal('finLedEditModal')">&#10005;</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div><label>Date *</label><input id="finLedEditDate" type="date"></div>
+        <div><label>Transaction Type *</label><select id="finLedEditType"></select></div>
+        <div><label id="finLedEditPersonLabel">Person *</label><select id="finLedEditPerson"><option value="">Select person...</option></select></div>
+        <div id="finLedEditPaymentRow">
+          <label>Payment Method *</label>
+          <select id="finLedEditPaymentMethod"><option value="Cash">Cash</option><option value="Bank">Bank</option><option value="Mobile Banking">Mobile Banking</option></select>
+        </div>
+        <div id="finLedEditBankRow" style="display:none;">
+          <label id="finLedEditBankLabel">Bank Account *</label>
+          <select id="finLedEditBankAccount"><option value="">Select bank account...</option></select>
+        </div>
+        <div><label>Amount *</label><input id="finLedEditAmount" type="number" min="0" step="0.01"></div>
+        <div><label>Reference No.</label><input id="finLedEditReferenceNo" type="text"></div>
+        <div class="full"><label>Notes</label><input id="finLedEditNotes" type="text"></div>
+      </div>
+      <p id="finLedEditMoneyHint" style="font-size:12px; color:var(--color-text-muted); margin:8px 0 0;"></p>
+      <div class="field-error" id="finLedEditFormError"></div>
+    </div>
+    <div class="modal-footer"><button class="btn" onclick="closeModal('finLedEditModal')">Cancel</button><button class="btn btn-primary" id="finLedEditSaveBtn">Save Changes</button></div>
+  </div>
+</div>
+
+<script>
+  var finLedState = {
+    rows: [], bankAccounts: [], transactionTypes: [], persons: [], currencySymbol: '', editingId: null,
+    summary: {}, selectedPerson: null, personCombo: null, _typesLoaded: false
+  };
+
+  function finLedMoney_(v) {
+    var n = Number(v) || 0;
+    return (finLedState.currencySymbol || '') + n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  }
+
+  function finLedType_(key) {
+    return finLedState.transactionTypes.filter(function (t) { return t.key === key; })[0] || null;
+  }
+
+  function finLedPersonRoles_(person) {
+    return person && Array.isArray(person.roles) && person.roles.length ? person.roles : [person && person.type || 'Owner'];
+  }
+
+  function finLedHasRole_(person, role) { return !role || finLedPersonRoles_(person).indexOf(role) !== -1; }
+
+  function finLedPersonDisplay_(person) {
+    return String(person && person.name || '') + (person && person.phone ? ' (' + person.phone + ')' : '');
+  }
+
+  function finLedFilters_() {
+    return {
+      dateFrom: document.getElementById('finLedDateFrom').value,
+      dateTo: document.getElementById('finLedDateTo').value,
+      transactionType: document.getElementById('finLedTypeFilter').value,
+      personId: finLedState.personCombo ? finLedState.personCombo.getSelectedId() : (document.getElementById('finLedPersonSearch').dataset.selectedId || ''),
+      query: document.getElementById('finLedSearch').value.trim()
+    };
+  }
+
+  function finLedEnsurePersonCombo_() {
+    if (finLedState.personCombo || typeof createPartySearchCombobox_ !== 'function') return finLedState.personCombo;
+    finLedState.personCombo = createPartySearchCombobox_({
+      input: document.getElementById('finLedPersonSearch'), results: document.getElementById('finLedPersonResults'),
+      toggleButton: document.getElementById('finLedPersonToggle'),
+      getItems: function () { return finLedState.persons || []; }, displayText: finLedPersonDisplay_,
+      emptyText: 'No matching finance people', limit: Math.max(1, finLedState.persons.length), showAllOnEmpty: true,
+      onSelect: function () { finLedLoad(); }, onClear: function () { finLedLoad(); }
+    });
+    return finLedState.personCombo;
+  }
+
+  function finLedBootstrap_() {
+    return withLoader(serverCall('getFinanceBootstrap', authToken)).then(function (d) {
+      finLedState.bankAccounts = d.bankAccounts || [];
+      finLedState.transactionTypes = d.transactionTypes || [];
+      finLedState.persons = d.personsAll || [];
+      finLedState.currencySymbol = d.currencySymbol || '';
+
+      var typeSel = document.getElementById('finLedTypeFilter');
+      typeSel.innerHTML = '<option value="">All transaction types</option>';
+      finLedState.transactionTypes.forEach(function (t) { typeSel.innerHTML += '<option value="' + t.key + '">' + escapeHtml(t.label) + '</option>'; });
+      var editSel = document.getElementById('finLedEditType'); editSel.innerHTML = '';
+      finLedState.transactionTypes.forEach(function (t) { editSel.innerHTML += '<option value="' + t.key + '">' + escapeHtml(t.label) + '</option>'; });
+      finLedEnsurePersonCombo_();
+      finLedState._typesLoaded = true;
+      return finLedLoad();
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  function finLedFillPersonSelect_(transactionType, preferredPersonId) {
+    var sel = document.getElementById('finLedEditPerson');
+    var current = preferredPersonId || sel.value;
+    var type = finLedType_(transactionType);
+    var requiredRole = type ? type.role : '';
+    sel.innerHTML = '<option value="">Select person...</option>';
+    finLedState.persons.filter(function (p) { return finLedHasRole_(p, requiredRole); }).forEach(function (p) {
+      sel.innerHTML += '<option value="' + p.id + '">' + escapeHtml(p.name) + (p.status === 'Inactive' ? ' (inactive)' : '') + '</option>';
+    });
+    if (finLedState.persons.some(function (p) { return p.id === current && finLedHasRole_(p, requiredRole); })) sel.value = current;
+  }
+
+  function finLedEnsureLoaded_() {
+    if (!finLedState._bootPromise) finLedState._bootPromise = finLedBootstrap_();
+    return finLedState._bootPromise;
+  }
+
+  function finLedRenderSummary_(summary) {
+    summary = summary || {};
+    document.getElementById('finLedCapital').textContent = finLedMoney_(summary.ownerCapital);
+    document.getElementById('finLedOwnerAdvance').textContent = finLedMoney_(summary.ownerAdvance);
+    document.getElementById('finLedLoan').textContent = finLedMoney_(summary.outstandingLoan);
+    document.getElementById('finLedLenderCredit').textContent = finLedMoney_(summary.lenderCredit);
+    document.getElementById('finLedBorrowerReceivable').textContent = finLedMoney_(summary.borrowerReceivable);
+    document.getElementById('finLedBorrowerCredit').textContent = finLedMoney_(summary.borrowerCredit);
+  }
+
+  function finLedRenderSelectedPersonBalance_() {
+    var card = document.getElementById('finLedSelectedPersonCard');
+    var person = finLedState.selectedPerson;
+    if (!person) {
+      card.hidden = true;
+      document.getElementById('finLedSelectedPersonName').textContent = '';
+      document.getElementById('finLedSelectedPersonBalances').innerHTML = '';
+      return;
+    }
+
+    var summary = finLedState.summary || {};
+    var roles = finLedPersonRoles_(person);
+    var balances = [];
+    if (roles.indexOf('Lender') !== -1) {
+      balances.push(summary.lenderCredit > 0
+        ? { label:'Lender Credit', value:summary.lenderCredit }
+        : { label:'Outstanding Loan', value:summary.outstandingLoan });
+    }
+    if (roles.indexOf('Borrower') !== -1) {
+      balances.push(summary.borrowerCredit > 0
+        ? { label:'Borrower Credit', value:summary.borrowerCredit }
+        : { label:'Borrower Receivable', value:summary.borrowerReceivable });
+    }
+    if (roles.indexOf('Owner') !== -1) {
+      balances.push(summary.ownerAdvance > 0
+        ? { label:'Owner Advance', value:summary.ownerAdvance }
+        : { label:'Owner Capital', value:summary.ownerCapital });
+    }
+    if (!balances.length) balances.push({ label:'Balance', value:0 });
+
+    document.getElementById('finLedSelectedPersonName').textContent = person.name || 'Selected person';
+    document.getElementById('finLedSelectedPersonBalances').innerHTML = balances.map(function (item) {
+      return '<div class="finance-selected-person-balance-item"><div class="label">' + escapeHtml(item.label) + '</div><div class="value mono">' + escapeHtml(finLedMoney_(item.value)) + '</div></div>';
+    }).join('');
+    card.hidden = false;
+  }
+
+  function finLedLoad() {
+    if (!finLedState._typesLoaded) return finLedBootstrap_();
+    return withLoader(serverCall('getFinanceLedger', authToken, finLedFilters_())).then(function (d) {
+      finLedState.rows = d.rows || [];
+      finLedState.currencySymbol = d.currencySymbol || finLedState.currencySymbol;
+      finLedState.summary = d.summary || {};
+      finLedState.selectedPerson = d.selectedPerson || null;
+      finLedRenderSummary_(finLedState.summary);
+      finLedRenderSelectedPersonBalance_();
+      document.getElementById('finLedCount').textContent = finLedState.rows.length;
+      finLedRender_();
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  function finLedRender_() {
+    var body = document.getElementById('finLedTableBody'); body.innerHTML = '';
+    finLedState.rows.forEach(function (r, idx) {
+      var backdatedBadge = r.isBackdated ? ' <span class="badge badge-warning" title="Entered ' + r.backdatedDays + ' day(s) late' + (r.backdatedReason ? ' — ' + escapeHtml(r.backdatedReason) : '') + '">⚠</span>' : '';
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + escapeHtml(r.date) + backdatedBadge + '</td>' +
+        '<td class="mono">' + escapeHtml(r.financeId) + '</td><td>' + escapeHtml(r.transactionTypeLabel) + '</td>' +
+        '<td>' + escapeHtml(r.accountLabel || '') + '</td><td>' + escapeHtml(r.person) + '</td>' +
+        '<td>' + escapeHtml(r.paymentMethod || (finLedType_(r.transactionType) && finLedType_(r.transactionType).cashDirection === 'none' ? 'Opening' : '')) + '</td>' +
+        '<td class="num mono">' + (r.debit ? finLedMoney_(r.debit) : '') + '</td>' +
+        '<td class="num mono">' + (r.credit ? finLedMoney_(r.credit) : '') + '</td>' +
+        '<td class="num mono">' + finLedMoney_(r.balance) + '</td><td>' + escapeHtml(r.createdBy) + '</td>' +
+        '<td style="white-space:nowrap;"><button class="btn" data-act="menuTxn" data-idx="' + idx + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button></td>';
+      body.appendChild(tr);
+    });
+    document.getElementById('finLedEmpty').hidden = finLedState.rows.length > 0;
+  }
+
+  ['finLedDateFrom', 'finLedDateTo', 'finLedTypeFilter'].forEach(function (id) { document.getElementById(id).addEventListener('change', finLedLoad); });
+  var finLedFilterTimer = null;
+  document.getElementById('finLedSearch').addEventListener('input', function () { clearTimeout(finLedFilterTimer); finLedFilterTimer = setTimeout(finLedLoad, 300); });
+  document.getElementById('finLedRefreshBtn').addEventListener('click', finLedLoad);
+
+  function finLedFillBankAccountSelect_(paymentMethod) { fillBankAccountSelect_(document.getElementById('finLedEditBankAccount'), finLedState.bankAccounts, paymentMethod); }
+  function finLedRowByIdx_(idx) { return finLedState.rows[Number(idx)]; }
+
+  document.getElementById('finLedTableBody').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-act="menuTxn"]'); if (!btn) return;
+    var row = finLedRowByIdx_(btn.dataset.idx); if (!row) return;
+    openRowActionMenu_(btn, [
+      { action: 'view', label: 'View' }, { action: 'edit', label: 'Edit' }, { divider: true }, { action: 'delete', label: 'Delete', danger: true }
+    ], function (action) {
+      if (action === 'view') finLedOpenView_(row.financeId);
+      if (action === 'edit') finLedOpenEdit_(row.financeId);
+      if (action === 'delete') finLedDelete_(row.financeId);
+    });
+  });
+
+  function finLedOpenViewById_(financeId) {
+    finLedEnsureLoaded_().then(function () {
+      var row = finLedState.rows.filter(function (r) { return r.financeId === financeId; })[0];
+      if (row) finLedOpenView_(financeId);
+      else showToast('Could not find ' + financeId + ' — it may be outside the current filters. Clear filters and search by ID.', 'error');
+    });
+  }
+
+  function finLedOpenView_(financeId) {
+    var row = finLedState.rows.filter(function (r) { return r.financeId === financeId; })[0];
+    if (!row) { showToast('That transaction is not in the current filter — clear filters and try again.', 'error'); return; }
+    document.getElementById('finLedViewId').textContent = row.financeId;
+    document.getElementById('finLedViewDate').textContent = row.date;
+    document.getElementById('finLedViewStatus').textContent = 'Active';
+    document.getElementById('finLedViewType').textContent = row.transactionTypeLabel;
+    document.getElementById('finLedViewAccount').textContent = row.accountLabel || '—';
+    document.getElementById('finLedViewPerson').textContent = row.person || '—';
+    var type = finLedType_(row.transactionType);
+    document.getElementById('finLedViewMethod').textContent = row.paymentMethod || (type && type.cashDirection === 'none' ? 'Opening balance — no Cash/Bank movement' : '—');
+    var needsAccount = paymentMethodNeedsAccount_(row.paymentMethod);
+    document.getElementById('finLedViewBankRow').style.display = needsAccount ? '' : 'none';
+    document.getElementById('finLedViewBank').textContent = row.bankAccountName || '—';
+    document.getElementById('finLedViewAmount').textContent = finLedMoney_(row.amount);
+    document.getElementById('finLedViewBalance').textContent = finLedMoney_(row.balance);
+    document.getElementById('finLedViewReferenceNo').textContent = row.referenceNo || '—';
+    document.getElementById('finLedViewBy').textContent = row.createdBy || '—';
+    document.getElementById('finLedViewNotes').textContent = row.notes || '—';
+    finLedState._viewingId = financeId; openModal('finLedViewModal');
+  }
+
+  document.getElementById('finLedViewEditBtn').addEventListener('click', function () {
+    var id = finLedState._viewingId; closeModal('finLedViewModal'); if (id) finLedOpenEdit_(id);
+  });
+
+  function finLedUpdateEditMode_(transactionType) {
+    var type = finLedType_(transactionType);
+    var isOpening = !!(type && type.cashDirection === 'none');
+    document.getElementById('finLedEditPersonLabel').textContent = type ? type.role + ' *' : 'Person *';
+    document.getElementById('finLedEditPaymentRow').style.display = isOpening ? 'none' : '';
+    document.getElementById('finLedEditPaymentMethod').disabled = isOpening;
+    document.getElementById('finLedEditBankAccount').disabled = isOpening;
+    document.getElementById('finLedEditMoneyHint').textContent = isOpening ? 'Opening balance — no Cash/Bank movement' : '';
+    if (isOpening) document.getElementById('finLedEditBankRow').style.display = 'none';
+    else {
+      var method = document.getElementById('finLedEditPaymentMethod').value;
+      document.getElementById('finLedEditBankRow').style.display = paymentMethodNeedsAccount_(method) ? '' : 'none';
+      finLedFillBankAccountSelect_(method);
+    }
+  }
+
+  function finLedOpenEdit_(financeId) {
+    withLoader(serverCall('getFinanceTransactionForEdit', authToken, financeId)).then(function (data) {
+      var t = data || {}; finLedState.editingId = financeId;
+      document.getElementById('finLedEditId').textContent = financeId;
+      document.getElementById('finLedEditDate').value = t.date;
+      document.getElementById('finLedEditType').value = t.transactionType;
+      finLedFillPersonSelect_(t.transactionType, t.personId || '');
+      document.getElementById('finLedEditPerson').value = t.personId || '';
+      document.getElementById('finLedEditPaymentMethod').value = t.paymentMethod || 'Cash';
+      document.getElementById('finLedEditBankLabel').textContent = (t.paymentMethod === 'Mobile Banking' ? 'Mobile Banking Account *' : 'Bank Account *');
+      finLedFillBankAccountSelect_(t.paymentMethod || 'Cash');
+      document.getElementById('finLedEditBankAccount').value = t.bankAccountId || '';
+      document.getElementById('finLedEditAmount').value = t.amount;
+      document.getElementById('finLedEditReferenceNo').value = t.referenceNo || '';
+      document.getElementById('finLedEditNotes').value = t.notes || '';
+      document.getElementById('finLedEditFormError').style.display = 'none';
+      finLedUpdateEditMode_(t.transactionType); openModal('finLedEditModal');
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  document.getElementById('finLedEditType').addEventListener('change', function () {
+    var currentPerson = document.getElementById('finLedEditPerson').value;
+    finLedFillPersonSelect_(this.value, currentPerson); finLedUpdateEditMode_(this.value);
+  });
+  document.getElementById('finLedEditPaymentMethod').addEventListener('change', function () {
+    document.getElementById('finLedEditBankRow').style.display = paymentMethodNeedsAccount_(this.value) ? '' : 'none';
+    document.getElementById('finLedEditBankLabel').textContent = (this.value === 'Mobile Banking' ? 'Mobile Banking Account *' : 'Bank Account *');
+    finLedFillBankAccountSelect_(this.value);
+  });
+
+  document.getElementById('finLedEditSaveBtn').addEventListener('click', function () {
+    var errEl = document.getElementById('finLedEditFormError'); errEl.style.display = 'none';
+    var type = finLedType_(document.getElementById('finLedEditType').value);
+    var hasMoneyMovement = !!(type && type.cashDirection !== 'none');
+    var payload = {
+      date: document.getElementById('finLedEditDate').value, transactionType: document.getElementById('finLedEditType').value,
+      personId: document.getElementById('finLedEditPerson').value,
+      paymentMethod: hasMoneyMovement ? document.getElementById('finLedEditPaymentMethod').value : '',
+      bankAccountId: hasMoneyMovement ? document.getElementById('finLedEditBankAccount').value : '',
+      amount: document.getElementById('finLedEditAmount').value, referenceNo: document.getElementById('finLedEditReferenceNo').value.trim(),
+      notes: document.getElementById('finLedEditNotes').value.trim()
+    };
+    var amount = Number(payload.amount) || 0;
+    var details = [
+      { label: 'Person', value: selectedOptionText_('finLedEditPerson'), emphasis: true }, { label: 'Transaction Type', value: selectedOptionText_('finLedEditType') },
+      { label: 'Amount', value: formatMoney(amount), emphasis: true }, { label: 'In words', value: banglaAmountInWords_(amount) }
+    ];
+    if (hasMoneyMovement) { details.push({ label: 'Method', value: payload.paymentMethod }); details.push({ label: 'Account', value: payload.bankAccountId ? selectedOptionText_('finLedEditBankAccount') : '' }); }
+    else details.push({ label: 'Opening Balance', value: 'Opening Balance — no Cash/Bank movement' });
+    details.push({ label: 'Reference', value: payload.referenceNo }); details.push({ label: 'Date', value: payload.date });
+    var financeId = finLedState.editingId;
+    runConfirmedAction({ type:'financial', title:'Update Finance Transaction?',
+      message: hasMoneyMovement ? 'This will update the posted transaction and its Cash/Bank and finance effects.' : 'This will update a non-cash opening balance.',
+      details:details, confirmLabel:'Update Transaction', loadingLabel:'Updating...', trigger:document.getElementById('finLedEditSaveBtn')
+    }, function () { return withLoader(serverCall('updateFinanceTransaction', authToken, financeId, payload)).then(function () {
+      closeModal('finLedEditModal'); showToast('Finance transaction updated', 'success'); finLedLoad(); reloadPage_('finance'); reloadPage_('dashboard'); reloadPage_('daybook');
+    }); }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+  });
+
+  function finLedDelete_(financeId) {
+    confirmDelete({ title:'Delete finance transaction', summary:'<p>This removes the Finance row and reverses its Cash/Bank effect when the transaction has money movement.</p>',
+      fn:'deleteFinanceTransaction', args:[financeId], reloadPages:['financeLedger','finance','daybook','dashboard'], onDone:function () { finLedLoad(); } });
+  }
+
+  // ---------------- Print / Export ----------------
+  var FIN_LED_COLUMNS = [
+    { key:'date', label:'Date' }, { key:'financeId', label:'Finance ID' }, { key:'transactionTypeLabel', label:'Type' },
+    { key:'accountLabel', label:'Account' }, { key:'person', label:'Party' }, { key:'paymentMethod', label:'Method' },
+    { key:'debit', label:'Debit', align:'right', value:function (r) { return r.debit ? finLedMoney_(r.debit) : ''; } },
+    { key:'credit', label:'Credit', align:'right', value:function (r) { return r.credit ? finLedMoney_(r.credit) : ''; } },
+    { key:'balance', label:'Balance', align:'right', value:function (r) { return r._summaryLabel ? finLedMoney_(r.balance) : finLedMoney_(r.balance); } }
+  ];
+
+  function finLedSummaryFooter_() {
+    var s = finLedState.summary || {};
+    return 'Owner Capital: ' + finLedMoney_(s.ownerCapital) + ' | Owner Advance: ' + finLedMoney_(s.ownerAdvance) +
+      ' | Outstanding Loan: ' + finLedMoney_(s.outstandingLoan) + ' | Lender Credit: ' + finLedMoney_(s.lenderCredit) +
+      ' | Borrower Receivable: ' + finLedMoney_(s.borrowerReceivable) + ' | Borrower Credit: ' + finLedMoney_(s.borrowerCredit);
+  }
+
+  function finLedCsvRows_() {
+    var rows = finLedState.rows.slice();
+    rows.push({});
+    if (finLedState.selectedPerson) rows.push({ date:'Selected Person', financeId:finLedState.selectedPerson.name, accountLabel:'Current complete-history balances', _summaryLabel:true, balance:0 });
+    var s = finLedState.summary || {};
+    [
+      ['Owner Capital',s.ownerCapital], ['Owner Advance',s.ownerAdvance], ['Outstanding Loan',s.outstandingLoan],
+      ['Lender Credit',s.lenderCredit], ['Borrower Receivable',s.borrowerReceivable], ['Borrower Credit',s.borrowerCredit]
+    ].forEach(function (item) { rows.push({ date:'Summary', financeId:item[0], _summaryLabel:true, balance:Number(item[1]) || 0 }); });
+    return rows;
+  }
+
+  document.getElementById('finLedPrintBtn').addEventListener('click', function () {
+    var f = finLedFilters_();
+    var personTitle = finLedState.selectedPerson ? (' — ' + finLedState.selectedPerson.name) : '';
+    printLedgerRange({ title:'Finance Ledger' + personTitle,
+      subtitle:(f.dateFrom || f.dateTo) ? ('From ' + (f.dateFrom || '…') + ' to ' + (f.dateTo || '…')) : 'All dates',
+      columns:FIN_LED_COLUMNS, rows:finLedState.rows, footer:finLedSummaryFooter_() });
+  });
+
+  document.getElementById('finLedExportBtn').addEventListener('click', function () {
+    if (!finLedState.rows.length) { showToast('Nothing to export.', 'error'); return; }
+    var suffix = finLedState.selectedPerson ? '-' + String(finLedState.selectedPerson.name || '').replace(/[^a-z0-9]+/gi,'-').replace(/^-|-$/g,'').toLowerCase() : '';
+    exportRowsToCsv({ filename:'finance-ledger' + suffix, columns:FIN_LED_COLUMNS, rows:finLedCsvRows_() });
+  });
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var origGoToPage = goToPage;
+    goToPage = function (key) { origGoToPage(key); if (key === 'financeLedger') finLedEnsureLoaded_(); };
+  });
+</script>

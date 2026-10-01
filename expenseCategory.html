@@ -1,0 +1,119 @@
+<!-- ================= Expense Categories ================= -->
+<div class="toolbar">
+  <input class="search-input" id="exsCatSearch" type="text" placeholder="Search categories...">
+  <div class="toolbar-spacer"></div>
+  <button class="btn btn-primary" id="exsCatAddBtn">+ Add Category</button>
+</div>
+<div class="card" style="padding:0;">
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Category</th><th>Description</th><th>Status</th><th></th></tr></thead>
+      <tbody id="exsCatTableBody"></tbody>
+    </table>
+  </div>
+  <div class="empty-state" id="exsCatEmpty" hidden>No expense categories yet.</div>
+</div>
+
+<!-- Add / Edit Category modal -->
+<div class="modal-overlay" id="exsCatModal" hidden>
+  <div class="modal">
+    <div class="modal-header"><div><h3 id="exsCatModalTitle">Add Category</h3><span class="bn-hint">খরচের ধরন</span></div><button class="modal-close" onclick="closeModal('exsCatModal')">&#10005;</button></div>
+    <div class="modal-body">
+      <label>Category Name *</label>
+      <input id="exsCatName" type="text" placeholder="e.g. Rent, Salary, Electricity">
+      <div style="height:8px;"></div>
+      <label>Description</label>
+      <input id="exsCatDescription" type="text" placeholder="Optional">
+      <div class="field-error" id="exsCatFormError"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('exsCatModal')">Cancel</button>
+      <button class="btn btn-primary" id="exsCatSaveBtn">Save Category</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  var exsCatState = { categories: [], editingCatId: null };
+
+  function exsCatLoad() {
+    return withLoader(serverCall('getExpenseSettingsBootstrap', authToken)).then(function (data) {
+      exsCatState.categories = data.categories;
+      exsRenderCategories_();
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  function exsRenderCategories_() {
+    var q = (document.getElementById('exsCatSearch').value || '').toLowerCase();
+    var rows = exsCatState.categories.filter(function (c) {
+      return !q || String(c['Category Name']).toLowerCase().indexOf(q) !== -1;
+    });
+    var body = document.getElementById('exsCatTableBody');
+    body.innerHTML = '';
+    rows.forEach(function (c) {
+      var statusBadge = c['Status'] === 'Active' ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-danger">Inactive</span>';
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td>' + escapeHtml(c['Category Name']) + '</td>' +
+        '<td>' + escapeHtml(c['Description'] || '') + '</td>' +
+        '<td>' + statusBadge + '</td>' +
+        '<td style="white-space:nowrap;">' +
+          '<button class="btn" data-act="editCat" data-id="' + c['Category ID'] + '">Edit</button> ' +
+          '<button class="btn" data-act="toggleCat" data-id="' + c['Category ID'] + '" data-status="' + c['Status'] + '">' + (c['Status'] === 'Active' ? 'Deactivate' : 'Activate') + '</button>' +
+        '</td>';
+      body.appendChild(tr);
+    });
+    document.getElementById('exsCatEmpty').hidden = rows.length > 0;
+  }
+  document.getElementById('exsCatSearch').addEventListener('input', exsRenderCategories_);
+
+  document.getElementById('exsCatAddBtn').addEventListener('click', function () {
+    exsCatState.editingCatId = null;
+    document.getElementById('exsCatModalTitle').textContent = 'Add Category';
+    document.getElementById('exsCatName').value = '';
+    document.getElementById('exsCatDescription').value = '';
+    document.getElementById('exsCatFormError').style.display = 'none';
+    openModal('exsCatModal');
+  });
+
+  document.getElementById('exsCatTableBody').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    var id = btn.dataset.id;
+    var cat = exsCatState.categories.filter(function (c) { return c['Category ID'] === id; })[0];
+    if (btn.dataset.act === 'editCat') {
+      exsCatState.editingCatId = id;
+      document.getElementById('exsCatModalTitle').textContent = 'Edit Category';
+      document.getElementById('exsCatName').value = cat['Category Name'];
+      document.getElementById('exsCatDescription').value = cat['Description'] || '';
+      document.getElementById('exsCatFormError').style.display = 'none';
+      openModal('exsCatModal');
+    }
+    if (btn.dataset.act === 'toggleCat') {
+      var next = btn.dataset.status === 'Active' ? 'Inactive' : 'Active';
+      runConfirmedAction({type:'state-change',title:(next === 'Inactive' ? 'Deactivate Expense Category?' : 'Activate Expense Category?'),message:'This changes whether the category is available for new expenses.',details:[{label:'Category',value:cat['Category Name'],emphasis:true},{label:'New Status',value:next}],confirmLabel:(next === 'Inactive' ? 'Deactivate' : 'Activate'),loadingLabel:'Updating...',trigger:btn}, function () {
+        return withLoader(serverCall('setExpenseCategoryStatus', authToken, id, next)).then(function () { showToast('Category updated', 'success'); exsCatLoad(); });
+      }).catch(function (err) { showToast(err.message, 'error'); });
+    }
+  });
+
+  document.getElementById('exsCatSaveBtn').addEventListener('click', function () {
+    var payload = { name: document.getElementById('exsCatName').value.trim(), description: document.getElementById('exsCatDescription').value.trim() };
+    var errEl = document.getElementById('exsCatFormError');
+    errEl.style.display = 'none';
+    var call = exsCatState.editingCatId ? serverCall('updateExpenseCategory', authToken, exsCatState.editingCatId, payload) : serverCall('addExpenseCategory', authToken, payload);
+    withLoader(call).then(function () {
+      closeModal('exsCatModal');
+      showToast('Category saved', 'success');
+      exsCatLoad();
+    }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+  });
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var origGoToPage = goToPage;
+    goToPage = function (key) {
+      origGoToPage(key);
+      if (key === 'expenseCategories' && !exsCatState._loaded) { exsCatState._loaded = true; exsCatLoad(); }
+    };
+  });
+</script>

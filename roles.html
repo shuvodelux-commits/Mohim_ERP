@@ -1,0 +1,211 @@
+<div class="toolbar">
+  <input class="search-input" id="rolSearch" type="text" placeholder="Search roles...">
+  <div class="toolbar-spacer"></div>
+  <button class="btn btn-primary" id="rolAddBtn">+ Add Role</button>
+</div>
+
+<div class="card" style="padding:0;">
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Role</th><th>Modules</th><th>Status</th><th></th></tr></thead>
+      <tbody id="rolTableBody"></tbody>
+    </table>
+  </div>
+  <div class="empty-state" id="rolEmpty" hidden>No custom roles yet. "Administrator" already has full access and doesn't need to be created here.</div>
+</div>
+
+<!-- Add / Edit Role modal -->
+<div class="modal-overlay" id="rolModal" hidden>
+  <div class="modal modal-lg">
+    <div class="modal-header"><div><h3 id="rolModalTitle">Add Role</h3><span class="bn-hint">কে কী করতে পারবে</span></div><button class="modal-close" onclick="closeModal('rolModal')">&#10005;</button></div>
+    <div class="modal-body">
+      <label>Role Name *</label>
+      <input id="rolName" type="text" placeholder="e.g. Cashier, Sales, Accounts">
+      <div style="height:14px;"></div>
+      <label>Module Access &amp; Permissions</label>
+      <p style="font-size:12px; color:var(--color-text-muted); margin:2px 0 8px;">View controls access. Add/Edit control changes. For Users and Roles, Delete is a simple permission. Other modules use the delete window.</p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Module</th><th>View</th><th>Add</th><th>Edit</th><th>Delete Window</th></tr></thead>
+          <tbody id="rolPermTableBody"></tbody>
+        </table>
+      </div>
+      <div class="field-error" id="rolFormError"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('rolModal')">Cancel</button>
+      <button class="btn btn-primary" id="rolSaveBtn">Save Role</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  var rolState = { roles: [], moduleOptions: [], deleteWindowOptions: [], editingId: null };
+
+  function rolCan_(action) { return userPermissions === null || !!(userPermissions && userPermissions.roles && (action === 'delete' ? (userPermissions.roles.delete === true || userPermissions.roles.delete === 'unlimited') : userPermissions.roles[action])); }
+
+  function rolLoad() {
+    return withLoader(serverCall('getRolesBootstrap', authToken)).then(function (data) {
+      rolState.roles = data.roles;
+      rolState.moduleOptions = data.moduleOptions;
+      rolState.deleteWindowOptions = data.deleteWindowOptions;
+      rolRender();
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  function rolModuleLabel_(key) {
+    var found = rolState.moduleOptions.filter(function (m) { return m.key === key; })[0];
+    return found ? found.label : key;
+  }
+
+  function rolParsePermissions_(raw) {
+    try {
+      var p = JSON.parse(raw || '{}');
+      return (p && typeof p === 'object') ? p : {};
+    } catch (e) { return {}; }
+  }
+
+  function rolRender() {
+    var q = (document.getElementById('rolSearch').value || '').toLowerCase();
+    var rows = rolState.roles.filter(function (r) { return !q || String(r['Role Name']).toLowerCase().indexOf(q) !== -1; });
+    var body = document.getElementById('rolTableBody');
+    body.innerHTML = '';
+    rows.forEach(function (r) {
+      var modules = String(r['Allowed Modules'] || '').split(',').filter(Boolean).map(rolModuleLabel_).join(', ');
+      var statusBadge = r['Status'] === 'Active' ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-danger">Inactive</span>';
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td>' + escapeHtml(r['Role Name']) + '</td>' +
+        '<td>' + escapeHtml(modules || '\u2014') + '</td>' +
+        '<td>' + statusBadge + '</td>' +
+        '<td style="white-space:nowrap;">' +
+          '<button class="btn" data-act="edit" data-id="' + r['Role ID'] + '">Edit</button> ' +
+          '<button class="btn" data-act="toggle" data-id="' + r['Role ID'] + '" data-status="' + r['Status'] + '">' + (r['Status'] === 'Active' ? 'Deactivate' : 'Activate') + '</button> ' +
+          '<button class="btn" data-act="delete" data-id="' + r['Role ID'] + '" style="color:var(--color-danger); border-color:var(--color-danger);">Delete</button>' +
+        '</td>';
+      body.appendChild(tr);
+      var rowButtons = tr.querySelectorAll('button[data-act]');
+      rowButtons.forEach(function (b) {
+        if (b.dataset.act === 'edit' && !rolCan_('edit')) b.hidden = true;
+        if (b.dataset.act === 'toggle' && !rolCan_('edit')) b.hidden = true;
+        if (b.dataset.act === 'delete' && !rolCan_('delete')) b.hidden = true;
+      });
+    });
+    document.getElementById('rolAddBtn').hidden = !rolCan_('add');
+    document.getElementById('rolEmpty').hidden = rows.length > 0;
+  }
+
+  function rolRenderPermTable_(permissions) {
+    permissions = permissions || {};
+    var body = document.getElementById('rolPermTableBody');
+    body.innerHTML = '';
+    rolState.moduleOptions.forEach(function (m) {
+      var p = permissions[m.key] || { view: false, add: false, edit: false, delete: 'disabled' };
+      var tr = document.createElement('tr');
+      if (m.permissionMode === 'editOnly') {
+        tr.innerHTML =
+          '<td>' + escapeHtml(m.label) + '</td>' +
+          '<td style="color:var(--color-text-muted);">&mdash;</td>' +
+          '<td style="color:var(--color-text-muted);">&mdash;</td>' +
+          '<td><input type="checkbox" data-mod="' + m.key + '" data-f="edit"' + (p.edit ? ' checked' : '') + ' style="width:auto;"></td>' +
+          '<td style="color:var(--color-text-muted);">&mdash;</td>';
+        body.appendChild(tr);
+        return;
+      }
+      var isMgmt = m.key === 'users' || m.key === 'roles';
+      var options = isMgmt ? '<label style="display:inline-flex;align-items:center;gap:6px;"><input type="checkbox" data-mod="' + m.key + '" data-f="delete"' + ((p.delete === true || p.delete === 'unlimited') ? ' checked' : '') + ' style="width:auto;"> Delete</label>' : '<select data-mod="' + m.key + '" data-f="delete" style="min-width:120px;">' + rolState.deleteWindowOptions.map(function (o) { return '<option value="' + o.key + '"' + (p.delete === o.key ? ' selected' : '') + '>' + escapeHtml(o.label) + '</option>'; }).join('') + '</select>';
+      tr.innerHTML =
+        '<td>' + escapeHtml(m.label) + '</td>' +
+        '<td><input type="checkbox" data-mod="' + m.key + '" data-f="view"' + (p.view ? ' checked' : '') + ' style="width:auto;"></td>' +
+        '<td><input type="checkbox" data-mod="' + m.key + '" data-f="add"' + (p.add ? ' checked' : '') + ' style="width:auto;"></td>' +
+        '<td><input type="checkbox" data-mod="' + m.key + '" data-f="edit"' + (p.edit ? ' checked' : '') + ' style="width:auto;"></td>' +
+        '<td>' + options + '</td>';
+      body.appendChild(tr);
+    });
+  }
+
+  function rolCollectPermTable_() {
+    var out = {};
+    rolState.moduleOptions.forEach(function (m) {
+      if (m.permissionMode === 'editOnly') {
+        var editOnly = document.querySelector('input[data-mod="' + m.key + '"][data-f="edit"]');
+        if (editOnly && editOnly.checked) out[m.key] = { view: false, add: false, edit: true, delete: 'disabled' };
+        return;
+      }
+      var view = document.querySelector('input[data-mod="' + m.key + '"][data-f="view"]').checked;
+      var add = document.querySelector('input[data-mod="' + m.key + '"][data-f="add"]').checked;
+      var edit = document.querySelector('input[data-mod="' + m.key + '"][data-f="edit"]').checked;
+      var delEl = document.querySelector('[data-mod="' + m.key + '"][data-f="delete"]');
+      var del = (m.key === 'users' || m.key === 'roles') ? !!delEl.checked : delEl.value;
+      if (view || add || edit || del !== 'disabled' && del !== false) out[m.key] = { view: view, add: add, edit: edit, delete: del };
+    });
+    return out;
+  }
+
+  document.getElementById('rolSearch').addEventListener('input', rolRender);
+
+  document.getElementById('rolAddBtn').addEventListener('click', function () {
+    rolState.editingId = null;
+    document.getElementById('rolModalTitle').textContent = 'Add Role';
+    document.getElementById('rolName').value = '';
+    rolRenderPermTable_({});
+    document.getElementById('rolFormError').style.display = 'none';
+    openModal('rolModal');
+  });
+
+  document.getElementById('rolTableBody').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    var id = btn.dataset.id;
+    var role = rolState.roles.filter(function (r) { return r['Role ID'] === id; })[0];
+    if (!role) return;
+
+    if (btn.dataset.act === 'edit') {
+      rolState.editingId = id;
+      document.getElementById('rolModalTitle').textContent = 'Edit Role';
+      document.getElementById('rolName').value = role['Role Name'];
+      rolRenderPermTable_(rolParsePermissions_(role['Permissions']));
+      document.getElementById('rolFormError').style.display = 'none';
+      openModal('rolModal');
+    }
+    if (btn.dataset.act === 'toggle') {
+      var next = btn.dataset.status === 'Active' ? 'Inactive' : 'Active';
+      runConfirmedAction({type:'state-change',title:(next === 'Inactive' ? 'Deactivate Role?' : 'Activate Role?'),message:'This changes whether the role can authorize active users.',details:[{label:'Role',value:role['Role Name'],emphasis:true},{label:'New Status',value:next}],confirmLabel:(next === 'Inactive' ? 'Deactivate' : 'Activate'),loadingLabel:'Updating...',trigger:btn}, function () {
+        return withLoader(serverCall('setRoleStatus', authToken, id, next)).then(function () { showToast('Role updated', 'success'); rolLoad(); });
+      }).catch(function (err) { showToast(err.message, 'error'); });
+    }
+    if (btn.dataset.act === 'delete') {
+      runConfirmedAction({
+        type: 'danger',
+        title: 'Delete Role?',
+        message: 'This permanently deletes the role. This cannot be undone.',
+        details: [{ label: 'Role', value: role['Role Name'], emphasis: true }],
+        confirmLabel: 'Delete Role',
+        loadingLabel: 'Deleting...',
+        trigger: btn
+      }, function () {
+        return withLoader(serverCall('deleteRole', authToken, id)).then(function () { showToast('Role deleted', 'success'); rolLoad(); });
+      }).catch(function (err) { showToast(err.message, 'error'); });
+    }
+  });
+
+  document.getElementById('rolSaveBtn').addEventListener('click', function () {
+    var errEl = document.getElementById('rolFormError');
+    errEl.style.display = 'none';
+    var payload = { name: document.getElementById('rolName').value.trim(), permissions: rolCollectPermTable_() };
+    var call = rolState.editingId ? serverCall('updateRole', authToken, rolState.editingId, payload) : serverCall('addRole', authToken, payload);
+    withLoader(call).then(function () {
+      closeModal('rolModal');
+      showToast('Role saved', 'success');
+      rolLoad();
+    }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+  });
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var origGoToPage = goToPage;
+    goToPage = function (key) {
+      origGoToPage(key);
+      if (key === 'roles' && !rolState._loaded) { rolState._loaded = true; rolLoad(); }
+    };
+  });
+</script>

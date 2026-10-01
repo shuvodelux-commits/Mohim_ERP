@@ -1,0 +1,590 @@
+<style>
+  #finType option { padding: 2px 8px; line-height: 1.15; }
+  #finType option.fin-type-group-header { font-weight: 700; color: var(--color-text-muted); }
+
+  /* Finance People is a data-management dialog, so desktop gets enough width
+     for the form + actions without forcing the whole modal to scroll sideways. */
+  .fin-manage-people-modal { width:min(96vw, 1040px); max-width:1040px; }
+  .fin-manage-people-modal .modal-body { overflow-x:hidden; }
+  .fin-person-master-grid { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,.8fr) minmax(0,1.45fr); gap:10px; align-items:end; }
+  .fin-person-master-grid > div { min-width:0; }
+  .fin-person-role-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .fin-person-role-row > strong { margin-right:2px; color:var(--color-text); }
+  .fin-role-choice {
+    display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:34px;
+    padding:6px 10px; border:1px solid var(--color-border); border-radius:9px;
+    background:var(--color-surface); color:var(--color-text-muted); font-size:13px; font-weight:600;
+    cursor:pointer; user-select:none;
+  }
+  .fin-role-choice input[type="checkbox"] { width:16px; height:16px; min-height:0; margin:0; flex:0 0 16px; accent-color:var(--color-primary); }
+  .fin-role-choice:has(input:checked) { border-color:var(--color-primary); background:rgba(37,99,235,.08); color:var(--color-primary); }
+  #finManageAddBtn { margin-left:auto; }
+
+  .fin-manage-table-wrap { width:100%; overflow-x:auto; border:1px solid var(--color-border); border-radius:10px; }
+  .fin-manage-persons-table { width:100%; table-layout:fixed; margin:0; }
+  .fin-manage-persons-table th, .fin-manage-persons-table td { padding:10px 8px; vertical-align:top; overflow-wrap:anywhere; }
+  .fin-manage-persons-table th:nth-child(1) { width:18%; }
+  .fin-manage-persons-table th:nth-child(2) { width:14%; }
+  .fin-manage-persons-table th:nth-child(3) { width:20%; }
+  .fin-manage-persons-table th:nth-child(4) { width:15%; }
+  .fin-manage-persons-table th:nth-child(5) { width:11%; }
+  .fin-manage-persons-table th:nth-child(6) { width:22%; }
+  .fin-manage-persons-table td:last-child { white-space:normal !important; text-align:right; }
+  .fin-manage-persons-table td:last-child .btn { min-height:34px; padding:6px 9px; font-size:12px; margin:0 0 4px 4px; }
+  .fin-person-description { max-width:none; white-space:normal; color:var(--color-text-muted); }
+
+  @media (max-width: 760px) {
+    .fin-person-master-grid { grid-template-columns:1fr; }
+  }
+
+  @media (max-width: 540px) {
+    .fin-person-role-row { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; align-items:stretch; }
+    .fin-person-role-row > strong { grid-column:1 / -1; margin:2px 0 0; }
+    .fin-role-choice { width:100%; min-width:0; min-height:40px; padding:7px 5px; border-radius:10px; font-size:12px; }
+    .fin-role-choice input[type="checkbox"] { width:16px; height:16px; min-height:0; }
+    #finManageAddBtn { grid-column:1 / -1; width:100%; margin-left:0; }
+
+    .fin-manage-table-wrap { overflow:visible; border:0; border-radius:0; }
+    .fin-manage-persons-table, .fin-manage-persons-table tbody { display:block; width:100%; }
+    .fin-manage-persons-table thead { display:none; }
+    .fin-manage-persons-table tbody tr { display:block; width:100%; margin:0 0 10px; padding:10px 12px; border:1px solid var(--color-border); border-radius:12px; background:var(--color-surface); }
+    .fin-manage-persons-table tbody td { display:grid; grid-template-columns:82px minmax(0,1fr); gap:8px; width:100%; padding:4px 0; border:0; text-align:left; font-size:13px; }
+    .fin-manage-persons-table tbody td::before { color:var(--color-text-muted); font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.02em; }
+    .fin-manage-persons-table td:nth-child(1)::before { content:"Name"; }
+    .fin-manage-persons-table td:nth-child(2)::before { content:"Phone"; }
+    .fin-manage-persons-table td:nth-child(3)::before { content:"Description"; }
+    .fin-manage-persons-table td:nth-child(4)::before { content:"Roles"; }
+    .fin-manage-persons-table td:nth-child(5)::before { content:"Status"; }
+    .fin-manage-persons-table td:nth-child(6)::before { content:"Actions"; }
+    .fin-manage-persons-table td:last-child { display:grid; grid-template-columns:82px minmax(0,1fr); gap:7px 8px; padding-top:8px; text-align:left; }
+    .fin-manage-persons-table td:last-child .btn { grid-column:2; width:100%; min-height:40px; margin:0; }
+    .fin-person-description { max-width:none; }
+  }
+</style>
+
+<!-- ================= Business Finance ================= -->
+<div class="stat-grid" style="margin-bottom:18px;">
+  <div class="stat-card"><div class="stat-label">Owner Capital</div><div class="stat-value" id="finCapitalStat">--</div></div>
+  <div class="stat-card"><div class="stat-label">Owner Advance</div><div class="stat-value" id="finOwnerAdvanceStat">--</div></div>
+  <div class="stat-card"><div class="stat-label">Outstanding Loan</div><div class="stat-value" id="finLoanStat">--</div></div>
+  <div class="stat-card"><div class="stat-label">Lender Credit</div><div class="stat-value" id="finLenderCreditStat">--</div></div>
+  <div class="stat-card"><div class="stat-label">Borrower Receivable</div><div class="stat-value" id="finBorrowerReceivableStat">--</div></div>
+  <div class="stat-card"><div class="stat-label">Borrower Credit</div><div class="stat-value" id="finBorrowerCreditStat">--</div></div>
+</div>
+
+<div class="card">
+  <div class="form-grid">
+    <div>
+      <label>Date *</label>
+      <input id="finDate" type="date">
+    </div>
+    <div id="finBackdatedReasonRow" style="display:none;">
+      <label>Reason for Backdating *</label>
+      <input id="finBackdatedReason" type="text" placeholder="Why is this dated in the past?">
+    </div>
+    <div>
+      <label>Transaction Type *</label>
+      <select id="finType" aria-label="Transaction Type"><option value="">Select type...</option></select>
+    </div>
+    <div>
+      <label id="finPersonLabel">Finance Person *</label>
+      <div style="display:flex; gap:8px;">
+        <select id="finPerson" aria-label="Finance Person" style="flex:1;"><option value="">Select person...</option></select>
+        <button type="button" class="btn" id="finQuickPersonBtn">+ New</button>
+        <button type="button" class="btn" id="finManagePersonsBtn" title="Add or manage finance people">Manage</button>
+      </div>
+      <div id="finQuickPersonRow" style="display:none; gap:8px; margin-top:8px; align-items:center; flex-wrap:wrap;">
+        <input id="finQuickPersonName" type="text" placeholder="Name" style="flex:1; min-width:160px;">
+        <input id="finQuickPersonPhone" type="text" inputmode="tel" placeholder="Phone" style="flex:.8; min-width:130px;">
+        <input id="finQuickPersonDescription" type="text" placeholder="Description" style="flex:1.2; min-width:180px;">
+        <span class="badge" id="finQuickRoleHint">Role</span>
+        <button type="button" class="btn btn-primary" id="finQuickPersonSave">Save</button>
+      </div>
+    </div>
+    <div id="finPaymentMethodRow">
+      <label>Payment Method *</label>
+      <select id="finPaymentMethod">
+        <option value="Cash">Cash</option>
+        <option value="Bank">Bank</option>
+        <option value="Mobile Banking">Mobile Banking</option>
+      </select>
+    </div>
+    <div id="finBankAccountRow" style="display:none;">
+      <label id="finBankAccountLabel">Bank Account *</label>
+      <select id="finBankAccount"><option value="">Select bank account...</option></select>
+    </div>
+    <div>
+      <label>Amount *</label>
+      <input id="finAmount" type="number" min="0" step="0.01">
+    </div>
+    <div>
+      <label>Reference No.</label>
+      <input id="finReferenceNo" type="text" placeholder="Optional">
+    </div>
+    <div class="full">
+      <label>Notes</label>
+      <input id="finNotes" type="text" placeholder="Optional">
+    </div>
+  </div>
+  <p style="font-size:12px; color:var(--color-text-muted); margin:10px 0 0;" id="finHint"></p>
+  <div class="field-error" id="finFormError"></div>
+  <div style="text-align:right; margin-top:14px;">
+    <button class="btn btn-primary btn-lg" id="finSaveBtn">Save Transaction</button>
+  </div>
+</div>
+
+<!-- Finance people master data. Roles are additive; existing Active/Inactive behavior is preserved. -->
+<div class="modal-overlay" id="finManagePersonsModal" hidden>
+  <div class="modal fin-manage-people-modal">
+    <div class="modal-header">
+      <h3>Manage Finance People <span class="bn-hint" style="display:inline;">— অর্থায়ন সংশ্লিষ্ট ব্যক্তি</span></h3>
+      <button class="modal-close" onclick="closeModal('finManagePersonsModal')">&#10005;</button>
+    </div>
+    <div class="modal-body">
+      <div class="fin-person-master-grid">
+        <div><label>Name *</label><input id="finManageNewName" type="text" placeholder="Finance person name"></div>
+        <div><label>Phone</label><input id="finManageNewPhone" type="text" inputmode="tel" placeholder="Optional phone"></div>
+        <div><label>Description</label><input id="finManageNewDescription" type="text" placeholder="Relationship, branch, loan details, etc."></div>
+      </div>
+      <div class="fin-person-role-row" style="margin-top:10px;">
+        <strong style="font-size:13px;">Roles *</strong>
+        <label class="fin-role-choice"><input type="checkbox" data-fin-role="Owner" id="finManageRoleOwner"> <span>Owner</span></label>
+        <label class="fin-role-choice"><input type="checkbox" data-fin-role="Lender" id="finManageRoleLender"> <span>Lender</span></label>
+        <label class="fin-role-choice"><input type="checkbox" data-fin-role="Borrower" id="finManageRoleBorrower"> <span>Borrower</span></label>
+        <button type="button" class="btn btn-primary" id="finManageAddBtn">Add Person</button>
+      </div>
+      <div class="field-error" id="finManageError"></div>
+      <div style="height:12px;"></div>
+      <div class="fin-manage-table-wrap">
+        <table class="fin-manage-persons-table">
+          <thead><tr><th>Name</th><th>Phone</th><th>Description</th><th>Roles</th><th>Status</th><th></th></tr></thead>
+          <tbody id="finManageBody"></tbody>
+        </table>
+      </div>
+      <div class="empty-state" id="finManageEmpty" hidden>None yet &mdash; add one above.</div>
+    </div>
+    <div class="modal-footer"><button class="btn" onclick="closeModal('finManagePersonsModal')">Close</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="finEditPersonModal" hidden>
+  <div class="modal" style="max-width:620px;">
+    <div class="modal-header">
+      <h3>Edit Finance Person <span id="finEditPersonTitle"></span></h3>
+      <button class="modal-close" onclick="closeModal('finEditPersonModal')">&#10005;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div><label>Name *</label><input id="finEditPersonName" type="text"></div>
+        <div><label>Phone</label><input id="finEditPersonPhone" type="text" inputmode="tel"></div>
+        <div class="full"><label>Description</label><input id="finEditPersonDescription" type="text" placeholder="Relationship, branch, loan details, etc."></div>
+        <div class="full fin-person-role-row">
+          <strong style="font-size:13px;">Roles *</strong>
+          <label class="fin-role-choice"><input type="checkbox" data-fin-role="Owner" id="finEditRoleOwner"> <span>Owner</span></label>
+          <label class="fin-role-choice"><input type="checkbox" data-fin-role="Lender" id="finEditRoleLender"> <span>Lender</span></label>
+          <label class="fin-role-choice"><input type="checkbox" data-fin-role="Borrower" id="finEditRoleBorrower"> <span>Borrower</span></label>
+        </div>
+      </div>
+      <div class="field-error" id="finEditPersonError"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('finEditPersonModal')">Cancel</button>
+      <button class="btn btn-primary" id="finEditPersonSaveBtn">Save Person</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  var finState = { transactionTypes: [], paymentMethods: [], bankAccounts: [], persons: [], personsAll: [], currencySymbol: '', editingPersonId: '' };
+
+  function finToday_() {
+    var d = new Date();
+    var m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + m + '-' + day;
+  }
+
+  function finMoney_(v) {
+    var n = Number(v) || 0;
+    return (finState.currencySymbol || '') + n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  }
+
+  function finCurrentType_() {
+    var key = document.getElementById('finType').value;
+    return finState.transactionTypes.filter(function (t) { return t.key === key; })[0] || null;
+  }
+
+  function finPersonRoles_(person) {
+    return person && Array.isArray(person.roles) && person.roles.length ? person.roles : [person && person.type || 'Owner'];
+  }
+
+  function finHasRole_(person, role) {
+    return !role || finPersonRoles_(person).indexOf(role) !== -1;
+  }
+
+  function finRenderSummary_(summary) {
+    summary = summary || {};
+    document.getElementById('finCapitalStat').textContent = finMoney_(summary.ownerCapital);
+    document.getElementById('finOwnerAdvanceStat').textContent = finMoney_(summary.ownerAdvance);
+    document.getElementById('finLoanStat').textContent = finMoney_(summary.outstandingLoan);
+    document.getElementById('finLenderCreditStat').textContent = finMoney_(summary.lenderCredit);
+    document.getElementById('finBorrowerReceivableStat').textContent = finMoney_(summary.borrowerReceivable);
+    document.getElementById('finBorrowerCreditStat').textContent = finMoney_(summary.borrowerCredit);
+  }
+
+  function finGroupName_(type) {
+    if (type.isOpening) return 'Opening Balance';
+    if (type.role === 'Owner') return 'Owner';
+    if (type.role === 'Lender') return 'Lender';
+    return 'Borrower';
+  }
+
+  function finTypeDisplayLabel_(type) {
+    var bangla = {
+      'Loan Received': 'ঋণদাতা হতে গ্রহণ',
+      'Loan Repayment': 'ঋণদাতাকে প্রদান',
+      'Borrower Repayment': 'ঋণগ্রহীতা হতে গ্রহণ',
+      'Borrower Loan': 'ঋণগ্রহীতাকে প্রদান',
+      'Owner Investment': 'মালিক হতে গ্রহণ',
+      'Owner Withdrawal': 'মালিককে প্রদান',
+      'Opening Owner Capital': 'মালিকের প্রারম্ভিক মূলধন',
+      'Opening Loan': 'প্রারম্ভিক ঋণ',
+      'Opening Borrower Loan': 'ঋণগ্রহীতার প্রারম্ভিক ঋণ'
+    };
+    return type.label + (bangla[type.key] ? ' — ' + bangla[type.key] : '');
+  }
+
+  function finRenderTypeOptions_() {
+    var sel = document.getElementById('finType');
+    var current = sel.value;
+    var groupOrder = ['Lender', 'Borrower', 'Owner', 'Opening Balance'];
+    var typeOrder = {
+      'Loan Received': 0, 'Loan Repayment': 1,
+      'Borrower Repayment': 0, 'Borrower Loan': 1,
+      'Owner Investment': 0, 'Owner Withdrawal': 1,
+      'Opening Owner Capital': 0, 'Opening Loan': 1, 'Opening Borrower Loan': 2
+    };
+    sel.innerHTML = '<option value="">Select type...</option>';
+    groupOrder.forEach(function (groupName) {
+      var types = finState.transactionTypes.filter(function (t) { return finGroupName_(t) === groupName; });
+      types.sort(function (a, b) { return (typeOrder[a.key] == null ? 99 : typeOrder[a.key]) - (typeOrder[b.key] == null ? 99 : typeOrder[b.key]); });
+      if (!types.length) return;
+      var header = document.createElement('option');
+      header.disabled = true;
+      header.className = 'fin-type-group-header';
+      header.setAttribute('data-fin-type-separator', 'true');
+      header.textContent = '──── ' + groupName + ' ────';
+      sel.appendChild(header);
+      types.forEach(function (t) {
+        var option = document.createElement('option');
+        option.value = t.key;
+        option.textContent = finTypeDisplayLabel_(t);
+        sel.appendChild(option);
+      });
+    });
+    if (finState.transactionTypes.some(function (t) { return t.key === current; })) sel.value = current;
+  }
+
+  function finLoad() {
+    return withLoader(serverCall('getFinanceBootstrap', authToken)).then(function (data) {
+      finState.transactionTypes = data.transactionTypes || [];
+      finState.paymentMethods = data.paymentMethods || [];
+      finState.bankAccounts = data.bankAccounts || [];
+      finState.persons = data.persons || [];
+      finState.personsAll = data.personsAll || [];
+      finState.currencySymbol = data.currencySymbol || '';
+      finRenderTypeOptions_();
+      finRenderSummary_(data.summary || {
+        ownerCapital: data.ownerCapital, outstandingLoan: data.outstandingLoan,
+        ownerAdvance: data.ownerAdvance, lenderCredit: data.lenderCredit,
+        borrowerReceivable: data.borrowerReceivable, borrowerCredit: data.borrowerCredit
+      });
+      finFillBankAccountSelect_(document.getElementById('finPaymentMethod').value);
+      if (!document.getElementById('finDate').value) document.getElementById('finDate').value = data.today || finToday_();
+      finUpdateHint_();
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  function finFillBankAccountSelect_(paymentMethod) {
+    fillBankAccountSelect_(document.getElementById('finBankAccount'), finState.bankAccounts, paymentMethod);
+  }
+
+  function finFillPersonSelect_() {
+    var sel = document.getElementById('finPerson');
+    var current = sel.value;
+    var type = finCurrentType_();
+    var requiredRole = type ? type.role : '';
+    sel.innerHTML = '<option value="">Select person...</option>';
+    finState.persons.filter(function (p) { return finHasRole_(p, requiredRole); }).forEach(function (p) {
+      sel.innerHTML += '<option value="' + p.id + '">' + escapeHtml(p.name) + '</option>';
+    });
+    if (finState.persons.some(function (p) { return p.id === current && finHasRole_(p, requiredRole); })) sel.value = current;
+  }
+
+  function finUpdateMoneyControls_(type) {
+    var isOpening = !!(type && type.cashDirection === 'none');
+    document.getElementById('finPaymentMethodRow').style.display = isOpening ? 'none' : '';
+    document.getElementById('finPaymentMethod').disabled = isOpening;
+    if (isOpening) {
+      document.getElementById('finBankAccountRow').style.display = 'none';
+      document.getElementById('finBankAccount').disabled = true;
+    } else {
+      document.getElementById('finBankAccount').disabled = false;
+      var method = document.getElementById('finPaymentMethod').value;
+      document.getElementById('finBankAccountRow').style.display = paymentMethodNeedsAccount_(method) ? '' : 'none';
+      finFillBankAccountSelect_(method);
+    }
+  }
+
+  function finUpdateHint_() {
+    var type = finCurrentType_();
+    var hint = '';
+    if (type) {
+      if (type.isOpening || type.cashDirection === 'none') {
+        hint = 'Opening balance — no Cash/Bank movement';
+      } else {
+        var moneyWord = type.cashDirection === 'in' ? 'increases' : 'decreases';
+        var relationWord = type.balanceEffect > 0 ? 'increases' : 'decreases';
+        hint = 'This ' + moneyWord + ' the selected Cash/Bank/Mobile Banking account and ' + relationWord + ' the ' + (type.account === 'owner' ? 'Owner Capital' : type.account === 'loanPayable' ? 'Loan Payable' : 'Borrower Receivable') + ' balance.';
+      }
+    }
+    document.getElementById('finPersonLabel').textContent = type ? (type.role + ' *') : 'Finance Person *';
+    document.getElementById('finQuickRoleHint').textContent = type ? type.role : 'Role';
+    document.getElementById('finHint').textContent = hint;
+    finUpdateMoneyControls_(type);
+    finFillPersonSelect_();
+  }
+
+  document.getElementById('finType').addEventListener('change', finUpdateHint_);
+
+  document.getElementById('finPaymentMethod').addEventListener('change', function () {
+    document.getElementById('finBankAccountRow').style.display = paymentMethodNeedsAccount_(this.value) ? '' : 'none';
+    document.getElementById('finBankAccountLabel').textContent = (this.value === 'Mobile Banking' ? 'Mobile Banking Account *' : 'Bank Account *');
+    finFillBankAccountSelect_(this.value);
+  });
+
+  document.getElementById('finDate').addEventListener('change', function () {
+    var val = document.getElementById('finDate').value;
+    document.getElementById('finBackdatedReasonRow').style.display = (val && val < finToday_()) ? '' : 'none';
+  });
+
+  // ---------------- Quick-add person ----------------
+  document.getElementById('finQuickPersonBtn').addEventListener('click', function () {
+    var type = finCurrentType_();
+    if (!type) { showToast('Choose a transaction type first.', 'error'); return; }
+    var row = document.getElementById('finQuickPersonRow');
+    row.style.display = row.style.display === 'flex' ? 'none' : 'flex';
+    document.getElementById('finQuickRoleHint').textContent = type.role;
+  });
+
+  document.getElementById('finQuickPersonSave').addEventListener('click', function () {
+    var name = document.getElementById('finQuickPersonName').value.trim();
+    var type = finCurrentType_();
+    if (!name || !type) return;
+    var requiredRole = type.role;
+    var phone = document.getElementById('finQuickPersonPhone').value.trim();
+    var description = document.getElementById('finQuickPersonDescription').value.trim();
+    withLoader(serverCall('addFinancePerson', authToken, { name: name, roles: [requiredRole], phone: document.getElementById('finQuickPersonPhone').value.trim(), description: document.getElementById('finQuickPersonDescription').value.trim() })).then(function (res) {
+      var p = { id: res.id, name: name, type: requiredRole, roles: res.roles || [requiredRole], status: 'Active', phone: phone, description: description };
+      finState.personsAll.push(p); finState.persons.push(p);
+      finFillPersonSelect_();
+      document.getElementById('finPerson').value = res.id;
+      document.getElementById('finQuickPersonName').value = '';
+      document.getElementById('finQuickPersonPhone').value = '';
+      document.getElementById('finQuickPersonDescription').value = '';
+      document.getElementById('finQuickPersonRow').style.display = 'none';
+      showToast('Person added', 'success');
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  });
+
+  // ---------------- Manage Finance People ----------------
+  function finCheckedRoles_(prefix) {
+    return ['Owner', 'Lender', 'Borrower'].filter(function (role) {
+      var el = document.getElementById(prefix + role);
+      return el && el.checked;
+    });
+  }
+
+  function finSetRoleChecks_(prefix, roles) {
+    ['Owner', 'Lender', 'Borrower'].forEach(function (role) {
+      var el = document.getElementById(prefix + role);
+      if (el) el.checked = (roles || []).indexOf(role) !== -1;
+    });
+  }
+
+  function finRefreshActivePeople_() {
+    finState.persons = finState.personsAll.filter(function (x) { return x.status !== 'Inactive'; }).map(function (x) {
+      return { id: x.id, name: x.name, type: x.type, roles: finPersonRoles_(x), phone: x.phone || '', description: x.description || '' };
+    });
+  }
+
+  document.getElementById('finManagePersonsBtn').addEventListener('click', function () {
+    document.getElementById('finManageNewName').value = '';
+    document.getElementById('finManageNewPhone').value = '';
+    document.getElementById('finManageNewDescription').value = '';
+    finSetRoleChecks_('finManageRole', []);
+    document.getElementById('finManageError').style.display = 'none';
+    finRenderManageList_();
+    openModal('finManagePersonsModal');
+  });
+
+  function finRoleBadges_(roles) {
+    return finPersonRoles_({ roles: roles }).map(function (role) { return '<span class="badge">' + escapeHtml(role) + '</span>'; }).join(' ');
+  }
+
+  function finRenderManageList_() {
+    var body = document.getElementById('finManageBody');
+    body.innerHTML = '';
+    finState.personsAll.forEach(function (p) {
+      var statusBadge = p.status === 'Active' ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-danger">Inactive</span>';
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td><strong>' + escapeHtml(p.name) + '</strong></td>' +
+        '<td>' + escapeHtml(p.phone || '—') + '</td>' +
+        '<td class="fin-person-description">' + escapeHtml(p.description || '—') + '</td>' +
+        '<td>' + finRoleBadges_(finPersonRoles_(p)) + '</td>' +
+        '<td>' + statusBadge + '</td>' +
+        '<td style="text-align:right; white-space:nowrap;">' +
+          '<button class="btn" data-act="edit" data-id="' + p.id + '">Edit</button> ' +
+          '<button class="btn" data-act="toggle" data-id="' + p.id + '" data-status="' + p.status + '">' + (p.status === 'Active' ? 'Deactivate' : 'Activate') + '</button>' +
+        '</td>';
+      body.appendChild(tr);
+    });
+    document.getElementById('finManageEmpty').hidden = finState.personsAll.length > 0;
+  }
+
+  document.getElementById('finManageAddBtn').addEventListener('click', function () {
+    var name = document.getElementById('finManageNewName').value.trim();
+    var phone = document.getElementById('finManageNewPhone').value.trim();
+    var description = document.getElementById('finManageNewDescription').value.trim();
+    var roles = finCheckedRoles_('finManageRole');
+    var errEl = document.getElementById('finManageError');
+    errEl.style.display = 'none';
+    if (!name) { errEl.textContent = 'Person name is required.'; errEl.style.display = 'block'; return; }
+    if (!roles.length) { errEl.textContent = 'Choose at least one role.'; errEl.style.display = 'block'; return; }
+    withLoader(serverCall('addFinancePerson', authToken, { name: name, roles: roles, phone: phone, description: description })).then(function (res) {
+      finState.personsAll.push({ id: res.id, name: name, type: roles[0], roles: res.roles || roles, status: 'Active', phone: phone, description: description });
+      finRefreshActivePeople_();
+      document.getElementById('finManageNewName').value = '';
+      document.getElementById('finManageNewPhone').value = '';
+      document.getElementById('finManageNewDescription').value = '';
+      finSetRoleChecks_('finManageRole', []);
+      finRenderManageList_(); finFillPersonSelect_();
+      showToast('Person added', 'success');
+    }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+  });
+
+  document.getElementById('finManageBody').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    var person = finState.personsAll.filter(function (x) { return x.id === btn.dataset.id; })[0];
+    if (!person) return;
+    if (btn.dataset.act === 'edit') {
+      finState.editingPersonId = person.id;
+      document.getElementById('finEditPersonTitle').textContent = '— ' + person.name;
+      document.getElementById('finEditPersonName').value = person.name || '';
+      document.getElementById('finEditPersonPhone').value = person.phone || '';
+      document.getElementById('finEditPersonDescription').value = person.description || '';
+      document.getElementById('finEditPersonError').style.display = 'none';
+      finSetRoleChecks_('finEditRole', finPersonRoles_(person));
+      openModal('finEditPersonModal');
+      return;
+    }
+    if (btn.dataset.act !== 'toggle') return;
+    var next = btn.dataset.status === 'Active' ? 'Inactive' : 'Active';
+    runConfirmedAction({
+      type: 'state-change', title: (next === 'Inactive' ? 'Deactivate' : 'Activate') + ' Finance Person?',
+      message: next === 'Inactive' ? 'This person will no longer be available for new finance transactions.' : 'This person will be available for new finance transactions.',
+      details: [
+        { label: 'Person', value: person.name, emphasis: true },
+        { label: 'Roles', value: finPersonRoles_(person).join(', ') }, { label: 'New Status', value: next }
+      ],
+      confirmLabel: next === 'Inactive' ? 'Deactivate' : 'Activate', loadingLabel: 'Updating...', trigger: btn
+    }, function () {
+      return withLoader(serverCall('setFinancePersonStatus', authToken, person.id, next)).then(function () {
+        person.status = next; finRefreshActivePeople_(); finRenderManageList_(); finFillPersonSelect_(); showToast('Person updated', 'success');
+      });
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  });
+
+  document.getElementById('finEditPersonSaveBtn').addEventListener('click', function () {
+    var person = finState.personsAll.filter(function (x) { return x.id === finState.editingPersonId; })[0];
+    var name = document.getElementById('finEditPersonName').value.trim();
+    var phone = document.getElementById('finEditPersonPhone').value.trim();
+    var description = document.getElementById('finEditPersonDescription').value.trim();
+    var roles = finCheckedRoles_('finEditRole');
+    var errEl = document.getElementById('finEditPersonError');
+    errEl.style.display = 'none';
+    if (!person) { errEl.textContent = 'Finance person not found.'; errEl.style.display = 'block'; return; }
+    if (!name) { errEl.textContent = 'Person name is required.'; errEl.style.display = 'block'; return; }
+    if (!roles.length) { errEl.textContent = 'Choose at least one role.'; errEl.style.display = 'block'; return; }
+    var personId = person.id;
+    var payload = { name: name, phone: phone, description: description, roles: roles };
+    runConfirmedAction({
+      type: 'state-change', title: 'Update Finance Person?', message: 'This updates master-data details and the roles available for future finance transactions.',
+      details: [
+        { label: 'Person', value: name, emphasis: true },
+        { label: 'Phone', value: phone || '—' },
+        { label: 'Description', value: description || '—' },
+        { label: 'Roles', value: roles.join(', ') }
+      ],
+      confirmLabel: 'Save Person', loadingLabel: 'Updating...', trigger: document.getElementById('finEditPersonSaveBtn')
+    }, function () {
+      return withLoader(serverCall('updateFinancePerson', authToken, personId, payload)).then(function (res) {
+        person.name = res.name || name;
+        person.phone = res.phone || '';
+        person.description = res.description || '';
+        person.roles = res.roles || roles;
+        person.type = res.type || person.roles[0];
+        finRefreshActivePeople_(); finRenderManageList_(); finFillPersonSelect_(); closeModal('finEditPersonModal');
+        showToast('Finance person updated', 'success');
+      });
+    }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+  });
+
+  document.getElementById('finSaveBtn').addEventListener('click', function () {
+    var errEl = document.getElementById('finFormError');
+    errEl.style.display = 'none';
+    var dateVal = document.getElementById('finDate').value || finToday_();
+    var backdatedReason = document.getElementById('finBackdatedReason').value.trim();
+    if (dateVal < finToday_() && !backdatedReason) { errEl.textContent = 'A reason is required when dating this entry in the past.'; errEl.style.display = 'block'; return; }
+    var type = finCurrentType_();
+    var hasMoneyMovement = !!(type && type.cashDirection !== 'none');
+    var payload = {
+      date: dateVal, transactionType: document.getElementById('finType').value, personId: document.getElementById('finPerson').value,
+      paymentMethod: hasMoneyMovement ? document.getElementById('finPaymentMethod').value : '',
+      bankAccountId: hasMoneyMovement ? document.getElementById('finBankAccount').value : '',
+      amount: document.getElementById('finAmount').value, referenceNo: document.getElementById('finReferenceNo').value.trim(),
+      notes: document.getElementById('finNotes').value.trim(), backdatedReason: backdatedReason
+    };
+    var amount = Number(payload.amount) || 0;
+    var details = [
+      { label: 'Person', value: selectedOptionText_('finPerson'), emphasis: true },
+      { label: 'Transaction Type', value: selectedOptionText_('finType') },
+      { label: 'Amount', value: formatMoney(amount), emphasis: true }, { label: 'In words', value: banglaAmountInWords_(amount) }
+    ];
+    if (hasMoneyMovement) {
+      details.push({ label: 'Method', value: payload.paymentMethod });
+      details.push({ label: 'Account', value: payload.bankAccountId ? selectedOptionText_('finBankAccount') : '' });
+    } else {
+      details.push({ label: 'Opening Balance', value: 'Opening Balance — no Cash/Bank movement' });
+    }
+    details.push({ label: 'Reference', value: payload.referenceNo }); details.push({ label: 'Date', value: payload.date });
+    runConfirmedAction({
+      type: 'financial', title: 'Save Finance Transaction?',
+      message: hasMoneyMovement ? 'Review this finance transaction before it changes Cash/Bank and finance balances.' : 'Review this non-cash opening balance before saving.',
+      details: details, confirmLabel: 'Save Transaction', loadingLabel: 'Saving...', trigger: document.getElementById('finSaveBtn')
+    }, function () {
+      return withLoader(serverCall('addFinanceTransaction', authToken, payload)).then(function () {
+        showToast('Finance transaction saved', 'success');
+        document.getElementById('finAmount').value = ''; document.getElementById('finPerson').value = '';
+        document.getElementById('finReferenceNo').value = ''; document.getElementById('finNotes').value = '';
+        document.getElementById('finBackdatedReason').value = ''; document.getElementById('finBackdatedReasonRow').style.display = 'none';
+        return finLoad();
+      });
+    }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+  });
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var origGoToPage = goToPage;
+    goToPage = function (key) { origGoToPage(key); if (key === 'finance') finLoad(); };
+  });
+</script>

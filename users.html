@@ -1,0 +1,237 @@
+<div class="toolbar">
+  <input class="search-input" id="usrSearch" type="text" placeholder="Search by name or mobile...">
+  <div class="toolbar-spacer"></div>
+  <button class="btn btn-primary" id="usrAddBtn">+ Add User</button>
+</div>
+
+<div class="card" style="padding:0;">
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Name</th><th>Mobile</th><th>Role</th><th>Status</th><th>Last Login</th><th></th></tr></thead>
+      <tbody id="usrTableBody"></tbody>
+    </table>
+  </div>
+  <div class="empty-state" id="usrEmpty" hidden>No users yet.</div>
+</div>
+
+<!-- Add / Edit User modal -->
+<div class="modal-overlay" id="usrModal" hidden>
+  <div class="modal">
+    <div class="modal-header"><div><h3 id="usrModalTitle">Add User</h3><span class="bn-hint">কর্মচারীর লগইন তথ্য</span></div><button class="modal-close" onclick="closeModal('usrModal')">&#10005;</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="full"><label>Full Name *</label><input id="usrName" type="text"></div>
+        <div><label>Mobile Number *</label><input id="usrMobile" type="text" placeholder="e.g. 01700000000"></div>
+        <div>
+          <label>Role *</label>
+          <select id="usrRole"><option value="Administrator">Administrator</option></select>
+        </div>
+        <div class="full" id="usrPasswordRow">
+          <label>Password *</label>
+          <input id="usrPassword" type="password" placeholder="At least 8 characters">
+        </div>
+      </div>
+      <div class="field-error" id="usrFormError"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('usrModal')">Cancel</button>
+      <button class="btn btn-primary" id="usrSaveBtn">Save User</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reset Password modal -->
+<div class="modal-overlay" id="usrResetModal" hidden>
+  <div class="modal">
+    <div class="modal-header"><h3>Reset Password <span class="bn-hint" style="display:inline;">— নতুন পাসওয়ার্ড দিন</span> &mdash; <span id="usrResetName"></span></h3><button class="modal-close" onclick="closeModal('usrResetModal')">&#10005;</button></div>
+    <div class="modal-body">
+      <label>New Password *</label>
+      <input id="usrResetPassword" type="password" placeholder="At least 8 characters">
+      <div class="field-error" id="usrResetError"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('usrResetModal')">Cancel</button>
+      <button class="btn btn-primary" id="usrResetSaveBtn">Reset Password</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  var usrState = { users: [], roles: [], editingId: null, resetId: null };
+
+  function usrCan_(action) { return userPermissions === null || !!(userPermissions && userPermissions.users && (action === 'delete' ? (userPermissions.users.delete === true || userPermissions.users.delete === 'unlimited') : userPermissions.users[action])); }
+
+  function usrLoad() {
+    return withLoader(serverCall('getUsersBootstrap', authToken)).then(function (data) {
+      usrState.users = data.users;
+      usrState.roles = data.roles;
+      usrFillRoleSelect_();
+      usrRender();
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  function usrFillRoleSelect_() {
+    var sel = document.getElementById('usrRole');
+    var current = sel.value;
+    sel.innerHTML = currentUser && currentUser.role === 'Administrator' ? '<option value="Administrator">Administrator</option>' : '';
+    usrState.roles.forEach(function (r) {
+      if (currentUser && currentUser.role !== 'Administrator' && r.name === 'Administrator') return;
+      sel.innerHTML += '<option value="' + escapeHtml(r.name) + '">' + escapeHtml(r.name) + '</option>';
+    });
+    if (current) sel.value = current;
+  }
+
+  function usrRender() {
+    var q = (document.getElementById('usrSearch').value || '').toLowerCase();
+    var rows = usrState.users.filter(function (u) {
+      return !q || String(u.name).toLowerCase().indexOf(q) !== -1 || phoneSearchMatches_(u.mobile, q);
+    });
+    var body = document.getElementById('usrTableBody');
+    body.innerHTML = '';
+    rows.forEach(function (u) {
+      var statusBadge = u.status === 'Active' ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-danger">Inactive</span>';
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td>' + escapeHtml(u.name) + '</td>' +
+        '<td>' + escapeHtml(u.mobile) + '</td>' +
+        '<td>' + escapeHtml(u.role) + '</td>' +
+        '<td>' + statusBadge + '</td>' +
+        '<td>' + (u.lastLogin ? escapeHtml(usrFormatDateTime_(u.lastLogin)) : '\u2014') + '</td>' +
+        '<td style="white-space:nowrap;">' +
+          '<button class="btn" data-act="edit" data-id="' + u.id + '">Edit</button> ' +
+          '<button class="btn" data-act="reset" data-id="' + u.id + '">Reset Password</button> ' +
+          '<button class="btn" data-act="toggle" data-id="' + u.id + '" data-status="' + u.status + '">' + (u.status === 'Active' ? 'Deactivate' : 'Activate') + '</button> ' +
+          '<button class="btn" data-act="delete" data-id="' + u.id + '" style="color:var(--color-danger); border-color:var(--color-danger);">Delete</button>' +
+        '</td>';
+      body.appendChild(tr);
+      tr.querySelectorAll('button[data-act]').forEach(function (b) {
+        if (b.dataset.act === 'edit' && !usrCan_('edit')) b.hidden = true;
+        if (b.dataset.act === 'reset' && !usrCan_('edit')) b.hidden = true;
+        if (b.dataset.act === 'toggle' && !usrCan_('edit')) b.hidden = true;
+        if (b.dataset.act === 'delete' && !usrCan_('delete')) b.hidden = true;
+      });
+    });
+    document.getElementById('usrAddBtn').hidden = !usrCan_('add');
+    document.getElementById('usrEmpty').hidden = rows.length > 0;
+  }
+
+  /** Page-local name (not the shared formatDateShort_ every other page defines) — since this app's script tags all share one global scope, redefining that name here would silently change every other page's date rendering too. */
+  function usrFormatDateTime_(val) {
+    var d = new Date(val);
+    if (isNaN(d.getTime())) return String(val);
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  }
+
+  document.getElementById('usrSearch').addEventListener('input', usrRender);
+
+  document.getElementById('usrAddBtn').addEventListener('click', function () {
+    usrState.editingId = null;
+    document.getElementById('usrModalTitle').textContent = 'Add User';
+    document.getElementById('usrName').value = '';
+    document.getElementById('usrMobile').value = '';
+    document.getElementById('usrPassword').value = '';
+    document.getElementById('usrPasswordRow').hidden = false;
+    document.getElementById('usrRole').value = 'Administrator';
+    document.getElementById('usrFormError').style.display = 'none';
+    openModal('usrModal');
+  });
+
+  document.getElementById('usrTableBody').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    var id = btn.dataset.id;
+    var user = usrState.users.filter(function (u) { return u.id === id; })[0];
+    if (!user) return;
+
+    if (btn.dataset.act === 'edit') {
+      usrState.editingId = id;
+      document.getElementById('usrModalTitle').textContent = 'Edit User';
+      document.getElementById('usrName').value = user.name;
+      document.getElementById('usrMobile').value = user.mobile;
+      usrFillRoleSelect_();
+      document.getElementById('usrRole').value = user.role;
+      document.getElementById('usrPasswordRow').hidden = true;
+      document.getElementById('usrFormError').style.display = 'none';
+      openModal('usrModal');
+    }
+    if (btn.dataset.act === 'reset') {
+      usrState.resetId = id;
+      document.getElementById('usrResetName').textContent = user.name;
+      document.getElementById('usrResetPassword').value = '';
+      document.getElementById('usrResetError').style.display = 'none';
+      openModal('usrResetModal');
+    }
+    if (btn.dataset.act === 'toggle') {
+      var next = btn.dataset.status === 'Active' ? 'Inactive' : 'Active';
+      runConfirmedAction({type:'state-change',title:(next === 'Inactive' ? 'Deactivate User?' : 'Activate User?'),message:'This changes whether the user can access the ERP.',details:[{label:'User',value:user.name,emphasis:true},{label:'New Status',value:next}],confirmLabel:(next === 'Inactive' ? 'Deactivate' : 'Activate'),loadingLabel:'Updating...',trigger:btn}, function () {
+        return withLoader(serverCall('setUserStatus', authToken, id, next)).then(function () { showToast('User updated', 'success'); usrLoad(); });
+      }).catch(function (err) { showToast(err.message, 'error'); });
+    }
+    if (btn.dataset.act === 'delete') {
+      runConfirmedAction({
+        type: 'danger',
+        title: 'Delete User?',
+        message: 'This permanently deletes the user account. This cannot be undone.',
+        details: [{ label: 'User', value: user.name, emphasis: true }, { label: 'Role', value: user.role || '' }],
+        confirmLabel: 'Delete User',
+        loadingLabel: 'Deleting...',
+        trigger: btn
+      }, function () {
+        return withLoader(serverCall('deleteUser', authToken, id)).then(function () { showToast('User deleted', 'success'); usrLoad(); });
+      }).catch(function (err) { showToast(err.message, 'error'); });
+    }
+  });
+
+  document.getElementById('usrSaveBtn').addEventListener('click', function () {
+    var errEl = document.getElementById('usrFormError');
+    errEl.style.display = 'none';
+    var payload = {
+      name: document.getElementById('usrName').value.trim(),
+      mobile: document.getElementById('usrMobile').value.trim(),
+      role: document.getElementById('usrRole').value
+    };
+    var call;
+    if (usrState.editingId) {
+      call = serverCall('updateUser', authToken, usrState.editingId, payload);
+    } else {
+      payload.password = document.getElementById('usrPassword').value;
+      call = serverCall('createUser', authToken, payload);
+    }
+    withLoader(call).then(function () {
+      closeModal('usrModal');
+      showToast('User saved', 'success');
+      usrLoad();
+    }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+  });
+
+  document.getElementById('usrResetSaveBtn').addEventListener('click', function () {
+    var errEl = document.getElementById('usrResetError');
+    errEl.style.display = 'none';
+    var pw = document.getElementById('usrResetPassword').value;
+    if (pw.length < 8) { errEl.textContent = 'Password must be at least 8 characters.'; errEl.style.display = 'block'; return; }
+    var userId = usrState.resetId;
+    var userName = document.getElementById('usrResetName').textContent || userId;
+    runConfirmedAction({
+      type: 'state-change',
+      title: 'Reset Password?',
+      message: 'This will replace the current login password for this user.',
+      details: [{ label: 'User', value: userName, emphasis: true }],
+      confirmLabel: 'Reset Password',
+      loadingLabel: 'Resetting...',
+      trigger: document.getElementById('usrResetSaveBtn')
+    }, function () {
+      return withLoader(serverCall('resetPassword', authToken, userId, pw)).then(function () {
+        closeModal('usrResetModal');
+        showToast('Password reset', 'success');
+      });
+    }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+  });
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var origGoToPage = goToPage;
+    goToPage = function (key) {
+      origGoToPage(key);
+      if (key === 'users') usrLoad(); // always fresh — Last Login/Status change often and this is an admin-only, low-traffic page
+    };
+  });
+</script>

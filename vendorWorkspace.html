@@ -1,0 +1,123 @@
+<!-- Vendor Workspace: existing vendor settlement workflow, now a dedicated page. -->
+<div class="toolbar">
+  <input class="search-input" id="vlWorkspaceSearch" type="search" placeholder="Search vendor by name or phone...">
+  <select id="vlWorkspaceVendor" style="min-width:260px; max-width:420px;"><option value="">Select vendor...</option></select>
+</div>
+<div class="empty-state" id="vlWorkspaceEmpty">Select a vendor to open the workspace.</div>
+<div id="vlWorkspaceContent" hidden>
+  <div class="card" style="margin-bottom:16px;">
+    <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:12px;">
+      <div>
+        <h2 id="vlDetailName" style="margin:0 0 4px;"></h2>
+        <div id="vlDetailAddress" class="bn-hint" style="display:block;"></div>
+      </div>
+      <button class="btn" type="button" id="vlWorkspaceEditVendorBtn">Edit Vendor</button>
+    </div>
+      <div style="display:flex; gap:24px; flex-wrap:wrap; margin-bottom:16px;">
+        <div><div class="stat-label">Payable — Current Due (You Owe)</div><div class="stat-value" id="vlDetailDue"></div></div>
+        <div><div class="stat-label">Receivable (They Owe You)</div><div class="stat-value" id="vlDetailReceivable"></div></div>
+      </div>
+
+      <h3 style="font-size:13px; margin:0 0 8px; color:var(--color-text-muted); text-transform:uppercase;">Payable — You Took Products From This Vendor</h3>
+      <div class="card" style="margin-bottom:16px;">
+        <h3 style="font-size:14px; margin:0 0 8px;">Pay Vendor <span class="bn-hint" style="display:inline;">— ভেন্ডরকে টাকা দিন</span></h3>
+        <div style="display:flex; align-items:flex-end; gap:8px; flex-wrap:wrap;">
+          <div style="flex:1; min-width:100px;"><label>Amount</label><input id="vlPayAmount" type="number" min="0" step="0.01" placeholder="Amount"></div>
+          <select id="vlPayMethod" style="max-width:120px;"><option value="Cash">Cash</option><option value="Bank">Bank</option><option value="Mobile Banking">Mobile Banking</option></select>
+          <select id="vlPayBankAccount" style="max-width:160px; display:none;"><option value="">Select bank account...</option></select>
+          <div style="flex:1; min-width:140px;"><label>Note</label><input id="vlPayNote" type="text" placeholder="Optional"></div>
+          <div style="min-width:140px;"><label>Payment Date</label><input id="vlPayDate" type="date"></div>
+          <button class="btn btn-primary" id="vlPaySaveBtn">Pay</button>
+        </div>
+        <div id="vlPayBackdatedReasonRow" style="display:none; margin-top:8px;"><label>Reason for Backdating *</label><input id="vlPayBackdatedReason" type="text" placeholder="Why is this dated in the past?"></div>
+        <div class="field-error" id="vlPayError"></div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px;">
+        <h3 style="font-size:14px; margin:0 0 8px;">Return Products to Vendor <span class="bn-hint" style="display:inline;">— মাল ফেরত দিয়ে হিসাব মেটান</span></h3>
+        <div style="display:flex; align-items:flex-end; gap:8px; flex-wrap:wrap;">
+          <div style="flex:2; min-width:220px;"><label>Sourcing Transaction</label><select id="vlRetSourcing" style="width:100%;"></select></div>
+          <div style="flex:1; min-width:100px;"><label>Quantity</label><input id="vlRetQty" type="number" min="0" step="1" placeholder="Qty"></div>
+          <div style="flex:1; min-width:100px;"><label>Unit Cost</label><input id="vlRetUnitCost" type="number" min="0" step="0.01"></div>
+          <div style="flex:1; min-width:140px;"><label>Note</label><input id="vlRetNote" type="text" placeholder="Optional"></div>
+          <div style="min-width:140px;"><label>Date</label><input id="vlRetDate" type="date"></div>
+          <button class="btn btn-primary" id="vlRetSaveBtn">Return</button>
+        </div>
+        <div id="vlRetBackdatedReasonRow" style="display:none; margin-top:8px;"><label>Reason for Backdating *</label><input id="vlRetBackdatedReason" type="text" placeholder="Why is this dated in the past?"></div>
+        <div class="empty-state" id="vlRetEmpty" hidden style="padding:8px 0;">No open sourcing transactions to settle.</div>
+        <div class="field-error" id="vlRetError"></div>
+      </div>
+
+      <h3 style="font-size:13px; margin:16px 0 8px; color:var(--color-text-muted); text-transform:uppercase;">Receivable — This Vendor Took Products From You</h3>
+      <div class="card" style="margin-bottom:16px;">
+        <h3 style="font-size:14px; margin:0 0 8px;">Give Products to Vendor <span class="bn-hint" style="display:inline;">— ভেন্ডরকে মাল দিন</span></h3>
+        <div style="display:flex; align-items:flex-end; gap:8px; flex-wrap:wrap;">
+          <div style="flex:2; min-width:220px;">
+            <label>Product</label>
+            <input id="vlGiveProductSearch" type="search" autocomplete="off" placeholder="Search name, brand, barcode, category..." style="width:100%; margin-bottom:6px;">
+            <select id="vlGiveProduct" style="width:100%;"></select>
+          </div>
+          <div style="flex:1; min-width:100px;"><label>Quantity</label><input id="vlGiveQty" type="number" min="0" step="1" placeholder="Qty"></div>
+          <div style="flex:1; min-width:130px;">
+            <label>Unit Value <span class="bn-hint" style="display:inline;">(Purchase Price)</span></label>
+            <input id="vlGiveUnitValue" type="number" min="0" step="0.01" placeholder="Auto-filled">
+          </div>
+          <button class="btn" type="button" id="vlGiveAddBtn">Add Product</button>
+        </div>
+
+        <div id="vlGiveItemsWrap" hidden style="margin-top:12px; overflow-x:auto;">
+          <table>
+            <thead><tr><th>Product</th><th class="num">Qty</th><th class="num">Unit Value</th><th class="num">Total</th><th></th></tr></thead>
+            <tbody id="vlGiveItemsBody"></tbody>
+            <tfoot><tr><th colspan="3" style="text-align:right;">Memo Total</th><th class="num mono" id="vlGiveMemoTotal">0</th><th></th></tr></tfoot>
+          </table>
+        </div>
+
+        <div style="display:flex; align-items:flex-end; gap:8px; flex-wrap:wrap; margin-top:12px;">
+          <div style="flex:2; min-width:180px;"><label>Memo Note</label><input id="vlGiveNote" type="text" placeholder="Optional note for this memo"></div>
+          <div style="min-width:140px;"><label>Date</label><input id="vlGiveDate" type="date"></div>
+          <button class="btn btn-primary" id="vlGiveSaveBtn">Give Products</button>
+        </div>
+        <div id="vlGiveBackdatedReasonRow" style="display:none; margin-top:8px;"><label>Reason for Backdating *</label><input id="vlGiveBackdatedReason" type="text" placeholder="Why is this dated in the past?"></div>
+        <div class="bn-hint" style="margin-top:8px;">Select a product to auto-fill its Purchase Price as Unit Value. Add multiple products, then save them together as one memo.</div>
+        <div class="field-error" id="vlGiveError"></div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px;">
+        <h3 style="font-size:14px; margin:0 0 8px;">Receive Payment from Vendor <span class="bn-hint" style="display:inline;">— ভেন্ডরের কাছ থেকে টাকা নিন</span></h3>
+        <div style="display:flex; align-items:flex-end; gap:8px; flex-wrap:wrap;">
+          <div style="flex:1; min-width:100px;"><label>Amount</label><input id="vlRecvAmount" type="number" min="0" step="0.01" placeholder="Amount"></div>
+          <select id="vlRecvMethod" style="max-width:120px;"><option value="Cash">Cash</option><option value="Bank">Bank</option><option value="Mobile Banking">Mobile Banking</option></select>
+          <select id="vlRecvBankAccount" style="max-width:160px; display:none;"><option value="">Select bank account...</option></select>
+          <div style="flex:1; min-width:140px;"><label>Note</label><input id="vlRecvNote" type="text" placeholder="Optional"></div>
+          <div style="min-width:140px;"><label>Date</label><input id="vlRecvDate" type="date"></div>
+          <button class="btn btn-primary" id="vlRecvSaveBtn">Receive</button>
+        </div>
+        <div id="vlRecvBackdatedReasonRow" style="display:none; margin-top:8px;"><label>Reason for Backdating *</label><input id="vlRecvBackdatedReason" type="text" placeholder="Why is this dated in the past?"></div>
+        <div class="field-error" id="vlRecvError"></div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px;">
+        <h3 style="font-size:14px; margin:0 0 8px;">Receive Products from Vendor <span class="bn-hint" style="display:inline;">— ভেন্ডরের কাছ থেকে মাল ফেরত নিন</span></h3>
+        <div style="display:flex; align-items:flex-end; gap:8px; flex-wrap:wrap;">
+          <div style="flex:2; min-width:220px;"><label>Issue Transaction</label><select id="vlRecvProdIssue" style="width:100%;"></select></div>
+          <div style="flex:1; min-width:100px;"><label>Quantity</label><input id="vlRecvProdQty" type="number" min="0" step="1" placeholder="Qty"></div>
+          <div style="flex:1; min-width:100px;"><label>Unit Value</label><input id="vlRecvProdUnitValue" type="number" min="0" step="0.01"></div>
+          <div style="flex:1; min-width:140px;"><label>Note</label><input id="vlRecvProdNote" type="text" placeholder="Optional"></div>
+          <div style="min-width:140px;"><label>Date</label><input id="vlRecvProdDate" type="date"></div>
+          <button class="btn btn-primary" id="vlRecvProdSaveBtn">Receive</button>
+        </div>
+        <div id="vlRecvProdBackdatedReasonRow" style="display:none; margin-top:8px;"><label>Reason for Backdating *</label><input id="vlRecvProdBackdatedReason" type="text" placeholder="Why is this dated in the past?"></div>
+        <div class="empty-state" id="vlRecvProdEmpty" hidden style="padding:8px 0;">No open issue transactions to settle.</div>
+        <div class="field-error" id="vlRecvProdError"></div>
+      </div>
+
+      <h3 style="font-size:14px; margin:16px 0 8px;">Ledger <span class="bn-hint" style="display:inline;">— ভেন্ডরের হিসাব</span></h3>
+      <table>
+        <thead><tr><th>Date</th><th>Type</th><th>Balance Type</th><th>Reference</th><th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th><th>Notes</th><th></th></tr></thead>
+        <tbody id="vlLedgerBody"></tbody>
+      </table>
+      <div class="empty-state" id="vlLedgerEmpty" hidden>No transactions yet.</div>
+
+  </div>
+</div>

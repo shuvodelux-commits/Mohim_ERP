@@ -1,0 +1,26 @@
+<div id="loginOverlay" class="login-overlay" hidden>
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="logo-mark" id="loginLogoMark">HS</div>
+      <div class="login-shop-name" id="loginShopName">Hardware Store ERP</div>
+    </div>
+    <h2 class="login-title">Sign in <span class="bn-hint" style="display:inline;">— লগইন করুন</span></h2>
+
+    <label>Mobile Number</label>
+    <input id="loginMobile" type="tel" placeholder="e.g. 01700000000" autocomplete="username">
+
+    <div style="height:10px;"></div>
+
+    <label>Password</label>
+    <div class="login-password-row">
+      <input id="loginPassword" type="password" placeholder="Your password" autocomplete="current-password">
+      <button type="button" class="btn" id="loginTogglePassword">Show</button>
+    </div>
+
+    <div class="field-error" id="loginError"></div>
+
+    <button class="btn btn-primary btn-lg" id="loginSubmitBtn" style="width:100%; margin-top:16px;" type="button"><span class="login-btn-spinner" id="loginBtnSpinner" aria-hidden="true" hidden></span><span id="loginBtnLabel">Login</span></button>
+
+    <p class="login-footnote">Only an Administrator can create accounts. Contact yours if you don't have one.</p>
+  </div>
+</div>

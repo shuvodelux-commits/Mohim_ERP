@@ -1,0 +1,55 @@
+<!-- Lightweight operational dashboard. Detailed analysis lives in Reports. -->
+
+<div class="stat-grid">
+  <div class="stat-card"><div class="stat-label">Today Sales</div><div class="stat-value" id="dashSales">--</div></div>
+  <div class="stat-card"><div class="stat-label">Today Collection</div><div class="stat-value" id="dashCollection">--</div></div>
+  <div class="stat-card"><div class="stat-label">Today Expense</div><div class="stat-value" id="dashExpense">--</div></div>
+  <div class="stat-card"><div class="stat-label">Today Purchase</div><div class="stat-value" id="dashPurchase">--</div></div>
+  <div class="stat-card"><div class="stat-label">Customer Due</div><div class="stat-value" id="dashDue">--</div></div>
+  <div class="stat-card"><div class="stat-label">Supplier Payable</div><div class="stat-value" id="dashPayable">--</div></div>
+  <div class="stat-card"><div class="stat-label">Borrower Receivable</div><div class="stat-value" id="dashBorrowerReceivable">--</div></div>
+  
+  <div class="stat-card"><div class="stat-label">Outstanding Loan</div><div class="stat-value" id="dashOutstandingLoan">--</div></div>
+  <div class="stat-card"><div class="stat-label">Cash Balance</div><div class="stat-value" id="dashCash">--</div></div>
+  <div class="stat-card"><div class="stat-label">Low Stock</div><div class="stat-value" id="dashLowStockCount">--</div></div>
+</div>
+
+<div class="mobile-quick-actions" aria-label="Quick actions">
+  <button type="button" class="mobile-quick-action" data-mobile-quick="pos" onclick="goToPage('pos')">POS</button>
+  <button type="button" class="mobile-quick-action" data-mobile-quick="sales" onclick="goToPage('sales')">Sales</button>
+  <button type="button" class="mobile-quick-action" data-mobile-quick="purchase" onclick="goToPage('purchase')">Purchase</button>
+  <button type="button" class="mobile-quick-action" data-mobile-quick="customers" onclick="goToPage('customers')">Customer<br>Payment</button>
+</div>
+
+<script>
+  function dashLoad() {
+    return serverCall('getDashboardStats', authToken).then(function (d) {
+      var sym = d.currencySymbol;
+      function m(v) { return formatMoneyWith_(v, sym); }
+
+      document.getElementById('dashSales').textContent = m(d.todaySalesTotal);
+      document.getElementById('dashCollection').textContent = m(d.todayCollectionTotal);
+      document.getElementById('dashExpense').textContent = m(d.todayExpenseTotal);
+      document.getElementById('dashPurchase').textContent = m(d.todayPurchaseTotal);
+      document.getElementById('dashDue').textContent = m(d.dueReceivable);
+      document.getElementById('dashBorrowerReceivable').textContent = m(d.borrowerReceivable);
+      document.getElementById('dashPayable').textContent = m(d.supplierPayable);
+      document.getElementById('dashOutstandingLoan').textContent = m(d.outstandingLoan);
+      document.getElementById('dashCash').textContent = m(d.cashBalance);
+      document.getElementById('dashLowStockCount').textContent = Number(d.lowStockCount) || 0;
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  function formatMoneyWith_(amount, symbol) {
+    var n = Number(amount) || 0;
+    return (symbol || '') + n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var origGoToPage = goToPage;
+    goToPage = function (key) {
+      origGoToPage(key);
+      if (key === 'dashboard') dashLoad();
+    };
+  });
+</script>

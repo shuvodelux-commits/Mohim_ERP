@@ -1,0 +1,383 @@
+<div class="toolbar cash-rec-toolbar">
+  <input id="cashRecDateFrom" type="date" style="max-width:150px;">
+  <input id="cashRecDateTo" type="date" style="max-width:150px;">
+  <select id="cashRecStatus" style="max-width:180px;">
+    <option value="">All states</option>
+    <option value="Balanced">Balanced</option>
+    <option value="Explained">Explained</option>
+    <option value="Needs Review">Needs Review</option>
+    <option value="Open">Open</option>
+    <option value="Closing">Closing</option>
+  </select>
+  <input class="search-input" id="cashRecSearch" type="search" placeholder="Search session or note...">
+  <div class="toolbar-spacer"></div>
+  <button class="btn" id="cashRecTodayBtn">Today</button>
+  <button class="btn" id="cashRecRefreshBtn">Refresh</button>
+</div>
+
+<div class="cash-rec-help">
+  <strong>Cash Reconciliation</strong>
+  <span>This page explains cash-count differences only. Record the real Cash In or Cash Out through the correct ERP transaction first, then link that transaction here.</span>
+</div>
+
+<div class="stat-grid cash-rec-stats">
+  <div class="stat-card"><div class="stat-label">Sessions</div><div class="stat-value" id="cashRecSessions">--</div></div>
+  <div class="stat-card"><div class="stat-label">Balanced</div><div class="stat-value" id="cashRecBalanced">--</div></div>
+  <div class="stat-card"><div class="stat-label">Explained</div><div class="stat-value" id="cashRecExplained">--</div></div>
+  <div class="stat-card"><div class="stat-label">Needs Review</div><div class="stat-value" id="cashRecNeedsReview">--</div></div>
+</div>
+
+<div class="card cash-rec-card" style="padding:0;">
+  <div class="table-scroll">
+    <table id="cashRecTable" class="mobile-card-table cash-rec-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Session</th>
+          <th class="num">Previous Close</th>
+          <th class="num">Opening Count</th>
+          <th class="num">Difference</th>
+          <th>Explanation Status</th>
+          <th class="num">Expected Close</th>
+          <th class="num">Closing Count</th>
+          <th class="num">Difference</th>
+          <th>Closing Status</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody id="cashRecBody"></tbody>
+    </table>
+  </div>
+  <div class="empty-state" id="cashRecEmpty" hidden>No cash sessions match these filters.</div>
+</div>
+
+<div class="modal-overlay" id="cashRecExplainModal" hidden>
+  <div class="modal cash-rec-explain-modal">
+    <div class="modal-header">
+      <div>
+        <h3 id="cashRecExplainTitle">Explain Cash Difference</h3>
+        <div class="cash-rec-explain-subtitle" id="cashRecExplainSubtitle"></div>
+      </div>
+      <button class="modal-close" type="button" onclick="closeModal('cashRecExplainModal')" aria-label="Close">&#10005;</button>
+    </div>
+    <div class="modal-body">
+      <div class="cash-rec-explain-note">
+        Record the real ERP transaction in its proper module first. Then select the real ERP transaction below that explains this cash difference. Cash Reconciliation does not create cash transactions.
+      </div>
+
+      <div class="cash-rec-explain-summary">
+        <div><span>Required</span><strong id="cashRecExplainRequired">—</strong></div>
+        <div><span>Selected</span><strong id="cashRecExplainSelected">—</strong></div>
+      </div>
+
+      <input class="search-input" id="cashRecExplainSearch" type="search" placeholder="Search transaction, reference or description...">
+      <div class="cash-rec-candidates" id="cashRecExplainCandidates"></div>
+      <div class="empty-state" id="cashRecExplainEmpty" hidden>No matching real cash transactions found.</div>
+      <div class="field-error" id="cashRecExplainError"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" type="button" onclick="closeModal('cashRecExplainModal')">Cancel</button>
+      <button class="btn btn-primary" type="button" id="cashRecExplainSaveBtn" disabled>Save Explanation</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  var cashRecState = {
+    rows: [],
+    totals: null,
+    currencySymbol: '',
+    loaded: false,
+    explain: null
+  };
+
+  function cashRecDate_(date) {
+    var d = date || new Date();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + m + '-' + day;
+  }
+
+  function cashRecDefaultFrom_() {
+    var d = new Date();
+    d.setDate(d.getDate() - 30);
+    return cashRecDate_(d);
+  }
+
+  function cashRecMoney_(value) {
+    return value === '' || value === null || value === undefined ? '—' : formatMoney(value);
+  }
+
+  function cashRecSignedMoney_(value) {
+    if (value === '' || value === null || value === undefined) return '—';
+    var n = Number(value) || 0;
+    if (!n) return formatMoney(0);
+    return (n > 0 ? '+' : '−') + formatMoney(Math.abs(n));
+  }
+
+  function cashRecStateBadge_(state) {
+    state = state || '—';
+    var cls = 'badge';
+    if (state === 'Balanced' || state === 'Explained') cls += ' badge-success';
+    else if (state === 'Needs Review') cls += ' badge-danger';
+    else if (state === 'Open' || state === 'Closing' || state === 'Unexplained') cls += ' badge-warning';
+    return '<span class="' + cls + '">' + escapeHtml(state) + '</span>';
+  }
+
+  function cashRecCanEdit_() {
+    return typeof hasActionPermission_ !== 'function' || hasActionPermission_('cashReconciliation', 'edit');
+  }
+
+  function cashRecExplanationLabel_(row, phase) {
+    var state = row[phase + 'State'];
+    if (state === 'Baseline') return 'Baseline';
+    if (state === 'Balanced') return 'Balanced';
+    if (state === 'Explained') return 'Explained';
+    if (state === 'Needs Review') return 'Needs Review';
+    if (state === 'Unexplained') {
+      return row[phase + 'RequiredDirection'] === 'Cash Out'
+        ? 'Record Cash Out ' + formatMoney(row[phase + 'RequiredAmount'])
+        : 'Record Cash In ' + formatMoney(row[phase + 'RequiredAmount']);
+    }
+    return state || '—';
+  }
+
+  function cashRecExplanationHtml_(row, phase) {
+    var state = row[phase + 'State'];
+    var label = cashRecExplanationLabel_(row, phase);
+    var canOpen = cashRecCanEdit_() && (state === 'Unexplained' || state === 'Explained' || state === 'Needs Review');
+    if (!canOpen) {
+      if (state === 'Explained' || state === 'Balanced') return '<span class="badge badge-success">' + escapeHtml(label) + '</span>';
+      if (state === 'Needs Review') return '<span class="badge badge-danger">' + escapeHtml(label) + '</span>';
+      if (state === 'Unexplained') return '<span class="badge badge-warning">' + escapeHtml(label) + '</span>';
+      return '<span class="badge">' + escapeHtml(label) + '</span>';
+    }
+
+    var cls = 'cash-rec-explain-btn';
+    if (state === 'Explained') cls += ' is-explained';
+    else if (state === 'Needs Review') cls += ' is-review';
+    return '<button type="button" class="' + cls + '" data-cash-rec-session="' +
+      escapeHtml(row.sessionId) + '" data-cash-rec-phase="' + phase + '">' +
+      escapeHtml(label) + '</button>';
+  }
+
+  function cashRecLoad() {
+    if (!document.getElementById('cashRecDateFrom').value) {
+      document.getElementById('cashRecDateFrom').value = cashRecDefaultFrom_();
+      document.getElementById('cashRecDateTo').value = cashRecDate_();
+    }
+    return cashRecFetch();
+  }
+
+  function cashRecFetch() {
+    var filters = {
+      dateFrom: document.getElementById('cashRecDateFrom').value,
+      dateTo: document.getElementById('cashRecDateTo').value,
+      status: document.getElementById('cashRecStatus').value,
+      query: document.getElementById('cashRecSearch').value.trim()
+    };
+    return withLoader(serverCall('getCashReconciliationRows', authToken, filters)).then(function (data) {
+      cashRecState.rows = data.rows || [];
+      cashRecState.totals = data.totals || {};
+      cashRecState.currencySymbol = data.currencySymbol || '';
+      cashRecRender_();
+      return data;
+    }).catch(function (err) {
+      showToast(err.message || 'Could not load cash reconciliation.', 'error');
+      return null;
+    });
+  }
+
+  function cashRecRender_() {
+    var body = document.getElementById('cashRecBody');
+    body.innerHTML = '';
+    cashRecState.rows.forEach(function (row) {
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td>' + escapeHtml(row.date || '') + '</td>' +
+        '<td class="mono">' + escapeHtml(row.sessionId || '') + '</td>' +
+        '<td class="num mono">' + escapeHtml(cashRecMoney_(row.openingExpected)) + '</td>' +
+        '<td class="num mono">' + escapeHtml(cashRecMoney_(row.openingCounted)) + '</td>' +
+        '<td class="num mono ' + (Number(row.openingDifference) < 0 ? 'cash-rec-negative' : (Number(row.openingDifference) > 0 ? 'cash-rec-positive' : '')) + '">' + escapeHtml(cashRecSignedMoney_(row.openingDifference)) + '</td>' +
+        '<td>' + cashRecExplanationHtml_(row, 'opening') + '</td>' +
+        '<td class="num mono">' + escapeHtml(cashRecMoney_(row.closingExpected)) + '</td>' +
+        '<td class="num mono">' + escapeHtml(cashRecMoney_(row.closingCounted)) + '</td>' +
+        '<td class="num mono ' + (Number(row.closingDifference) < 0 ? 'cash-rec-negative' : (Number(row.closingDifference) > 0 ? 'cash-rec-positive' : '')) + '">' + escapeHtml(cashRecSignedMoney_(row.closingDifference)) + '</td>' +
+        '<td>' + cashRecExplanationHtml_(row, 'closing') + '</td>' +
+        '<td>' + escapeHtml(row.notes || '') + '</td>';
+      body.appendChild(tr);
+    });
+
+    var totals = cashRecState.totals || {};
+    document.getElementById('cashRecSessions').textContent = totals.sessions || 0;
+    document.getElementById('cashRecBalanced').textContent = totals.balanced || 0;
+    document.getElementById('cashRecExplained').textContent = totals.explained || 0;
+    document.getElementById('cashRecNeedsReview').textContent = totals.needsReview || 0;
+    document.getElementById('cashRecEmpty').hidden = cashRecState.rows.length > 0;
+    if (typeof enhanceMobileCardTables_ === 'function') enhanceMobileCardTables_(document.getElementById('cashRecTable'));
+  }
+
+  function cashRecOpenExplain_(sessionId, phase) {
+    cashRecState.explain = {
+      sessionId: sessionId,
+      phase: phase,
+      requiredAmount: 0,
+      requiredDirection: '',
+      selected: {},
+      candidates: []
+    };
+    document.getElementById('cashRecExplainSearch').value = '';
+    document.getElementById('cashRecExplainError').textContent = '';
+    document.getElementById('cashRecExplainCandidates').innerHTML = '';
+    document.getElementById('cashRecExplainEmpty').hidden = true;
+    document.getElementById('cashRecExplainSaveBtn').disabled = true;
+    openModal('cashRecExplainModal');
+    cashRecLoadCandidates_('');
+  }
+
+  function cashRecLoadCandidates_(query) {
+    var state = cashRecState.explain;
+    if (!state) return Promise.resolve();
+    return withLoader(serverCall(
+      'getCashReconciliationCandidates',
+      authToken,
+      state.sessionId,
+      state.phase,
+      query || ''
+    )).then(function (data) {
+      if (!cashRecState.explain) return;
+      state.requiredAmount = Number(data.requiredAmount) || 0;
+      state.requiredDirection = data.requiredDirection || '';
+      (data.selectedEntryIds || []).forEach(function (id) { state.selected[id] = true; });
+      state.candidates = data.candidates || [];
+
+      document.getElementById('cashRecExplainTitle').textContent =
+        (state.phase === 'opening' ? 'Explain Opening Difference' : 'Explain Closing Difference');
+      document.getElementById('cashRecExplainSubtitle').textContent =
+        state.sessionId + ' · ' + state.requiredDirection + ' ' + formatMoney(state.requiredAmount);
+      document.getElementById('cashRecExplainRequired').textContent =
+        state.requiredDirection + ' ' + formatMoney(state.requiredAmount);
+      cashRecRenderCandidates_();
+    }).catch(function (err) {
+      document.getElementById('cashRecExplainError').textContent = err.message || 'Could not load transactions.';
+    });
+  }
+
+  function cashRecRenderCandidates_() {
+    var state = cashRecState.explain;
+    var host = document.getElementById('cashRecExplainCandidates');
+    host.innerHTML = '';
+    if (!state) return;
+
+    state.candidates.forEach(function (item) {
+      var row = document.createElement('label');
+      row.className = 'cash-rec-candidate';
+      row.innerHTML =
+        '<input type="checkbox" data-cash-rec-entry="' + escapeHtml(item.entryId) + '"' +
+          (state.selected[item.entryId] ? ' checked' : '') + '>' +
+        '<span class="cash-rec-candidate-main">' +
+          '<strong>' + escapeHtml(item.type || 'Cash transaction') + '</strong>' +
+          '<span>' + escapeHtml(item.reference || item.entryId) + (item.description ? ' · ' + escapeHtml(item.description) : '') + '</span>' +
+        '</span>' +
+        '<span class="cash-rec-candidate-meta">' +
+          '<span>' + escapeHtml(item.date || '') + '</span>' +
+          '<strong>' + escapeHtml(item.direction + ' ' + formatMoney(item.amount)) + '</strong>' +
+        '</span>';
+      host.appendChild(row);
+    });
+    document.getElementById('cashRecExplainEmpty').hidden = state.candidates.length > 0;
+    cashRecUpdateSelectedTotal_();
+  }
+
+  function cashRecUpdateSelectedTotal_() {
+    var state = cashRecState.explain;
+    if (!state) return;
+    var byId = {};
+    state.candidates.forEach(function (item) { byId[item.entryId] = item; });
+    var total = 0;
+    Object.keys(state.selected).forEach(function (entryId) {
+      if (state.selected[entryId] && byId[entryId]) total += Number(byId[entryId].amount) || 0;
+    });
+    total = Math.round((total + Number.EPSILON) * 100) / 100;
+    document.getElementById('cashRecExplainSelected').textContent = formatMoney(total);
+    document.getElementById('cashRecExplainSaveBtn').disabled =
+      Math.abs(total - Number(state.requiredAmount || 0)) > 0.0001;
+  }
+
+  function cashRecSelectedEntryIds_() {
+    var state = cashRecState.explain;
+    if (!state) return [];
+    return Object.keys(state.selected).filter(function (id) { return state.selected[id]; });
+  }
+
+  document.getElementById('cashRecBody').addEventListener('click', function (event) {
+    var button = event.target.closest('[data-cash-rec-session][data-cash-rec-phase]');
+    if (!button) return;
+    cashRecOpenExplain_(button.dataset.cashRecSession, button.dataset.cashRecPhase);
+  });
+
+  document.getElementById('cashRecExplainCandidates').addEventListener('change', function (event) {
+    var input = event.target.closest('[data-cash-rec-entry]');
+    if (!input || !cashRecState.explain) return;
+    cashRecState.explain.selected[input.dataset.cashRecEntry] = !!input.checked;
+    cashRecUpdateSelectedTotal_();
+  });
+
+  var cashRecExplainSearchTimer_ = null;
+  document.getElementById('cashRecExplainSearch').addEventListener('input', function () {
+    clearTimeout(cashRecExplainSearchTimer_);
+    var query = this.value.trim();
+    cashRecExplainSearchTimer_ = setTimeout(function () { cashRecLoadCandidates_(query); }, 200);
+  });
+
+  document.getElementById('cashRecExplainSaveBtn').addEventListener('click', function () {
+    var state = cashRecState.explain;
+    if (!state) return;
+    var ids = cashRecSelectedEntryIds_();
+    document.getElementById('cashRecExplainError').textContent = '';
+    withLoader(serverCall(
+      'saveCashReconciliationExplanation',
+      authToken,
+      state.sessionId,
+      state.phase,
+      ids
+    )).then(function () {
+      closeModal('cashRecExplainModal');
+      cashRecState.explain = null;
+      showToast('Cash difference explained.', 'success');
+      return cashRecFetch();
+    }).catch(function (err) {
+      document.getElementById('cashRecExplainError').textContent = err.message || 'Could not save explanation.';
+    });
+  });
+
+  ['cashRecDateFrom', 'cashRecDateTo', 'cashRecStatus'].forEach(function (id) {
+    document.getElementById(id).addEventListener('change', cashRecFetch);
+  });
+
+  var cashRecSearchTimer_ = null;
+  document.getElementById('cashRecSearch').addEventListener('input', function () {
+    clearTimeout(cashRecSearchTimer_);
+    cashRecSearchTimer_ = setTimeout(cashRecFetch, 250);
+  });
+
+  document.getElementById('cashRecTodayBtn').addEventListener('click', function () {
+    var today = cashRecDate_();
+    document.getElementById('cashRecDateFrom').value = today;
+    document.getElementById('cashRecDateTo').value = today;
+    cashRecFetch();
+  });
+
+  document.getElementById('cashRecRefreshBtn').addEventListener('click', cashRecFetch);
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var origGoToPage = goToPage;
+    goToPage = function (key) {
+      origGoToPage(key);
+      if (key === 'cashReconciliation' && !cashRecState.loaded) {
+        cashRecState.loaded = true;
+        cashRecLoad();
+      }
+    };
+  });
+</script>

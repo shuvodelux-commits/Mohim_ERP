@@ -1,0 +1,469 @@
+<div class="toolbar">
+  <input class="search-input" id="supSearch" type="text" placeholder="Search by name or phone...">
+  <div class="toolbar-spacer"></div>
+  <button class="btn btn-primary" id="supAddBtn">+ Add Supplier</button>
+</div>
+
+<div class="card" style="padding:0;">
+  <div class="table-scroll">
+    <table class="mobile-card-table">
+      <thead><tr><th>Supplier</th><th>Phone</th><th>Address</th><th class="num">Current Due</th><th>Status</th><th></th></tr></thead>
+      <tbody id="supTableBody"></tbody>
+    </table>
+  </div>
+  <div class="empty-state" id="supEmpty" hidden>No suppliers yet.</div>
+</div>
+
+<!-- Add / Edit Supplier modal -->
+<div class="modal-overlay" id="supModal" hidden>
+  <div class="modal">
+    <div class="modal-header">
+      <div><h3 id="supModalTitle">Add Supplier</h3><span class="bn-hint">সাপ্লায়ারের তথ্য</span></div>
+      <button class="modal-close" onclick="supCloseAddModal_()">&#10005;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="full"><label>Supplier Name *</label><input id="supName" type="text"></div>
+        <div><label>Phone</label><input id="supPhone" type="text"></div>
+        <div><label>Opening Balance (Owed / Advance)</label><input id="supOpening" type="number" step="0.01" value="0"><div class="bn-hint">Positive = payable, negative = supplier advance</div></div>
+        <div class="full" id="supOpeningReasonRow" style="display:none;"><label>Opening Balance Change Reason *</label><input id="supOpeningBalanceReason" type="text" placeholder="Why is the opening balance being corrected?"></div>
+        <div class="fucominll"><label>Address</label><input id="supAddress" type="text"></div>
+        <div class="full"><label>Notes</label><input id="supNotes" type="text"></div>
+      </div>
+      <div class="field-error" id="supFormError"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="supCloseAddModal_()">Cancel</button>
+      <button class="btn btn-primary" id="supSaveBtn">Save Supplier</button>
+    </div>
+  </div>
+</div>
+<!-- Supplier detail / ledger modal -->
+<div class="modal-overlay" id="supDetailModal" hidden>
+  <div class="modal modal-lg">
+    <div class="modal-header"><div><h3 id="supDetailName"></h3><span class="bn-hint">সাপ্লায়ারের বাকি ও হিসাব</span></div><button class="modal-close" onclick="closeModal('supDetailModal')">&#10005;</button></div>
+    <div class="modal-body">
+      <div style="display:flex; gap:24px; flex-wrap:wrap; margin-bottom:16px; align-items:flex-start;">
+        <div><div class="stat-label">Current Due (You Owe)</div><div class="stat-value" id="supDetailDue"></div></div>
+        <div class="mobile-payment-workspace" style="flex:1; min-width:520px;">
+          <div style="display:flex; align-items:flex-end; gap:8px; flex-wrap:wrap;" class="mobile-payment-panel">
+            <div style="flex:1; min-width:110px;"><label>Pay Amount</label><input id="supPayAmount" type="number" min="0" step="0.01" placeholder="Amount"></div>
+            <div style="flex:1; min-width:110px;"><label>Discount Received</label><input id="supPayDiscount" type="number" min="0" step="0.01" value="0" placeholder="0.00"></div>
+            <select id="supPayMethod" style="max-width:120px;"><option value="Cash">Cash</option><option value="Bank">Bank</option><option value="Mobile Banking">Mobile Banking</option></select>
+            <select id="supPayBankAccount" style="max-width:160px; display:none;"><option value="">Select bank account...</option></select>
+            <div style="flex:1; min-width:140px;"><label>Note</label><input id="supPayNote" type="text" placeholder="Optional"></div>
+            <div style="min-width:140px;"><label>Payment Date</label><input id="supPayDate" type="date"></div>
+            <button class="btn btn-primary" id="supPaySaveBtn">Pay</button>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; margin-top:8px;">
+            <div id="supPayDiscountReasonRow" style="flex:1; min-width:240px; display:none;"><label>Discount Reason *</label><input id="supPayDiscountReason" type="text" placeholder="Why did the supplier give this discount?"></div>
+            <button type="button" class="btn" id="supPaySettleFullBtn">Settle Full Balance</button>
+            <div style="font-size:12px; color:var(--color-text-muted); min-width:230px; padding:7px 0;" class="mobile-payment-summary"><div class="mobile-payment-summary-row"><span>Total Settled</span><strong id="supPayTotalSettled">0</strong></div><div class="mobile-payment-summary-row"><span>Balance After</span><strong id="supPayBalanceAfter">0</strong></div></div>
+          </div>
+          <div id="supPayBackdatedReasonRow" style="margin-top:8px; display:none;"><label>Reason for Backdating *</label><input id="supPayBackdatedReason" type="text" placeholder="Why is this dated in the past?"></div>
+          <div class="field-error" id="supPayError"></div>
+        </div>
+      </div>
+      <h3 style="font-size:14px; margin:16px 0 8px;">Ledger <span class="bn-hint" style="display:inline;">— সাপ্লায়ারের বাকি হিসাব</span></h3>
+      <table class="mobile-card-table">
+        <thead><tr><th>Date</th><th>Type</th><th>Reference</th><th class="num">Debit<br><span class="bn-hint" style="display:inline;">খরচ</span></th><th class="num">Credit<br><span class="bn-hint" style="display:inline;">জমা</span></th><th class="num">Balance</th><th></th></tr></thead>
+        <tbody id="supLedgerBody"></tbody>
+      </table>
+      <div class="empty-state" id="supLedgerEmpty" hidden>No transactions yet.</div>
+    </div>
+    <div class="modal-footer"><button class="btn" onclick="closeModal('supDetailModal')">Close</button></div>
+  </div>
+</div>
+
+<!-- Edit Payment (ledger row) modal -->
+<div class="modal-overlay" id="supLedEditModal" hidden>
+  <div class="modal">
+    <div class="modal-header"><h3>Edit Payment <span class="bn-hint" style="display:inline;">— খরচ ঠিক করুন</span></h3><button class="modal-close" onclick="closeModal('supLedEditModal')">&#10005;</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div><label>Date *</label><input id="supLedEditDate" type="date"></div>
+        <div><label>Payment Amount *</label><input id="supLedEditAmount" type="number" min="0" step="0.01"></div>
+        <div><label>Discount Received</label><input id="supLedEditDiscount" type="number" min="0" step="0.01" value="0"></div>
+        <div class="full"><label>Discount Reason</label><input id="supLedEditDiscountReason" type="text" placeholder="Required when discount is changed"></div>
+        <div>
+          <label>Payment Method</label>
+          <select id="supLedEditMethod">
+            <option value="Cash">Cash</option><option value="Bank">Bank</option>
+            <option value="Mobile Banking">Mobile Banking</option><option value="Other">Other</option>
+          </select>
+        </div>
+        <div id="supLedEditBankAccountRow" style="display:none;">
+          <label id="supLedEditBankAccountLabel">Bank Account *</label>
+          <select id="supLedEditBankAccount"><option value="">Select bank account...</option></select>
+        </div>
+        <div class="full"><label>Note</label><input id="supLedEditNote" type="text"></div>
+      </div>
+      <div class="field-error" id="supLedEditFormError"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('supLedEditModal')">Cancel</button>
+      <button class="btn btn-primary" id="supLedEditSaveBtn">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  var supState = { suppliers: [], currencySymbol: '', bankAccounts: [], ledger: [], editingId: null, detailId: null, detailDue: 0, editingLedgerId: null, addSuccessCallback: null };
+
+  /** Supplier delete. Blocked by the server if there is a balance or history. */
+  function supDelete_(id, name) {
+    confirmDelete({
+      title: 'Delete supplier',
+      summary: '<p><b>' + escapeHtml(name || id) + '</b></p>',
+      fn: 'deleteSupplier', args: [id], reloadPages: ['suppliers']
+    });
+  }
+
+
+  function supCanOpeningBalanceEdit_() {
+    return userPermissions === null || !!(userPermissions && userPermissions.openingBalance && userPermissions.openingBalance.edit);
+  }
+
+  function supCanSettlementDiscount_() {
+    return userPermissions === null || !!(userPermissions && userPermissions.settlementDiscount && userPermissions.settlementDiscount.edit);
+  }
+
+  function supPayRecalc_() {
+    var payment = Number(document.getElementById('supPayAmount').value) || 0;
+    var discount = Number(document.getElementById('supPayDiscount').value) || 0;
+    var total = Math.round((payment + discount) * 100) / 100;
+    var balance = Math.round((supState.detailDue - total) * 100) / 100;
+    document.getElementById('supPayTotalSettled').textContent = formatMoney(total);
+    document.getElementById('supPayBalanceAfter').textContent = balance < 0 ? ('Credit ' + formatMoney(Math.abs(balance))) : formatMoney(balance);
+    document.getElementById('supPayDiscountReasonRow').style.display = discount > 0 ? '' : 'none';
+    var canDiscount = supCanSettlementDiscount_() && supState.detailDue > 0;
+    document.getElementById('supPayDiscount').disabled = !canDiscount;
+    document.getElementById('supPaySettleFullBtn').disabled = !canDiscount || payment <= 0 || payment > supState.detailDue;
+  }
+
+  function supConfigureOpeningBalance_(editing, originalValue) {
+    var input = document.getElementById('supOpening');
+    var reasonRow = document.getElementById('supOpeningReasonRow');
+    var reason = document.getElementById('supOpeningBalanceReason');
+    supState.originalOpening = Number(originalValue) || 0;
+    reason.value = '';
+    if (!editing) {
+      input.disabled = false;
+      reasonRow.style.display = 'none';
+      return;
+    }
+    var canEdit = supCanOpeningBalanceEdit_();
+    input.disabled = !canEdit;
+    reasonRow.style.display = canEdit ? '' : 'none';
+  }
+
+  function supLoad() {
+    return withLoader(serverCall('getSuppliersBootstrap', authToken)).then(function (data) {
+      supState.suppliers = data.suppliers;
+      supState.currencySymbol = data.currencySymbol;
+      supState.bankAccounts = data.bankAccounts;
+      fillBankAccountSelect_(document.getElementById('supPayBankAccount'), supState.bankAccounts, document.getElementById('supPayMethod').value);
+      supRender();
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  function supRender() {
+    var q = (document.getElementById('supSearch').value || '').toLowerCase();
+    var rows = supState.suppliers.filter(function (s) {
+      return !q || String(s['Supplier Name']).toLowerCase().indexOf(q) !== -1 || phoneSearchMatches_(s['Phone'], q);
+    });
+    var body = document.getElementById('supTableBody');
+    body.innerHTML = '';
+    rows.forEach(function (s) {
+      var due = Number(s['Current Due']) || 0;
+      var dueCell = due > 0
+        ? '<span class="badge badge-danger">' + formatMoney(due) + '</span>'
+        : (due < 0 ? '<span class="badge badge-success">Credit ' + formatMoney(Math.abs(due)) + '</span>' : formatMoney(0));
+      var statusBadge = s['Status'] === 'Active' ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-danger">Inactive</span>';
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td><button type="button" class="party-ledger-link" data-supplier-ledger-id="' + s['Supplier ID'] + '">' + escapeHtml(s['Supplier Name']) + '</button></td>' +
+        '<td>' + escapeHtml(s['Phone'] || '') + '</td>' +
+        '<td>' + escapeHtml(s['Address'] || '') + '</td>' +
+        '<td class="num mono">' + dueCell + '</td>' +
+        '<td>' + statusBadge + '</td>' +
+        '<td style="white-space:nowrap;"><button class="btn" data-act="menu" data-id="' + s['Supplier ID'] + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button></td>';
+      body.appendChild(tr);
+    });
+    document.getElementById('supEmpty').hidden = rows.length > 0;
+  }
+
+  document.getElementById('supSearch').addEventListener('input', supRender);
+
+  function supOpenAdd_(onSaved) {
+    supState.editingId = null;
+    supState.addSuccessCallback = typeof onSaved === 'function' ? onSaved : null;
+    document.getElementById('supModalTitle').textContent = 'Add Supplier';
+    ['supName', 'supPhone', 'supAddress', 'supNotes'].forEach(function (id) { document.getElementById(id).value = ''; });
+    document.getElementById('supOpening').value = 0;
+    supConfigureOpeningBalance_(false, 0);
+    document.getElementById('supFormError').style.display = 'none';
+    openModal('supModal');
+  }
+
+  function supCloseAddModal_() {
+    supState.addSuccessCallback = null;
+    closeModal('supModal');
+  }
+
+  document.getElementById('supAddBtn').addEventListener('click', function () {
+    supOpenAdd_(null);
+  });
+
+  function supOpenEdit_(id) {
+    supState.addSuccessCallback = null;
+    var supplier = supState.suppliers.filter(function (s) { return s['Supplier ID'] === id; })[0];
+    if (!supplier) return;
+    supState.editingId = id;
+    document.getElementById('supModalTitle').textContent = 'Edit Supplier';
+    document.getElementById('supName').value = supplier['Supplier Name'];
+    document.getElementById('supPhone').value = supplier['Phone'];
+    document.getElementById('supAddress').value = supplier['Address'];
+    document.getElementById('supNotes').value = supplier['Notes'];
+    document.getElementById('supOpening').value = supplier['Opening Balance'];
+    supConfigureOpeningBalance_(true, supplier['Opening Balance']);
+    document.getElementById('supFormError').style.display = 'none';
+    openModal('supModal');
+  }
+
+  document.getElementById('supTableBody').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-act]');
+    if (!btn || btn.dataset.act !== 'menu') return;
+    var id = btn.dataset.id;
+    var supplier = supState.suppliers.filter(function (s) { return s['Supplier ID'] === id; })[0];
+    if (!supplier) return;
+    openRowActionMenu_(btn, [
+      { action: 'view', label: 'View' },
+      { action: 'edit', label: 'Edit' },
+      { action: 'toggle', label: supplier['Status'] === 'Active' ? 'Deactivate' : 'Activate' },
+      { divider: true },
+      { action: 'delete', label: 'Delete', danger: true }
+    ], function (action) {
+      if (action === 'view') supOpenDetail_(id);
+      if (action === 'edit') supOpenEdit_(id);
+      if (action === 'delete') supDelete_(id, supplier['Supplier Name']);
+      if (action === 'toggle') {
+        var next = supplier['Status'] === 'Active' ? 'Inactive' : 'Active';
+        runConfirmedAction({type:'state-change',title:(next === 'Inactive' ? 'Deactivate Supplier?' : 'Activate Supplier?'),message:'This changes whether the supplier can be used for new transactions.',details:[{label:'Supplier',value:supplier['Supplier Name'],emphasis:true},{label:'New Status',value:next}],confirmLabel:(next === 'Inactive' ? 'Deactivate' : 'Activate'),loadingLabel:'Updating...',trigger:btn}, function () {
+          return withLoader(serverCall('setSupplierStatus', authToken, id, next)).then(function () { showToast('Supplier updated', 'success'); supLoad(); });
+        }).catch(function (err) { showToast(err.message, 'error'); });
+      }
+    });
+  });
+  document.getElementById('supPayMethod').addEventListener('change', function () {
+    document.getElementById('supPayBankAccount').style.display = paymentMethodNeedsAccount_(this.value) ? '' : 'none';
+    fillBankAccountSelect_(document.getElementById('supPayBankAccount'), supState.bankAccounts, this.value);
+  });
+  function supPayToday_() {
+    var d = new Date();
+    var m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + m + '-' + day;
+  }
+  document.getElementById('supPayDate').addEventListener('change', function () {
+    var val = document.getElementById('supPayDate').value;
+    document.getElementById('supPayBackdatedReasonRow').style.display = (val && val < supPayToday_()) ? '' : 'none';
+  });
+  document.getElementById('supPayAmount').addEventListener('input', supPayRecalc_);
+  document.getElementById('supPayDiscount').addEventListener('input', supPayRecalc_);
+  document.getElementById('supPaySettleFullBtn').addEventListener('click', function () {
+    if (!supCanSettlementDiscount_()) return;
+    var payment = Number(document.getElementById('supPayAmount').value) || 0;
+    if (payment <= 0 || supState.detailDue <= 0 || payment > supState.detailDue) return;
+    document.getElementById('supPayDiscount').value = (Math.round((supState.detailDue - payment) * 100) / 100).toFixed(2);
+    supPayRecalc_();
+    if (Number(document.getElementById('supPayDiscount').value) > 0) document.getElementById('supPayDiscountReason').focus();
+  });
+
+  document.getElementById('supPaySaveBtn').addEventListener('click', function () {
+  var amount = document.getElementById('supPayAmount').value;
+  var method = document.getElementById('supPayMethod').value;
+  var discountAmount = Number(document.getElementById('supPayDiscount').value) || 0;
+  var discountReason = document.getElementById('supPayDiscountReason').value.trim();
+  var bankAccountId = document.getElementById('supPayBankAccount').value;
+  var note = document.getElementById('supPayNote').value.trim();
+  var errEl = document.getElementById('supPayError');
+  errEl.style.display = 'none';
+  var payDate = document.getElementById('supPayDate').value || supPayToday_();
+  var backdatedReason = document.getElementById('supPayBackdatedReason').value.trim();
+  if (payDate < supPayToday_() && !backdatedReason) { errEl.textContent = 'A reason is required when dating a payment in the past.'; errEl.style.display = 'block'; return; }
+  if (discountAmount > 0 && !discountReason) { errEl.textContent = 'Discount Reason is required.'; errEl.style.display = 'block'; return; }
+  if (discountAmount > 0 && ((Number(amount) || 0) + discountAmount) - supState.detailDue > 0.004) { errEl.textContent = 'Pay amount plus discount cannot exceed the current due.'; errEl.style.display = 'block'; return; }
+  var supplierName = document.getElementById('supDetailName').textContent || 'Supplier';
+  var supplierId = supState.detailId;
+  runConfirmedAction({type:'financial',title:'Pay Supplier?',message:supplierName + '-কে পেমেন্ট করছেন।',details:settlementConfirmDetails_({partyLabel:'Supplier',partyName:supplierName,directionLabel:'Pay',amount:Number(amount)||0,discount:discountAmount,discountLabel:'Discount Received',method:method,accountName:paymentMethodNeedsAccount_(method)?selectedOptionText_('supPayBankAccount'):'',date:payDate}),confirmLabel:'Pay ' + formatMoney(Number(amount)||0),loadingLabel:'Paying...',trigger:document.getElementById('supPaySaveBtn')}, function () {
+    return withLoader(serverCall('paySupplier', authToken, supplierId, amount, method, bankAccountId, note, payDate, backdatedReason, discountAmount, discountReason)).then(function () { showToast('Payment recorded', 'success'); supLoad(); supOpenDetail_(supplierId); });
+  }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+});
+
+  document.getElementById('supSaveBtn').addEventListener('click', function () {
+    var payload = {
+      name: document.getElementById('supName').value.trim(),
+      phone: document.getElementById('supPhone').value.trim(),
+      address: document.getElementById('supAddress').value.trim(),
+      notes: document.getElementById('supNotes').value.trim(),
+      openingBalance: document.getElementById('supOpening').value,
+      openingBalanceReason: document.getElementById('supOpeningBalanceReason').value.trim()
+    };
+    var errEl = document.getElementById('supFormError');
+    errEl.style.display = 'none';
+    if (supState.editingId && supCanOpeningBalanceEdit_()) {
+      var nextOpening = Number(payload.openingBalance);
+      if (isFinite(nextOpening) && Math.abs(nextOpening - supState.originalOpening) >= 0.005 && !payload.openingBalanceReason) {
+        errEl.textContent = 'Reason is required when changing the opening balance.';
+        errEl.style.display = 'block';
+        return;
+      }
+    }
+    var call = supState.editingId ? serverCall('updateSupplier', authToken, supState.editingId, payload) : serverCall('addSupplier', authToken, payload);
+    withLoader(call).then(function (res) {
+      var addCallback = supState.editingId ? null : supState.addSuccessCallback;
+      supState.addSuccessCallback = null;
+      closeModal('supModal');
+      document.getElementById('supOpening').disabled = false;
+      showToast('Supplier saved', 'success');
+      supLoad();
+      if (addCallback && res && res.id) addCallback(res.id);
+    }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+  });
+
+  function supOpenDetail_(id) {
+  supState.detailId = id;
+  withLoader(serverCall('getSupplierDetail', authToken, id)).then(function (data) {
+    document.getElementById('supDetailName').textContent = data.supplier['Supplier Name'] + ' \u2014 ' + (data.supplier['Phone'] || '');
+    var detailDue = Number(data.supplier['Current Due']) || 0;
+    supState.detailDue = detailDue;
+    document.getElementById('supDetailDue').textContent = detailDue < 0 ? ('Credit ' + formatMoney(Math.abs(detailDue))) : formatMoney(detailDue);
+
+    document.getElementById('supPayAmount').value = '';
+    document.getElementById('supPayDiscount').value = '0';
+    document.getElementById('supPayDiscountReason').value = '';
+    document.getElementById('supPayMethod').value = 'Cash';
+    document.getElementById('supPayBankAccount').style.display = 'none';
+    document.getElementById('supPayNote').value = '';
+    document.getElementById('supPayDate').value = supPayToday_();
+    document.getElementById('supPayBackdatedReason').value = '';
+    document.getElementById('supPayBackdatedReasonRow').style.display = 'none';
+    document.getElementById('supPayError').style.display = 'none';
+    supPayRecalc_();
+
+    supState.ledger = data.ledger;
+    var body = document.getElementById('supLedgerBody');
+      body.innerHTML = '';
+      data.ledger.forEach(function (l) {
+        // Only raw Payment rows can be edited/deleted here — Purchase-driven
+        // ledger rows have to be corrected through Purchase Invoice instead,
+        // same guard as updateSupplierPayment/deleteSupplierPayment enforce
+        // server-side.
+        var isPayment = l['Type'] === 'Payment';
+        var paymentAmount = (l['Payment Amount'] === '' || l['Payment Amount'] == null) ? (Number(l['Credit']) || 0) : (Number(l['Payment Amount']) || 0);
+        var discountAmount = Number(l['Discount Amount']) || 0;
+        var creditHtml = l['Credit'] ? formatMoney(l['Credit']) : '';
+        if (isPayment && discountAmount > 0) creditHtml += '<div style="font-size:11px;color:var(--color-text-muted);">Payment ' + formatMoney(paymentAmount) + ' + Discount ' + formatMoney(discountAmount) + '</div>';
+        var tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td>' + escapeHtml(formatDateShort_(l['Date'])) + '</td>' +
+          '<td>' + escapeHtml(l['Type']) + '</td>' +
+          '<td class="mono">' + escapeHtml(l['Reference'] || '') + '</td>' +
+          '<td class="num mono">' + (l['Debit'] ? formatMoney(l['Debit']) : '') + '</td>' +
+          '<td class="num mono">' + creditHtml + '</td>' +
+          '<td class="num mono">' + formatMoney(l['Balance']) + '</td>' +
+          '<td style="white-space:nowrap;">' +
+          (isPayment
+            ? '<button class="btn" data-act="menuLed" data-id="' + l['Ledger ID'] + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button>'
+            : '') +
+          '</td>';
+        body.appendChild(tr);
+      });
+      document.getElementById('supLedgerEmpty').hidden = data.ledger.length > 0;
+      openModal('supDetailModal');
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  function formatDateShort_(val) {
+    var d = new Date(val);
+    if (isNaN(d.getTime())) return String(val);
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+
+  document.getElementById('supLedgerBody').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-act="menuLed"]');
+    if (!btn) return;
+    var ledgerId = btn.dataset.id;
+    openRowActionMenu_(btn, [
+      { action: 'edit', label: 'Edit' },
+      { divider: true },
+      { action: 'delete', label: 'Delete', danger: true }
+    ], function (action) {
+      if (action === 'edit') supLedOpenEdit_(ledgerId);
+      if (action === 'delete') supLedDelete_(ledgerId);
+    });
+  });
+
+  function supLedOpenEdit_(ledgerId) {
+    withLoader(serverCall('getSupplierPaymentForEdit', authToken, ledgerId)).then(function (data) {
+      var p = data || {};
+      supState.editingLedgerId = ledgerId;
+      document.getElementById('supLedEditDate').value = p.date || '';
+      document.getElementById('supLedEditAmount').value = p.amount;
+      document.getElementById('supLedEditDiscount').value = p.discountAmount || 0;
+      document.getElementById('supLedEditDiscountReason').value = p.discountReason || '';
+      document.getElementById('supLedEditDiscount').disabled = !supCanSettlementDiscount_();
+      document.getElementById('supLedEditDiscountReason').disabled = !supCanSettlementDiscount_();
+      document.getElementById('supLedEditMethod').value = p.method || 'Cash';
+      document.getElementById('supLedEditBankAccountRow').style.display = paymentMethodNeedsAccount_(p.method) ? '' : 'none';
+      document.getElementById('supLedEditBankAccountLabel').textContent = (p.method === 'Mobile Banking' ? 'Mobile Banking Account *' : 'Bank Account *');
+      fillBankAccountSelect_(document.getElementById('supLedEditBankAccount'), supState.bankAccounts, p.method);
+      document.getElementById('supLedEditBankAccount').value = p.bankAccountId || '';
+      document.getElementById('supLedEditNote').value = p.notes || '';
+      document.getElementById('supLedEditFormError').style.display = 'none';
+      openModal('supLedEditModal');
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  document.getElementById('supLedEditMethod').addEventListener('change', function () {
+    document.getElementById('supLedEditBankAccountRow').style.display = paymentMethodNeedsAccount_(this.value) ? '' : 'none';
+    document.getElementById('supLedEditBankAccountLabel').textContent = (this.value === 'Mobile Banking' ? 'Mobile Banking Account *' : 'Bank Account *');
+    fillBankAccountSelect_(document.getElementById('supLedEditBankAccount'), supState.bankAccounts, this.value);
+  });
+
+  document.getElementById('supLedEditSaveBtn').addEventListener('click', function () {
+    var errEl = document.getElementById('supLedEditFormError');
+    errEl.style.display = 'none';
+    var payload = {
+      date: document.getElementById('supLedEditDate').value,
+      amount: document.getElementById('supLedEditAmount').value,
+      discountAmount: document.getElementById('supLedEditDiscount').value,
+      discountReason: document.getElementById('supLedEditDiscountReason').value.trim(),
+      method: document.getElementById('supLedEditMethod').value,
+      bankAccountId: document.getElementById('supLedEditBankAccount').value,
+      notes: document.getElementById('supLedEditNote').value.trim()
+    };
+    var ledgerId = supState.editingLedgerId;
+    var supplierName = document.getElementById('supDetailName').textContent || 'Supplier';
+    runConfirmedAction({type:'financial',title:'Update Supplier Payment?',message:'This will update supplier payable and Cash/Bank accounting.',details:settlementConfirmDetails_({partyLabel:'Supplier',partyName:supplierName,directionLabel:'New Amount',amount:Number(payload.amount)||0,discount:Number(payload.discountAmount)||0,discountLabel:'Discount Received',method:payload.method,accountName:paymentMethodNeedsAccount_(payload.method)?selectedOptionText_('supLedEditBankAccount'):'',date:payload.date}),confirmLabel:'Update Payment',loadingLabel:'Updating...',trigger:document.getElementById('supLedEditSaveBtn')}, function () {
+      return withLoader(serverCall('updateSupplierPayment', authToken, ledgerId, payload)).then(function () { closeModal('supLedEditModal'); showToast('Payment updated', 'success'); supLoad(); supOpenDetail_(supState.detailId); reloadPage_('daybook'); reloadPage_('dashboard'); });
+    }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+  });
+
+  function supLedDelete_(ledgerId) {
+    confirmDelete({
+      title: 'Delete supplier payment',
+      summary: '<p>This will reverse the payment and restore the supplier payable.</p>',
+      fn: 'deleteSupplierPayment', args: [ledgerId], reloadPages: ['suppliers', 'daybook', 'dashboard'],
+      onDone: function () { supLoad(); supOpenDetail_(supState.detailId); }
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var origGoToPage = goToPage;
+    goToPage = function (key) {
+      origGoToPage(key);
+      if (key === 'suppliers' && !supState._loaded) { supState._loaded = true; supLoad(); }
+    };
+  });
+</script>

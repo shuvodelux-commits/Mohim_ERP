@@ -1,0 +1,17 @@
+const fs=require('fs'),path=require('path'),assert=require('assert');
+const root=path.resolve(__dirname,'..');
+const html=fs.readFileSync(path.join(root,'pos.html'),'utf8');
+assert.match(html,/id="posSaveDraftBtn"/);
+assert.match(html,/id="posDraftBanner"/);
+assert.match(html,/function posBuildDraftPayload_/);
+assert.match(html,/serverCall\(['"]saveSalesDraft['"]/);
+assert.match(html,/serverCall\(['"]updateSalesDraft['"]/);
+assert.match(html,/function posOpenDraft_/);
+assert.match(html,/priceMode:\s*['"]fixed['"]/);
+assert.match(html,/savedPriceMode/);
+assert.match(html,/sourceDraftId/);
+assert.match(html,/sourceDraftVersion/);
+assert.match(html,/line\.priceMode\s*===\s*['"]fixed['"][\s\S]*line\.priceMode\s*=\s*['"]manual['"]/);
+assert.match(html,/Reset to Lot Price/);
+assert.match(html,/function posResetSaleForm_/);
+console.log('PASS POS draft contract');
