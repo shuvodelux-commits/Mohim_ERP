@@ -84,7 +84,7 @@
     body.innerHTML = '';
     keys.forEach(function (k) {
       var tr = document.createElement('tr');
-      tr.innerHTML = '<td>' + escapeHtml(k) + '</td><td class="num mono">' + formatMoney(totals[k]) + '</td>';
+      tr.innerHTML = '<td>' + escapeHtml(k) + '</td><td class="num">' + formatMoney(totals[k]) + '</td>';
       body.appendChild(tr);
     });
     document.getElementById(emptyId).hidden = keys.length > 0;
