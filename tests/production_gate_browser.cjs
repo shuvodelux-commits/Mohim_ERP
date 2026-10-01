@@ -30,9 +30,8 @@ async function main() {
   await page.close();
   ({page,errors}=await boot(browser)); await route(page,'posv2');
   await page.fill('#posSearch','4 inch Test Pipe');
-  await page.locator('#posProductGrid .product-tile').first().waitFor({state:'visible'});
-  await check('POS bootstrap',async()=>assert.equal(await page.locator('#posProductGrid .product-tile').count(),1));
-  await page.locator('#posProductGrid .product-tile').first().click();
+  await page.press('#posSearch','Enter');
+  await check('POS V2 search adds product',async()=>assert.equal(await page.textContent('#posCartCount'),'1'));
   await page.fill('#posCustomerName','মহিউদ্দিন');await page.fill('#posCustomerPhone','01712345678');
   await check('POS cart and cash-session gating',async()=>{assert.equal(await page.textContent('#posCartCount'),'1');assert.equal(await page.isDisabled('#posCompleteBtn'),false);});
   await page.click('#posCompleteBtn');
@@ -62,7 +61,7 @@ async function main() {
   await route(page,'returns');await page.evaluate("returnsLoadInvoiceById_('INV-UNPAID')");
   await check('unpaid return uses store credit and blocks cash',async()=>{await page.waitForFunction(()=>document.getElementById('rtRefundMethod').value==='Store Credit');assert.equal(await page.locator('#rtRefundMethod option[value="Cash"]').isDisabled(),true);assert.match(await page.textContent('#rtRefundHint'),/No cash was collected/);});
   await check('unpaid return browser errors',()=>assert.deepEqual(errors,[]));await page.close();
-  ({page,errors}=await boot(browser));await route(page,'posv2');await page.fill('#posSearch','4 inch Test Pipe');await page.locator('#posProductGrid .product-tile').first().click();
+  ({page,errors}=await boot(browser));await route(page,'posv2');await page.fill('#posSearch','4 inch Test Pipe');await page.press('#posSearch','Enter');
   await page.fill('#posCustomerName','মহিউদ্দিন');await page.fill('#posCustomerPhone','01712345678');await page.click('#posSaveDraftBtn');
   await check('draft save preserves totals without posting sale',async()=>{await page.waitForFunction(()=>__rpcCalls.some(c=>c.name==='saveSalesDraft'));const calls=await page.evaluate(()=>__rpcCalls);const draft=calls.filter(c=>c.name==='saveSalesDraft');assert.equal(draft.length,1);assert.equal(draft[0].args[1].grandTotal,50);assert.equal(draft[0].args[1].items[0].lineTotal,50);assert.equal(calls.filter(c=>c.name==='completeSale').length,0);});
   await check('draft browser errors',()=>assert.deepEqual(errors,[]));await page.close();
