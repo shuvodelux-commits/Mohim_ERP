@@ -185,7 +185,7 @@
         '<td><button type="button" class="party-ledger-link" data-supplier-ledger-id="' + s['Supplier ID'] + '">' + escapeHtml(s['Supplier Name']) + '</button></td>' +
         '<td>' + escapeHtml(s['Phone'] || '') + '</td>' +
         '<td>' + escapeHtml(s['Address'] || '') + '</td>' +
-        '<td class="num mono">' + dueCell + '</td>' +
+        '<td class="num">' + dueCell + '</td>' +
         '<td>' + statusBadge + '</td>' +
         '<td style="white-space:nowrap;"><button class="btn" data-act="menu" data-id="' + s['Supplier ID'] + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button></td>';
       body.appendChild(tr);
@@ -368,10 +368,10 @@
         tr.innerHTML =
           '<td>' + escapeHtml(formatDateShort_(l['Date'])) + '</td>' +
           '<td>' + escapeHtml(l['Type']) + '</td>' +
-          '<td class="mono">' + escapeHtml(l['Reference'] || '') + '</td>' +
-          '<td class="num mono">' + (l['Debit'] ? formatMoney(l['Debit']) : '') + '</td>' +
-          '<td class="num mono">' + creditHtml + '</td>' +
-          '<td class="num mono">' + formatMoney(l['Balance']) + '</td>' +
+          '<td>' + escapeHtml(l['Reference'] || '') + '</td>' +
+          '<td class="num">' + (l['Debit'] ? formatMoney(l['Debit']) : '') + '</td>' +
+          '<td class="num">' + creditHtml + '</td>' +
+          '<td class="num">' + formatMoney(l['Balance']) + '</td>' +
           '<td style="white-space:nowrap;">' +
           (isPayment
             ? '<button class="btn" data-act="menuLed" data-id="' + l['Ledger ID'] + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button>'
