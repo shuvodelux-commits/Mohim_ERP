@@ -28,12 +28,6 @@
     font-variant-numeric: tabular-nums;
   }
 
-  body.pos-v2-active #page-pos .mono,
-  body.pos-v2-active #page-pos .v,
-  body.pos-v2-active #page-pos .p-price {
-    font-family: 'Geist Mono', 'JetBrains Mono', ui-monospace, monospace;
-  }
-
   body.pos-v2-active #page-pos .card,
   body.pos-v2-active #page-pos .pos-customer-section,
   body.pos-v2-active #page-pos .pos-cart-section {
@@ -1313,7 +1307,7 @@
 
     body.innerHTML = rows.map(function (row) {
       return '<tr>' +
-        '<td data-label="Draft"><strong class="mono">' + escapeHtml(row.draftNo || '') + '</strong></td>' +
+        '<td data-label="Draft"><strong>' + escapeHtml(row.draftNo || '') + '</strong></td>' +
         '<td data-label="Updated">' + escapeHtml(String(row.updatedAt || '')) + '</td>' +
         '<td data-label="Customer">' + escapeHtml(row.customerName || 'Not selected') + '</td>' +
         '<td data-label="Phone">' + escapeHtml(row.customerPhone || '') + '</td>' +
