@@ -340,17 +340,17 @@
       rptSet_('rsPaid', rptMoney_(d.totals.paid));
       rptSet_('rsDue', rptMoney_(d.totals.due));
       rptFill_('rsDayBody', d.byDay, function (r) {
-        return '<td>' + escapeHtml(r.label) + '</td><td class="num mono">' + r.invoices + '</td>' +
-               '<td class="num mono">' + rptMoney_(r.gross) + '</td><td class="num mono">' + rptMoney_(r.returned) + '</td>' +
-               '<td class="num mono">' + rptMoney_(r.net) + '</td>';
+        return '<td>' + escapeHtml(r.label) + '</td><td class="num">' + r.invoices + '</td>' +
+               '<td class="num">' + rptMoney_(r.gross) + '</td><td class="num">' + rptMoney_(r.returned) + '</td>' +
+               '<td class="num">' + rptMoney_(r.net) + '</td>';
       }, 'rsDayEmpty');
       rptFill_('rsPayBody', d.byPaymentType, function (r) {
-        return '<td>' + escapeHtml(r.label) + '</td><td class="num mono">' + r.invoices + '</td>' +
-               '<td class="num mono">' + rptMoney_(r.gross) + '</td><td class="num mono">' + rptMoney_(r.net) + '</td>';
+        return '<td>' + escapeHtml(r.label) + '</td><td class="num">' + r.invoices + '</td>' +
+               '<td class="num">' + rptMoney_(r.gross) + '</td><td class="num">' + rptMoney_(r.net) + '</td>';
       });
       rptFill_('rsCustBody', d.topCustomers, function (r) {
-        return '<td>' + escapeHtml(r.label) + '</td><td class="num mono">' + r.invoices + '</td>' +
-               '<td class="num mono">' + rptMoney_(r.net) + '</td>';
+        return '<td>' + escapeHtml(r.label) + '</td><td class="num">' + r.invoices + '</td>' +
+               '<td class="num">' + rptMoney_(r.net) + '</td>';
       });
     });
   }
@@ -364,13 +364,13 @@
       rptSet_('rpPaid', rptMoney_(d.totals.paid));
       rptSet_('rpDue', rptMoney_(d.totals.due));
       rptFill_('rpDayBody', d.byDay, function (r) {
-        return '<td>' + escapeHtml(r.label) + '</td><td class="num mono">' + r.purchases + '</td>' +
-               '<td class="num mono">' + rptMoney_(r.gross) + '</td><td class="num mono">' + rptMoney_(r.returned) + '</td>' +
-               '<td class="num mono">' + rptMoney_(r.net) + '</td>';
+        return '<td>' + escapeHtml(r.label) + '</td><td class="num">' + r.purchases + '</td>' +
+               '<td class="num">' + rptMoney_(r.gross) + '</td><td class="num">' + rptMoney_(r.returned) + '</td>' +
+               '<td class="num">' + rptMoney_(r.net) + '</td>';
       }, 'rpDayEmpty');
       rptFill_('rpSupBody', d.topSuppliers, function (r) {
-        return '<td>' + escapeHtml(r.label) + '</td><td class="num mono">' + r.purchases + '</td>' +
-               '<td class="num mono">' + rptMoney_(r.net) + '</td><td class="num mono">' + rptMoney_(r.due) + '</td>';
+        return '<td>' + escapeHtml(r.label) + '</td><td class="num">' + r.purchases + '</td>' +
+               '<td class="num">' + rptMoney_(r.net) + '</td><td class="num">' + rptMoney_(r.due) + '</td>';
       });
     });
   }
@@ -388,14 +388,14 @@
       document.getElementById('rkMismatchCard').hidden = mismatches.length === 0;
       rptSet_('rkMismatchCount', d.totals.mismatchCount);
       rptFill_('rkMismatchBody', mismatches, function (p) {
-        return '<td>' + escapeHtml(p.name) + '</td><td class="num mono">' + p.stock + '</td>' +
-               '<td class="num mono">' + p.lotQuantity + '</td>' +
-               '<td class="num mono">' + (p.stock - p.lotQuantity) + '</td>';
+        return '<td>' + escapeHtml(p.name) + '</td><td class="num">' + p.stock + '</td>' +
+               '<td class="num">' + p.lotQuantity + '</td>' +
+               '<td class="num">' + (p.stock - p.lotQuantity) + '</td>';
       });
 
       rptFill_('rkCatBody', d.byCategory, function (r) {
-        return '<td>' + escapeHtml(r.label) + '</td><td class="num mono">' + r.products + '</td>' +
-               '<td class="num mono">' + r.stock + '</td><td class="num mono">' + rptMoney_(r.value) + '</td>';
+        return '<td>' + escapeHtml(r.label) + '</td><td class="num">' + r.products + '</td>' +
+               '<td class="num">' + r.stock + '</td><td class="num">' + rptMoney_(r.value) + '</td>';
       });
       rptFill_('rkProdBody', d.products, function (p) {
         var badge = p.status === 'Inactive'
@@ -404,9 +404,9 @@
             : (p.stock <= p.minStock ? '<span class="badge badge-warning">Low</span>'
               : '<span class="badge badge-success">OK</span>'));
         return '<td>' + escapeHtml(p.name) + '</td><td>' + escapeHtml(p.category) + '</td>' +
-               '<td class="num mono">' + p.stock + '</td><td class="num mono">' + p.minStock + '</td>' +
-               '<td class="num mono">' + rptMoney_(p.purchasePrice) + '</td>' +
-               '<td class="num mono">' + rptMoney_(p.lotValue) + '</td><td>' + badge + '</td>';
+               '<td class="num">' + p.stock + '</td><td class="num">' + p.minStock + '</td>' +
+               '<td class="num">' + rptMoney_(p.purchasePrice) + '</td>' +
+               '<td class="num">' + rptMoney_(p.lotValue) + '</td><td>' + badge + '</td>';
       }, 'rkProdEmpty');
     });
   }
@@ -420,14 +420,14 @@
       rptSet_('rcCombOpen', rptMoney_(d.combined.opening));
       rptSet_('rcCombClose', rptMoney_(d.combined.closing));
       rptFill_('rcTypeBody', d.cash.byType, function (r) {
-        return '<td>' + escapeHtml(r.label) + '</td><td class="num mono">' + r.entries + '</td>' +
-               '<td class="num mono">' + rptMoney_(r.inflow) + '</td><td class="num mono">' + rptMoney_(r.outflow) + '</td>' +
-               '<td class="num mono">' + rptMoney_(r.net) + '</td>';
+        return '<td>' + escapeHtml(r.label) + '</td><td class="num">' + r.entries + '</td>' +
+               '<td class="num">' + rptMoney_(r.inflow) + '</td><td class="num">' + rptMoney_(r.outflow) + '</td>' +
+               '<td class="num">' + rptMoney_(r.net) + '</td>';
       }, 'rcTypeEmpty');
       rptFill_('rcBankBody', d.banks, function (b) {
         return '<td>' + escapeHtml(b.name) + '</td><td>' + escapeHtml(b.bankName) + '</td>' +
-               '<td class="num mono">' + rptMoney_(b.opening) + '</td><td class="num mono">' + rptMoney_(b.inflow) + '</td>' +
-               '<td class="num mono">' + rptMoney_(b.outflow) + '</td><td class="num mono">' + rptMoney_(b.closing) + '</td>';
+               '<td class="num">' + rptMoney_(b.opening) + '</td><td class="num">' + rptMoney_(b.inflow) + '</td>' +
+               '<td class="num">' + rptMoney_(b.outflow) + '</td><td class="num">' + rptMoney_(b.closing) + '</td>';
       }, 'rcBankEmpty');
     });
   }
@@ -449,28 +449,28 @@
         rptSet_('rfMissingCount', d.coverage.invoicesMissingLotData);
         rptSet_('rfTotalCount', d.coverage.invoicesInRange);
         rptFill_('rfMissingBody', d.coverage.missingSample, function (m) {
-          return '<td class="mono">' + escapeHtml(m.invoiceId) + '</td><td>' + escapeHtml(m.date) + '</td>' +
-                 '<td class="num mono">' + rptMoney_(m.grandTotal) + '</td>';
+          return '<td>' + escapeHtml(m.invoiceId) + '</td><td>' + escapeHtml(m.date) + '</td>' +
+                 '<td class="num">' + rptMoney_(m.grandTotal) + '</td>';
         });
       }
 
       rptFill_('rfTopBody', d.topProducts, function (p) {
-        return '<td>' + escapeHtml(p.label) + '</td><td class="num mono">' + p.qtySold + '</td>' +
-               '<td class="num mono">' + p.qtyReturned + '</td>' +
-               '<td class="num mono">' + rptMoney_(p.revenue) + '</td><td class="num mono">' + rptMoney_(p.cost) + '</td>' +
-               '<td class="num mono">' + rptMoney_(p.profit) + '</td>';
+        return '<td>' + escapeHtml(p.label) + '</td><td class="num">' + p.qtySold + '</td>' +
+               '<td class="num">' + p.qtyReturned + '</td>' +
+               '<td class="num">' + rptMoney_(p.revenue) + '</td><td class="num">' + rptMoney_(p.cost) + '</td>' +
+               '<td class="num">' + rptMoney_(p.profit) + '</td>';
       }, 'rfTopEmpty');
 
       document.getElementById('rfLossCard').hidden = (d.lossMakers || []).length === 0;
       rptFill_('rfLossBody', d.lossMakers, function (p) {
-        return '<td>' + escapeHtml(p.label) + '</td><td class="num mono">' + p.qtySold + '</td>' +
-               '<td class="num mono">' + rptMoney_(p.revenue) + '</td><td class="num mono">' + rptMoney_(p.cost) + '</td>' +
-               '<td class="num mono">' + rptMoney_(p.profit) + '</td>';
+        return '<td>' + escapeHtml(p.label) + '</td><td class="num">' + p.qtySold + '</td>' +
+               '<td class="num">' + rptMoney_(p.revenue) + '</td><td class="num">' + rptMoney_(p.cost) + '</td>' +
+               '<td class="num">' + rptMoney_(p.profit) + '</td>';
       });
 
       rptFill_('rfExpBody', d.expenseByCategory, function (r) {
-        return '<td>' + escapeHtml(r.label) + '</td><td class="num mono">' + r.entries + '</td>' +
-               '<td class="num mono">' + rptMoney_(r.amount) + '</td>';
+        return '<td>' + escapeHtml(r.label) + '</td><td class="num">' + r.entries + '</td>' +
+               '<td class="num">' + rptMoney_(r.amount) + '</td>';
       }, 'rfExpEmpty');
     });
   }

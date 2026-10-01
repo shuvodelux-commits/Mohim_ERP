@@ -149,17 +149,17 @@
     <div class="modal-body">
       <p style="color:var(--color-text-muted); font-size:13px;">This corrects this internal stock lot and exact matching historical COGS evidence. It does not change sale revenue, payments or stock quantity.</p>
       <div class="form-grid">
-        <div><label>Lot ID</label><div class="mono" id="prodLotCostLotId"></div></div>
-        <div><label>Source</label><div class="mono" id="prodLotCostSource"></div></div>
+        <div><label>Lot ID</label><div id="prodLotCostLotId"></div></div>
+        <div><label>Source</label><div id="prodLotCostSource"></div></div>
         <div class="full"><label>Product</label><div id="prodLotCostProduct"></div></div>
-        <div><label>Original Qty</label><div class="mono" id="prodLotCostOriginalQty"></div></div>
-        <div><label>Remaining Qty</label><div class="mono" id="prodLotCostRemainingQty"></div></div>
-        <div><label>Consumed Qty</label><div class="mono" id="prodLotCostConsumedQty"></div></div>
-        <div><label>Current Lot Cost</label><div class="mono" id="prodLotCostCurrent"></div></div>
-        <div><label>Product Purchase Price</label><div class="mono" id="prodLotCostMaster"></div></div>
-        <div><label>Historical Matched Qty</label><div class="mono" id="prodLotCostHistoricalQty"></div></div>
-        <div><label>Historical Invoice Count</label><div class="mono" id="prodLotCostInvoiceCount"></div></div>
-        <div><label>Historical COGS Impact</label><div class="mono" id="prodLotCostImpact"></div></div>
+        <div><label>Original Qty</label><div id="prodLotCostOriginalQty"></div></div>
+        <div><label>Remaining Qty</label><div id="prodLotCostRemainingQty"></div></div>
+        <div><label>Consumed Qty</label><div id="prodLotCostConsumedQty"></div></div>
+        <div><label>Current Lot Cost</label><div id="prodLotCostCurrent"></div></div>
+        <div><label>Product Purchase Price</label><div id="prodLotCostMaster"></div></div>
+        <div><label>Historical Matched Qty</label><div id="prodLotCostHistoricalQty"></div></div>
+        <div><label>Historical Invoice Count</label><div id="prodLotCostInvoiceCount"></div></div>
+        <div><label>Historical COGS Impact</label><div id="prodLotCostImpact"></div></div>
         <div>
           <label>New Purchase Cost *</label>
           <input id="prodLotCostNewPrice" type="number" min="0.01" step="0.01">
@@ -461,7 +461,7 @@
     rows.forEach(function (p) {
       var lowStock = Number(p['Current Stock']) <= Number(p['Minimum Stock']);
       var statusBadge = p['Status'] === 'Active' ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-danger">Inactive</span>';
-      var stockCell = '<span class="mono">' + p['Current Stock'] + '</span>' + (lowStock ? ' <span class="badge badge-warning">Low</span>' : '');
+      var stockCell = '<span>' + p['Current Stock'] + '</span>' + (lowStock ? ' <span class="badge badge-warning">Low</span>' : '');
       var unpricedCount = Number(p['Unpriced Lot Count']) || 0;
       var unpricedBadge = unpricedCount > 0 ? ' <span class="badge badge-warning">Unpriced lots: ' + unpricedCount + '</span>' : '';
 
@@ -470,10 +470,10 @@
         '<td>' + escapeHtml(p['Product Name']) + unpricedBadge + '<div style="font-size:11px;color:var(--color-text-muted);">' +
           escapeHtml([p['Brand'] || '', p['Unit'] || ''].filter(Boolean).join(' · ')) + '</div></td>' +
         '<td>' + escapeHtml(p['Category'] || '') + '</td>' +
-        '<td class="num mono">' + formatMoney(p['Purchase Price']) + '</td>' +
-        '<td class="num mono">' + formatMoney(p['Selling Price']) + '</td>' +
+        '<td class="num">' + formatMoney(p['Purchase Price']) + '</td>' +
+        '<td class="num">' + formatMoney(p['Selling Price']) + '</td>' +
         '<td class="num">' + stockCell + '</td>' +
-        '<td class="num mono">' + formatMoney(p['Stock Value']) + '</td>' +
+        '<td class="num">' + formatMoney(p['Stock Value']) + '</td>' +
         '<td>' + statusBadge + '</td>' +
         '<td style="white-space:nowrap;">' +
           '<button class="btn" data-act="menu" data-id="' + p['Product ID'] + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button>' +
@@ -800,14 +800,14 @@ function prodOpenLots_(product) {
         : '';
       var tr = document.createElement('tr');
       tr.innerHTML =
-        '<td class="mono">' + escapeHtml(l.lotId) + '</td>' +
-        '<td class="mono">' + escapeHtml(l.purchaseId || '') + '</td>' +
+        '<td>' + escapeHtml(l.lotId) + '</td>' +
+        '<td>' + escapeHtml(l.purchaseId || '') + '</td>' +
         '<td>' + escapeHtml(l.supplierName || 'Unattributed') + '</td>' +
         '<td>' + escapeHtml(formatDateShort_(l.purchaseDate)) + '</td>' +
-        '<td class="num mono">' + formatMoney(l.purchasePrice) + '</td>' +
-        '<td class="num mono">' + l.originalQuantity + '</td>' +
-        '<td class="num mono">' + remaining + '</td>' +
-        '<td class="num mono">' + formatMoney(value) + '</td>' +
+        '<td class="num">' + formatMoney(l.purchasePrice) + '</td>' +
+        '<td class="num">' + l.originalQuantity + '</td>' +
+        '<td class="num">' + remaining + '</td>' +
+        '<td class="num">' + formatMoney(value) + '</td>' +
         '<td>' + statusBadge + '</td>' +
         '<td>' + correctionAction + '</td>';
       body.appendChild(tr);
@@ -935,18 +935,18 @@ function prodRenderUnpricedLots_() {
     var tr = document.createElement('tr');
     tr.innerHTML =
       '<td><input type="checkbox" data-prod-cost-select="' + index + '"' + (row.selected ? ' checked' : '') + '></td>' +
-      '<td class="mono">' + escapeHtml(row.lotId) + '</td>' +
+      '<td>' + escapeHtml(row.lotId) + '</td>' +
       '<td>' + escapeHtml(row.productName) + '</td>' +
-      '<td class="mono">' + escapeHtml(row.source || '') + '</td>' +
+      '<td>' + escapeHtml(row.source || '') + '</td>' +
       '<td>' + escapeHtml(formatDateShort_(row.purchaseDate)) + '</td>' +
-      '<td class="num mono">' + row.originalQuantity + '</td>' +
-      '<td class="num mono">' + row.remainingQuantity + '</td>' +
-      '<td class="num mono">' + row.consumedQuantity + '</td>' +
-      '<td class="num mono">' + formatMoney(row.currentPurchasePrice) + '</td>' +
-      '<td class="num mono">' + formatMoney(row.productPurchasePrice) + '</td>' +
+      '<td class="num">' + row.originalQuantity + '</td>' +
+      '<td class="num">' + row.remainingQuantity + '</td>' +
+      '<td class="num">' + row.consumedQuantity + '</td>' +
+      '<td class="num">' + formatMoney(row.currentPurchasePrice) + '</td>' +
+      '<td class="num">' + formatMoney(row.productPurchasePrice) + '</td>' +
       '<td class="num"><input type="number" min="0.01" step="0.01" data-prod-cost-value="' + index + '" value="' + (proposed > 0 ? escapeHtml(String(proposed)) : '') + '" style="width:110px;text-align:right;"></td>' +
-      '<td class="num mono">' + row.affectedInvoiceCount + '</td>' +
-      '<td class="num mono" data-prod-cost-impact="' + index + '">' + formatMoney(impact) + '</td>' +
+      '<td class="num">' + row.affectedInvoiceCount + '</td>' +
+      '<td class="num" data-prod-cost-impact="' + index + '">' + formatMoney(impact) + '</td>' +
       '<td data-prod-cost-status="' + index + '"><span class="badge ' + (status === 'Ready' ? 'badge-success' : 'badge-warning') + '">' + status + '</span></td>';
     body.appendChild(tr);
   });

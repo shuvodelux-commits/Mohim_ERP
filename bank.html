@@ -229,9 +229,9 @@
         '<td>' + escapeHtml(b['Account Name']) + '</td>' +
         '<td>' + typeBadge + '</td>' +
         '<td>' + escapeHtml(b['Bank Name'] || '') + '</td>' +
-        '<td class="mono">' + escapeHtml(b['Account Number'] || '') + '</td>' +
-        '<td class="num mono">' + formatMoney(b['Opening Balance']) + '</td>' +
-        '<td class="num mono">' + formatMoney(b['Current Balance']) + '</td>' +
+        '<td>' + escapeHtml(b['Account Number'] || '') + '</td>' +
+        '<td class="num">' + formatMoney(b['Opening Balance']) + '</td>' +
+        '<td class="num">' + formatMoney(b['Current Balance']) + '</td>' +
         '<td>' + statusBadge + '</td>' +
         '<td style="white-space:nowrap;"><button class="btn" data-act="menu" data-id="' + b['Bank Account ID'] + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button></td>';
       body.appendChild(tr);
@@ -348,7 +348,7 @@
           '<td>' + escapeHtml(bnkFormatDateShort_(t['Date'])) + '</td>' +
           '<td>' + escapeHtml(t['From Account Name']) + '</td>' +
           '<td>' + escapeHtml(t['To Account Name']) + '</td>' +
-          '<td class="num mono">' + formatMoney(t['Amount']) + '</td>' +
+          '<td class="num">' + formatMoney(t['Amount']) + '</td>' +
           '<td>' + escapeHtml(t['Notes'] || '') + '</td>' +
           '<td></td>';
         body.appendChild(tr);
@@ -448,14 +448,14 @@
         var canReverse = e.status !== 'Reversed' && !e.reversalOf && String(e.type || '').toLowerCase().indexOf('correction') === -1;
         var tr = document.createElement('tr');
         tr.innerHTML =
-          '<td class="mono">' + escapeHtml(e.date) + '</td>' +
-          '<td class="mono">' + escapeHtml(e.entryId) + '</td>' +
+          '<td>' + escapeHtml(e.date) + '</td>' +
+          '<td>' + escapeHtml(e.entryId) + '</td>' +
           '<td>' + escapeHtml(e.type) + flags + '</td>' +
-          '<td class="mono">' + escapeHtml(e.reference) + '</td>' +
+          '<td>' + escapeHtml(e.reference) + '</td>' +
           '<td>' + escapeHtml(e.description) + (e.notes ? '<br><span style="font-size:11px; color:var(--color-text-muted);">' + escapeHtml(e.notes) + '</span>' : '') + '</td>' +
-          '<td class="num mono">' + (e.debit ? formatMoney(e.debit) : '') + '</td>' +
-          '<td class="num mono">' + (e.credit ? formatMoney(e.credit) : '') + '</td>' +
-          '<td class="num mono">' + formatMoney(e.balance) + '</td>' +
+          '<td class="num">' + (e.debit ? formatMoney(e.debit) : '') + '</td>' +
+          '<td class="num">' + (e.credit ? formatMoney(e.credit) : '') + '</td>' +
+          '<td class="num">' + formatMoney(e.balance) + '</td>' +
           '<td>' + escapeHtml(e.createdBy) + '</td>' +
           '<td style="white-space:nowrap;">' +
             (canReverse ? '<button class="btn" data-act="reverse" data-id="' + escapeHtml(e.entryId) + '">Reverse</button>' : '') +

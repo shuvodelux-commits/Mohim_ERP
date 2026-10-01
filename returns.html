@@ -30,8 +30,8 @@
       <div class="form-grid">
         <div><label>Customer</label><div id="rtSelectedCustomerName"></div></div>
         <div><label>Phone</label><div id="rtSelectedCustomerPhone"></div></div>
-        <div><label>Customer ID</label><div class="mono" id="rtSelectedCustomerId"></div></div>
-        <div><label>Current Due</label><div class="mono" id="rtSelectedCustomerDue"></div></div>
+        <div><label>Customer ID</label><div id="rtSelectedCustomerId"></div></div>
+        <div><label>Current Due</label><div id="rtSelectedCustomerDue"></div></div>
         <div class="full"><label>Address</label><div id="rtSelectedCustomerAddress"></div></div>
       </div>
     </div>
@@ -47,19 +47,19 @@
 <div id="rtInvoiceArea" hidden>
   <div class="card" style="margin-bottom:16px;">
     <div class="form-grid">
-      <div><label>Invoice</label><div class="mono" id="rtInvId"></div></div>
+      <div><label>Invoice</label><div id="rtInvId"></div></div>
       <div><label>Date</label><div id="rtInvDate"></div></div>
       <div><label>Customer</label><div id="rtInvCustomer"></div></div>
       <div><label>Phone</label><div id="rtInvPhone"></div></div>
       <div class="full"><label>Address</label><div id="rtInvAddress"></div></div>
     </div>
     <div class="return-invoice-summary" style="display:flex; gap:24px; flex-wrap:wrap; margin-top:14px; border-top:1px solid var(--color-border); padding-top:12px;">
-      <div><div class="stat-label">Original Total</div><div class="mono" id="rtInvGrandTotal"></div></div>
-      <div><div class="stat-label">Paid</div><div class="mono" id="rtInvPaid"></div></div>
-      <div><div class="stat-label">Cash Refund Available</div><div class="mono" id="rtCashRefundAvailable"></div></div>
-      <div><div class="stat-label">Due</div><div class="mono" id="rtInvDue"></div></div>
-      <div><div class="stat-label">Previously Returned</div><div class="mono" id="rtInvPrevReturned"></div></div>
-      <div><div class="stat-label">Net Sale</div><div class="mono" id="rtInvNetSale"></div></div>
+      <div><div class="stat-label">Original Total</div><div id="rtInvGrandTotal"></div></div>
+      <div><div class="stat-label">Paid</div><div id="rtInvPaid"></div></div>
+      <div><div class="stat-label">Cash Refund Available</div><div id="rtCashRefundAvailable"></div></div>
+      <div><div class="stat-label">Due</div><div id="rtInvDue"></div></div>
+      <div><div class="stat-label">Previously Returned</div><div id="rtInvPrevReturned"></div></div>
+      <div><div class="stat-label">Net Sale</div><div id="rtInvNetSale"></div></div>
     </div>
   </div>
 
@@ -163,10 +163,10 @@
       var tr = document.createElement('tr');
       var integrityBadge = m.duplicateInvoiceId ? ' <span class="badge badge-danger">Duplicate ID</span>' : '';
       tr.innerHTML =
-        '<td class="mono">' + escapeHtml(m.invoiceId) + integrityBadge + '</td>' +
+        '<td>' + escapeHtml(m.invoiceId) + integrityBadge + '</td>' +
         '<td>' + escapeHtml(m.date) + '</td>' +
         '<td>' + escapeHtml(m.customerName) + '</td>' +
-        '<td class="num mono">' + formatMoney(m.grandTotal) + '</td>' +
+        '<td class="num">' + formatMoney(m.grandTotal) + '</td>' +
         '<td>' + escapeHtml(m.paymentStatus) + '</td>' +
         '<td><button class="btn" data-id="' + escapeHtml(m.invoiceId) + '" ' + (m.duplicateInvoiceId ? 'disabled aria-disabled="true"' : '') + '>Load</button></td>';
       tbody.appendChild(tr);
@@ -198,11 +198,11 @@
     rtState.customerSearchMatches.forEach(function (c) {
       var tr = document.createElement('tr');
       tr.innerHTML =
-        '<td class="mono">' + escapeHtml(c.customerId) + '</td>' +
+        '<td>' + escapeHtml(c.customerId) + '</td>' +
         '<td>' + escapeHtml(c.customerName || '') + '</td>' +
         '<td>' + escapeHtml(c.phone || '') + '</td>' +
         '<td>' + escapeHtml(c.address || '') + '</td>' +
-        '<td class="num mono">' + formatMoney(c.currentDue || 0) + '</td>' +
+        '<td class="num">' + formatMoney(c.currentDue || 0) + '</td>' +
         '<td>' + escapeHtml(c.status || '') + '</td>' +
         '<td><button class="btn btn-primary" data-return-customer-id="' + escapeHtml(c.customerId) + '">View Invoices</button></td>';
       tbody.appendChild(tr);
@@ -248,11 +248,11 @@
       var integrityBadge = inv.duplicateInvoiceId ? ' <span class="badge badge-danger">Duplicate ID</span>' : '';
       tr.innerHTML =
         '<td><input type="checkbox" data-customer-invoice-select-id="' + escapeHtml(inv.invoiceId) + '" ' + (selected ? 'checked ' : '') + (selectable ? '' : 'disabled ') + '></td>' +
-        '<td class="mono">' + escapeHtml(inv.invoiceId) + integrityBadge + '</td>' +
+        '<td>' + escapeHtml(inv.invoiceId) + integrityBadge + '</td>' +
         '<td>' + escapeHtml(inv.date) + '</td>' +
-        '<td class="num mono">' + formatMoney(inv.grandTotal || 0) + '</td>' +
-        '<td class="num mono">' + formatMoney(inv.paidAmount || 0) + '</td>' +
-        '<td class="num mono">' + formatMoney(inv.dueAmount || 0) + '</td>' +
+        '<td class="num">' + formatMoney(inv.grandTotal || 0) + '</td>' +
+        '<td class="num">' + formatMoney(inv.paidAmount || 0) + '</td>' +
+        '<td class="num">' + formatMoney(inv.dueAmount || 0) + '</td>' +
         '<td>' + escapeHtml(inv.paymentStatus || '') + '</td>' +
         '<td>' + escapeHtml(inv.returnStatus || '') + '</td>' +
         '<td><button class="btn" data-customer-invoice-load-id="' + escapeHtml(inv.invoiceId) + '" ' + (inv.duplicateInvoiceId ? 'disabled' : '') + '>Load</button></td>';
@@ -410,12 +410,12 @@
     var lineId = bi === null ? ('rtLineTotal' + i) : ('rtLineTotalB' + bi + 'I' + i);
     tr.innerHTML =
       '<td class="return-product-cell">' + escapeHtml(item.name) + '</td>' +
-      '<td class="num mono" data-label="Sold">' + item.soldQty + '</td>' +
-      '<td class="num mono" data-label="Returned">' + (rtState.editingReturnId ? otherReturnedQty : item.previouslyReturnedQty) + '</td>' +
-      '<td class="num mono" data-label="Available">' + item._editMaxQty + '</td>' +
+      '<td class="num" data-label="Sold">' + item.soldQty + '</td>' +
+      '<td class="num" data-label="Returned">' + (rtState.editingReturnId ? otherReturnedQty : item.previouslyReturnedQty) + '</td>' +
+      '<td class="num" data-label="Available">' + item._editMaxQty + '</td>' +
       '<td class="num return-qty-cell" data-label="Return Qty"><input type="number" min="0" max="' + item._editMaxQty + '" value="' + item._returnQty + '" ' + (disabled ? 'disabled' : '') + keyAttrs + ' data-f="qty"></td>' +
       '<td class="num return-price-cell" data-label="Return Price"><input type="number" min="0" max="' + (Number(item.unitPrice) || 0) + '" step="0.01" value="' + item._returnPrice + '" ' + (disabled ? 'disabled' : '') + keyAttrs + ' data-f="price" aria-label="Return Price"></td>' +
-      '<td class="num mono return-line-total" data-label="Line Total" id="' + lineId + '">' + formatMoney(item._returnQty * (Number(item._returnPrice) || 0)) + '</td>';
+      '<td class="num return-line-total" data-label="Line Total" id="' + lineId + '">' + formatMoney(item._returnQty * (Number(item._returnPrice) || 0)) + '</td>';
     return tr;
   }
 

@@ -83,7 +83,7 @@
 <!-- View modal -->
 <div class="modal-overlay" id="finLedViewModal" hidden>
   <div class="modal">
-    <div class="modal-header"><h3>Finance Transaction <span class="bn-hint" style="display:inline;">— লেনদেনের বিস্তারিত</span> <span id="finLedViewId" class="mono"></span></h3><button class="modal-close" onclick="closeModal('finLedViewModal')">&#10005;</button></div>
+    <div class="modal-header"><h3>Finance Transaction <span class="bn-hint" style="display:inline;">— লেনদেনের বিস্তারিত</span> <span id="finLedViewId"></span></h3><button class="modal-close" onclick="closeModal('finLedViewModal')">&#10005;</button></div>
     <div class="modal-body">
       <div class="form-grid">
         <div><label>Date</label><div id="finLedViewDate"></div></div>
@@ -93,8 +93,8 @@
         <div><label>Party</label><div id="finLedViewPerson"></div></div>
         <div><label>Payment Method</label><div id="finLedViewMethod"></div></div>
         <div id="finLedViewBankRow" style="display:none;"><label>Account</label><div id="finLedViewBank"></div></div>
-        <div><label>Amount</label><div class="mono" id="finLedViewAmount"></div></div>
-        <div><label>Balance After</label><div class="mono" id="finLedViewBalance"></div></div>
+        <div><label>Amount</label><div id="finLedViewAmount"></div></div>
+        <div><label>Balance After</label><div id="finLedViewBalance"></div></div>
         <div><label>Reference No.</label><div id="finLedViewReferenceNo"></div></div>
         <div><label>Created By</label><div id="finLedViewBy"></div></div>
         <div class="full"><label>Notes</label><div id="finLedViewNotes"></div></div>
@@ -107,7 +107,7 @@
 <!-- Edit modal -->
 <div class="modal-overlay" id="finLedEditModal" hidden>
   <div class="modal">
-    <div class="modal-header"><h3>Edit Finance Transaction <span class="bn-hint" style="display:inline;">— লেনদেন ঠিক করুন</span> <span id="finLedEditId" class="mono"></span></h3><button class="modal-close" onclick="closeModal('finLedEditModal')">&#10005;</button></div>
+    <div class="modal-header"><h3>Edit Finance Transaction <span class="bn-hint" style="display:inline;">— লেনদেন ঠিক করুন</span> <span id="finLedEditId"></span></h3><button class="modal-close" onclick="closeModal('finLedEditModal')">&#10005;</button></div>
     <div class="modal-body">
       <div class="form-grid">
         <div><label>Date *</label><input id="finLedEditDate" type="date"></div>
@@ -256,7 +256,7 @@
 
     document.getElementById('finLedSelectedPersonName').textContent = person.name || 'Selected person';
     document.getElementById('finLedSelectedPersonBalances').innerHTML = balances.map(function (item) {
-      return '<div class="finance-selected-person-balance-item"><div class="label">' + escapeHtml(item.label) + '</div><div class="value mono">' + escapeHtml(finLedMoney_(item.value)) + '</div></div>';
+      return '<div class="finance-selected-person-balance-item"><div class="label">' + escapeHtml(item.label) + '</div><div class="value">' + escapeHtml(finLedMoney_(item.value)) + '</div></div>';
     }).join('');
     card.hidden = false;
   }
@@ -281,12 +281,12 @@
       var backdatedBadge = r.isBackdated ? ' <span class="badge badge-warning" title="Entered ' + r.backdatedDays + ' day(s) late' + (r.backdatedReason ? ' — ' + escapeHtml(r.backdatedReason) : '') + '">⚠</span>' : '';
       var tr = document.createElement('tr');
       tr.innerHTML = '<td>' + escapeHtml(r.date) + backdatedBadge + '</td>' +
-        '<td class="mono">' + escapeHtml(r.financeId) + '</td><td>' + escapeHtml(r.transactionTypeLabel) + '</td>' +
+        '<td>' + escapeHtml(r.financeId) + '</td><td>' + escapeHtml(r.transactionTypeLabel) + '</td>' +
         '<td>' + escapeHtml(r.accountLabel || '') + '</td><td>' + escapeHtml(r.person) + '</td>' +
         '<td>' + escapeHtml(r.paymentMethod || (finLedType_(r.transactionType) && finLedType_(r.transactionType).cashDirection === 'none' ? 'Opening' : '')) + '</td>' +
-        '<td class="num mono">' + (r.debit ? finLedMoney_(r.debit) : '') + '</td>' +
-        '<td class="num mono">' + (r.credit ? finLedMoney_(r.credit) : '') + '</td>' +
-        '<td class="num mono">' + finLedMoney_(r.balance) + '</td><td>' + escapeHtml(r.createdBy) + '</td>' +
+        '<td class="num">' + (r.debit ? finLedMoney_(r.debit) : '') + '</td>' +
+        '<td class="num">' + (r.credit ? finLedMoney_(r.credit) : '') + '</td>' +
+        '<td class="num">' + finLedMoney_(r.balance) + '</td><td>' + escapeHtml(r.createdBy) + '</td>' +
         '<td style="white-space:nowrap;"><button class="btn" data-act="menuTxn" data-idx="' + idx + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button></td>';
       body.appendChild(tr);
     });

@@ -62,7 +62,7 @@
       <datalist id="posCustomerPhoneList"></datalist>
 
       <div id="posCustomerDueRow" class="totals-row pos-outstanding-due" hidden>
-        <span>Outstanding Due <span class="bn-hint" style="display:inline;">— আগের বাকি</span></span><span class="v mono" id="posCustomerDueValue"></span>
+        <span>Outstanding Due <span class="bn-hint" style="display:inline;">— আগের বাকি</span></span><span class="v" id="posCustomerDueValue"></span>
       </div>
 
       <div class="pos-customer-actions">
@@ -77,12 +77,12 @@
       </div>
 
       <div id="posUpdateBanner" class="session-banner is-closed" hidden>
-        <div>Updating invoice <strong class="mono" id="posUpdateBannerId"></strong></div>
+        <div>Updating invoice <strong id="posUpdateBannerId"></strong></div>
         <div class="toolbar-spacer"></div>
         <button class="btn" id="posCancelUpdateBtn" type="button">Cancel Update</button>
       </div>
       <div id="posDraftBanner" class="session-banner is-open pos-draft-banner" hidden>
-        <div>Editing <strong class="mono" id="posDraftBannerNo"></strong></div>
+        <div>Editing <strong id="posDraftBannerNo"></strong></div>
         <div class="toolbar-spacer"></div>
         <button class="btn" id="posExitDraftBtn" type="button">Exit Draft</button>
       </div>
@@ -121,8 +121,8 @@
         <div class="pos-checkout-totals">
           <div class="totals-row"><span>Subtotal</span><span class="v" id="posSubtotal">0</span></div>
           <div class="totals-row grand"><span>Grand Total</span><span class="v" id="posGrandTotal">0</span></div>
-          <div class="totals-row" id="posChangeRow" style="display:none;"><span>Change Due</span><span class="v mono" id="posChangeDue">0</span></div>
-          <div class="totals-row" id="posDueRow" style="display:none;"><span>Due Amount</span><span class="v mono" id="posDueAmountDisplay">0</span></div>
+          <div class="totals-row" id="posChangeRow" style="display:none;"><span>Change Due</span><span class="v" id="posChangeDue">0</span></div>
+          <div class="totals-row" id="posDueRow" style="display:none;"><span>Due Amount</span><span class="v" id="posDueAmountDisplay">0</span></div>
         </div>
       </div>
 
@@ -1023,7 +1023,7 @@
       tr.innerHTML =
         '<td>' + escapeHtml(v.name) + '</td>' +
         '<td>' + escapeHtml(v.phone || '') + '</td>' +
-        '<td class="num mono">' + formatMoney(v.currentDue) + '</td>' +
+        '<td class="num">' + formatMoney(v.currentDue) + '</td>' +
         '<td>' + statusBadge + '</td>' +
         '<td style="text-align:right;"><button class="btn" data-act="toggle" data-id="' + v.id + '" data-status="' + v.status + '">' + (v.status === 'Active' ? 'Deactivate' : 'Activate') + '</button></td>';
       body.appendChild(tr);
@@ -2065,9 +2065,9 @@
           ? ' <span class="badge badge-danger" title="Duplicate historical invoice ID. Repair data before using invoice actions.">Duplicate ID</span>'
           : '';
         tr.innerHTML =
-          '<td class="mono" data-label="Invoice">' + s.invoiceId + integrityBadge + '</td>' +
+          '<td data-label="Invoice">' + s.invoiceId + integrityBadge + '</td>' +
           '<td data-label="Date">' + escapeHtml(s.date) + ' ' + escapeHtml(s.time || '') + '</td>' +
-          '<td class="num mono" data-label="Total">' + formatMoney(s.grandTotal) + '</td>' +
+          '<td class="num" data-label="Total">' + formatMoney(s.grandTotal) + '</td>' +
           '<td data-label="Status"><span class="badge ' + statusBadge + '">' + s.paymentStatus + '</span></td>' +
           '<td><button class="btn" data-act="historyMenu" data-id="' + s.invoiceId + '" aria-haspopup="menu" aria-expanded="false"' + (s.duplicateInvoiceId ? ' disabled title="Duplicate invoice ID must be repaired before actions can continue"' : '') + '>Actions &#9662;</button></td>';
 

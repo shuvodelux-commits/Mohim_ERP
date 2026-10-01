@@ -40,7 +40,7 @@
 <!-- View / Edit / Open Original modal -->
 <div class="modal-overlay" id="dbViewModal" hidden>
   <div class="modal">
-    <div class="modal-header"><h3>Transaction <span class="bn-hint" style="display:inline;">— লেনদেনের বিস্তারিত</span> <span id="dbViewRef" class="mono"></span></h3><button class="modal-close" onclick="closeModal('dbViewModal')">&#10005;</button></div>
+    <div class="modal-header"><h3>Transaction <span class="bn-hint" style="display:inline;">— লেনদেনের বিস্তারিত</span> <span id="dbViewRef"></span></h3><button class="modal-close" onclick="closeModal('dbViewModal')">&#10005;</button></div>
     <div class="modal-body">
       <div class="form-grid">
         <div><label>Date / Time</label><div id="dbViewDateTime"></div></div>
@@ -49,9 +49,9 @@
         <div><label>Party</label><div id="dbViewParty"></div></div>
         <div><label>Payment Method</label><div id="dbViewMethod"></div></div>
         <div><label>Status</label><div id="dbViewStatus"></div></div>
-        <div><label>Cash In</label><div class="mono" id="dbViewIn"></div></div>
-        <div><label>Cash Out</label><div class="mono" id="dbViewOut"></div></div>
-        <div><label>Running Cash Balance</label><div class="mono" id="dbViewBalance"></div></div>
+        <div><label>Cash In</label><div id="dbViewIn"></div></div>
+        <div><label>Cash Out</label><div id="dbViewOut"></div></div>
+        <div><label>Running Cash Balance</label><div id="dbViewBalance"></div></div>
         <div><label>Created By</label><div id="dbViewBy"></div></div>
         <div class="full"><label>Description</label><div id="dbViewDesc"></div></div>
       </div>
@@ -122,19 +122,19 @@
       var backdatedBadge = r.isBackdated ? ' <span class="badge badge-warning" title="Entered ' + r.backdatedDays + ' day(s) late' + (r.backdatedReason ? ' \u2014 ' + escapeHtml(r.backdatedReason) : '') + '">\u26a0 Backdated</span>' : '';
       var tr = document.createElement('tr');
       tr.innerHTML =
-        '<td class="mono">' + escapeHtml(r.time || '') + '</td>' +
+        '<td>' + escapeHtml(r.time || '') + '</td>' +
         '<td>' + escapeHtml(r.date || '') + backdatedBadge + '</td>' +
-        '<td class="mono">' + escapeHtml(r.referenceNo || '') + '</td>' +
+        '<td>' + escapeHtml(r.referenceNo || '') + '</td>' +
         '<td>' + escapeHtml(r.module) + '</td>' +
         '<td>' + escapeHtml(r.transactionType || '') + '</td>' +
         '<td>' + escapeHtml(r.party || '') + '</td>' +
         '<td>' + escapeHtml(r.description || '') + '</td>' +
         '<td>' + escapeHtml(r.paymentMethod || '') + '</td>' +
-         '<td class="num mono" style="color:var(--color-success);">' + (r.cashIn ? formatMoney(r.cashIn) : '') + '</td>' +
-        '<td class="num mono" style="color:var(--color-danger);">' + (r.cashOut ? formatMoney(r.cashOut) : '') + '</td>' +
-        '<td class="num mono" style="color:var(--color-success);">' + (r.bankIn ? formatMoney(r.bankIn) : '') + '</td>' +
-        '<td class="num mono" style="color:var(--color-danger);">' + (r.bankOut ? formatMoney(r.bankOut) : '') + '</td>' +
-        '<td class="num mono">' + (r.runningCashBalance === null || r.runningCashBalance === undefined ? '\u2014' : formatMoney(r.runningCashBalance)) + '</td>' +
+         '<td class="num" style="color:var(--color-success);">' + (r.cashIn ? formatMoney(r.cashIn) : '') + '</td>' +
+        '<td class="num" style="color:var(--color-danger);">' + (r.cashOut ? formatMoney(r.cashOut) : '') + '</td>' +
+        '<td class="num" style="color:var(--color-success);">' + (r.bankIn ? formatMoney(r.bankIn) : '') + '</td>' +
+        '<td class="num" style="color:var(--color-danger);">' + (r.bankOut ? formatMoney(r.bankOut) : '') + '</td>' +
+        '<td class="num">' + (r.runningCashBalance === null || r.runningCashBalance === undefined ? '\u2014' : formatMoney(r.runningCashBalance)) + '</td>' +
         '<td>' + escapeHtml(r.createdBy || '') + '</td>' +
         '<td>' + statusBadge + '</td>' +
         '<td style="white-space:nowrap;">' +

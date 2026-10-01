@@ -60,7 +60,7 @@
 <div class="modal-overlay" id="smViewModal" hidden>
   <div class="modal modal-lg">
     <div class="modal-header">
-      <h3>Invoice <span class="bn-hint" style="display:inline;">— বিক্রির বিস্তারিত</span> <span id="smViewInvoiceId" class="mono"></span></h3>
+      <h3>Invoice <span class="bn-hint" style="display:inline;">— বিক্রির বিস্তারিত</span> <span id="smViewInvoiceId"></span></h3>
       <button class="modal-close" onclick="closeModal('smViewModal')">
         &#10005;
       </button>
@@ -150,7 +150,7 @@
     <div class="modal-body">
       <p style="font-size: 13px; color: var(--color-text-muted)">
         Remaining due on this invoice:
-        <strong class="mono" id="smPayCurrentDue"></strong>
+        <strong id="smPayCurrentDue"></strong>
       </p>
       <p
         style="
@@ -159,7 +159,7 @@
           margin-top: -6px;
         "
       >
-        This payment is applied to invoice <strong class="mono" id="smPayInvoiceId"></strong>.
+        This payment is applied to invoice <strong id="smPayInvoiceId"></strong>.
         Any extra Cash, Bank, or Mobile Banking payment becomes Customer Advance automatically.
       </p>
       <div class="form-grid" style="margin-top: 10px">
@@ -260,7 +260,7 @@
         : '';
       var tr = document.createElement("tr");
       tr.innerHTML =
-        '<td class="mono"><button type="button" class="party-ledger-link mono" data-invoice-view-id="' + s.invoiceId + '" title="Open invoice">' +
+        '<td><button type="button" class="party-ledger-link" data-invoice-view-id="' + s.invoiceId + '" title="Open invoice">' +
         escapeHtml(s.invoiceId) + '</button>' + integrityBadge +
         "</td>" +
         "<td>" +
@@ -274,21 +274,21 @@
         "<td>" +
         escapeHtml(s.customerPhone || "") +
         "</td>" +
-        '<td class="num mono">' +
+        '<td class="num">' +
         formatMoney(s.grandTotal) +
         "</td>" +
-        '<td class="num mono">' +
+        '<td class="num">' +
         formatMoney(s.paidAmount) +
         ((Number(s.customerCreditUsed) || 0) > 0 ? '<span class="bn-hint" style="display:block;">Credit</span>' : '') +
         "</td>" +
-        '<td class="num mono">' +
+        '<td class="num">' +
         formatMoney(s.dueAmount) +
         "</td>" +
-        '<td class="num mono">' +
+        '<td class="num">' +
         (s.duplicateInvoiceId ? '&mdash;' : formatMoney(s.returnedAmount)) +
         "</td>" +
         (smState.showProfit
-          ? '<td class="num mono"' + (!s.profitCostComplete && !s.duplicateInvoiceId ? ' title="Incomplete historical cost coverage; profit uses available recorded cost evidence."' : '') + '>' +
+          ? '<td class="num"' + (!s.profitCostComplete && !s.duplicateInvoiceId ? ' title="Incomplete historical cost coverage; profit uses available recorded cost evidence."' : '') + '>' +
             (s.duplicateInvoiceId || !Object.prototype.hasOwnProperty.call(s, "profit") ? '&mdash;' : formatMoney(s.profit)) +
             (!s.profitCostComplete && !s.duplicateInvoiceId && Object.prototype.hasOwnProperty.call(s, "profit") ? '<span class="bn-hint" style="display:block;">Cost incomplete</span>' : '') +
             '</td>'
@@ -450,9 +450,9 @@
             escapeHtml(i.name) +
             '</td><td class="num">' +
             i.qty +
-            '</td><td class="num mono">' +
+            '</td><td class="num">' +
             formatMoney(i.unitPrice) +
-            '</td><td class="num mono">' +
+            '</td><td class="num">' +
             formatMoney(i.lineTotal) +
             "</td>";
           body.appendChild(tr);

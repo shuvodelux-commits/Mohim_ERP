@@ -38,11 +38,11 @@
 <!-- ===== View Expense modal ===== -->
 <div class="modal-overlay" id="expViewModal" hidden>
   <div class="modal">
-    <div class="modal-header"><h3>Expense <span class="bn-hint" style="display:inline;">— খরচের বিস্তারিত</span> <span id="expViewId" class="mono"></span></h3><button class="modal-close" onclick="closeModal('expViewModal')">&#10005;</button></div>
+    <div class="modal-header"><h3>Expense <span class="bn-hint" style="display:inline;">— খরচের বিস্তারিত</span> <span id="expViewId"></span></h3><button class="modal-close" onclick="closeModal('expViewModal')">&#10005;</button></div>
     <div class="modal-body"><div class="form-grid">
       <div><label>Date</label><div id="expViewDate"></div></div><div><label>Status</label><div id="expViewStatus"></div></div>
       <div><label>Category</label><div id="expViewCategory"></div></div><div><label>Payee</label><div id="expViewPayee"></div></div>
-      <div><label>Amount</label><div class="mono" id="expViewAmount"></div></div><div><label>Payment Method</label><div id="expViewPaymentMethod"></div></div>
+      <div><label>Amount</label><div id="expViewAmount"></div></div><div><label>Payment Method</label><div id="expViewPaymentMethod"></div></div>
       <div id="expViewBankAccountRow" style="display:none;"><label>Bank Account</label><div id="expViewBankAccount"></div></div>
       <div><label>Reference No.</label><div id="expViewReferenceNo"></div></div>
       <div class="full"><label>Description</label><div id="expViewDescription"></div></div><div class="full"><label>Notes</label><div id="expViewNotes"></div></div>
@@ -54,7 +54,7 @@
 <!-- ===== Edit Expense modal ===== -->
 <div class="modal-overlay" id="expEditModal" hidden>
   <div class="modal">
-    <div class="modal-header"><h3>Edit Expense <span class="bn-hint" style="display:inline;">— খরচ ঠিক করুন</span> <span id="expEditId" class="mono"></span></h3><button class="modal-close" onclick="closeModal('expEditModal')">&#10005;</button></div>
+    <div class="modal-header"><h3>Edit Expense <span class="bn-hint" style="display:inline;">— খরচ ঠিক করুন</span> <span id="expEditId"></span></h3><button class="modal-close" onclick="closeModal('expEditModal')">&#10005;</button></div>
     <div class="modal-body"><div class="form-grid">
       <div><label>Expense Date *</label><input id="expEditDate" type="date"></div>
       <div><label>Payment Method *</label><select id="expEditPaymentMethod"><option value="Cash">Cash</option><option value="Bank">Bank</option><option value="Mobile Banking">Mobile Banking</option><option value="Other">Other</option></select></div>
@@ -163,10 +163,10 @@
       var amountHtml = e.status === 'Cancelled' ? '<span style="text-decoration:line-through;opacity:.7;">' + expHistMoney_(e.amount) + '</span>' : expHistMoney_(e.amount);
       var tr = document.createElement('tr');
       tr.innerHTML = '<td>' + escapeHtml(e.date) + backdatedBadge + '</td>' +
-        '<td class="mono">' + escapeHtml(e.expenseId) + '</td>' + '<td>' + escapeHtml(e.payeeName || 'Unassigned') + '</td>' +
+        '<td>' + escapeHtml(e.expenseId) + '</td>' + '<td>' + escapeHtml(e.payeeName || 'Unassigned') + '</td>' +
         '<td>' + escapeHtml(e.category || '') + '</td>' + '<td>' + escapeHtml(e.description || e.referenceNo || '') + '</td>' +
-        '<td class="num mono">' + amountHtml + '</td>' + '<td>' + escapeHtml(e.paymentMethod || '') + '</td>' + '<td>' + statusBadge + '</td>' +
-        '<td class="num mono">' + expHistMoney_(e.runningTotal) + '</td>' +
+        '<td class="num">' + amountHtml + '</td>' + '<td>' + escapeHtml(e.paymentMethod || '') + '</td>' + '<td>' + statusBadge + '</td>' +
+        '<td class="num">' + expHistMoney_(e.runningTotal) + '</td>' +
         '<td style="white-space:nowrap;"><button class="btn" data-act="menu" data-id="' + escapeHtml(e.expenseId) + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button></td>';
       body.appendChild(tr);
     });

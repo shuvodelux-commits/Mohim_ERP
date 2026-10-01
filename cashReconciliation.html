@@ -195,14 +195,14 @@
       var tr = document.createElement('tr');
       tr.innerHTML =
         '<td>' + escapeHtml(row.date || '') + '</td>' +
-        '<td class="mono">' + escapeHtml(row.sessionId || '') + '</td>' +
-        '<td class="num mono">' + escapeHtml(cashRecMoney_(row.openingExpected)) + '</td>' +
-        '<td class="num mono">' + escapeHtml(cashRecMoney_(row.openingCounted)) + '</td>' +
-        '<td class="num mono ' + (Number(row.openingDifference) < 0 ? 'cash-rec-negative' : (Number(row.openingDifference) > 0 ? 'cash-rec-positive' : '')) + '">' + escapeHtml(cashRecSignedMoney_(row.openingDifference)) + '</td>' +
+        '<td>' + escapeHtml(row.sessionId || '') + '</td>' +
+        '<td class="num">' + escapeHtml(cashRecMoney_(row.openingExpected)) + '</td>' +
+        '<td class="num">' + escapeHtml(cashRecMoney_(row.openingCounted)) + '</td>' +
+        '<td class="num ' + (Number(row.openingDifference) < 0 ? 'cash-rec-negative' : (Number(row.openingDifference) > 0 ? 'cash-rec-positive' : '')) + '">' + escapeHtml(cashRecSignedMoney_(row.openingDifference)) + '</td>' +
         '<td>' + cashRecExplanationHtml_(row, 'opening') + '</td>' +
-        '<td class="num mono">' + escapeHtml(cashRecMoney_(row.closingExpected)) + '</td>' +
-        '<td class="num mono">' + escapeHtml(cashRecMoney_(row.closingCounted)) + '</td>' +
-        '<td class="num mono ' + (Number(row.closingDifference) < 0 ? 'cash-rec-negative' : (Number(row.closingDifference) > 0 ? 'cash-rec-positive' : '')) + '">' + escapeHtml(cashRecSignedMoney_(row.closingDifference)) + '</td>' +
+        '<td class="num">' + escapeHtml(cashRecMoney_(row.closingExpected)) + '</td>' +
+        '<td class="num">' + escapeHtml(cashRecMoney_(row.closingCounted)) + '</td>' +
+        '<td class="num ' + (Number(row.closingDifference) < 0 ? 'cash-rec-negative' : (Number(row.closingDifference) > 0 ? 'cash-rec-positive' : '')) + '">' + escapeHtml(cashRecSignedMoney_(row.closingDifference)) + '</td>' +
         '<td>' + cashRecExplanationHtml_(row, 'closing') + '</td>' +
         '<td>' + escapeHtml(row.notes || '') + '</td>';
       body.appendChild(tr);
