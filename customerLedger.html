@@ -366,10 +366,10 @@
       tr.innerHTML =
         '<td data-label="Date">' + escapeHtml(String(row['Date'] || '').slice(0,10)) + '</td>' +
         '<td data-label="Type">' + escapeHtml(displayType) + '</td>' +
-        '<td class="mono" data-label="Reference">' + escapeHtml(displayReference) + '</td>' +
-        '<td class="num mono" data-label="Debit">' + (row['Debit'] ? escapeHtml(formatMoney(row['Debit'])) : '') + '</td>' +
-        '<td class="num mono" data-label="Credit">' + credit + '</td>' +
-        '<td class="num mono" data-label="Balance">' + escapeHtml(formatMoney(Number(row['Balance']) || 0)) + '</td>' +
+        '<td data-label="Reference">' + escapeHtml(displayReference) + '</td>' +
+        '<td class="num" data-label="Debit">' + (row['Debit'] ? escapeHtml(formatMoney(row['Debit'])) : '') + '</td>' +
+        '<td class="num" data-label="Credit">' + credit + '</td>' +
+        '<td class="num" data-label="Balance">' + escapeHtml(formatMoney(Number(row['Balance']) || 0)) + '</td>' +
         '<td>' + (actions.length ? '<button class="btn" type="button" data-customer-ledger-action-index="' + index + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button>' : '') + '</td>';
       body.appendChild(tr);
     });
