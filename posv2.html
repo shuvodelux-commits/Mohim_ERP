@@ -1181,7 +1181,7 @@
           '</div>' +
           '<div class="table-scroll">' +
             '<table class="mobile-card-table">' +
-              '<thead><tr><th>Draft</th><th>Updated</th><th>Customer</th><th>Phone</th><th class="num">Amount</th><th></th></tr></thead>' +
+              '<thead><tr><th>Draft</th><th>Updated</th><th>Customer</th><th>Phone</th><th class="num">Amount</th><th>Actions</th></tr></thead>' +
               '<tbody id="v2DraftsBody"></tbody>' +
             '</table>' +
           '</div>' +
@@ -1196,18 +1196,105 @@
     document.getElementById('v2DraftRefreshBtn').addEventListener('click', posV2OpenDrafts_);
     document.getElementById('v2DraftSearch').addEventListener('input', posV2RenderDraftRows_);
     document.getElementById('v2DraftsBody').addEventListener('click', function (event) {
-      var button = event.target.closest('[data-pos-v2-draft-open]');
+      var button = event.target.closest('[data-pos-v2-draft-menu]');
       if (!button) return;
-      var draftId = button.getAttribute('data-pos-v2-draft-open');
-      var row = posV2DraftRows_.filter(function (item) { return String(item.draftId) === String(draftId); })[0] || null;
-      if (row && typeof posState !== 'undefined') {
-        var existing = (posState.recentDrafts || []).some(function (item) { return String(item.draftId) === String(draftId); });
-        if (!existing) posState.recentDrafts = [row].concat(posState.recentDrafts || []).slice(0, 3);
-      }
-      closeModal('v2DraftsModal');
-      if (typeof posOpenDraft_ === 'function') posOpenDraft_(draftId, 'posv2');
+      var row = posV2FindDraftRow_(button.getAttribute('data-pos-v2-draft-menu'));
+      if (!row) return;
+      var canOpen = hasActionPermission_('pos', 'view');
+      var canDuplicate = hasActionPermission_('pos', 'add');
+      openRowActionMenu_(button, [
+        { action: 'open', label: 'Open', hidden: !canOpen },
+        { action: 'duplicate', label: 'Duplicate', hidden: !canDuplicate },
+        { action: 'preview', label: 'Print / Preview' },
+        { action: 'jpg', label: 'Save JPG' },
+        { divider: true },
+        { action: 'delete', label: 'Delete', danger: true }
+      ], function (action) { posV2RunDraftAction_(row, action); });
     });
     return modal;
+  }
+
+  function posV2FindDraftRow_(draftId) {
+    return (posV2DraftRows_ || []).filter(function (item) {
+      return String(item.draftId) === String(draftId);
+    })[0] || null;
+  }
+
+  function posV2OpenDraftRow_(row) {
+    if (!row || typeof posOpenDraft_ !== 'function') return null;
+    if (typeof posState !== 'undefined') {
+      var existing = (posState.recentDrafts || []).some(function (item) {
+        return String(item.draftId) === String(row.draftId);
+      });
+      if (!existing) posState.recentDrafts = [row].concat(posState.recentDrafts || []).slice(0, 3);
+    }
+    closeModal('v2DraftsModal');
+    return posOpenDraft_(row.draftId, 'posv2');
+  }
+
+  function posV2DuplicateDraft_(row) {
+    if (!row) return Promise.resolve(null);
+    return withLoader(serverCall('getSalesDraft', authToken, row.draftId)).then(function (draft) {
+      closeModal('v2DraftsModal');
+      goToPage('posv2');
+      return posLoadDuplicateInvoice_(draft);
+    }).then(function (result) {
+      showToast('Loaded into POS — adjust and complete the sale', 'success');
+      return result;
+    }).catch(function (err) {
+      showToast(err.message || 'Could not duplicate draft.', 'error');
+      return null;
+    });
+  }
+
+  function posV2PreviewDraft_(row, action) {
+    if (!row) return Promise.resolve(null);
+    return withLoader(serverCall('getSalesDraftPreview', authToken, row.draftId)).then(function (preview) {
+      closeModal('v2DraftsModal');
+      posRenderInvoice_(preview);
+      openModal('invoiceModal');
+      if (action === 'jpg') downloadInvoiceJpg_(preview);
+      return preview;
+    }).catch(function (err) {
+      showToast(err.message || 'Could not preview draft.', 'error');
+      return null;
+    });
+  }
+
+  function posV2DeleteDraft_(row) {
+    if (!row) return Promise.resolve(null);
+    return confirmAction({
+      type: 'danger',
+      title: 'Delete Draft?',
+      message: 'This removes the unfinished draft only. No posted sale or accounting entry exists.',
+      details: [
+        { label: 'Draft', value: row.draftNo },
+        { label: 'Customer', value: row.customerName || 'Not selected' },
+        { label: 'Amount', value: formatMoney(Number(row.grandTotal) || 0) }
+      ],
+      confirmLabel: 'Delete Draft',
+      cancelLabel: 'Cancel',
+      reason: { required: true, label: 'Reason', placeholder: 'Why are you deleting this draft?' }
+    }).then(function (result) {
+      if (!result || !result.confirmed) return null;
+      return withLoader(serverCall('deleteSalesDraft', authToken, row.draftId, row.version, result.reason)).then(function () {
+        showToast('Draft deleted.', 'success');
+        if (typeof posLoadRecentDrafts_ === 'function') posLoadRecentDrafts_();
+        return posV2OpenDrafts_();
+      });
+    }).catch(function (err) {
+      showToast(err.message || 'Could not delete draft.', 'error');
+      return null;
+    });
+  }
+
+  function posV2RunDraftAction_(row, action) {
+    if (action === 'open') return posV2OpenDraftRow_(row);
+    if (action === 'duplicate') return posV2DuplicateDraft_(row);
+    if (action === 'preview') return posV2PreviewDraft_(row, 'preview');
+    if (action === 'jpg') return posV2PreviewDraft_(row, 'jpg');
+    if (action === 'delete') return posV2DeleteDraft_(row);
+    return null;
   }
 
   function posV2RenderDraftRows_() {
@@ -1231,7 +1318,7 @@
         '<td data-label="Customer">' + escapeHtml(row.customerName || 'Not selected') + '</td>' +
         '<td data-label="Phone">' + escapeHtml(row.customerPhone || '') + '</td>' +
         '<td data-label="Amount" class="num">' + formatMoney(Number(row.grandTotal) || 0) + '</td>' +
-        '<td data-label="Action"><button type="button" class="btn btn-sm" data-pos-v2-draft-open="' + escapeHtml(String(row.draftId || '')) + '">Open</button></td>' +
+        '<td data-label="Actions"><button type="button" class="btn btn-sm" data-pos-v2-draft-menu="' + escapeHtml(String(row.draftId || '')) + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button></td>' +
       '</tr>';
     }).join('');
     empty.hidden = rows.length > 0;
