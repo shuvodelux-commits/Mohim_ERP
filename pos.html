@@ -899,6 +899,28 @@
     if (input) { input.focus(); input.select(); }
   }
 
+  function posCartFastEntryTargetIsInteractive_(target) {
+    if (!target || !target.closest) return false;
+    return !!target.closest('input, textarea, select, button, a[href], [contenteditable]:not([contenteditable="false"]), [role="button"]');
+  }
+
+  function posHandleCartFastEntryKeydown_(e) {
+    if (e.key !== 'Enter' || e.defaultPrevented || e.isComposing || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+    if (currentPage !== 'pos' && currentPage !== 'posv2') return;
+
+    var confirmModal = document.getElementById('confirmActionModal');
+    if ((confirmModal && !confirmModal.hidden) || document.querySelector('.modal-overlay:not([hidden])')) return;
+    if (posCartFastEntryTargetIsInteractive_(e.target)) return;
+
+    var input = document.querySelector('#posCartList .pos-cart-entry-row [data-cart-product-input][data-cart-product-mode="add"]');
+    if (!input || input.disabled) return;
+
+    e.preventDefault();
+    posFocusCartEntryProduct_();
+  }
+
+  document.addEventListener('keydown', posHandleCartFastEntryKeydown_);
+
   function posStartCartEntry_(product) {
     if (!product) return false;
     var already = posState.cart.some(function (line) { return line.productId === product.id; });
