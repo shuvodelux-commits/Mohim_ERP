@@ -38,6 +38,39 @@ test('selected inline product immediately shows canonical full name before qty t
   assert.match(focus, /input\.select\(\)/);
 });
 
+test('cart page Enter shortcut focuses Add Product without hijacking form controls or modals', () => {
+  const shortcut = functionSource('posHandleCartFastEntryKeydown_');
+  const interactive = functionSource('posCartFastEntryTargetIsInteractive_');
+
+  assert.match(shortcut, /e\.key !== 'Enter'/);
+  assert.match(shortcut, /currentPage !== 'pos'/);
+  assert.match(shortcut, /currentPage !== 'posv2'/);
+  assert.match(shortcut, /confirmActionModal/);
+  assert.match(shortcut, /\.modal-overlay:not\(\[hidden\]\)/);
+  assert.match(shortcut, /posCartFastEntryTargetIsInteractive_\(e\.target\)/);
+  assert.match(shortcut, /e\.preventDefault\(\)/);
+  assert.match(shortcut, /posFocusCartEntryProduct_\(\)/);
+
+  assert.match(interactive, /input, textarea, select, button/);
+  assert.match(interactive, /a\[href\]/);
+  assert.match(interactive, /contenteditable/);
+  assert.match(pos, /document\.addEventListener\('keydown', posHandleCartFastEntryKeydown_\)/);
+});
+
+test('quantity Enter completes the active line and focuses the next Add Product row', () => {
+  const finish = functionSource('posFinishCartEntry_');
+  const start = pos.indexOf("document.getElementById('posCartList').addEventListener('keydown'");
+  const end = pos.indexOf("document.getElementById('posCartList').addEventListener('scroll'", start);
+  const keyArea = pos.slice(start, end);
+
+  assert.match(keyArea, /data-cart-entry-qty/);
+  assert.match(keyArea, /e\.key === 'Enter'/);
+  assert.match(keyArea, /posFinishCartEntry_\(\)/);
+  assert.match(finish, /posState\.cartEntryIndex = null/);
+  assert.match(finish, /posRenderCart_\(\)/);
+  assert.match(finish, /posFocusCartEntryProduct_\(\)/);
+});
+
 test('inline Add product and replace search support ArrowUp ArrowDown and Enter selected option', () => {
   const move = functionSource('posMoveCartProductActive_');
   const active = functionSource('posActiveCartProductOption_');
