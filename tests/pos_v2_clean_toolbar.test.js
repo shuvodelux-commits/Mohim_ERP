@@ -70,6 +70,34 @@ test('V2 Drafts opens an all-drafts modal and opens drafts back into POS V2', ()
   assert.match(v2, /posOpenDraft_\([^,]+,\s*['"]posv2['"]\)/);
 });
 
+test('V2 Drafts modal exposes the full Draft Invoice action menu', () => {
+  const ensure = functionSource(v2, 'posV2EnsureDraftModal_');
+  const render = functionSource(v2, 'posV2RenderDraftRows_');
+  const run = functionSource(v2, 'posV2RunDraftAction_');
+  const duplicate = functionSource(v2, 'posV2DuplicateDraft_');
+  const preview = functionSource(v2, 'posV2PreviewDraft_');
+  const remove = functionSource(v2, 'posV2DeleteDraft_');
+
+  assert.match(ensure, /openRowActionMenu_/);
+  assert.match(ensure, /label:\s*['"]Open['"]/);
+  assert.match(ensure, /label:\s*['"]Duplicate['"]/);
+  assert.match(ensure, /label:\s*['"]Print \/ Preview['"]/);
+  assert.match(ensure, /label:\s*['"]Save JPG['"]/);
+  assert.match(ensure, /label:\s*['"]Delete['"]/);
+  assert.match(render, /data-pos-v2-draft-menu/);
+  assert.match(run, /posV2OpenDraftRow_/);
+  assert.match(run, /posV2DuplicateDraft_/);
+  assert.match(run, /posV2PreviewDraft_/);
+  assert.match(run, /posV2DeleteDraft_/);
+  assert.match(duplicate, /getSalesDraft/);
+  assert.match(duplicate, /posLoadDuplicateInvoice_/);
+  assert.match(preview, /getSalesDraftPreview/);
+  assert.match(preview, /downloadInvoiceJpg_/);
+  assert.match(remove, /deleteSalesDraft/);
+  assert.match(remove, /posLoadRecentDrafts_/);
+  assert.match(remove, /posV2OpenDrafts_/);
+});
+
 test('V2 Add Product delegates to the existing Products modal workflow', () => {
   const open = functionSource(v2, 'posV2OpenAddProduct_');
   assert.match(open, /prodAddBtn/);
