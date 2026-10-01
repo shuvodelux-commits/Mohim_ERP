@@ -129,7 +129,7 @@
 <div class="modal-overlay" id="vlMemoEditModal" hidden>
   <div class="modal" style="max-width:760px;">
     <div class="modal-header">
-      <div><h3>Edit Vendor Memo <span id="vlMemoEditId" class="mono"></span></h3><span class="bn-hint">Edit quantity and unit value for all products in this memo</span></div>
+      <div><h3>Edit Vendor Memo <span id="vlMemoEditId"></span></h3><span class="bn-hint">Edit quantity and unit value for all products in this memo</span></div>
       <button class="modal-close" onclick="closeModal('vlMemoEditModal')">&#10005;</button>
     </div>
     <div class="modal-body">
@@ -141,7 +141,7 @@
         <table>
           <thead><tr><th>Product</th><th class="num">Qty</th><th class="num">Already Returned</th><th class="num">Unit Value</th><th class="num">Total</th></tr></thead>
           <tbody id="vlMemoEditItemsBody"></tbody>
-          <tfoot><tr><th colspan="4" style="text-align:right;">Memo Total</th><th class="num mono" id="vlMemoEditTotal">0</th></tr></tfoot>
+          <tfoot><tr><th colspan="4" style="text-align:right;">Memo Total</th><th class="num" id="vlMemoEditTotal">0</th></tr></tfoot>
         </table>
       </div>
       <div id="vlMemoEditBackdatedReasonRow" style="display:none; margin-top:10px;"><label>Reason for Backdating *</label><input id="vlMemoEditBackdatedReason" type="text" placeholder="Why is this dated in the past?"></div>
@@ -292,8 +292,8 @@
       tr.innerHTML =
         '<td>' + escapeHtml(v.name) + '</td>' +
         '<td>' + escapeHtml(v.phone || '') + '</td>' +
-        '<td class="num mono">' + dueCell + '</td>' +
-        '<td class="num mono">' + receivableCell + '</td>' +
+        '<td class="num">' + dueCell + '</td>' +
+        '<td class="num">' + receivableCell + '</td>' +
         '<td>' + statusBadge + '</td>' +
         '<td style="white-space:nowrap;">' +
           '<button class="btn" data-act="menu" data-id="' + v.id + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button>' +
@@ -590,7 +590,7 @@
       tr.innerHTML = '<td>' + escapeHtml(item.productName) + '</td>' +
         '<td class="num"><input type="number" min="0" step="1" ' + (maxStock !== '' ? 'max="' + maxStock + '" ' : '') + 'data-vl-give-field="quantity" data-vl-give-index="' + index + '" value="' + escapeHtml(String(item.quantity)) + '" style="width:90px; text-align:right;"></td>' +
         '<td class="num"><input type="number" min="0" step="0.01" data-vl-give-field="unitValue" data-vl-give-index="' + index + '" value="' + escapeHtml(String(item.unitValue)) + '" style="width:110px; text-align:right;"></td>' +
-        '<td class="num mono" data-vl-give-line-total="' + index + '">' + escapeHtml(formatMoney(lineTotal)) + '</td>' +
+        '<td class="num" data-vl-give-line-total="' + index + '">' + escapeHtml(formatMoney(lineTotal)) + '</td>' +
         '<td><button type="button" class="btn btn-sm" data-vl-give-remove="' + index + '">Remove</button></td>';
       body.appendChild(tr);
     });
@@ -906,10 +906,10 @@
           '<td>' + escapeHtml(formatDateShort_(l['Date'])) + '</td>' +
           '<td>' + escapeHtml(type) + '</td>' +
           '<td>' + balanceTypeBadge + '</td>' +
-          '<td class="mono">' + escapeHtml(displayReference || '') + '</td>' +
-          '<td class="num mono">' + (l['Debit'] ? formatMoney(l['Debit']) : '') + '</td>' +
-          '<td class="num mono">' + (l['Credit'] ? formatMoney(l['Credit']) : '') + '</td>' +
-          '<td class="num mono">' + formatMoney(l['Balance']) + '</td>' +
+          '<td>' + escapeHtml(displayReference || '') + '</td>' +
+          '<td class="num">' + (l['Debit'] ? formatMoney(l['Debit']) : '') + '</td>' +
+          '<td class="num">' + (l['Credit'] ? formatMoney(l['Credit']) : '') + '</td>' +
+          '<td class="num">' + formatMoney(l['Balance']) + '</td>' +
           '<td>' + escapeHtml(l['Notes'] || '') + '</td>' +
           '<td style="white-space:nowrap;">' + ledgerActions + '</td>';
         body.appendChild(tr);
@@ -946,9 +946,9 @@
       var tr = document.createElement('tr');
       tr.innerHTML = '<td>' + escapeHtml(item.productName) + '</td>' +
         '<td class="num"><input type="number" min="' + Math.max(1, Number(item.returnedQty) || 0) + '" step="1" data-vl-memo-field="quantity" data-vl-memo-index="' + index + '" value="' + escapeHtml(String(item.quantity)) + '" style="width:90px; text-align:right;"></td>' +
-        '<td class="num mono">' + escapeHtml(String(Number(item.returnedQty) || 0)) + '</td>' +
+        '<td class="num">' + escapeHtml(String(Number(item.returnedQty) || 0)) + '</td>' +
         '<td class="num"><input type="number" min="0" step="0.01" data-vl-memo-field="unitValue" data-vl-memo-index="' + index + '" value="' + escapeHtml(String(item.unitValue)) + '" style="width:110px; text-align:right;"></td>' +
-        '<td class="num mono" data-vl-memo-line-total="' + index + '">' + escapeHtml(formatMoney(lineTotal)) + '</td>';
+        '<td class="num" data-vl-memo-line-total="' + index + '">' + escapeHtml(formatMoney(lineTotal)) + '</td>';
       body.appendChild(tr);
     });
     document.getElementById('vlMemoEditTotal').textContent = formatMoney(total);
