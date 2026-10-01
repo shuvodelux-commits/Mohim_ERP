@@ -110,7 +110,13 @@ function buildInvoicePayload_(invoiceId) {
     paidAmount: settlement.paidAmount, dueAmount: settlement.dueAmount,
     customerCreditUsed: settlement.customerCreditUsed || 0,
     paymentType: settlement.paymentType, paymentStatus: settlement.paymentStatus,
-    paymentMethod: sale['Payment Method'] || '', bankAccountName: sale['Bank Account Name'] || '',
+    // paidAmount above is the current settlement snapshot and may include
+    // later customer payments. Keep the original sale tender separately so
+    // Duplicate Invoice can reproduce the original checkout form without
+    // accidentally copying later collections.
+    originalPaidAmount: Number(sale['Paid Amount']) || 0,
+    paymentMethod: sale['Payment Method'] || '', bankAccountId: sale['Bank Account ID'] || '',
+    bankAccountName: sale['Bank Account Name'] || '',
     shop: buildInvoiceShopPayload_(settings)
   };
 }
