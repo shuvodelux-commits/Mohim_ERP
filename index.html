@@ -10,7 +10,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet">
   <?!= include('style'); ?>
 </head>
 <body>
@@ -74,7 +74,7 @@
     <div class="modal">
       <div class="modal-header"><h3>Close Cash Session <span class="bn-hint" style="display:inline;">— দিনের হিসাব বন্ধ করুন</span></h3><button class="modal-close" onclick="closeModal('posCloseModal')">&#10005;</button></div>
       <div class="modal-body">
-        <p style="font-size:13px; color:var(--color-text-muted);">Expected in drawer <span class="bn-hint" style="display:inline;">— ড্রয়ারে থাকার কথা</span>: <strong class="mono" id="posCloseExpected"></strong></p>
+        <p style="font-size:13px; color:var(--color-text-muted);">Expected in drawer <span class="bn-hint" style="display:inline;">— ড্রয়ারে থাকার কথা</span>: <strong id="posCloseExpected"></strong></p>
         <label>Counted Cash (what you actually count in the drawer) <span class="bn-hint" style="display:inline;">— গুনে দেখা টাকা</span></label>
         <input id="posCountedCash" type="number" min="0" step="0.01">
         <div style="height:10px;"></div>
