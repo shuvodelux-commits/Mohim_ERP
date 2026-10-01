@@ -7,7 +7,7 @@
 <!-- ================= New Purchase ================= -->
 <div class="tab-panel" id="purNew">
   <div id="purUpdateBanner" class="session-banner is-closed" hidden style="margin-bottom: 12px">
-    <div>Updating purchase <span class="bn-hint" style="display:inline;">— কেনা পরিবর্তন হচ্ছে</span> <strong class="mono" id="purUpdateBannerId"></strong></div>
+    <div>Updating purchase <span class="bn-hint" style="display:inline;">— কেনা পরিবর্তন হচ্ছে</span> <strong id="purUpdateBannerId"></strong></div>
     <div class="toolbar-spacer"></div>
     <button class="btn" id="purCancelUpdateBtn" type="button">Cancel Update</button>
   </div>
@@ -176,7 +176,7 @@
 <div class="modal-overlay" id="purViewModal" hidden>
   <div class="modal modal-lg">
     <div class="modal-header">
-      <h3>Purchase <span class="bn-hint" style="display:inline;">— কেনার বিস্তারিত</span> <span id="purViewId" class="mono"></span></h3>
+      <h3>Purchase <span class="bn-hint" style="display:inline;">— কেনার বিস্তারিত</span> <span id="purViewId"></span></h3>
       <button class="modal-close" onclick="closeModal('purViewModal')">&#10005;</button>
     </div>
     <div class="modal-body">
@@ -233,7 +233,7 @@
       <div class="form-grid">
         <div>
           <label>Purchase <span class="bn-hint" style="display:inline;">— কেনার নম্বর</span></label>
-          <div class="mono" id="prtPurId"></div>
+          <div id="prtPurId"></div>
         </div>
         <div>
           <label>Date <span class="bn-hint" style="display:inline;">— তারিখ</span></label>
@@ -256,23 +256,23 @@
       >
         <div>
           <div class="stat-label">Original Total <span class="bn-hint" style="display:inline;">— মূল মোট টাকা</span></div>
-          <div class="mono" id="prtPurGrandTotal"></div>
+          <div id="prtPurGrandTotal"></div>
         </div>
         <div>
           <div class="stat-label">Paid <span class="bn-hint" style="display:inline;">— কত দিলেন</span></div>
-          <div class="mono" id="prtPurPaid"></div>
+          <div id="prtPurPaid"></div>
         </div>
         <div>
           <div class="stat-label">Due <span class="bn-hint" style="display:inline;">— বাকি</span></div>
-          <div class="mono" id="prtPurDue"></div>
+          <div id="prtPurDue"></div>
         </div>
         <div>
           <div class="stat-label">Previously Returned <span class="bn-hint" style="display:inline;">— আগে ফেরত দেওয়া</span></div>
-          <div class="mono" id="prtPurPrevReturned"></div>
+          <div id="prtPurPrevReturned"></div>
         </div>
         <div>
           <div class="stat-label">Net Purchase <span class="bn-hint" style="display:inline;">— প্রকৃত কেনা</span></div>
-          <div class="mono" id="prtPurNetPurchase"></div>
+          <div id="prtPurNetPurchase"></div>
         </div>
       </div>
     </div>
@@ -391,7 +391,7 @@
 <div class="modal-overlay" id="prtDetailModal" hidden>
   <div class="modal">
     <div class="modal-header">
-      <h3>Return <span class="bn-hint" style="display:inline;">— ফেরতের বিস্তারিত</span> <span id="prtDetailId" class="mono"></span></h3>
+      <h3>Return <span class="bn-hint" style="display:inline;">— ফেরতের বিস্তারিত</span> <span id="prtDetailId"></span></h3>
       <button class="modal-close" onclick="closeModal('prtDetailModal')">
         &#10005;
       </button>
@@ -400,7 +400,7 @@
       <div class="form-grid" style="margin-bottom: 12px">
         <div>
           <label>Purchase <span class="bn-hint" style="display:inline;">— কেনার নম্বর</span></label>
-          <div class="mono" id="prtDetailPurchase"></div>
+          <div id="prtDetailPurchase"></div>
         </div>
         <div>
           <label>Date <span class="bn-hint" style="display:inline;">— তারিখ</span></label>
@@ -512,13 +512,13 @@
       var retBadge = p.returnStatus === "No Return" ? "" : (p.returnStatus === "Fully Returned" ? "badge-danger" : "badge-warning");
       var tr = document.createElement("tr");
       tr.innerHTML =
-        '<td class="mono">' + p.purchaseId + "</td>" +
+        '<td>' + p.purchaseId + "</td>" +
         "<td>" + escapeHtml(formatDateShort_(p.date)) + "</td>" +
         "<td>" + escapeHtml(p.supplierName) + "</td>" +
-        '<td class="num mono">' + formatMoney(p.grandTotal) + "</td>" +
-        '<td class="num mono">' + formatMoney(p.paidAmount) + "</td>" +
-        '<td class="num mono">' + formatMoney(p.dueAmount) + "</td>" +
-        '<td class="num mono">' + formatMoney(p.returnedAmount) + "</td>" +
+        '<td class="num">' + formatMoney(p.grandTotal) + "</td>" +
+        '<td class="num">' + formatMoney(p.paidAmount) + "</td>" +
+        '<td class="num">' + formatMoney(p.dueAmount) + "</td>" +
+        '<td class="num">' + formatMoney(p.returnedAmount) + "</td>" +
         '<td><span class="badge ' + statusBadge + '">' + p.paymentStatus + "</span>" +
         (retBadge ? ' <span class="badge ' + retBadge + '">' + p.returnStatus + "</span>" : "") +
         "</td>" +
@@ -565,9 +565,9 @@
           tr.innerHTML =
             "<td>" + escapeHtml(i.name) + "</td>" +
             '<td class="num">' + i.qty + "</td>" +
-            '<td class="num mono">' + formatMoney(i.unitPrice) + "</td>" +
-            '<td class="num mono">' + formatMoney(i.sellingPrice) + "</td>" +
-            '<td class="num mono">' + formatMoney(i.lineTotal) + "</td>";
+            '<td class="num">' + formatMoney(i.unitPrice) + "</td>" +
+            '<td class="num">' + formatMoney(i.sellingPrice) + "</td>" +
+            '<td class="num">' + formatMoney(i.lineTotal) + "</td>";
           body.appendChild(tr);
         });
 
@@ -1393,14 +1393,14 @@
         matches.forEach(function (m) {
           var tr = document.createElement("tr");
           tr.innerHTML =
-            '<td class="mono">' +
+            '<td>' +
             m.purchaseId +
             "</td><td>" +
             escapeHtml(m.date) +
             "</td>" +
             "<td>" +
             escapeHtml(m.supplierName) +
-            '</td><td class="num mono">' +
+            '</td><td class="num">' +
             formatMoney(m.grandTotal) +
             "</td>" +
             "<td>" +
@@ -1507,13 +1507,13 @@
         "<td>" +
         escapeHtml(item.name) +
         "</td>" +
-        '<td class="num mono">' +
+        '<td class="num">' +
         item.boughtQty +
         "</td>" +
-        '<td class="num mono">' +
+        '<td class="num">' +
         (prtState.editingReturnId ? otherReturnedQty : item.previouslyReturnedQty) +
         "</td>" +
-        '<td class="num mono">' +
+        '<td class="num">' +
         maxQty +
         "</td>" +
         '<td class="num"><input type="number" min="0" max="' +
@@ -1523,10 +1523,10 @@
         ' data-i="' +
         i +
         '" data-f="qty" style="width:70px; text-align:right;"></td>' +
-        '<td class="num mono">' +
+        '<td class="num">' +
         formatMoney(item.unitPrice) +
         '</td>' +
-        '<td class="num mono" id="prtLineTotal' +
+        '<td class="num" id="prtLineTotal' +
         i +
         '">' + formatMoney(existingQty * item.unitPrice) + '</td>';
       body.appendChild(tr);
@@ -1669,19 +1669,19 @@
     rows.forEach(function (r) {
       var tr = document.createElement("tr");
       tr.innerHTML =
-        '<td class="mono">' +
+        '<td>' +
         r["Return ID"] +
         "</td>" +
         "<td>" +
         escapeHtml(formatDateShort_(r["Date"])) +
         "</td>" +
-        '<td class="mono">' +
+        '<td>' +
         r["Purchase ID"] +
         "</td>" +
         "<td>" +
         escapeHtml(r["Supplier Name"] || "") +
         "</td>" +
-        '<td class="num mono">' +
+        '<td class="num">' +
         formatMoney(r["Total Return Amount"]) +
         "</td>" +
         "<td>" +
@@ -1731,9 +1731,9 @@
             escapeHtml(i["Product Name"]) +
             '</td><td class="num">' +
             i["Return Quantity"] +
-            '</td><td class="num mono">' +
+            '</td><td class="num">' +
             formatMoney(i["Return Price"]) +
-            '</td><td class="num mono">' +
+            '</td><td class="num">' +
             formatMoney(i["Line Total"]) +
             "</td>";
           body.appendChild(tr);
