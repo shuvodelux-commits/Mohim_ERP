@@ -17,10 +17,10 @@
 <!-- ===== Return detail popup ===== -->
 <div class="modal-overlay" id="rhDetailModal" hidden>
   <div class="modal">
-    <div class="modal-header"><h3>Return <span class="bn-hint" style="display:inline;">— ফেরতের বিস্তারিত</span> <span id="rhDetailId" class="mono"></span></h3><button class="modal-close" onclick="closeModal('rhDetailModal')">&#10005;</button></div>
+    <div class="modal-header"><h3>Return <span class="bn-hint" style="display:inline;">— ফেরতের বিস্তারিত</span> <span id="rhDetailId"></span></h3><button class="modal-close" onclick="closeModal('rhDetailModal')">&#10005;</button></div>
     <div class="modal-body">
       <div class="form-grid" style="margin-bottom:12px;">
-        <div><label>Invoice</label><div class="mono" id="rhDetailInvoice"></div></div>
+        <div><label>Invoice</label><div id="rhDetailInvoice"></div></div>
         <div><label>Date</label><div id="rhDetailDate"></div></div>
         <div><label>Customer</label><div id="rhDetailCustomer"></div></div>
         <div><label>Refund Method</label><div id="rhDetailMethod"></div></div>
@@ -42,13 +42,13 @@
 <!-- ===== Batch detail popup ===== -->
 <div class="modal-overlay" id="rhBatchDetailModal" hidden>
   <div class="modal" style="max-width:900px;">
-    <div class="modal-header"><h3>Return Batch <span id="rhBatchDetailId" class="mono"></span></h3><button class="modal-close" onclick="closeModal('rhBatchDetailModal')">&#10005;</button></div>
+    <div class="modal-header"><h3>Return Batch <span id="rhBatchDetailId"></span></h3><button class="modal-close" onclick="closeModal('rhBatchDetailModal')">&#10005;</button></div>
     <div class="modal-body">
       <div class="form-grid" style="margin-bottom:12px;">
         <div><label>Date</label><div id="rhBatchDetailDate"></div></div>
         <div><label>Customer</label><div id="rhBatchDetailCustomer"></div></div>
         <div><label>Refund Method</label><div id="rhBatchDetailMethod"></div></div>
-        <div><label>Batch Total</label><div id="rhBatchDetailTotal" class="mono"></div></div>
+        <div><label>Batch Total</label><div id="rhBatchDetailTotal"></div></div>
       </div>
       <div id="rhBatchChildren"></div>
     </div>
@@ -82,13 +82,13 @@
       var tr = document.createElement('tr');
       var batchId = r['Batch ID'] || '';
       tr.innerHTML =
-        '<td class="mono">' + escapeHtml(r['Return ID']) + '</td>' +
-        '<td class="mono">' + escapeHtml(batchId || '—') + '</td>' +
+        '<td>' + escapeHtml(r['Return ID']) + '</td>' +
+        '<td>' + escapeHtml(batchId || '—') + '</td>' +
         '<td>' + escapeHtml(formatDateShort_(r['Date'])) + '</td>' +
-        '<td class="mono">' + escapeHtml(r['Invoice ID']) + '</td>' +
+        '<td>' + escapeHtml(r['Invoice ID']) + '</td>' +
         '<td>' + escapeHtml(r['Customer Name'] || '') + '</td>' +
         '<td>' + escapeHtml(r['Refund Method']) + '</td>' +
-        '<td class="num mono">' + formatMoney(r['Total Return Amount']) + '</td>' +
+        '<td class="num">' + formatMoney(r['Total Return Amount']) + '</td>' +
         '<td>' + escapeHtml(r['Processed By'] || '') + '</td>' +
         '<td><button class="btn" data-act="menuReturn" data-id="' + escapeHtml(r['Return ID']) + '" data-batch="' + escapeHtml(batchId) + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button></td>';
       body.appendChild(tr);
@@ -120,7 +120,7 @@
       body.innerHTML = '';
       data.items.forEach(function (i) {
         var tr = document.createElement('tr');
-        tr.innerHTML = '<td>' + escapeHtml(i['Product Name']) + '</td><td class="num">' + i['Return Quantity'] + '</td><td class="num mono">' + formatMoney(i['Return Price']) + '</td><td class="num mono">' + formatMoney(i['Line Total']) + '</td>';
+        tr.innerHTML = '<td>' + escapeHtml(i['Product Name']) + '</td><td class="num">' + i['Return Quantity'] + '</td><td class="num">' + formatMoney(i['Return Price']) + '</td><td class="num">' + formatMoney(i['Line Total']) + '</td>';
         body.appendChild(tr);
       });
       openModal('rhDetailModal');
@@ -141,12 +141,12 @@
         card.className = 'card';
         card.style.marginBottom = '12px';
         var html = '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px;">' +
-          '<div><strong>Return ID:</strong> <span class="mono">' + escapeHtml(child.header['Return ID']) + '</span></div>' +
-          '<div><strong>Invoice:</strong> <span class="mono">' + escapeHtml(child.header['Invoice ID']) + '</span></div>' +
-          '<div><strong>Total:</strong> <span class="mono">' + formatMoney(child.header['Total Return Amount']) + '</span></div>' +
+          '<div><strong>Return ID:</strong> <span>' + escapeHtml(child.header['Return ID']) + '</span></div>' +
+          '<div><strong>Invoice:</strong> <span>' + escapeHtml(child.header['Invoice ID']) + '</span></div>' +
+          '<div><strong>Total:</strong> <span>' + formatMoney(child.header['Total Return Amount']) + '</span></div>' +
           '</div><table><thead><tr><th>Product</th><th class="num">Qty</th><th class="num">Price</th><th class="num">Total</th></tr></thead><tbody>';
         child.items.forEach(function (item) {
-          html += '<tr><td>' + escapeHtml(item['Product Name']) + '</td><td class="num">' + item['Return Quantity'] + '</td><td class="num mono">' + formatMoney(item['Return Price']) + '</td><td class="num mono">' + formatMoney(item['Line Total']) + '</td></tr>';
+          html += '<tr><td>' + escapeHtml(item['Product Name']) + '</td><td class="num">' + item['Return Quantity'] + '</td><td class="num">' + formatMoney(item['Return Price']) + '</td><td class="num">' + formatMoney(item['Line Total']) + '</td></tr>';
         });
         html += '</tbody></table>';
         card.innerHTML = html;
