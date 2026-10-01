@@ -85,7 +85,11 @@ test('Edit Sale and Day Book Edit route to POS V2', () => {
 });
 
 test('existing sale restoration keeps original invoice identity and editable sale data', () => {
-  const update = functionSource(pos, 'posLoadUpdateInvoice_');
+  const updateStart = pos.indexOf('function posLoadUpdateInvoice_(');
+  const updateEnd = pos.indexOf('function posEnterUpdateMode_', updateStart);
+  assert.notStrictEqual(updateStart, -1);
+  assert.notStrictEqual(updateEnd, -1);
+  const update = pos.slice(updateStart, updateEnd);
   for (const token of [
     'item.qty', 'item.unitPrice', 'item.lineTotal', 'item.vendorId', 'item.vendorName',
     'item.vendorUnitCost', 'inv.customerName', 'inv.customerPhone', 'inv.customerAddress',
