@@ -1,0 +1,6 @@
+*.test.js
+**/*.test.js
+tests/**
+.github/**
+docs/**
+jsconfig.json
