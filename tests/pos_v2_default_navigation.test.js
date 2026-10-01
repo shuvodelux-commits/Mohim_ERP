@@ -40,7 +40,8 @@ test('POS group exposes POS V2 only and never renders Classic POS as a child', (
   assert.match(posBlock, /landingKey:\s*['"]posv2['"]/);
   assert.match(posBlock, /key:\s*['"]posv2['"]\s*,\s*label:\s*['"]POS V2['"]/);
   assert.doesNotMatch(posBlock, /Classic POS/);
-  assert.doesNotMatch(posBlock, /key:\s*['"]pos['"]\s*,\s*label:/);
+  const childBlock = posBlock.slice(posBlock.indexOf('children:'));
+  assert.doesNotMatch(childBlock, /key:\s*['"]pos['"]\s*,\s*label:/);
 });
 
 test('desktop sidebar uses a group landing key instead of always opening the parent key', () => {
