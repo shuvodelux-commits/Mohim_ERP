@@ -235,7 +235,7 @@
       var reason = promptForUpdateReason_();
       if (!reason) return;
       withLoader(serverCall('getSaleForUpdate', authToken, row.sourceId)).then(function (inv) {
-        goToPage('pos');
+        goToPage('posv2');
         posLoadUpdateInvoice_(inv, reason);
         showToast('Loaded into POS for update \u2014 adjust and save', 'success');
       }).catch(function (err) { showToast(err.message, 'error'); });

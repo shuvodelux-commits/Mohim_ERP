@@ -1300,12 +1300,19 @@
     }
   }
 
+  function posV2NormalizeRoute_(key) {
+    // Keep the legacy route as a compatibility alias only. No caller that
+    // asks for POS may expose the Classic presentation anymore.
+    return key === 'pos' ? 'posv2' : key;
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     var originalGoToPage = goToPage;
     goToPage = function (key) {
+      key = posV2NormalizeRoute_(key);
       originalGoToPage(key);
       posV2SetActive_(key === 'posv2');
     };
-    posV2SetActive_(currentPage === 'posv2');
+    posV2SetActive_(posV2NormalizeRoute_(currentPage) === 'posv2');
   });
 </script>

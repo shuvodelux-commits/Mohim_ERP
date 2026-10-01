@@ -10,7 +10,7 @@ html=index
 # mocked Apps Script bridge
 nav=[
  {'key':'dashboard','label':'Dashboard','icon':'dashboard'},
- {'key':'pos','label':'POS','icon':'pos'}, {'key':'counter','label':'Counter','icon':'counter'},
+ {'key':'pos','label':'POS','icon':'pos','landingKey':'posv2','children':[{'key':'posv2','label':'POS V2','permKey':'pos'}]}, {'key':'counter','label':'Counter','icon':'counter'},
  {'key':'sales','label':'Sales','icon':'sales','children':[{'key':'sales','label':'Sales Invoice'},{'key':'draftSales','label':'Draft Invoices'},{'key':'returns','label':'New Return'},{'key':'returnHistory','label':'Return History','permKey':'returns'}]},
  {'key':'purchase','label':'Purchases','icon':'purchase'},
  {'key':'suppliers','label':'Suppliers','icon':'suppliers','children':[{'key':'suppliers','label':'Suppliers'},{'key':'supplierLedger','label':'Supplier Ledger','permKey':'suppliers'}]},
@@ -87,7 +87,7 @@ Path('/tmp/shererp_e2e.html').write_text(html)
 
 from playwright.sync_api import sync_playwright
 
-PAGES = ['dashboard','pos','counter','sales','draftSales','returns','returnHistory','purchase','suppliers','supplierLedger','vendorWorkspace','vendors','products','customers','customerLedger','bank','expense','expenseList','expenseCategories','expenseReports','finance','financeLedger','daybook','reports','settings','invoiceDesign','users','roles']
+PAGES = ['dashboard','posv2','counter','sales','draftSales','returns','returnHistory','purchase','suppliers','supplierLedger','vendorWorkspace','vendors','products','customers','customerLedger','bank','expense','expenseList','expenseCategories','expenseReports','finance','financeLedger','daybook','reports','settings','invoiceDesign','users','roles']
 AUTH_JS = "onAuthenticated_({token:'test-token',user:{id:'USR-1',name:'Admin',mobile:'017',role:'Administrator'},allowedModules:null,permissions:null})"
 
 class Gate:
@@ -126,7 +126,8 @@ def run():
             try:
                 page.evaluate('k=>goToPage(k)', key)
                 page.wait_for_timeout(180)
-                visible=page.eval_on_selector('#page-'+key, 'e=>!e.hidden')
+                runtime_key = 'pos' if key == 'posv2' else key
+                visible=page.eval_on_selector('#page-'+runtime_key, 'e=>!e.hidden')
                 gate.check(bool(visible) and len(errors)==before, 'route '+key, '; '.join(errors[before:]))
             except Exception as exc:
                 gate.check(False, 'route '+key, str(exc))
@@ -134,9 +135,10 @@ def run():
 
         # 2) POS post -> global confirmation -> exact returned invoice render.
         page, errors = boot(browser)
-        page.evaluate("goToPage('pos')"); page.wait_for_timeout(350)
-        gate.check(page.locator('#posProductGrid .product-tile').count() == 1, 'POS product bootstrap')
-        page.locator('#posProductGrid .product-tile').first.click()
+        page.evaluate("goToPage('posv2')"); page.wait_for_timeout(350)
+        page.fill('#posSearch','4 inch Test Pipe')
+        page.press('#posSearch','Enter')
+        gate.check(page.text_content('#posCartCount') == '1', 'POS V2 search adds product')
         page.fill('#posCustomerName','মহিউদ্দিন'); page.fill('#posCustomerPhone','01712345678')
         gate.check(page.text_content('#posCartCount') == '1', 'POS product added to cart')
         gate.check(not page.is_disabled('#posCompleteBtn'), 'POS complete enabled with open cash session')
@@ -153,7 +155,7 @@ def run():
 
         # 3) Phone sales history fails closed for an already-duplicated ID.
         page, errors = boot(browser)
-        page.evaluate("goToPage('pos')"); page.wait_for_timeout(300)
+        page.evaluate("goToPage('posv2')"); page.wait_for_timeout(300)
         page.fill('#posCustomerPhone','01712345678'); page.press('#posCustomerPhone','Escape'); page.click('#posHistoryBtn'); page.wait_for_timeout(220)
         history=page.text_content('#posHistoryBody') or ''
         dup_btn=page.locator('#posHistoryBody button[data-id="INV-000005"]')
@@ -205,8 +207,9 @@ def run():
 
         # 6) Draft save is accounting-free client flow and carries exact cart state to draft RPC.
         page, errors = boot(browser)
-        page.evaluate("goToPage('pos')"); page.wait_for_timeout(300)
-        page.locator('#posProductGrid .product-tile').first.click()
+        page.evaluate("goToPage('posv2')"); page.wait_for_timeout(300)
+        page.fill('#posSearch','4 inch Test Pipe')
+        page.press('#posSearch','Enter')
         page.fill('#posCustomerName','মহিউদ্দিন'); page.fill('#posCustomerPhone','01712345678')
         page.click('#posSaveDraftBtn'); page.wait_for_timeout(280)
         drafts=page.evaluate("__rpcCalls.filter(x=>x.name==='saveSalesDraft')")
@@ -218,7 +221,7 @@ def run():
 
         # 7) Galaxy Tab-like portrait keeps the desktop/tablet two-column POS without overflow.
         page, errors = boot(browser, {'width':768,'height':1024})
-        page.evaluate("goToPage('pos')"); page.wait_for_timeout(320)
+        page.evaluate("goToPage('posv2')"); page.wait_for_timeout(320)
         cols=page.eval_on_selector('#page-pos .pos-layout','e=>getComputedStyle(e).gridTemplateColumns.split(/\\s+/).filter(Boolean)')
         overflow=page.evaluate('document.documentElement.scrollWidth-document.documentElement.clientWidth')
         gate.check(1 <= len(cols) <= 2, 'Tablet POS adaptive layout renders usable columns', str(cols))

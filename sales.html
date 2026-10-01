@@ -642,7 +642,7 @@
   function smDuplicateSale_(invoiceId) {
     withLoader(serverCall("findInvoice", authToken, invoiceId))
       .then(function (inv) {
-        goToPage("pos");
+        goToPage("posv2");
         posLoadDuplicateInvoice_(inv);
         showToast(
           "Loaded into POS \u2014 adjust and complete the sale",
@@ -658,7 +658,7 @@
     if (!reason) return;
     withLoader(serverCall('getSaleForUpdate', authToken, invoiceId))
       .then(function (inv) {
-        goToPage('pos');
+        goToPage('posv2');
         posLoadUpdateInvoice_(inv, reason, 'legacy');
         showToast('Loaded into POS for update — adjust and save', 'success');
       })

@@ -492,17 +492,21 @@ readable over a customer's shoulder unless staff deliberately ask for it.
 
 ### POS V2 presentation
 
-SherERP now exposes two POS views under the same POS permission:
+POS V2 is the **only user-facing POS screen**. Classic POS is no longer exposed in sidebar/sub-navigation, mobile navigation, dashboard shortcuts, draft actions, Sales actions, or Day Book edit routes.
+
+The application still intentionally uses **one live POS runtime**. `pos.html` remains the owner of POS state, DOM control IDs, server calls, validation flow, cart behavior, draft/update behavior, shortage handling, and sale completion. `posv2.html` is the presentation/controller layer that activates the SherHisab UI over the shared `#page-pos` runtime.
 
 ```text
-POS
-├── Classic POS  → pos.html presentation
-└── POS V2       → posv2.html SherHisab presentation
+all normal POS entry points
+          ↓
+        posv2
+          ↓
+shared pos.html state + business workflow
 ```
 
-Both views intentionally use **one live POS runtime**. `pos.html` remains the only owner of POS state, DOM control IDs, server calls, validation flow, cart behavior, draft/update behavior, shortage handling, and sale completion. Navigating to `posv2` keeps `currentPage = 'posv2'` for navigation/title purposes but renders the existing `#page-pos` runtime with the scoped `pos-v2-active` presentation layer.
+The legacy route key `pos` remains only as a compatibility alias and is normalized to `posv2`; it must not expose the Classic presentation. `posv2` continues to ride on the existing `pos` permission and does not add a second permission module.
 
-This avoids duplicate DOM IDs and prevents Classic POS and POS V2 from drifting into different business implementations. Switching between the two views preserves the active cart/session state. `posv2` rides on the existing `pos` permission and does not add a second permission module.
+Draft Open/Continue keeps the same Draft ID/version and restores its saved customer, cart, payment, discount, notes and line metadata. Sale Edit/Update keeps the same Invoice ID and posts through `updateSale`. Duplicate Draft/Sale/Invoice clears draft/update identity, restores the copied form snapshot, and posts through normal `completeSale` as a new invoice.
 
 ## 9. Vendor / consignment sourcing
 

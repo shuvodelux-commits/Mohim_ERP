@@ -196,7 +196,7 @@
 </div>
 
 <script>
-  var posState = { products: [], productStockById: {}, productCostById: {}, showCost: false, customers: [], bankAccounts: [], vendors: [], vendorsAll: [], cart: [], cartEditIndex: null, cartEntryIndex: null, activeSession: null, openingCashMismatch: null, dismissedCashMismatchKey: '', closeSessionSummary: null, updateInvoiceId: null, updateReason: null, draftId: null, draftNo: '', draftVersion: null, recentDrafts: [], searchResults: [], searchActiveIndex: -1 };
+  var posState = { products: [], productStockById: {}, productCostById: {}, showCost: false, customers: [], bankAccounts: [], vendors: [], vendorsAll: [], cart: [], cartEditIndex: null, cartEntryIndex: null, activeSession: null, openingCashMismatch: null, dismissedCashMismatchKey: '', closeSessionSummary: null, updateInvoiceId: null, updateReason: null, draftId: null, draftNo: '', draftVersion: null, recentDrafts: [], saleNotes: '', searchResults: [], searchActiveIndex: -1 };
 
 
   // POS uses the shared touch-select presentation layer. The native select
@@ -1768,6 +1768,7 @@
 
   function posResetSaleForm_() {
     posState.cart = [];
+    posState.saleNotes = '';
     posState.cartEditIndex = null;
     posState.cartEntryIndex = null;
     posState._addVendorForLineIndex = null;
@@ -1801,7 +1802,7 @@
           serialSelections: Array.isArray(line.serialSelections) ? line.serialSelections : [], warrantyData: line.warrantyData || null };
       }),
       payment: { amountReceived: document.getElementById('posAmountReceived').value, paymentMethod: document.getElementById('posPaymentMethod').value, bankAccountId: document.getElementById('posBankAccount').value },
-      notes: '', subtotal: subtotal, discount: discount, grandTotal: Math.max(0, subtotal-discount)
+      notes: posState.saleNotes || '', subtotal: subtotal, discount: discount, grandTotal: Math.max(0, subtotal-discount)
     };
   }
 
@@ -1840,7 +1841,7 @@
   }
 
   function posOpenDraft_(draftId) {
-    var targetPage = arguments.length > 1 && arguments[1] ? arguments[1] : 'pos';
+    var targetPage = arguments.length > 1 && arguments[1] ? arguments[1] : 'posv2';
     function loadDraft_() {
       goToPage(targetPage);
       return withLoader(Promise.all([posLoad(),serverCall('getSalesDraft',authToken,draftId)])).then(function(results){ posRestoreDraft_(results[1]); }).catch(function(err){showToast(err.message,'error');});
@@ -1866,6 +1867,7 @@
 
   function posRestoreDraft_(draft) {
     posExitUpdateMode_();
+    posState.saleNotes = draft.notes || '';
     posState.cartEditIndex = null;
     posState.cartEntryIndex = null;
     posState.cart=(draft.items||[]).map(function(item){
@@ -2028,7 +2030,14 @@
     }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
   });
 
-  document.getElementById('posNewSaleBtn').addEventListener('click', function () { closeModal('invoiceModal'); });
+  document.getElementById('posNewSaleBtn').addEventListener('click', function () {
+    closeModal('invoiceModal');
+    posExitUpdateMode_();
+    posExitDraftMode_(false);
+    posResetSaleForm_();
+    goToPage('posv2');
+    posFocusCartEntryProduct_();
+  });
 
   document.getElementById('posThermalPrintBtn').addEventListener('click', function () {
     // thermal print renders its own narrow layout from the invoice data —
@@ -2137,38 +2146,116 @@
    * correctly whether POS has already loaded or is loading for the first
    * time right nowl.
    */
+  function posCopiedPaymentSnapshot_(source) {
+    source = source || {};
+    var payment = source.payment || {};
+    var amountReceived = payment.amountReceived;
+    if (amountReceived === undefined || amountReceived === null || amountReceived === '') {
+      amountReceived = source.originalPaidAmount;
+    }
+    if (amountReceived === undefined || amountReceived === null || amountReceived === '') {
+      amountReceived = source.paidAmount;
+    }
+    if (amountReceived === undefined || amountReceived === null) amountReceived = '';
+
+    return {
+      amountReceived: amountReceived,
+      paymentMethod: payment.paymentMethod || source.paymentMethod || 'Cash',
+      bankAccountId: payment.bankAccountId || source.bankAccountId || ''
+    };
+  }
+
+  function posRestoreCopiedSaleFields_(source) {
+    source = source || {};
+    var customerId = source.customerId || '';
+    var custMatch = customerId ? posState.customers.filter(function (c) { return String(c.id) === String(customerId); })[0] : null;
+    var payment = posCopiedPaymentSnapshot_(source);
+
+    document.getElementById('posCustomerName').value = source.customerName || '';
+    document.getElementById('posCustomerName').dataset.customerId = customerId;
+    document.getElementById('posCustomerPhone').value = source.customerPhone || '';
+    document.getElementById('posCustomerFatherName').value =
+      source.customerFatherName || (custMatch ? (custMatch.fatherName || '') : '');
+    document.getElementById('posCustomerAddress').value = source.customerAddress || '';
+    document.getElementById('posDiscount').value = Number(source.discount) > 0 ? source.discount : '';
+    document.getElementById('posAmountReceived').value =
+      (payment.amountReceived !== '' && Number(payment.amountReceived) > 0) ? payment.amountReceived : '';
+    document.getElementById('posPaymentMethod').value = payment.paymentMethod || 'Cash';
+    document.getElementById('posBankAccountRow').style.display =
+      paymentMethodNeedsAccount_(payment.paymentMethod) ? '' : 'none';
+    document.getElementById('posBankAccountLabel').textContent =
+      (payment.paymentMethod === 'Mobile Banking' ? 'Mobile Banking Account *' : 'Bank Account *');
+    fillBankAccountSelect_(document.getElementById('posBankAccount'), posState.bankAccounts, payment.paymentMethod || 'Cash');
+    document.getElementById('posBankAccount').value = payment.bankAccountId || '';
+    posRefreshTabletSelect_(document.getElementById('posPaymentMethod'));
+    posRefreshTabletSelect_(document.getElementById('posBankAccount'));
+    posState.saleNotes = source.notes || '';
+    posSetCustomerMoreExpanded_(!!(document.getElementById('posCustomerFatherName').value || source.customerAddress));
+    posUpdateCustomerDueDisplay_(custMatch ? custMatch.due : 0);
+  }
+
+  /**
+   * Duplicate Draft/Sale/Invoice entry point.
+   * Restores the copied form snapshot into a fresh sale while deliberately
+   * clearing draft/update identity. Completing this cart therefore always
+   * goes through completeSale() and can never mutate the source record.
+   */
   function posLoadDuplicateInvoice_(inv) {
-    // Duplicate always starts a brand-new sale. Never carry customer/payment,
-    // draft identity, update mode, or any other state from the current POS.
+    inv = inv || {};
     posExitUpdateMode_();
     posExitDraftMode_(false);
     posResetSaleForm_();
-    posState._loadPromise = posLoad(); // always fresh, so stock caps below are accurate
+    posState._loadPromise = posLoad();
 
     return posState._loadPromise.then(function () {
       posState.cart = [];
       posState.cartEntryIndex = null;
       var skipped = [];
-      // Carries over the original quantity regardless of current stock —
-      // selling past what's on hand is allowed (see completeSale in
-      // Sales.gs), so a duplicate is never silently short-filled or
-      // skipped just because stock has since run low or negative.
-      inv.items.forEach(function (item) {
+
+      (inv.items || []).forEach(function (item) {
         var product = posState.products.filter(function (p) { return p.id === item.productId; })[0];
-        if (!product) { skipped.push(item.name); return; }
+        if (!product) { skipped.push(item.name || item.productId); return; }
+
         var qty = Number(item.qty) || 1;
-        var duplicatePrice = Number(item.unitPrice) || Number(product.sellingPrice) || 0;
+        var unitPrice = (item.unitPrice !== '' && item.unitPrice !== null && item.unitPrice !== undefined && !isNaN(Number(item.unitPrice)))
+          ? Number(item.unitPrice)
+          : (Number(product.sellingPrice) || 0);
+        var lineTotal = (item.lineTotal !== '' && item.lineTotal !== null && item.lineTotal !== undefined && !isNaN(Number(item.lineTotal)))
+          ? Number(item.lineTotal)
+          : Math.round((qty * unitPrice + Number.EPSILON) * 100) / 100;
+
         posState.cart.push({
           productId: product.id,
-          name: product.name, unit: product.unit, unitPrice: duplicatePrice, lineTotal: Math.round((qty * duplicatePrice + Number.EPSILON) * 100) / 100, priceMode: 'manual', qty: qty,
-          // A duplicate is a brand-new sale — vendor sourcing (if any) on
-          // the original invoice is never carried over; it's a fresh
-          // decision against today's own stock, same as any new cart line.
-          shortageResolution: 'negative', vendorId: '', vendorName: '', vendorUnitCost: '', editAvailableBoost: 0
+          name: item.name || product.name,
+          unit: item.unit || product.unit || '',
+          unitPrice: unitPrice,
+          lineTotal: lineTotal,
+          priceMode: 'fixed',
+          savedPriceMode: item.savedPriceMode || item.priceMode || 'manual',
+          qty: qty,
+          shortageResolution: item.shortageResolution || 'negative',
+          vendorId: item.vendorId || '',
+          vendorName: item.vendorName || '',
+          vendorUnitCost: item.vendorUnitCost === undefined || item.vendorUnitCost === null ? '' : item.vendorUnitCost,
+          serialSelections: Array.isArray(item.serialSelections) ? item.serialSelections.slice() : [],
+          warrantyData: item.warrantyData || null,
+          editAvailableBoost: 0
         });
       });
+
+      // Duplicate is a new sale: identity stays clear, while user-entered
+      // customer/payment/discount/note data from the source is restored.
+      posState.updateInvoiceId = null;
+      posState.updateReason = null;
+      posState.draftId = null;
+      posState.draftNo = '';
+      posState.draftVersion = null;
+      posRestoreCopiedSaleFields_(inv);
       posRenderCart_();
+      posRenderSessionUI_();
+
       if (skipped.length) showToast('Skipped (no longer available): ' + skipped.join(', '), 'error');
+      return true;
     });
   }
 

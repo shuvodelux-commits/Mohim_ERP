@@ -26,8 +26,11 @@ test('POS V2 is a separate route/file but reuses the one live POS runtime', () =
   assert.match(js, /classList\.toggle\(['"]pos-v2-active['"],\s*key\s*===\s*['"]posv2['"]\)/);
 });
 
-test('POS navigation offers Classic and V2 while both use POS permission', () => {
-  assert.match(ui, /key:\s*['"]pos['"][\s\S]*children:\s*\[[\s\S]*key:\s*['"]pos['"][\s\S]*key:\s*['"]posv2['"][\s\S]*permKey:\s*['"]pos['"]/);
+test('POS navigation exposes only V2 while reusing the POS permission', () => {
+  const posBlock = ui.slice(ui.indexOf("key: 'pos', label: 'POS'"), ui.indexOf("{ key: 'counter'"));
+  assert.match(posBlock, /landingKey:\s*['"]posv2['"]/);
+  assert.match(posBlock, /children:\s*\[[\s\S]*key:\s*['"]posv2['"][\s\S]*permKey:\s*['"]pos['"]/);
+  assert.doesNotMatch(posBlock, /Classic POS/);
   const permissionStart = ui.indexOf('const PERMISSION_MODULES = [');
   const permissionEnd = ui.indexOf('];', permissionStart);
   assert.notStrictEqual(permissionStart, -1);
@@ -36,7 +39,7 @@ test('POS navigation offers Classic and V2 while both use POS permission', () =>
   assert.doesNotMatch(permissionBlock, /key:\s*['"]posv2['"]/);
 });
 
-test('classic POS loader also serves POS V2', () => {
+test('shared POS runtime serves POS V2', () => {
   assert.match(pos, /key\s*===\s*['"]pos['"]\s*\|\|\s*key\s*===\s*['"]posv2['"]/);
 });
 
@@ -53,7 +56,7 @@ test('POS V2 applies the SherHisab compact design tokens only while active', () 
   assert.match(v2, /grid-template-columns:\s*minmax\(0,\s*1fr\)\s+minmax\(300px,\s*23vw\)/);
 });
 
-test('POS V2 moves checkout into the customer rail and restores Classic layout', () => {
+test('POS V2 moves checkout into the customer rail while preserving shared runtime anchors', () => {
   assert.match(v2, /function\s+posV2SetActive_\s*\(/);
   assert.match(v2, /pos-checkout-summary/);
   assert.match(v2, /pos-checkout-actions/);

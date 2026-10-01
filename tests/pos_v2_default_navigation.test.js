@@ -7,6 +7,7 @@ const assert = require('assert');
 const root = path.resolve(__dirname, '..');
 const ui = fs.readFileSync(path.join(root, 'UI.gs'), 'utf8');
 const js = fs.readFileSync(path.join(root, 'javascript.html'), 'utf8');
+const v2 = fs.readFileSync(path.join(root, 'posv2.html'), 'utf8');
 
 let pass = 0, fail = 0;
 function test(name, fn) {
@@ -34,11 +35,13 @@ function functionSource(source, name) {
   throw new Error('unclosed function ' + name);
 }
 
-test('POS group explicitly lands on POS V2 while keeping Classic POS as a child', () => {
+test('POS group exposes POS V2 only and never renders Classic POS as a child', () => {
   const posBlock = ui.slice(ui.indexOf("key: 'pos', label: 'POS'"), ui.indexOf("{ key: 'counter'"));
   assert.match(posBlock, /landingKey:\s*['"]posv2['"]/);
-  assert.match(posBlock, /key:\s*['"]pos['"]\s*,\s*label:\s*['"]Classic POS['"]/);
   assert.match(posBlock, /key:\s*['"]posv2['"]\s*,\s*label:\s*['"]POS V2['"]/);
+  assert.doesNotMatch(posBlock, /Classic POS/);
+  const childBlock = posBlock.slice(posBlock.indexOf('children:'));
+  assert.doesNotMatch(childBlock, /key:\s*['"]pos['"]\s*,\s*label:/);
 });
 
 test('desktop sidebar uses a group landing key instead of always opening the parent key', () => {
@@ -53,9 +56,12 @@ test('mobile POS button uses the same POS V2 landing key', () => {
   assert.match(mobile, /navLandingKey_\(item\)/);
 });
 
-test('Classic POS remains directly reachable from the POS sub-navigation', () => {
-  const subnav = functionSource(js, 'renderSubNav_');
-  assert.match(subnav, /goToPage\(c\.key\)/);
+test('legacy pos route is compatibility-only and normalizes to POS V2', () => {
+  const normalize = functionSource(v2, 'posV2NormalizeRoute_');
+  assert.match(normalize, /key\s*===\s*['"]pos['"]/);
+  assert.match(normalize, /['"]posv2['"]/);
+  assert.match(v2, /key\s*=\s*posV2NormalizeRoute_\(key\)/);
+  assert.match(v2, /posV2SetActive_\(key\s*===\s*['"]posv2['"]\)/);
 });
 
 console.log('\n' + pass + '/' + (pass + fail) + ' passed');
