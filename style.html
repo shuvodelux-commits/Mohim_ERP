@@ -25,7 +25,6 @@
     --mobile-nav-clearance: 0px;
     --font-sans: "Inter", "Noto Sans Bengali", "Segoe UI", Arial, sans-serif;
     --font: var(--font-sans);
-    --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
     /* Noto Sans Bengali is loaded as a webfont so Bangla stays consistent
        across Windows, Android, ChromeOS and macOS. System fonts remain as
        offline fallbacks. Mirrored as RECEIPT_FONT_STACK in javascript.html
@@ -46,8 +45,6 @@
   }
   h1, h2, h3 { margin: 0 0 4px; font-weight: 700; letter-spacing: -.01em; }
   p { line-height: 1.5; }
-  .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-
   #app { display: flex; min-height: 100vh; }
   #app[hidden] { display: none; }
 
@@ -73,7 +70,7 @@
     background: var(--color-primary); color: #fff;
     display: flex; align-items: center; justify-content: center;
     font-weight: 700; font-size: 13px; flex-shrink: 0;
-    font-family: var(--font-mono);
+    font-family: var(--font-sans);
   }
   .shop-name { font-weight: 600; font-size: 14px; line-height: 1.3; }
 
@@ -117,7 +114,7 @@
   .topbar-date-toggle {
     min-height: 32px; padding: 5px 7px; border: 0; border-radius: 8px;
     display: inline-flex; align-items: center; gap: 4px; cursor: pointer;
-    background: transparent; color: inherit; font: 500 13px/1 var(--font-mono);
+    background: transparent; color: inherit; font: 500 13px/1 var(--font-sans);
   }
   .topbar-date-toggle:hover, .topbar-date-toggle:focus-visible, .topbar-date.is-open .topbar-date-toggle {
     background: var(--color-bg); outline: none;
@@ -433,11 +430,11 @@
   .calc-line { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
   .calc-line-no {
     flex-shrink: 0; width: 16px; text-align: right;
-    font-family: var(--font-mono); font-size: 11px; color: var(--color-text-muted);
+    font-family: var(--font-sans); font-size: 11px; color: var(--color-text-muted);
   }
   .calc-line-input {
     flex: 1; min-width: 0; width: 0; border: none; border-bottom: 1px solid transparent;
-    padding: 4px 2px; font-family: var(--font-mono); font-size: 13px;
+    padding: 4px 2px; font-family: var(--font-sans); font-size: 13px;
     background: transparent; color: var(--color-text);
   }
   .calc-line-input:focus { outline: none; border-bottom-color: var(--color-primary); }
@@ -450,7 +447,7 @@
   }
   .calc-line-input.has-error { color: var(--color-danger); }
   .calc-line-result {
-    flex-shrink: 0; font-family: var(--font-mono); font-size: 13px; font-weight: 600;
+    flex-shrink: 0; font-family: var(--font-sans); font-size: 13px; font-weight: 600;
     color: var(--color-primary-dark); min-width: 60px; text-align: right;
   }
   .calc-line-remove {
@@ -467,7 +464,7 @@
     font-size: 14px; font-weight: 700; flex-shrink: 0;
     background: var(--color-bg);
   }
-  .calc-total-value { font-family: var(--font-mono); }
+  .calc-total-value { font-family: var(--font-sans); }
 
   /* Touch keypad — an alternative to typing directly into a line, for
      touchscreens/kiosks. Grid buttons insert at the active line's cursor
@@ -480,7 +477,7 @@
   .calc-key {
     border: none; border-radius: var(--radius-sm);
     background: var(--color-surface); color: var(--color-text);
-    font-family: var(--font-mono); font-size: 16px; font-weight: 600;
+    font-family: var(--font-sans); font-size: 16px; font-weight: 600;
     padding: 13px 0; cursor: pointer; box-shadow: var(--shadow-sm);
     -webkit-tap-highlight-color: transparent;
   }
@@ -730,7 +727,7 @@
      posCostMarkerHtml_ in pos.html), which is when it earns the contrast. */
   .cart-row .c-cost {
     border: none; background: transparent; padding: 0 3px; margin-left: 2px; cursor: pointer;
-    font-family: var(--font-mono); font-size: 11px; line-height: 1; vertical-align: baseline;
+    font-family: var(--font-sans); font-size: 11px; line-height: 1; vertical-align: baseline;
     color: var(--color-text-muted); opacity: .45; border-radius: 4px;
   }
   .cart-row .c-cost:hover { opacity: .75; }
@@ -1587,7 +1584,7 @@
     .mobile-payment-summary { display: grid; gap: 7px; width: 100%; padding: 12px; border: 1px solid #a7e4d3; border-radius: 12px; background: #f0fbf7; }
     .mobile-payment-summary-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
     .mobile-payment-summary-row span { color: var(--color-text); font-weight: 700; }
-    .mobile-payment-summary strong { color: #0f8a63; font-size: 16px; font-family: var(--font-mono); }
+    .mobile-payment-summary strong { color: #0f8a63; font-size: 16px; font-family: var(--font-sans); }
     #custPaySettleFullBtn, #supPaySettleFullBtn, #custPaySaveBtn, #supPaySaveBtn { width: 100%; min-height: 48px; }
 
     /* POS/Purchase touch ergonomics. Same transaction state and submit paths. */
@@ -2302,7 +2299,7 @@
 </style>
 <style>
   .pos-checkout-actions{display:flex;gap:8px;justify-content:flex-end}.pos-draft-banner{margin-top:8px}.pos-draft-conflict{display:flex;gap:8px;align-items:center;padding:10px 12px;margin:8px 0;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px}.pos-draft-conflict[hidden]{display:none}
-  .pos-search-drafts-row{display:grid;grid-template-columns:minmax(220px,1fr) auto;gap:10px;align-items:stretch;margin-bottom:10px}.pos-search-drafts-row .pos-product-search-box{margin-bottom:0}.pos-recent-drafts{display:flex;align-items:stretch;gap:6px;min-width:0}.pos-recent-drafts[hidden]{display:none}.pos-recent-drafts-meta{width:70px;display:flex;flex-direction:column;justify-content:center;gap:3px}.pos-recent-drafts-meta>span{color:var(--color-text-muted);font-size:9px;font-weight:800;line-height:1.1;text-transform:uppercase}.pos-recent-drafts-meta .btn-link{padding:0;font-size:10px;text-align:left}.pos-recent-drafts-list{display:flex;gap:6px;min-width:0}.pos-recent-draft-card{width:94px;min-width:94px;height:52px;padding:5px 7px;display:inline-flex;flex-direction:column;justify-content:center;align-items:flex-start;overflow:hidden;border:1px solid var(--color-border);border-radius:9px;background:#fff;color:var(--color-text);cursor:pointer;text-align:left}.pos-recent-draft-card:hover{border-color:var(--color-primary);background:var(--color-primary-light)}.pos-recent-draft-card span,.pos-recent-draft-card strong,.pos-recent-draft-card small{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pos-recent-draft-card span{font-size:10px;font-weight:700}.pos-recent-draft-card strong{font:700 11px var(--font-mono);color:var(--color-primary-dark)}.pos-recent-draft-card small{font-size:8px;color:var(--color-text-muted)}
+  .pos-search-drafts-row{display:grid;grid-template-columns:minmax(220px,1fr) auto;gap:10px;align-items:stretch;margin-bottom:10px}.pos-search-drafts-row .pos-product-search-box{margin-bottom:0}.pos-recent-drafts{display:flex;align-items:stretch;gap:6px;min-width:0}.pos-recent-drafts[hidden]{display:none}.pos-recent-drafts-meta{width:70px;display:flex;flex-direction:column;justify-content:center;gap:3px}.pos-recent-drafts-meta>span{color:var(--color-text-muted);font-size:9px;font-weight:800;line-height:1.1;text-transform:uppercase}.pos-recent-drafts-meta .btn-link{padding:0;font-size:10px;text-align:left}.pos-recent-drafts-list{display:flex;gap:6px;min-width:0}.pos-recent-draft-card{width:94px;min-width:94px;height:52px;padding:5px 7px;display:inline-flex;flex-direction:column;justify-content:center;align-items:flex-start;overflow:hidden;border:1px solid var(--color-border);border-radius:9px;background:#fff;color:var(--color-text);cursor:pointer;text-align:left}.pos-recent-draft-card:hover{border-color:var(--color-primary);background:var(--color-primary-light)}.pos-recent-draft-card span,.pos-recent-draft-card strong,.pos-recent-draft-card small{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pos-recent-draft-card span{font-size:10px;font-weight:700}.pos-recent-draft-card strong{font:700 11px var(--font-sans);color:var(--color-primary-dark)}.pos-recent-draft-card small{font-size:8px;color:var(--color-text-muted)}
   
   
   
