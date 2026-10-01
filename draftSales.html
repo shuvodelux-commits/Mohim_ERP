@@ -45,7 +45,7 @@
   }
 
   function draftSalesFindRow_(id){return (draftSalesState_.rows||[]).filter(function(r){return r.draftId===id;})[0]||null;}
-  function draftSalesOpen_(draftId){ if(typeof posOpenDraft_==='function') return posOpenDraft_(draftId); showToast('POS draft loader is not available.','error'); }
+  function draftSalesOpen_(draftId){ if(typeof posOpenDraft_==='function') return posOpenDraft_(draftId,'posv2'); showToast('POS draft loader is not available.','error'); }
   function draftSalesPreview_(draftId,action){
     return withLoader(serverCall('getSalesDraftPreview',authToken,draftId)).then(function(preview){
       posRenderInvoice_(preview); openModal('invoiceModal');
@@ -56,7 +56,7 @@
   }
   function draftSalesDuplicate_(draftId){
     return withLoader(serverCall('getSalesDraft',authToken,draftId)).then(function(draft){
-      goToPage('pos');
+      goToPage('posv2');
       return posLoadDuplicateInvoice_(draft);
     }).then(function(){
       showToast('Loaded into POS — adjust and complete the sale','success');
