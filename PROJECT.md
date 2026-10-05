@@ -506,7 +506,7 @@ shared pos.html state + business workflow
 
 The legacy route key `pos` remains only as a compatibility alias and is normalized to `posv2`; it must not expose the Classic presentation. `posv2` continues to ride on the existing `pos` permission and does not add a second permission module.
 
-Draft Open/Continue keeps the same Draft ID/version and restores its saved customer, cart, payment, discount, notes and line metadata. Sale Edit/Update keeps the same Invoice ID and posts through `updateSale`. Duplicate Draft/Sale/Invoice clears draft/update identity, restores the copied form snapshot, and posts through normal `completeSale` as a new invoice.
+Draft Open/Continue keeps the same Draft ID/version and restores its saved customer, cart, payment, discount, notes and line metadata. Sale Edit/Update keeps the same Invoice ID and posts through `updateSale`. Duplicate Draft/Sale/Invoice clears draft/update identity, restores the copied form snapshot, and posts through normal `completeSale` as a new invoice. Because a duplicate is no longer the source draft, copied lines are normalized to ordinary manual pricing using the copied unit price and a recalculated `qty × unit price` line total; draft-only `fixed` pricing is reserved for an actual opened draft that carries `sourceDraftId`.
 
 The POS V2 Draft Invoices modal mirrors the full Draft Invoices page actions: Open, Duplicate, Print / Preview, Save JPG, and Delete. Delete refreshes both the modal list and POS recent drafts.\n\nTypography rule: the ERP uses the normal sans-serif UI font for numbers, money, IDs, references, dates, calculator values, stock quantities, and other operational values. Monospace fonts are intentionally not loaded or used anywhere in the production HTML.
 

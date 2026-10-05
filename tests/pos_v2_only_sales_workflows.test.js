@@ -123,10 +123,19 @@ test('duplicate restores copied form data but clears source identity', () => {
     'source.discount', 'source.notes', 'payment.amountReceived', 'payment.paymentMethod', 'payment.bankAccountId'
   ]) assert.ok(fields.includes(token), 'missing duplicate field restoration token: ' + token);
   for (const token of [
-    'item.unit', 'item.unitPrice', 'item.lineTotal', 'item.savedPriceMode',
+    'item.unit', 'item.unitPrice',
     'item.shortageResolution', 'item.vendorId', 'item.vendorName', 'item.vendorUnitCost',
     'item.serialSelections', 'item.warrantyData'
   ]) assert.ok(duplicate.includes(token), 'missing duplicate line token: ' + token);
+});
+
+test('duplicate draft pricing is normalized to a fresh manual sale', () => {
+  const duplicate = functionSource(pos, 'posLoadDuplicateInvoice_');
+  assert.match(duplicate, /priceMode:\s*['"]manual['"]/);
+  assert.match(duplicate, /savedPriceMode:\s*['"]manual['"]/);
+  assert.doesNotMatch(duplicate, /priceMode:\s*['"]fixed['"]/);
+  assert.match(duplicate, /Math\.round\(\(qty\s*\*\s*unitPrice\s*\+\s*Number\.EPSILON\)\s*\*\s*100\)\s*\/\s*100/);
+  assert.doesNotMatch(duplicate, /item\.lineTotal/);
 });
 
 test('Duplicate Invoice uses original tender, not later settlement collections', () => {
