@@ -2220,9 +2220,12 @@
         var unitPrice = (item.unitPrice !== '' && item.unitPrice !== null && item.unitPrice !== undefined && !isNaN(Number(item.unitPrice)))
           ? Number(item.unitPrice)
           : (Number(product.sellingPrice) || 0);
-        var lineTotal = (item.lineTotal !== '' && item.lineTotal !== null && item.lineTotal !== undefined && !isNaN(Number(item.lineTotal)))
-          ? Number(item.lineTotal)
-          : Math.round((qty * unitPrice + Number.EPSILON) * 100) / 100;
+        // A duplicate is a brand-new sale, not the source draft. Keep the
+        // copied unit price, but normalize the line to ordinary manual pricing
+        // so completeSale() never receives draft-only "fixed" pricing without
+        // a sourceDraftId. Recalculate the total from qty × unit price so the
+        // POS display and server-authoritative manual total stay identical.
+        var lineTotal = Math.round((qty * unitPrice + Number.EPSILON) * 100) / 100;
 
         posState.cart.push({
           productId: product.id,
@@ -2230,8 +2233,8 @@
           unit: item.unit || product.unit || '',
           unitPrice: unitPrice,
           lineTotal: lineTotal,
-          priceMode: 'fixed',
-          savedPriceMode: item.savedPriceMode || item.priceMode || 'manual',
+          priceMode: 'manual',
+          savedPriceMode: 'manual',
           qty: qty,
           shortageResolution: item.shortageResolution || 'negative',
           vendorId: item.vendorId || '',
