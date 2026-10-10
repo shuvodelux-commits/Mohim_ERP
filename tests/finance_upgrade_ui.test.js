@@ -24,8 +24,8 @@ test('transaction picker is grouped and driven by transaction metadata', () => {
   assert.doesNotMatch(src, /typeKey\.indexOf\(['"]Loan['"]\)/);
 });
 
-test('opening transactions hide money controls and submit blank money fields', () => {
-  assert.match(src, /Opening balance\s*[—-]\s*no Cash\/Bank movement/);
+test('opening transactions seed historical cash but submit no current-day payment fields', () => {
+  assert.match(src, /Pre-ERP opening\s*[—-]\s*updates ERP cash baseline, not current Cash Session/);
   assert.match(src, /cashDirection\s*===\s*['"]none['"]/);
   assert.match(src, /paymentMethod:\s*hasMoneyMovement\s*\?[^:]+:\s*['"]['"]/s);
   assert.match(src, /bankAccountId:\s*hasMoneyMovement\s*\?[^:]+:\s*['"]['"]/s);
