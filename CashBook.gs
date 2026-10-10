@@ -53,6 +53,9 @@ function addCashBookEntry_(fields, preloadedBalance) {
     // Transaction date. Defaults to now() so callers that pass nothing
     // behave exactly as before.
     'Date': fields.Date || new Date(),
+    // Keep the business date above for backdated transactions, but preserve
+    // the actual posting time for an accurate Day Book running balance.
+    'Created At': fields.CreatedAt || new Date(),
     'Type': fields.Type || '',
     'Reference': fields.Reference || '',
     'Description': fields.Description || '',

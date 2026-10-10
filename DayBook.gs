@@ -494,24 +494,49 @@ function getDayBookTransactions(token, filters) {
       }));
     });
 
-    // ---- running cash balance: walk transactions + Cash Book together in time order ----
-    // Deleted cash entries are excluded, so the running balance matches the
-    // drawer after a correction rather than the drawer before it.
-    const cashBookSorted = cashBookRows
-      .map(function (c) {
-        return {
-          ts: String(c['Date']),
-          delta: (Number(c['Credit']) || 0) - (Number(c['Debit']) || 0)
-        };
-      })
-      .sort(function (a, b) { return a.ts.localeCompare(b.ts); });
-
-    rows.forEach(function (r) { r.ts = String(r.ts || ''); });
+    // ---- Running drawer balance: use Cash Book movements, not inferred UI amounts. ----
+    // Cash Book's Date is a *business date*, often stored as YYYY-MM-DD
+    // (or midnight after Sheets date serialization). It is NOT the posting
+    // time. Treating it as a timestamp applied every day's cash movements
+    // before the first transaction, producing the same balance on each row.
+    rows.forEach(function (row) { row.ts = String(row.ts || ''); });
     rows.sort(function (a, b) { return a.ts.localeCompare(b.ts); });
 
+    // For old Cash Book rows without Created At, the owning document provides
+    // the best known timestamp. In one-second ties, attach the movement to
+    // its own transaction rather than applying it to all rows at that second.
+    const cashSources = {};
+    rows.forEach(function (row, index) {
+      if (row.referenceNo && row.ts && (row.cashIn || row.cashOut) && !row.isDeleted) {
+        cashSources[String(row.referenceNo)] = { ts: row.ts, index: index };
+      }
+    });
+    const cashBookSorted = cashBookRows.map(function (c) {
+      const ref = String(c['Reference'] || '');
+      const source = cashSources[ref];
+      const postedAt = String(c['Created At'] || '');
+      const businessDate = String(c['Date'] || '');
+      const dateOnly = /^\d{4}-\d{2}-\d{2}(?:T00:00:00)?$/.test(businessDate);
+      // A new entry normally posts seconds after the parent row is written.
+      // Group that same operation with its source; later correction entries
+      // retain their own posting time instead of changing historical order.
+      const nearSource = !!(postedAt && source &&
+        Math.abs(new Date(postedAt).getTime() - new Date(source.ts).getTime()) <= 30000);
+      const ts = nearSource ? source.ts : (postedAt || (dateOnly && source ? source.ts : businessDate));
+      return {
+        ts: ts,
+        sourceIndex: source && source.ts === ts ? source.index : -1,
+        delta: (Number(c['Credit']) || 0) - (Number(c['Debit']) || 0)
+      };
+    }).sort(function (a, b) {
+      return a.ts.localeCompare(b.ts) || a.sourceIndex - b.sourceIndex;
+    });
+
     let cbPointer = 0, currentBalance = null;
-    rows.forEach(function (row) {
-      while (cbPointer < cashBookSorted.length && cashBookSorted[cbPointer].ts <= row.ts) {
+    rows.forEach(function (row, index) {
+      while (cbPointer < cashBookSorted.length &&
+        (cashBookSorted[cbPointer].ts < row.ts ||
+          (cashBookSorted[cbPointer].ts === row.ts && cashBookSorted[cbPointer].sourceIndex <= index))) {
         currentBalance = roundMoney_((currentBalance === null ? 0 : currentBalance) + cashBookSorted[cbPointer].delta);
         cbPointer++;
       }

@@ -402,6 +402,9 @@ const CONFIG = {
       "Credit",
       "Balance",
       "Payment Method",
+      // Posting time is distinct from the backdatable transaction Date.
+      // Day Book uses it to place each cash movement next to its source row.
+      "Created At",
 
       // ---- Soft delete (Delete System). Additive: getSheetHeaders_ appends
       // these to the live sheet on first touch, and every existing row just
