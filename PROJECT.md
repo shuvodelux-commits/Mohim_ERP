@@ -1031,6 +1031,12 @@ Customer collections and Supplier payments support negotiated settlement discoun
   once, preserves manual reversal pairs, separates role-dependent cache entries,
   and reuses its Supplier Ledger read. Cash-session opening/closing reconciliation
   is deliberately excluded from Day Book rows and Day Book Cash In/Cash Out totals.
+  The Cash Book stores posting time in `Created At` separately from its
+  backdatable business `Date`. Day Book uses that posting time; for legacy
+  date-only Cash Book entries, it aligns an entry with the owning transaction
+  by reference (including exact-second ties). Unmatched old date-only movements
+  cannot have their precise intra-day order reconstructed and retain a
+  date-level fallback.
 - Cash Reconciliation is a dedicated cash-session audit/explanation module. It
   compares each session's opening count with the previous closed count and the
   closing expected amount with the closing count. A non-zero difference shows a
