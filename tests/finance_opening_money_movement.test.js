@@ -23,7 +23,7 @@ function runtime(initialFinance = []) {
     CASH_BOOK: [], BANK_BOOK: []
   };
   let nextId = 1;
-  const calls = { session: 0, cashPost: 0, bankPost: 0, cashReverse: 0, bankReverse: 0, deleted: 0 };
+  const calls = { session: 0, cashPost: 0, bankPost: 0, cashReverse: 0, bankReverse: 0, openingReverse: 0, openingPosts: [], deleted: 0 };
   const context = {
     console,
     CONFIG: { LOCK_TIMEOUT_MS: 1000 },
@@ -63,6 +63,8 @@ function runtime(initialFinance = []) {
     resolveEditedTransactionDate_: (token, module, requested, original) => requested || original || '2026-09-15',
     actorName_: () => 'Tester',
     addCashBookEntry_: () => { calls.cashPost++; },
+    postHistoricalOpeningCash_: (...args) => { calls.cashPost++; calls.openingPosts.push(args); },
+    reverseHistoricalOpeningCash_: (...args) => { calls.openingReverse++; },
     addBankBookEntry_: () => { calls.bankPost++; },
     isBankLikePaymentMethod_: method => method === 'Bank' || method === 'Mobile Banking',
     safeDateOnly_: value => String(value || '').slice(0, 10),
@@ -87,7 +89,7 @@ const openings = [
   ['Opening Borrower Loan', 'BOR']
 ];
 
-test('all opening transaction types bypass cash session and money books and canonicalize forged method/account fields to blank', () => {
+test('all opening finance types seed historical ERP cash without a session and reject forged bank methods', () => {
   const { context, sheets, calls } = runtime();
   for (const [transactionType, personId] of openings) {
     const result = context.addFinanceTransaction('T', {
@@ -97,7 +99,9 @@ test('all opening transaction types bypass cash session and money books and cano
     assert.equal(result.success, true, result.message);
   }
   assert.equal(calls.session, 0);
-  assert.equal(calls.cashPost, 0);
+  assert.equal(calls.cashPost, 3);
+  assert.equal(calls.openingPosts.length, 3);
+  assert.deepEqual(calls.openingPosts.map(post => post[0]), ['Owner', 'Lender', 'Borrower']);
   assert.equal(calls.bankPost, 0);
   sheets.FINANCE_TRANSACTIONS.forEach(row => {
     assert.equal(row['Payment Method'], '');
@@ -117,7 +121,7 @@ test('normal finance transaction still requires an active cash session and posts
   assert.equal(calls.bankPost, 0);
 });
 
-test('normal to opening edit reverses old money once, posts none, and blanks payment fields', () => {
+test('normal to opening edit reverses current-session money and replaces it with historical book effect', () => {
   const { context, sheets, calls } = runtime([{
     'Finance ID': 'FIN-1', Date: '2026-09-15', 'Transaction Type': 'Owner Investment',
     'Person ID': 'OWN', Person: 'Owner', 'Payment Method': 'Cash', Amount: 100
@@ -130,12 +134,14 @@ test('normal to opening edit reverses old money once, posts none, and blanks pay
   assert.equal(calls.session, 1);
   assert.equal(calls.cashReverse, 1);
   assert.equal(calls.bankReverse, 1);
-  assert.equal(calls.cashPost + calls.bankPost, 0);
+  assert.equal(calls.cashPost, 1);
+  assert.equal(calls.bankPost, 0);
+  assert.equal(calls.openingPosts[0][0], 'Owner');
   assert.equal(sheets.FINANCE_TRANSACTIONS[0]['Payment Method'], '');
   assert.equal(sheets.FINANCE_TRANSACTIONS[0]['Bank Account ID'], '');
 });
 
-test('opening to normal edit reverses no old money, requires session, and posts new movement', () => {
+test('opening to normal edit removes historical baseline and requires session for normal movement', () => {
   const { context, calls } = runtime([{
     'Finance ID': 'FIN-1', Date: '2026-09-15', 'Transaction Type': 'Opening Owner Capital',
     'Person ID': 'OWN', Person: 'Owner', 'Payment Method': '', Amount: 100
@@ -145,11 +151,12 @@ test('opening to normal edit reverses no old money, requires session, and posts 
   });
   assert.equal(result.success, true, result.message);
   assert.equal(calls.session, 1);
+  assert.equal(calls.openingReverse, 1);
   assert.equal(calls.cashReverse + calls.bankReverse, 0);
   assert.equal(calls.cashPost, 1);
 });
 
-test('opening to opening edit does not require session and never touches money books', () => {
+test('opening to opening edit replaces historical book amount without requiring session', () => {
   const { context, calls } = runtime([{
     'Finance ID': 'FIN-1', Date: '2026-09-15', 'Transaction Type': 'Opening Loan',
     'Person ID': 'LEN', Person: 'Lender', 'Payment Method': '', Amount: 100
@@ -160,7 +167,9 @@ test('opening to opening edit does not require session and never touches money b
   });
   assert.equal(result.success, true, result.message);
   assert.equal(calls.session, 0);
-  assert.equal(calls.cashReverse + calls.bankReverse + calls.cashPost + calls.bankPost, 0);
+  assert.equal(calls.openingReverse, 1);
+  assert.equal(calls.cashPost, 1);
+  assert.equal(calls.bankPost + calls.cashReverse + calls.bankReverse, 0);
 });
 
 
@@ -177,7 +186,7 @@ test('edit rejects changing to a transaction type whose required role the select
   assert.equal(calls.cashReverse + calls.bankReverse + calls.cashPost + calls.bankPost, 0);
 });
 
-test('delete opening soft-deletes only; delete normal requires session and reverses money', () => {
+test('delete opening reverses historical cash without session; delete normal reverses regular money', () => {
   const opening = runtime([{
     'Finance ID': 'OPEN-1', Date: '2026-09-15', 'Transaction Type': 'Opening Borrower Loan',
     'Person ID': 'BOR', Person: 'Borrower', 'Payment Method': '', Amount: 100
@@ -185,6 +194,7 @@ test('delete opening soft-deletes only; delete normal requires session and rever
   let result = opening.context.deleteFinanceTransaction('T', 'OPEN-1', 'Remove opening');
   assert.equal(result.success, true, result.message);
   assert.equal(opening.calls.session, 0);
+  assert.equal(opening.calls.openingReverse, 1);
   assert.equal(opening.calls.cashReverse + opening.calls.bankReverse, 0);
   assert.equal(String(opening.sheets.FINANCE_TRANSACTIONS[0]['Is Deleted']).toUpperCase(), 'TRUE');
 
