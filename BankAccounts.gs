@@ -68,7 +68,7 @@ function addBankAccount(token, payload) {
     if (duplicate) return fail_('A bank account with this name already exists.');
 
     const opening = isValidNonNegativeNumber_(payload.openingBalance) ? Number(payload.openingBalance) : 0;
-    if (opening > 0) requireActiveCashSession_();
+    // An existing bank opening balance predates ERP adoption, not today's cash session.
     const id = generateId_('BANK_ACCOUNTS');
     const now = new Date();
 
