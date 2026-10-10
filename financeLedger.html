@@ -331,7 +331,7 @@
     document.getElementById('finLedViewAccount').textContent = row.accountLabel || '—';
     document.getElementById('finLedViewPerson').textContent = row.person || '—';
     var type = finLedType_(row.transactionType);
-    document.getElementById('finLedViewMethod').textContent = row.paymentMethod || (type && type.cashDirection === 'none' ? 'Opening balance — no Cash/Bank movement' : '—');
+    document.getElementById('finLedViewMethod').textContent = row.paymentMethod || (type && type.cashDirection === 'none' ? 'Pre-ERP opening — updates ERP cash baseline, not current Cash Session' : '—');
     var needsAccount = paymentMethodNeedsAccount_(row.paymentMethod);
     document.getElementById('finLedViewBankRow').style.display = needsAccount ? '' : 'none';
     document.getElementById('finLedViewBank').textContent = row.bankAccountName || '—';
@@ -354,7 +354,7 @@
     document.getElementById('finLedEditPaymentRow').style.display = isOpening ? 'none' : '';
     document.getElementById('finLedEditPaymentMethod').disabled = isOpening;
     document.getElementById('finLedEditBankAccount').disabled = isOpening;
-    document.getElementById('finLedEditMoneyHint').textContent = isOpening ? 'Opening balance — no Cash/Bank movement' : '';
+    document.getElementById('finLedEditMoneyHint').textContent = isOpening ? 'Pre-ERP opening — updates ERP cash baseline, not current Cash Session' : '';
     if (isOpening) document.getElementById('finLedEditBankRow').style.display = 'none';
     else {
       var method = document.getElementById('finLedEditPaymentMethod').value;
@@ -415,7 +415,7 @@
     details.push({ label: 'Reference', value: payload.referenceNo }); details.push({ label: 'Date', value: payload.date });
     var financeId = finLedState.editingId;
     runConfirmedAction({ type:'financial', title:'Update Finance Transaction?',
-      message: hasMoneyMovement ? 'This will update the posted transaction and its Cash/Bank and finance effects.' : 'This will update a non-cash opening balance.',
+      message: hasMoneyMovement ? 'This will update the posted transaction and its Cash/Bank and finance effects.' : 'This changes the historical ERP cash baseline, not current Cash Session turnover.',
       details:details, confirmLabel:'Update Transaction', loadingLabel:'Updating...', trigger:document.getElementById('finLedEditSaveBtn')
     }, function () { return withLoader(serverCall('updateFinanceTransaction', authToken, financeId, payload)).then(function () {
       closeModal('finLedEditModal'); showToast('Finance transaction updated', 'success'); finLedLoad(); reloadPage_('finance'); reloadPage_('dashboard'); reloadPage_('daybook');

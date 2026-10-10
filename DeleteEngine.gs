@@ -506,6 +506,7 @@ function deleteSupplier(token, supplierId, reason) {
     }
 
     var now = new Date();
+    reverseHistoricalOpeningCash_('Supplier', supplierId, user, reason);
     markMatchingDeleted_('SUPPLIER_LEDGER', function (l) { return l['Supplier ID'] === supplierId; }, user, reason, now);
     markRowDeleted_('SUPPLIERS', sup._rowIndex, user, reason, now);
     logDeletion_('suppliers', supplierId, '', reason, user);
@@ -1080,13 +1081,14 @@ function updateFinanceTransactionInternal_(token, financeId, payload, options) {
     var dateStr = resolveEditedTransactionDate_(token, 'finance', payload.date, row['Date'], payload.backdatedReason, 'Finance Transaction Edit');
 
     if (oldMovesMoney) reverseFinanceTransactionMoney_(financeId, user, 'Finance entry edited', now);
+    else if (oldType && oldType.isOpening) reverseHistoricalOpeningCash_(oldType.role, financeId, user, 'Opening finance entry edited');
 
     updateRowFields_('FINANCE_TRANSACTIONS', row._rowIndex, {
       'Date': dateStr, 'Transaction Type': type.key, 'Person ID': personId, 'Person': personName, 'Payment Method': method,
       'Bank Account ID': bank.id, 'Bank Account Name': bank.name, 'Amount': amount,
       'Reference No': sanitizeInput_(payload.referenceNo), 'Notes': sanitizeInput_(payload.notes)
     });
-    if (newMovesMoney) postFinanceTransactionMoney_(financeId, type, method, bank.id, amount, personName, dateStr, user);
+    if (newMovesMoney || type.isOpening) postFinanceTransactionMoney_(financeId, type, method, bank.id, amount, personName, dateStr, user);
 
     return ok_({ financeId: financeId, ownerCapital: getOwnerCapital_(), outstandingLoan: getOutstandingLoan_() });
   } catch (err) {
@@ -1116,6 +1118,7 @@ function deleteFinanceTransaction(token, financeId, reason) {
     var amount = Number(row['Amount']) || 0;
 
     if (movesMoney) reverseFinanceTransactionMoney_(financeId, user, reason, now);
+    else if (type && type.isOpening) reverseHistoricalOpeningCash_(type.role, financeId, user, reason);
     markRowDeleted_('FINANCE_TRANSACTIONS', row._rowIndex, user, reason, now);
     logDeletion_('finance', financeId, '', reason, user);
 

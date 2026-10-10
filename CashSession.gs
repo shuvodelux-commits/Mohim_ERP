@@ -117,10 +117,17 @@ function startCashSession(token, openingCash, notes) {
       const hasPreviousClosedSession = sessionRows.some(function (row) {
         return row !== sessionRow && row['Status'] === 'Closed';
       });
-      const baselineDelta = hasPreviousClosedSession ? 0 : roundMoney_(storedOpening - currentCash);
+      // A pre-ERP historical opening already established the book baseline.
+      // Start Day must never overwrite it with the physical till count.
+      const hasHistoricalOpening = cashRows.some(function (row) {
+        return row['Type'] === 'Historical Opening';
+      });
+      const baselineDelta = hasPreviousClosedSession || hasHistoricalOpening
+        ? 0 : roundMoney_(storedOpening - currentCash);
       addCashBookEntry_({
         Type: 'Session Open', Reference: id,
-        Description: hasPreviousClosedSession ? 'Cash session opening marker' : 'Initial cash session baseline',
+        Description: hasPreviousClosedSession || hasHistoricalOpening
+          ? 'Cash session opening marker' : 'Initial cash session baseline',
         Debit: baselineDelta < 0 ? Math.abs(baselineDelta) : '',
         Credit: baselineDelta > 0 ? baselineDelta : '',
         PaymentMethod: 'Cash'
@@ -203,6 +210,9 @@ function cashSessionSummaryFromRows_(session, sessionRows, cashRows) {
   const reconciliationEntries = cashSessionLinkedReconciliationEntryIds_(sessionRows);
   let cashIn = 0, cashOut = 0;
   for (let i = startIndex; i < cashRows.length; i++) {
+    // Migration/opening corrections are book-balance entries, not drawer
+    // turnover, even if recorded after the session's boundary marker.
+    if (cashRows[i]['Type'] === 'Historical Opening') continue;
     const entryId = String(cashRows[i]['Entry ID'] || '');
     if (entryId && reconciliationEntries[entryId]) continue;
     if (session['Status'] === 'Closing' &&

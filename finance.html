@@ -340,7 +340,7 @@
     var hint = '';
     if (type) {
       if (type.isOpening || type.cashDirection === 'none') {
-        hint = 'Opening balance — no Cash/Bank movement';
+        hint = 'Pre-ERP opening — updates ERP cash baseline, not current Cash Session';
       } else {
         var moneyWord = type.cashDirection === 'in' ? 'increases' : 'decreases';
         var relationWord = type.balanceEffect > 0 ? 'increases' : 'decreases';
@@ -570,7 +570,7 @@
     details.push({ label: 'Reference', value: payload.referenceNo }); details.push({ label: 'Date', value: payload.date });
     runConfirmedAction({
       type: 'financial', title: 'Save Finance Transaction?',
-      message: hasMoneyMovement ? 'Review this finance transaction before it changes Cash/Bank and finance balances.' : 'Review this non-cash opening balance before saving.',
+      message: hasMoneyMovement ? 'Review this finance transaction before it changes Cash/Bank and finance balances.' : 'This opening updates the ERP historical cash balance, but not the current Cash Session.',
       details: details, confirmLabel: 'Save Transaction', loadingLabel: 'Saving...', trigger: document.getElementById('finSaveBtn')
     }, function () {
       return withLoader(serverCall('addFinanceTransaction', authToken, payload)).then(function () {

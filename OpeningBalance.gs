@@ -2,14 +2,15 @@
  * OpeningBalance.gs
  * ---------------------------------------------------------------------
  * High-privilege corrections for Customer / Supplier opening balances.
- * Opening balance is a signed accounting baseline, not cash movement:
+ * Opening balance is a signed pre-ERP baseline, not current-day turnover:
  *   Customer  + = customer owes us, - = customer advance/credit.
  *   Supplier  + = we owe supplier,   - = supplier advance/receivable.
  *
  * A correction changes the master Opening Balance and Current Due by the
  * same delta, rewrites (or creates) the Opening Balance ledger row, shifts
  * every active dependent ledger Balance by that delta, and writes a separate
- * immutable audit row. Cash Book and Bank Book are deliberately untouched.
+ * immutable audit row. The historical Cash Book baseline is updated without
+ * contributing to any current Cash Session or Day Book turnover.
  * ---------------------------------------------------------------------
  */
 
@@ -25,6 +26,71 @@ function openingBalanceLedgerAmounts_(balance) {
   if (amount > 0) return { Debit: amount, Credit: '' };
   if (amount < 0) return { Debit: '', Credit: Math.abs(amount) };
   return { Debit: '', Credit: '' };
+}
+
+/**
+ * Historical obligations are brought forward into the ERP cash baseline.
+ * This is a migration/book-balance adjustment, NOT today's cash collection
+ * or payment. Negative signed balances reverse their corresponding direction.
+ *
+ * The unique reference is a stable source identity, so editing the same
+ * opening replaces the old effect rather than accumulating duplicates.
+ */
+const HISTORICAL_OPENING_CASH_TYPE = 'Historical Opening';
+
+function historicalOpeningCashDirection_(entityType) {
+  if (entityType === 'Customer' || entityType === 'Borrower') return -1;
+  if (entityType === 'Supplier' || entityType === 'Lender' || entityType === 'Owner') return 1;
+  throw new Error('Unsupported historical opening balance type.');
+}
+
+function historicalOpeningCashReference_(entityType, sourceId) {
+  if (!String(sourceId || '').trim()) throw new Error('Historical opening source is required.');
+  historicalOpeningCashDirection_(entityType);
+  return 'OPEN:' + entityType + ':' + String(sourceId);
+}
+
+function historicalOpeningCashRows_(entityType, sourceId) {
+  const reference = historicalOpeningCashReference_(entityType, sourceId);
+  return activeRows_('CASH_BOOK').filter(function (row) {
+    return row['Type'] === HISTORICAL_OPENING_CASH_TYPE && row['Reference'] === reference;
+  });
+}
+
+function postHistoricalOpeningCash_(entityType, sourceId, openingBalance, displayName, date) {
+  const signed = roundMoney_(parseSignedOpeningBalance_(openingBalance) *
+    historicalOpeningCashDirection_(entityType));
+  if (Math.abs(signed) < 0.005) return;
+  if (historicalOpeningCashRows_(entityType, sourceId).length) {
+    throw new Error('Historical opening cash baseline already exists for this record.');
+  }
+  return addCashBookEntry_({
+    Type: HISTORICAL_OPENING_CASH_TYPE,
+    Reference: historicalOpeningCashReference_(entityType, sourceId),
+    Description: entityType + ' opening balance' + (displayName ? ' — ' + displayName : ''),
+    Debit: signed < 0 ? Math.abs(signed) : '',
+    Credit: signed > 0 ? signed : '',
+    Date: date || new Date(),
+    PaymentMethod: 'Cash'
+  });
+}
+
+/** Caller owns ScriptLock. Never reverse a regular cash transaction here. */
+function replaceHistoricalOpeningCash_(entityType, sourceId, openingBalance, displayName, date, actingUser, reason) {
+  const rows = historicalOpeningCashRows_(entityType, sourceId);
+  if (rows.length > 1) throw new Error('Duplicate historical opening cash entries require repair.');
+  rows.forEach(function (row) {
+    markRowDeleted_('CASH_BOOK', row._rowIndex, actingUser, reason || 'Historical opening corrected', new Date());
+  });
+  return postHistoricalOpeningCash_(entityType, sourceId, openingBalance, displayName, date);
+}
+
+function reverseHistoricalOpeningCash_(entityType, sourceId, actingUser, reason) {
+  const rows = historicalOpeningCashRows_(entityType, sourceId);
+  if (rows.length > 1) throw new Error('Duplicate historical opening cash entries require repair.');
+  rows.forEach(function (row) {
+    markRowDeleted_('CASH_BOOK', row._rowIndex, actingUser, reason || 'Historical opening deleted', new Date());
+  });
 }
 
 function openingBalanceEntityConfig_(entityType) {
@@ -216,6 +282,16 @@ function applyOpeningBalanceCorrectionPlan_(plan, extraMasterFields) {
     row['Ledger ID'] = generateId_(plan.ledgerSheet);
     appendRow_(plan.ledgerSheet, row);
   }
+
+  replaceHistoricalOpeningCash_(
+    plan.entityType,
+    plan.auditRow['Entity ID'],
+    plan.masterFields['Opening Balance'],
+    plan.auditRow['Entity Name'],
+    plan.auditRow['Changed At'],
+    plan.auditRow['Changed By'],
+    plan.auditRow['Reason']
+  );
 
   const auditRow = Object.assign({}, plan.auditRow);
   auditRow['Audit ID'] = generateId_('OPENING_BALANCE_EDIT_LOG');

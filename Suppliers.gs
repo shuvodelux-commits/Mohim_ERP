@@ -97,7 +97,7 @@ function addSupplier(token, payload) {
     if (duplicate) return fail_("A supplier with this name already exists.");
 
     const opening = parseSignedOpeningBalance_(payload.openingBalance);
-    if (opening > 0) requireActiveCashSession_();
+    // Pre-ERP opening balances never require a current Cash Session.
     const id = generateId_("SUPPLIERS");
     const now = new Date();
     appendRow_("SUPPLIERS", {
@@ -128,6 +128,8 @@ function addSupplier(token, payload) {
         "Created At": now,
       });
     }
+
+    if (opening !== 0) postHistoricalOpeningCash_('Supplier', id, opening, name, now);
 
     return ok_({ id: id });
   } catch (err) {
