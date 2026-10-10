@@ -195,6 +195,82 @@ test('day-book running cash balance excludes an earlier soft-deleted cash row', 
   assert.equal(result.data.rows[0].runningCashBalance, 50);
 });
 
+
+test('legacy date-only Cash Book rows attach to their own Day Book transactions', () => {
+  const { context } = runtime({
+    SALES: [
+      { 'Invoice ID': 'INV-1', Date: '2026-10-09', Time: '09:00:00',
+        'Created At': '2026-10-09T09:00:00', 'Paid Amount': 50,
+        'Payment Method': 'Cash', 'Payment Type': 'Cash', 'Payment Status': 'Paid' },
+      { 'Invoice ID': 'INV-2', Date: '2026-10-09', Time: '11:00:00',
+        'Created At': '2026-10-09T11:00:00', 'Paid Amount': 0,
+        'Payment Method': 'Cash', 'Payment Type': 'Due', 'Payment Status': 'Due' }
+    ],
+    EXPENSES: [
+      { 'Expense ID': 'EXP-1', Date: '2026-10-09',
+        'Created At': '2026-10-09T10:00:00', Amount: 20,
+        'Payment Method': 'Cash', Status: 'Active' }
+    ],
+    CASH_BOOK: [
+      { 'Entry ID': 'CB-START', Date: '2026-10-09', Reference: 'OPEN',
+        Credit: 100, Debit: '' },
+      { 'Entry ID': 'CB-SALE', Date: '2026-10-09', Reference: 'INV-1',
+        Credit: 50, Debit: '' },
+      { 'Entry ID': 'CB-EXP', Date: '2026-10-09T00:00:00', Reference: 'EXP-1',
+        Debit: 20, Credit: '' }
+    ]
+  });
+  const result = context.getDayBookTransactions('TOKEN', {});
+  assert.equal(result.success, true, result.message);
+  const byId = Object.fromEntries(result.data.rows.map(row => [row.referenceNo, row]));
+  assert.equal(byId['INV-1'].runningCashBalance, 150);
+  assert.equal(byId['EXP-1'].runningCashBalance, 130);
+  assert.equal(byId['INV-2'].runningCashBalance, 130);
+  assert.equal(result.data.totals.netCash, 30);
+});
+
+test('two sales at the same second do not receive the same ending balance', () => {
+  const { context } = runtime({
+    SALES: [
+      { 'Invoice ID': 'INV-1', Date: '2026-10-09', 'Created At': '2026-10-09T10:00:00',
+        'Paid Amount': 30, 'Payment Method': 'Cash', 'Payment Type': 'Cash' },
+      { 'Invoice ID': 'INV-2', Date: '2026-10-09', 'Created At': '2026-10-09T10:00:00',
+        'Paid Amount': 70, 'Payment Method': 'Cash', 'Payment Type': 'Cash' }
+    ],
+    CASH_BOOK: [
+      { Date: '2026-10-09', Reference: 'INV-1', Credit: 30 },
+      { Date: '2026-10-09', Reference: 'INV-2', Credit: 70 }
+    ]
+  });
+  const result = context.getDayBookTransactions('TOKEN', {});
+  assert.equal(result.success, true, result.message);
+  const byId = Object.fromEntries(result.data.rows.map(row => [row.referenceNo, row]));
+  assert.equal(byId['INV-1'].runningCashBalance, 30);
+  assert.equal(byId['INV-2'].runningCashBalance, 100);
+});
+
+test('posting timestamps group initial cash movement but not later corrections', () => {
+  const { context } = runtime({
+    SALES: [
+      { 'Invoice ID': 'INV-1', Date: '2026-10-08', 'Created At': '2026-10-09T10:00:59',
+        'Paid Amount': 100, 'Payment Method': 'Cash', 'Payment Type': 'Cash' },
+      { 'Invoice ID': 'INV-2', Date: '2026-10-09', 'Created At': '2026-10-09T11:00:00',
+        'Paid Amount': 0, 'Payment Method': 'Cash', 'Payment Type': 'Due' }
+    ],
+    CASH_BOOK: [
+      { Date: '2026-10-08', 'Created At': '2026-10-09T10:01:00',
+        Reference: 'INV-1', Credit: 100 },
+      { Date: '2026-10-08', 'Created At': '2026-10-09T10:30:00',
+        Reference: 'INV-1', Debit: 30 }
+    ]
+  });
+  const result = context.getDayBookTransactions('TOKEN', {});
+  assert.equal(result.success, true, result.message);
+  const byId = Object.fromEntries(result.data.rows.map(row => [row.referenceNo, row]));
+  assert.equal(byId['INV-1'].runningCashBalance, 100);
+  assert.equal(byId['INV-2'].runningCashBalance, 70);
+});
+
 test('day-book summary returns two-decimal cash and bank totals', () => {
   const { context } = runtime({
     SALES: [
