@@ -574,7 +574,7 @@ No cash/bank change
 
 Current transaction areas include sales, purchases, returns, payments, expenses, finance transactions, vendor flows, stock adjustments and bank transactions.
 
-Master-data edits can be performed without an open cash session unless they also create a financial opening balance.
+Master-data edits and pre-ERP financial opening balances can be saved without an active Cash Session. Current-day cash or bank transactions still require the usual session guard.
 
 ---
 
@@ -1004,9 +1004,25 @@ Customer collections and Supplier payments support negotiated settlement discoun
   deleted historical rows.
 - Sales update, return, and delete derive owned-stock effects from
   `SALE_ITEM_LOTS`; later vendor-sourcing edits cannot create owned stock.
-- Cash balance is the sum of active Cash Book movements. A Cash Session posts
-  only the difference between counted opening cash and the existing balance,
-  preventing carried cash from being counted again.
+- Cash balance is the sum of active Cash Book movements. A first Cash Session
+  creates a baseline only when no pre-ERP historical opening has already seeded
+  the book; later sessions write a zero-value boundary marker.
+- Pre-ERP customer, supplier, owner, lender and borrower opening balances post
+  signed `Historical Opening` Cash Book rows with stable `OPEN:type:id`
+  references. Positive customer/borrower amounts reduce the brought-forward
+  cash position; positive supplier/lender/owner amounts increase it; signed
+  advances reverse the direction. This is a **historical cash baseline**
+  adjustment, not a current-day receipt or payment.
+- Historical opening rows never contribute to Cash Session cash-in/cash-out or
+  the expected physical till total, even if recorded after Start Day. Finance
+  opening entries remain non-cash in Day Book turnover. Edit replaces the old
+  historical entry, while eligible delete reverses it. Bank-account opening
+  balances remain in the corresponding Bank Book/account baseline without
+  requiring the current Cash Session.
+- Existing opening balances entered before this upgrade are **not** silently
+  backfilled, because prior Cash Session opening counts and bank openings may
+  already contain these amounts. Reconcile the go-live baseline before any
+  one-time historical migration to avoid double counting.
 - Ambiguous legacy customer/supplier payment book references must be repaired
   before edit/delete; reversal never guesses between same-value movements.
 - Deleted expenses and sales cannot re-enter native update/cancel paths, and
@@ -1113,3 +1129,10 @@ Batch accounting is unchanged: each selected invoice creates its own Sales Retur
 - Google Sheets still has no SQL-style rollback. SherERP validates the full selected correction batch before the first business write, then applies deterministic bounded writes under one ScriptLock.
 
 Deployment note: run `setupSystem_()` once after installing this version so the additive `Stock Lot Cost Corrections` audit sheet/header schema is available before using the correction workflow.
+### Historical party opening cash migration (2026-10-10)
+
+Opening Customer/Supplier and Finance Person balances are legacy obligations
+from before adopting the ERP, but also now seed the running ERP cash baseline
+using auditable cash-book references. They do **not** represent money received
+or paid during the current session. Never infer a duplicate historical cash
+movement from the same invoice/payment, and never silently re-seed old records.
