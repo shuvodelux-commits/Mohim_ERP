@@ -210,6 +210,8 @@ function addCustomer_(payload) {
       });
     }
 
+    if (opening !== 0) postHistoricalOpeningCash_('Customer', id, opening, name, now);
+
     return ok_({ id: id });
   } catch (err) {
     logError_("addCustomer_", err);
@@ -222,7 +224,7 @@ function addCustomerChecked(token, payload) {
   try {
     requirePermission_(token, "customers", "add");
     const opening = parseSignedOpeningBalance_(payload && payload.openingBalance);
-    if (opening > 0) requireActiveCashSession_();
+    // Pre-ERP opening balances never require a current Cash Session.
     return addCustomerLocked_(payload);
   } catch (err) {
     logError_("addCustomerChecked", err);
