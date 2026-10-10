@@ -516,7 +516,7 @@ function getDayBookTransactions(token, filters) {
       const source = cashSources[ref];
       const postedAt = String(c['Created At'] || '');
       const businessDate = String(c['Date'] || '');
-      const dateOnly = /^\\d{4}-\\d{2}-\\d{2}(?:T00:00:00)?$/.test(businessDate);
+      const dateOnly = /^\d{4}-\d{2}-\d{2}(?:T00:00:00)?$/.test(businessDate);
       // A new entry normally posts seconds after the parent row is written.
       // Group that same operation with its source; later correction entries
       // retain their own posting time instead of changing historical order.
