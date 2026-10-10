@@ -5,8 +5,8 @@
  * One sheet (FINANCE_TRANSACTIONS, see Config.gs), two pages (Business
  * Finance to record a transaction, Finance Ledger to browse/edit/delete
  * them) and four transaction types, plus two opening-balance variants
- * that behave identically to their non-opening counterpart — "opening"
- * is just a label so the ledger can show which entry seeded the figure,
+ * that seed historical financial obligations. These opening entries adjust
+ * the ERP's main historical cash baseline, not the active session;
  * exactly the way this codebase already lets a Bank Account's first
  * transaction be its own opening entry rather than building a second
  * opening-balance system.
@@ -28,7 +28,9 @@
 /**
  * Explicit relationship-account and money-movement metadata for Business Finance.
  * `balanceEffect` changes the relationship balance while `cashDirection` controls
- * the real Cash/Bank side. Opening entries intentionally have no money movement.
+ * current-day Cash/Bank movements. Opening records retain cashDirection='none'
+ * for Day Book/session reporting, but post separately to ERP's historical
+ * cash baseline, outside today's cash session.
  */
 const FINANCE_TRANSACTION_TYPES = [
   { key:'Owner Investment', label:'Owner Credit', account:'owner', balanceEffect:1, cashDirection:'in', role:'Owner', isOpening:false },
@@ -334,6 +336,10 @@ function financeTypeHasMoneyMovement_(type) {
  * exists exactly once.
  */
 function postFinanceTransactionMoney_(financeId, type, method, bankAccountId, amount, person, dateStr, actingUser) {
+  if (type && type.isOpening) {
+    postHistoricalOpeningCash_(type.role, financeId, amount, person, dateStr);
+    return;
+  }
   if (!financeTypeHasMoneyMovement_(type)) return;
   const description = type.label + (person ? ' — ' + person : '');
   if (method === 'Cash') {
