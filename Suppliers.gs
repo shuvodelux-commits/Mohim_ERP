@@ -199,7 +199,9 @@ function getSupplierDetail(token, supplierId) {
       }),
       "",
     );
-    return ok_({ supplier: supplier, ledger: ledger });
+    return ok_({ supplier: supplier, ledger: ledger.map(function (row) {
+      return partyLedgerPresentAmounts_('supplier', row);
+    }) });
   } catch (err) {
     logError_("getSupplierDetail", err);
     return fail_(err.message);
