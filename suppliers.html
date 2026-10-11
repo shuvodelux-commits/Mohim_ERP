@@ -66,7 +66,7 @@
       </div>
       <h3 style="font-size:14px; margin:16px 0 8px;">Ledger <span class="bn-hint" style="display:inline;">— সাপ্লায়ারের বাকি হিসাব</span></h3>
       <table class="mobile-card-table">
-        <thead><tr><th>Date</th><th>Type</th><th>Reference</th><th class="num">Debit<br><span class="bn-hint" style="display:inline;">খরচ</span></th><th class="num">Credit<br><span class="bn-hint" style="display:inline;">জমা</span></th><th class="num">Balance</th><th></th></tr></thead>
+        <thead><tr><th>Date</th><th>Type</th><th>Reference</th><th class="num">Debit<br><span class="bn-hint" style="display:inline;">দেনা কমে</span></th><th class="num">Credit<br><span class="bn-hint" style="display:inline;">দেনা বাড়ে</span></th><th class="num">Balance</th><th></th></tr></thead>
         <tbody id="supLedgerBody"></tbody>
       </table>
       <div class="empty-state" id="supLedgerEmpty" hidden>No transactions yet.</div>
@@ -337,7 +337,7 @@
     document.getElementById('supDetailName').textContent = data.supplier['Supplier Name'] + ' \u2014 ' + (data.supplier['Phone'] || '');
     var detailDue = Number(data.supplier['Current Due']) || 0;
     supState.detailDue = detailDue;
-    document.getElementById('supDetailDue').textContent = detailDue < 0 ? ('Credit ' + formatMoney(Math.abs(detailDue))) : formatMoney(detailDue);
+    document.getElementById('supDetailDue').textContent = detailDue < 0 ? ('Advance ' + formatMoney(Math.abs(detailDue)) + ' Dr') : (formatMoney(detailDue) + (detailDue > 0 ? ' Cr' : ''));
 
     document.getElementById('supPayAmount').value = '';
     document.getElementById('supPayDiscount').value = '0';
@@ -360,18 +360,18 @@
         // same guard as updateSupplierPayment/deleteSupplierPayment enforce
         // server-side.
         var isPayment = l['Type'] === 'Payment';
-        var paymentAmount = (l['Payment Amount'] === '' || l['Payment Amount'] == null) ? (Number(l['Credit']) || 0) : (Number(l['Payment Amount']) || 0);
+        var paymentAmount = (l['Payment Amount'] === '' || l['Payment Amount'] == null) ? (Number(l['Debit']) || 0) : (Number(l['Payment Amount']) || 0);
         var discountAmount = Number(l['Discount Amount']) || 0;
-        var creditHtml = l['Credit'] ? formatMoney(l['Credit']) : '';
-        if (isPayment && discountAmount > 0) creditHtml += '<div style="font-size:11px;color:var(--color-text-muted);">Payment ' + formatMoney(paymentAmount) + ' + Discount ' + formatMoney(discountAmount) + '</div>';
+        var debitHtml = l['Debit'] ? formatMoney(l['Debit']) : '';
+        if (isPayment && discountAmount > 0) debitHtml += '<div style="font-size:11px;color:var(--color-text-muted);">Payment ' + formatMoney(paymentAmount) + ' + Discount ' + formatMoney(discountAmount) + '</div>';
         var tr = document.createElement('tr');
         tr.innerHTML =
           '<td>' + escapeHtml(formatDateShort_(l['Date'])) + '</td>' +
           '<td>' + escapeHtml(l['Type']) + '</td>' +
           '<td>' + escapeHtml(l['Reference'] || '') + '</td>' +
-          '<td class="num">' + (l['Debit'] ? formatMoney(l['Debit']) : '') + '</td>' +
-          '<td class="num">' + creditHtml + '</td>' +
-          '<td class="num">' + formatMoney(l['Balance']) + '</td>' +
+          '<td class="num">' + debitHtml + '</td>' +
+          '<td class="num">' + (l['Credit'] ? formatMoney(l['Credit']) : '') + '</td>' +
+          '<td class="num">' + formatMoney(Math.abs(Number(l['Balance']) || 0)) + (Number(l['Balance']) > 0 ? ' Cr' : (Number(l['Balance']) < 0 ? ' Dr' : '')) + '</td>' +
           '<td style="white-space:nowrap;">' +
           (isPayment
             ? '<button class="btn" data-act="menuLed" data-id="' + l['Ledger ID'] + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button>'
