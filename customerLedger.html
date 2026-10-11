@@ -454,6 +454,7 @@
     var after = Math.round((due - total) * 100) / 100;
     document.getElementById('customerLedgerPayTotalSettled').textContent = formatMoney(total);
     document.getElementById('customerLedgerPayBalanceAfter').textContent = after < 0 ? ('Credit ' + formatMoney(Math.abs(after))) : formatMoney(after);
+    partyLedgerPaintBalance_(document.getElementById('customerLedgerPayBalanceAfter'), after);
     document.getElementById('customerLedgerPayDiscountReasonRow').hidden = discount <= 0;
     var canDiscount = customerLedgerCanDiscount_() && due > 0;
     document.getElementById('customerLedgerPayDiscount').disabled = !canDiscount;
@@ -464,6 +465,7 @@
     if (!customerLedgerState.party || !customerLedgerState.party.canPay) return;
     customerLedgerClearPaymentForms_();
     document.getElementById('customerLedgerPayCurrentDue').textContent = formatMoney(Math.max(0, Number(customerLedgerState.party.balance) || 0));
+    partyLedgerPaintBalance_(document.getElementById('customerLedgerPayCurrentDue'), customerLedgerState.party.balance);
     document.getElementById('customerLedgerPayMethod').value = 'Cash';
     document.getElementById('customerLedgerPayBankRow').hidden = true;
     customerLedgerFillBank_('customerLedgerPayBank', 'Cash');
@@ -536,6 +538,7 @@
     var credit = Number(customerLedgerState.paymentContext.customerCredit) || 0;
     if (credit <= 0.004) { showToast('No refundable customer advance is available.', 'error'); return; }
     document.getElementById('customerLedgerAdvanceRefundAvailable').textContent = formatMoney(credit);
+    partyLedgerPaintBalance_(document.getElementById('customerLedgerAdvanceRefundAvailable'), -credit);
     document.getElementById('customerLedgerAdvanceRefundAmount').value = '';
     document.getElementById('customerLedgerAdvanceRefundAmount').max = String(credit);
     document.getElementById('customerLedgerAdvanceRefundMethod').value = 'Cash';
