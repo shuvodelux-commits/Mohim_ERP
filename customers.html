@@ -304,6 +304,7 @@
       var detailDue = Number(data.customer['Current Due']) || 0;
       custState.detailDue = detailDue;
       document.getElementById('custDetailDue').textContent = detailDue < 0 ? ('Credit ' + formatMoney(Math.abs(detailDue))) : formatMoney(detailDue);
+      partyLedgerPaintBalance_(document.getElementById('custDetailDue'), detailDue);
       document.getElementById('custPayAmount').value = '';
       document.getElementById('custPayDiscount').value = '0';
       document.getElementById('custPayDiscountReason').value = '';
@@ -332,9 +333,9 @@
           '<td>' + escapeHtml(formatDateShort_(l['Date'])) + '</td>' +
           '<td>' + escapeHtml(l['Type']) + '</td>' +
           '<td>' + escapeHtml(l['Reference'] || '') + '</td>' +
-          '<td class="num">' + (l['Debit'] ? formatMoney(l['Debit']) : '') + '</td>' +
-          '<td class="num">' + creditHtml + '</td>' +
-          '<td class="num">' + formatMoney(l['Balance']) + '</td>' +
+          '<td class="num ledger-txn--increase">' + (l['Debit'] ? formatMoney(l['Debit']) : '') + '</td>' +
+          '<td class="num ledger-txn--decrease">' + creditHtml + '</td>' +
+          '<td class="num ' + partyLedgerBalanceTone_(l['Balance']) + '">' + formatMoney(l['Balance']) + '</td>' +
           '<td style="white-space:nowrap;">' +
           (isPayment
             ? '<button class="btn" data-act="menuLed" data-id="' + l['Ledger ID'] + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button>'
