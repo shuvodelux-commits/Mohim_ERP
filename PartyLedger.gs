@@ -420,6 +420,26 @@ function partyLedgerDecodeCursor_(cursor) {
   }
 }
 
+/**
+ * Read-only public supplier-ledger presentation.
+ *
+ * Historical SUPPLIER_LEDGER rows use a legacy due-centric sign convention:
+ * Debit increases supplier due; Credit settles it. This is authoritative
+ * for all writers, reverse/edit flows, and stored Current Due.
+ *
+ * Conventional accounts-payable statements are credit-normal:
+ * purchases/opening payables are Credit; payments/returns are Debit.
+ * Swap only the API-facing columns, never the persisted rows or balances.
+ */
+function partyLedgerPresentAmounts_(kind, ledgerRow) {
+  const out = Object.assign({}, ledgerRow);
+  if (kind !== 'supplier') return out;
+  const debit = out['Debit'];
+  out['Debit'] = out['Credit'];
+  out['Credit'] = debit;
+  return out;
+}
+
 function partyLedgerNormalizeFullRows_(kind, selectedIndexEntries) {
   if (!selectedIndexEntries.length) return [];
   const cfg = partyLedgerConfig_(kind);
@@ -449,7 +469,7 @@ function partyLedgerNormalizeFullRows_(kind, selectedIndexEntries) {
     row._rowIndex = entry._rowIndex;
     row['Balance'] = entry._displayBalance;
     partyLedgerAttachSourceMetadata_(kind, row);
-    return row;
+    return partyLedgerPresentAmounts_(kind, row);
   });
 }
 
@@ -660,7 +680,11 @@ function getPartyLedgerStatement_(kind, token, partyId, fromDate, toDate) {
     debit = roundMoney_(debit + (Number(row['Debit']) || 0));
     credit = roundMoney_(credit + (Number(row['Credit']) || 0));
   });
-  const closing = roundMoney_(opening + debit - credit);
+  // Supplier statements are credit-normal in the public display, while
+  // opening/current payable retains its pre-existing positive-due sign.
+  const closing = kind === 'supplier'
+    ? roundMoney_(opening + credit - debit)
+    : roundMoney_(opening + debit - credit);
   return {
     kind: kind,
     business: partyLedgerBusinessIdentity_(),
