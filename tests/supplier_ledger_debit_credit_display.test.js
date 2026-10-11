@@ -67,10 +67,10 @@ test('purchase credits payable; direct purchase settlement, payment, and return 
     row(4, 'Purchase Return Credit', '2026-09-06', 0, 500, 5500)
   ];
   const rows = c.partyLedgerNormalizeFullRows_('supplier', internalRows);
-  assert.deepEqual(rows.map(r => [Number(r.Debit) || 0, Number(r.Credit) || 0]), [
+  assert.deepEqual(Array.from(rows, r => [Number(r.Debit) || 0, Number(r.Credit) || 0]), [
     [0, 5000], [1000, 3000], [1000, 0], [500, 0]
   ]);
-  assert.deepEqual(rows.map(r => r.Balance), [5000, 7000, 6000, 5500]);
+  assert.deepEqual(Array.from(rows, r => r.Balance), [5000, 7000, 6000, 5500]);
   assert.equal(rows.at(-1).Balance,
     rows.reduce((bal, r) => bal + (Number(r.Credit) || 0) - (Number(r.Debit) || 0), 0));
   assert.equal(internalRows[1].Debit, 3000, 'purchase writer convention must stay unchanged');
@@ -92,7 +92,7 @@ test('supplier statement uses credit-normal columns and preserves period closing
   assert.equal(statement.periodCredit, 3000);
   assert.equal(statement.periodDebit, 2500);
   assert.equal(statement.closingBalance, 5500);
-  assert.deepEqual(statement.rows.map(r => [Number(r.Debit) || 0, Number(r.Credit) || 0]),
+  assert.deepEqual(statement.Array.from(rows, r => [Number(r.Debit) || 0, Number(r.Credit) || 0]),
     [[1000, 3000], [1000, 0], [500, 0]]);
   assert.equal(statement.rows.at(-1).Balance, 5500);
 });
