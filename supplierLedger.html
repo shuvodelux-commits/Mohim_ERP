@@ -386,6 +386,7 @@
     var after = Math.round((due - total) * 100) / 100;
     document.getElementById('supplierLedgerPayTotalSettled').textContent = formatMoney(total);
     document.getElementById('supplierLedgerPayBalanceAfter').textContent = after < 0 ? ('Credit ' + formatMoney(Math.abs(after))) : formatMoney(after);
+    partyLedgerPaintBalance_(document.getElementById('supplierLedgerPayBalanceAfter'), after);
     document.getElementById('supplierLedgerPayDiscountReasonRow').hidden = discount <= 0;
     var canDiscount = supplierLedgerCanDiscount_() && due > 0;
     document.getElementById('supplierLedgerPayDiscount').disabled = !canDiscount;
@@ -396,6 +397,7 @@
     if (!supplierLedgerState.party || !supplierLedgerState.party.canPay) return;
     supplierLedgerClearPaymentForms_();
     document.getElementById('supplierLedgerPayCurrentDue').textContent = formatMoney(Number(supplierLedgerState.party.balance) || 0);
+    partyLedgerPaintBalance_(document.getElementById('supplierLedgerPayCurrentDue'), supplierLedgerState.party.balance);
     document.getElementById('supplierLedgerPayMethod').value = 'Cash';
     document.getElementById('supplierLedgerPayBankRow').hidden = true;
     supplierLedgerFillBank_('supplierLedgerPayBank', 'Cash');
