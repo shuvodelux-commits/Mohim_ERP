@@ -45,7 +45,7 @@ test('public workspace/page/statement endpoints exist for both party kinds',()=>
 
 test('workspace is read-only and contains no accounting mutation endpoint',()=>{ assert.doesNotMatch(src,/appendRow_|updateRowFields_|deleteRow_|addCashBookEntry_|addBankBookEntry_/); });
 
-test('statement computes opening, period debit/credit and closing from authoritative index',()=>{ assert.match(src,/if \(d < period\.from\) opening/); assert.match(src,/debit = roundMoney_/); assert.match(src,/credit = roundMoney_/); assert.match(src,/const closing = roundMoney_\(opening \+ debit - credit\)/); });
+test('statement computes opening, period debit/credit and closing from authoritative index',()=>{ assert.match(src,/if \(d < period\.from\) opening/); assert.match(src,/debit = roundMoney_/); assert.match(src,/credit = roundMoney_/); assert.match(src,/roundMoney_\(opening \+ debit - credit\)/); assert.match(src,/roundMoney_\(opening \+ credit - debit\)/); assert.match(src,/kind === 'supplier'/); });
 
 test('supplier bank payment uses actual settlement payment amount',()=>{ const suppliers=fs.readFileSync(path.join(root,'Suppliers.gs'),'utf8'); assert.match(suppliers,/Type: "Supplier Payment"[\s\S]{0,260}Debit: settlement\.payment/); assert.doesNotMatch(suppliers,/Type: "Supplier Payment"[\s\S]{0,260}Debit: amt/); });
 console.log(`\n${pass}/${pass+fail} passed`); if(fail)process.exit(1);
