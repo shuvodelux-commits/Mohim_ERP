@@ -135,6 +135,7 @@
     var balance = Math.round((supState.detailDue - total) * 100) / 100;
     document.getElementById('supPayTotalSettled').textContent = formatMoney(total);
     document.getElementById('supPayBalanceAfter').textContent = balance < 0 ? ('Credit ' + formatMoney(Math.abs(balance))) : formatMoney(balance);
+    partyLedgerPaintBalance_(document.getElementById('supPayBalanceAfter'), balance);
     document.getElementById('supPayDiscountReasonRow').style.display = discount > 0 ? '' : 'none';
     var canDiscount = supCanSettlementDiscount_() && supState.detailDue > 0;
     document.getElementById('supPayDiscount').disabled = !canDiscount;
