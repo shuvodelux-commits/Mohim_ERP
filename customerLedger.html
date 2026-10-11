@@ -248,6 +248,7 @@
     customerLedgerState.paymentContext = ctx || null;
     var credit = Number(ctx && ctx.customerCredit) || 0;
     document.getElementById('customerLedgerAdvance').textContent = formatMoney(credit);
+    partyLedgerPaintBalance_(document.getElementById('customerLedgerAdvance'), -credit);
     document.getElementById('customerLedgerAdvanceRefundBtn').disabled = !customerLedgerState.party || credit <= 0.004 || !customerLedgerCan_('customers', 'edit');
     customerLedgerFillInvoiceSelect_();
   }
@@ -308,6 +309,7 @@
       document.getElementById('customerLedgerReceiveBtn').disabled = true;
       document.getElementById('customerLedgerAdvanceRefundBtn').disabled = true;
       document.getElementById('customerLedgerAdvance').textContent = formatMoney(0);
+      partyLedgerPaintBalance_(document.getElementById('customerLedgerAdvance'), 0);
       document.getElementById('customerLedgerPrintBtn').disabled = true;
       return;
     }
@@ -319,6 +321,8 @@
     statusEl.hidden = !statusEl.textContent;
     var balance = Number(party.balance) || 0;
     document.getElementById('customerLedgerBalance').textContent = formatMoney(Math.max(0, balance));
+    partyLedgerPaintBalance_(document.getElementById('customerLedgerBalance'), balance);
+    partyLedgerPaintBalance_(document.querySelector('#customerLedgerSelected .party-ledger-balance-box'), balance);
     document.getElementById('customerLedgerReceiveBtn').disabled = !party.canPay || !customerLedgerCan_('customers', 'edit');
     document.getElementById('customerLedgerPrintBtn').disabled = customerLedgerState.rows.length === 0 && !(customerLedgerState.page && customerLedgerState.page.hasOlder);
     document.getElementById('customerLedgerPageSize').value = String(customerLedgerState.pageSize);
@@ -367,9 +371,9 @@
         '<td data-label="Date">' + escapeHtml(String(row['Date'] || '').slice(0,10)) + '</td>' +
         '<td data-label="Type">' + escapeHtml(displayType) + '</td>' +
         '<td data-label="Reference">' + escapeHtml(displayReference) + '</td>' +
-        '<td class="num" data-label="Debit">' + (row['Debit'] ? escapeHtml(formatMoney(row['Debit'])) : '') + '</td>' +
-        '<td class="num" data-label="Credit">' + credit + '</td>' +
-        '<td class="num" data-label="Balance">' + escapeHtml(formatMoney(Number(row['Balance']) || 0)) + '</td>' +
+        '<td class="num ledger-txn--increase" data-label="Debit">' + (row['Debit'] ? escapeHtml(formatMoney(row['Debit'])) : '') + '</td>' +
+        '<td class="num ledger-txn--decrease" data-label="Credit">' + credit + '</td>' +
+        '<td class="num ' + partyLedgerBalanceTone_(row['Balance']) + '" data-label="Balance">' + escapeHtml(formatMoney(Number(row['Balance']) || 0)) + '</td>' +
         '<td>' + (actions.length ? '<button class="btn" type="button" data-customer-ledger-action-index="' + index + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button>' : '') + '</td>';
       body.appendChild(tr);
     });
@@ -450,6 +454,7 @@
     var after = Math.round((due - total) * 100) / 100;
     document.getElementById('customerLedgerPayTotalSettled').textContent = formatMoney(total);
     document.getElementById('customerLedgerPayBalanceAfter').textContent = after < 0 ? ('Credit ' + formatMoney(Math.abs(after))) : formatMoney(after);
+    partyLedgerPaintBalance_(document.getElementById('customerLedgerPayBalanceAfter'), after);
     document.getElementById('customerLedgerPayDiscountReasonRow').hidden = discount <= 0;
     var canDiscount = customerLedgerCanDiscount_() && due > 0;
     document.getElementById('customerLedgerPayDiscount').disabled = !canDiscount;
@@ -460,6 +465,7 @@
     if (!customerLedgerState.party || !customerLedgerState.party.canPay) return;
     customerLedgerClearPaymentForms_();
     document.getElementById('customerLedgerPayCurrentDue').textContent = formatMoney(Math.max(0, Number(customerLedgerState.party.balance) || 0));
+    partyLedgerPaintBalance_(document.getElementById('customerLedgerPayCurrentDue'), customerLedgerState.party.balance);
     document.getElementById('customerLedgerPayMethod').value = 'Cash';
     document.getElementById('customerLedgerPayBankRow').hidden = true;
     customerLedgerFillBank_('customerLedgerPayBank', 'Cash');
@@ -532,6 +538,7 @@
     var credit = Number(customerLedgerState.paymentContext.customerCredit) || 0;
     if (credit <= 0.004) { showToast('No refundable customer advance is available.', 'error'); return; }
     document.getElementById('customerLedgerAdvanceRefundAvailable').textContent = formatMoney(credit);
+    partyLedgerPaintBalance_(document.getElementById('customerLedgerAdvanceRefundAvailable'), -credit);
     document.getElementById('customerLedgerAdvanceRefundAmount').value = '';
     document.getElementById('customerLedgerAdvanceRefundAmount').max = String(credit);
     document.getElementById('customerLedgerAdvanceRefundMethod').value = 'Cash';

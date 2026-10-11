@@ -3236,6 +3236,20 @@
     return false;
   }
 
+  // UI-only: all ledgers retain their original signed balances and calculations.
+  // Positive means due/payable; negative means party credit/advance.
+  function partyLedgerBalanceTone_(balance) {
+    var value = Number(balance) || 0;
+    return value > 0.004 ? 'ledger-tone--due' : (value < -0.004 ? 'ledger-tone--advance' : 'ledger-tone--neutral');
+  }
+
+  function partyLedgerPaintBalance_(element, balance) {
+    if (!element) return;
+    var tones = ['ledger-tone--due', 'ledger-tone--advance', 'ledger-tone--neutral'];
+    element.classList.remove.apply(element.classList, tones);
+    element.classList.add(partyLedgerBalanceTone_(balance));
+  }
+
   function partyLedgerPrintStatement_(statement) {
     var s = statement || {};
     var host = document.getElementById('printHost');

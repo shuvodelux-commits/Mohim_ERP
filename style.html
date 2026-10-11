@@ -1945,6 +1945,37 @@
   }
 
 
+/* Customer & supplier ledger colors (presentation only; never affect book signs).
+   Current sheet/ledger convention: Debit increases due, Credit settles due.
+   The pending supplier credit-normal statement PR will invert only supplier
+   column tone styling when its read-only column projection becomes active. */
+#page-customerLedger .ledger-txn--increase,
+#page-supplierLedger .ledger-txn--increase,
+#page-customers .ledger-txn--increase,
+#page-suppliers .ledger-txn--increase {
+  color:var(--color-danger);
+  font-weight:650;
+}
+#page-customerLedger .ledger-txn--decrease,
+#page-supplierLedger .ledger-txn--decrease,
+#page-customers .ledger-txn--decrease,
+#page-suppliers .ledger-txn--decrease {
+  color:var(--color-success);
+  font-weight:650;
+}
+.ledger-tone--due { color:var(--color-danger) !important; font-weight:700; }
+.ledger-tone--advance { color:var(--color-success) !important; font-weight:700; }
+.ledger-tone--neutral { color:var(--color-text-muted) !important; }
+.party-ledger-balance-box { padding:10px 14px; border-radius:10px; }
+.party-ledger-balance-box.ledger-tone--due { background:var(--color-danger-light); }
+.party-ledger-balance-box.ledger-tone--advance { background:var(--color-success-light); }
+.party-ledger-balance-box.ledger-tone--neutral { background:var(--color-bg); }
+.party-ledger-table td.ledger-tone--due,
+.party-ledger-table td.ledger-tone--advance { font-weight:700; }
+@media print {
+  .party-ledger-balance-box { background:transparent !important; }
+}
+
 /* Clean party-ledger audit toggle: privileged on-screen control only. */
 .party-ledger-list-controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end}
 .party-ledger-corrections-toggle{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);white-space:nowrap;cursor:pointer}
