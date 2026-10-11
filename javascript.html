@@ -3236,6 +3236,14 @@
     return false;
   }
 
+  // Supplier payables are credit-normal on statements; preserve the
+  // positive Current Due used by all settlement business logic.
+  function partyLedgerStatementBalance_(kind, amount) {
+    var value = Number(amount) || 0;
+    if (kind !== 'supplier') return formatMoney(value);
+    return formatMoney(Math.abs(value)) + (value > 0 ? ' Cr' : (value < 0 ? ' Dr' : ''));
+  }
+
   function partyLedgerPrintStatement_(statement) {
     var s = statement || {};
     var host = document.getElementById('printHost');
@@ -3253,7 +3261,7 @@
         '<td>' + escapeHtml(r['Reference'] || '') + '</td>' +
         '<td style="text-align:right">' + escapeHtml(formatMoney(Number(r['Debit']) || 0)) + '</td>' +
         '<td style="text-align:right">' + escapeHtml(formatMoney(Number(r['Credit']) || 0)) + '</td>' +
-        '<td style="text-align:right">' + escapeHtml(formatMoney(Number(r['Balance']) || 0)) + '</td>' +
+        '<td style="text-align:right">' + escapeHtml(partyLedgerStatementBalance_(s.kind, r['Balance'])) + '</td>' +
       '</tr>';
     }).join('');
 
@@ -3270,10 +3278,10 @@
           (partyMeta ? '<br>' + escapeHtml(partyMeta) : '') +
           '<br>Period: ' + escapeHtml((s.period || {}).from || '') + ' to ' + escapeHtml((s.period || {}).to || '') + '</div>' +
         '<div class="party-ledger-print-summary">' +
-          '<span>Opening Balance: <strong>' + escapeHtml(formatMoney(Number(s.openingBalance) || 0)) + '</strong></span>' +
+          '<span>Opening Balance: <strong>' + escapeHtml(partyLedgerStatementBalance_(s.kind, s.openingBalance)) + '</strong></span>' +
           '<span>Period Debit: <strong>' + escapeHtml(formatMoney(Number(s.periodDebit) || 0)) + '</strong></span>' +
           '<span>Period Credit: <strong>' + escapeHtml(formatMoney(Number(s.periodCredit) || 0)) + '</strong></span>' +
-          '<span>Closing Balance: <strong>' + escapeHtml(formatMoney(Number(s.closingBalance) || 0)) + '</strong></span>' +
+          '<span>Closing Balance: <strong>' + escapeHtml(partyLedgerStatementBalance_(s.kind, s.closingBalance)) + '</strong></span>' +
         '</div>' +
         '<table class="ledger-print-table"><thead><tr><th>Date</th><th>Type</th><th>Reference</th><th>Debit</th><th>Credit</th><th>Balance</th></tr></thead><tbody>' + rows + '</tbody></table>' +
         '<div class="ledger-print-meta" style="margin-top:10px">Printed: ' + escapeHtml(s.printedAt || '') + '</div>' +
