@@ -87,8 +87,14 @@ test('supplier statement uses credit-normal columns and preserves period closing
   c.partyLedgerBuildDisplayIndex_ = () => raw;
   c.partyLedgerSelectedParty_ = () => ({ id: 'S1', name: 'Example Supplier', balance: 5500 });
   c.partyLedgerValidateStatementDates_ = () => ({ from: '2026-09-01', to: '2026-09-30' });
-  const statement = c.getSupplierLedgerStatement('T', 'S1', '2026-09-01', '2026-09-30');
-  assert.equal(statement.success, undefined, 'result is wrapped by standard RPC helpers in production');
+  const statement = c.getPartyLedgerStatement_('supplier', 'T', 'S1', '2026-09-01', '2026-09-30');
+  assert.equal(statement.openingBalance, 5000);
+  assert.equal(statement.periodCredit, 3000);
+  assert.equal(statement.periodDebit, 2500);
+  assert.equal(statement.closingBalance, 5500);
+  assert.deepEqual(statement.rows.map(r => [Number(r.Debit) || 0, Number(r.Credit) || 0]),
+    [[1000, 3000], [1000, 0], [500, 0]]);
+  assert.equal(statement.rows.at(-1).Balance, 5500);
 });
 
 test('supplier pages and print view use the same displayed Debit/Credit convention', () => {
