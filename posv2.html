@@ -256,8 +256,12 @@
     color: transparent;
   }
 
-  body.pos-v2-active #page-pos .cart-row .c-name-main {
+  body.pos-v2-active #page-pos .cart-row .c-name {
     position: relative;
+  }
+
+  body.pos-v2-active #page-pos .cart-row .c-name-main {
+    position: static;
     min-width: 0;
     padding-right: 76px;
   }
@@ -265,7 +269,8 @@
   body.pos-v2-active #page-pos .cart-row .c-cost {
     position: absolute;
     right: 0;
-    top: 0;
+    top: 50%;
+    transform: translateY(-50%);
     width: 70px;
     min-width: 70px;
     max-width: 70px;
