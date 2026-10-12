@@ -1945,10 +1945,9 @@
   }
 
 
-/* Customer & supplier ledger colors (presentation only; never affect book signs).
-   Current sheet/ledger convention: Debit increases due, Credit settles due.
-   The pending supplier credit-normal statement PR will invert only supplier
-   column tone styling when its read-only column projection becomes active. */
+/* Party ledger visual semantics only. Keep debit/credit values and accounting signs unchanged.
+   Both current customer and supplier sheet views use debit=increased due,
+   credit=decreased due. Negative running balances represent advance/credit. */
 #page-customerLedger .ledger-txn--increase,
 #page-supplierLedger .ledger-txn--increase,
 #page-customers .ledger-txn--increase,
@@ -1966,14 +1965,29 @@
 .ledger-tone--due { color:var(--color-danger) !important; font-weight:700; }
 .ledger-tone--advance { color:var(--color-success) !important; font-weight:700; }
 .ledger-tone--neutral { color:var(--color-text-muted) !important; }
-.party-ledger-balance-box { padding:10px 14px; border-radius:10px; }
-.party-ledger-balance-box.ledger-tone--due { background:var(--color-danger-light); }
-.party-ledger-balance-box.ledger-tone--advance { background:var(--color-success-light); }
-.party-ledger-balance-box.ledger-tone--neutral { background:var(--color-bg); }
+.party-ledger-balance-box {
+  padding:10px 14px;
+  border-radius:10px;
+  border:1px solid transparent;
+}
+.party-ledger-balance-box.ledger-tone--due {
+  background:var(--color-danger-light);
+  border-color:var(--color-danger);
+}
+.party-ledger-balance-box.ledger-tone--advance {
+  background:var(--color-success-light);
+  border-color:var(--color-success);
+}
+.party-ledger-balance-box.ledger-tone--neutral {
+  background:var(--color-bg);
+  border-color:var(--color-border);
+}
 .party-ledger-table td.ledger-tone--due,
 .party-ledger-table td.ledger-tone--advance { font-weight:700; }
+.party-ledger-table td.ledger-txn--increase,
+.party-ledger-table td.ledger-txn--decrease { font-weight:650; }
 @media print {
-  .party-ledger-balance-box { background:transparent !important; }
+  .party-ledger-balance-box { background:transparent !important; border-color:transparent !important; }
 }
 
 /* Clean party-ledger audit toggle: privileged on-screen control only. */
