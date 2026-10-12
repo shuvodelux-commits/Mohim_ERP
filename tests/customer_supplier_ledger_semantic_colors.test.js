@@ -65,6 +65,8 @@ test('customer payment is Money In, credit refund Money Out, and opening is neut
   assert.match(render({'Type':'Advance Refund', Debit:25}, 'Debit'), /is-out[\s\S]*Money Out/);
   assert.match(render({'Type':'Opening Balance', Debit:50}, 'Debit'), /is-opening[\s\S]*Opening/);
   assert.match(render({'Type':'Opening Balance', Credit:50}, 'Credit'), /is-opening[\s\S]*Opening/);
+  assert.match(render({'Type':'Sale', Debit:970}, 'Debit'), /is-sales-due[\s\S]*৳970[\s\S]*Sales Due/);
+  assert.equal(render({'Type':'Sale', Debit:970}, 'Credit'), '');
 });
 
 test('supplier payment is Money Out despite credit column; cash-free discount is Adjustment', () => {
@@ -91,15 +93,18 @@ test('noncash invoice or return is not mislabelled as money movement', () => {
 
 test('customer due and customer credit color independently, and zero resets', () => {
   const {context,getNode} = harness(customer, 'customerLedger');
-  context.customerLedgerPaintBalanceCard_('due','dueNote',100,'is-receivable');
-  context.customerLedgerPaintBalanceCard_('credit','creditNote',50,'is-payable');
-  assert.ok(getNode('due').classList.contains('is-receivable'));
-  assert.ok(getNode('credit').classList.contains('is-payable'));
+  context.customerLedgerPaintBalanceCard_('due','dueNote',100,'is-due');
+  context.customerLedgerPaintBalanceCard_('credit','creditNote',50,'is-credit');
+  assert.ok(getNode('due').classList.contains('is-due'));
+  assert.ok(getNode('credit').classList.contains('is-credit'));
   assert.equal(getNode('dueNote').hidden,false);
-  context.customerLedgerPaintBalanceCard_('due','dueNote',0,'is-receivable');
+  context.customerLedgerPaintBalanceCard_('due','dueNote',0,'is-due');
   assert.ok(getNode('due').classList.contains('is-neutral'));
   assert.equal(getNode('dueNote').hidden,true);
-  assert.ok(!getNode('due').classList.contains('is-receivable'));
+  assert.ok(!getNode('due').classList.contains('is-due'));
+  context.customerLedgerPaintBalanceCard_('credit','creditNote',0,'is-credit');
+  assert.ok(getNode('credit').classList.contains('is-neutral'));
+  assert.equal(getNode('creditNote').hidden,true);
 });
 
 test('semantic labels/cards use existing theme colors; no ledger backend changes', () => {
@@ -108,8 +113,9 @@ test('semantic labels/cards use existing theme colors; no ledger backend changes
   assert.match(supplier, /id="supplierLedgerBalanceNote"/);
   assert.match(supplier, /'To Pay'/);
   assert.match(supplier, /'Credit Available'/);
-  assert.match(style, /#page-customerLedger \.party-ledger-balance-item\.is-receivable/);
-  assert.match(style, /#page-customerLedger \.party-ledger-balance-item\.is-payable/);
+  assert.match(style, /#page-customerLedger \.party-ledger-balance-item\.is-due/);
+  assert.match(style, /#page-customerLedger \.party-ledger-balance-item\.is-credit/);
+  assert.match(style, /\.party-ledger-inline-money\.is-sales-due \{ color:var\(--color-danger\)/);
   assert.match(style, /--color-success/);
   assert.match(style, /--color-danger/);
 });

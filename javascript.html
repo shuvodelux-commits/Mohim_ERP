@@ -4234,7 +4234,7 @@
   var ERP_SEMANTIC_CARDS_ = {
     // Dashboard: purchases are intentionally not classified as cash out.
     dashSales:['gain','Sales'], dashCollection:['gain','Collected'],
-    dashExpense:['cost','Expense'], dashDue:['gain','To Receive'],
+    dashExpense:['cost','Expense'], dashDue:['customer','To Receive','Customer Credit'],
     dashPayable:['cost','To Pay'], dashBorrowerReceivable:['gain','To Receive'],
     dashOutstandingLoan:['cost','To Pay'], dashCash:['signed','Available','Negative Balance'],
     dashLowStockCount:['alert','Low Stock'],
@@ -4255,7 +4255,7 @@
     expRepPeriodTotal:['cost','Expense'],
     // Sales report.
     rsGross:['gain','Sales'], rsReturned:['cost','Returns'],
-    rsNet:['gain','Net Sales'], rsPaid:['gain','Collected'], rsDue:['gain','To Receive'],
+    rsNet:['gain','Net Sales'], rsPaid:['gain','Collected'], rsDue:['customer','To Receive','Customer Credit'],
     // Purchase report: these are purchases/obligations, not necessarily cash out.
     rpGross:['cost','Purchases'], rpReturned:['gain','Returns'],
     rpNet:['cost','Purchases'], rpPaid:['cost','Paid'], rpDue:['cost','To Pay'],
@@ -4282,11 +4282,11 @@
     vlDetailReceivable:['gain','To Receive','Owed by Business']
   };
   var ERP_SEMANTIC_INLINE_ = {
-    counterCustomerDue:['gain'], counterCustomerAdvance:['cost'],
-    counterCustomerBalance:['gain'], counterSupplierPayable:['cost'],
-    counterSupplierBalance:['cost'], counterAdvanceRefundAvailable:['cost'],
-    posCustomerDueValue:['gain'], posDueAmountDisplay:['gain'], posChangeDue:['cost'],
-    rtSelectedCustomerDue:['gain'],
+    counterCustomerDue:['customer'], counterCustomerAdvance:['gain'],
+    counterCustomerBalance:['customer'], counterSupplierPayable:['cost'],
+    counterSupplierBalance:['cost'], counterAdvanceRefundAvailable:['gain'],
+    posCustomerDueValue:['customer'], posDueAmountDisplay:['customer'], posChangeDue:['cost'],
+    rtSelectedCustomerDue:['customer'],
     rbCash:['signed'], rbBank:['signed'], rbMobileBanking:['signed'],
     rbTotalAssets:['signed'], rbLoan:['cost'], rbTotalLiabilities:['cost'],
     rbCapital:['gain'], rbTotalEquity:['signed']
@@ -4310,7 +4310,7 @@
     if (value === null || Math.abs(value) < 0.005) return 'neutral';
     var mode = rule && rule[0] || '';
     var isCredit = /^\s*Credit\b/i.test(String(display));
-    if (mode === 'customer') return isCredit || value < 0 ? 'negative' : 'positive';
+    if (mode === 'customer') return isCredit || value < 0 ? 'positive' : 'negative';
     if (mode === 'supplier') return isCredit || value < 0 ? 'positive' : 'negative';
     if (mode === 'signed') return value > 0 ? 'positive' : 'negative';
     if (mode === 'alert') return value > 0 ? 'negative' : 'positive';
@@ -4322,8 +4322,7 @@
   function erpSemanticLabel_(rule, tone) {
     if (!rule || tone === 'neutral') return '';
     if (rule[0] === 'customer' || rule[0] === 'supplier') {
-      return tone === 'positive' ? (rule[0] === 'customer' ? rule[1] : rule[2])
-        : (rule[0] === 'customer' ? rule[2] : rule[1]);
+      return tone === 'negative' ? (rule[1] || '') : (rule[2] || '');
     }
     if (rule[0] === 'signed') return tone === 'positive' ? (rule[1] || '') : (rule[2] || '');
     if (rule[0] === 'gain' && tone === 'negative') return rule[2] || 'Negative Balance';

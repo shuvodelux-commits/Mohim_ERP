@@ -16,7 +16,8 @@ The shared `ERP_SEMANTIC_CARDS_`, `ERP_SEMANTIC_DETAILS_`, and `ERP_SEMANTIC_INL
 
 | Economic meaning | Tone | Examples |
 | --- | --- | --- |
-| Positive receivable / collection / asset availability / profit | Green | Customer due, collected, borrower receivable, profit |
+| Collection / available customer credit / asset availability / profit | Green | Customer credit, collected, borrower receivable, profit |
+| Customer Due / Sales Due | Red | Customer outstanding due, unpaid sales |
 | Positive payable / expense / cost / cash out | Red | Supplier payable, outstanding loan, expenses, cash out |
 | Signed net balance / margin | Green when positive, red when negative | Cash closing, profit, margin, daybook net |
 | Operational issue when nonzero | Red | Low stock, out of stock, reconciliation needs review |
