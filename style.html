@@ -3143,6 +3143,17 @@
 #page-customerLedger .party-ledger-inline-money.is-out,
 #page-supplierLedger .party-ledger-inline-money.is-out { color:var(--color-danger); }
 #page-customerLedger .party-ledger-inline-money.is-sales-due { color:var(--color-danger); }
+/* Supplier purchase ledger: color the actual accounting effect, not every Credit as cash in. */
+#page-supplierLedger .party-ledger-inline-money.is-purchase-invoice,
+#page-supplierLedger .party-ledger-inline-money.is-invoice-payment,
+#page-supplierLedger .party-ledger-inline-money.is-purchase-adjust-increase {
+  color:var(--color-danger);
+}
+#page-supplierLedger .party-ledger-inline-money.is-purchase-return,
+#page-supplierLedger .party-ledger-inline-money.is-purchase-adjust-decrease {
+  color:var(--color-success);
+}
+
 #page-customerLedger .party-ledger-inline-money.is-opening .party-ledger-money-caption,
 #page-supplierLedger .party-ledger-inline-money.is-opening .party-ledger-money-caption,
 #page-customerLedger .party-ledger-inline-money.is-adjustment .party-ledger-money-caption,
