@@ -1366,8 +1366,10 @@
       var button = event.target && event.target.closest
         ? event.target.closest('[data-pos-v2-quick-product]') : null;
       if (!button || !document.body.classList.contains('pos-v2-active')) return;
-      var product = typeof posProductById_ === 'function'
-        ? posProductById_(button.dataset.posV2QuickProduct) : null;
+      var product = typeof posState !== 'undefined'
+        ? (posState.products || []).filter(function (item) {
+            return String(item.id) === String(button.dataset.posV2QuickProduct);
+          })[0] : null;
       if (product && typeof posAddToCart_ === 'function') posAddToCart_(product);
     });
     layout.appendChild(section);
@@ -1410,7 +1412,7 @@
 
       var amount = document.createElement('span');
       amount.className = 'pos-v2-quick-price';
-      amount.textContent = '৳' + formatMoney(price) + (unit ? ' / ' + unit : '');
+      amount.textContent = formatMoney(price) + (unit ? ' / ' + unit : '');
 
       var stock = document.createElement('span');
       stock.className = 'pos-v2-quick-stock';
