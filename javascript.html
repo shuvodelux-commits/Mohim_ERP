@@ -4322,6 +4322,8 @@
         : (rule[0] === 'customer' ? rule[2] : rule[1]);
     }
     if (rule[0] === 'signed') return tone === 'positive' ? (rule[1] || '') : (rule[2] || '');
+    if (rule[0] === 'gain' && tone === 'negative') return rule[2] || 'Negative Balance';
+    if (rule[0] === 'cost' && tone === 'positive') return rule[2] || 'Credit Balance';
     return rule[1] || '';
   }
 
