@@ -4285,7 +4285,11 @@
     counterCustomerDue:['gain'], counterCustomerAdvance:['cost'],
     counterCustomerBalance:['gain'], counterSupplierPayable:['cost'],
     counterSupplierBalance:['cost'], counterAdvanceRefundAvailable:['cost'],
-    posCustomerDueValue:['gain'], posDueAmountDisplay:['gain'], posChangeDue:['cost']
+    posCustomerDueValue:['gain'], posDueAmountDisplay:['gain'], posChangeDue:['cost'],
+    rtSelectedCustomerDue:['gain'],
+    rbCash:['signed'], rbBank:['signed'], rbMobileBanking:['signed'],
+    rbTotalAssets:['signed'], rbLoan:['cost'], rbTotalLiabilities:['cost'],
+    rbCapital:['gain'], rbTotalEquity:['signed']
   };
 
   function erpSemanticAmount_(value) {
