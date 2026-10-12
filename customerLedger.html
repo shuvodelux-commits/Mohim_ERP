@@ -254,7 +254,7 @@
     customerLedgerState.paymentContext = ctx || null;
     var credit = Number(ctx && ctx.customerCredit) || 0;
     document.getElementById('customerLedgerAdvance').textContent = formatMoney(credit);
-    customerLedgerPaintBalanceCard_('customerLedgerCreditCard', 'customerLedgerCreditNote', credit, 'is-payable');
+    customerLedgerPaintBalanceCard_('customerLedgerCreditCard', 'customerLedgerCreditNote', credit, 'is-credit');
     document.getElementById('customerLedgerAdvanceRefundBtn').disabled = !customerLedgerState.party || credit <= 0.004 || !customerLedgerCan_('customers', 'edit');
     customerLedgerFillInvoiceSelect_();
   }
@@ -315,8 +315,8 @@
       document.getElementById('customerLedgerReceiveBtn').disabled = true;
       document.getElementById('customerLedgerAdvanceRefundBtn').disabled = true;
       document.getElementById('customerLedgerAdvance').textContent = formatMoney(0);
-      customerLedgerPaintBalanceCard_('customerLedgerCreditCard', 'customerLedgerCreditNote', 0, 'is-payable');
-      customerLedgerPaintBalanceCard_('customerLedgerDueCard', 'customerLedgerDueNote', 0, 'is-receivable');
+      customerLedgerPaintBalanceCard_('customerLedgerCreditCard', 'customerLedgerCreditNote', 0, 'is-credit');
+      customerLedgerPaintBalanceCard_('customerLedgerDueCard', 'customerLedgerDueNote', 0, 'is-due');
       document.getElementById('customerLedgerPrintBtn').disabled = true;
       return;
     }
@@ -328,7 +328,7 @@
     statusEl.hidden = !statusEl.textContent;
     var balance = Number(party.balance) || 0;
     document.getElementById('customerLedgerBalance').textContent = formatMoney(Math.max(0, balance));
-    customerLedgerPaintBalanceCard_('customerLedgerDueCard', 'customerLedgerDueNote', Math.max(0, balance), 'is-receivable');
+    customerLedgerPaintBalanceCard_('customerLedgerDueCard', 'customerLedgerDueNote', Math.max(0, balance), 'is-due');
     document.getElementById('customerLedgerReceiveBtn').disabled = !party.canPay || !customerLedgerCan_('customers', 'edit');
     document.getElementById('customerLedgerPrintBtn').disabled = customerLedgerState.rows.length === 0 && !(customerLedgerState.page && customerLedgerState.page.hasOlder);
     document.getElementById('customerLedgerPageSize').value = String(customerLedgerState.pageSize);
@@ -365,7 +365,7 @@
     var card = document.getElementById(id);
     var note = document.getElementById(noteId);
     if (!card || !note) return;
-    card.classList.remove('is-neutral', 'is-receivable', 'is-payable');
+    card.classList.remove('is-neutral', 'is-due', 'is-credit');
     card.classList.add(Number(amount) > 0 ? kind : 'is-neutral');
     note.hidden = Number(amount) <= 0;
   }
@@ -377,6 +377,7 @@
     var type = String(row['Type'] || '');
     var kind = '';
     if (type === 'Opening Balance') kind = 'opening';
+    else if (type === 'Sale' && column === 'Debit') kind = 'sales-due';
     else if (type === 'Payment' && column === 'Credit') {
       var cash = row['Payment Amount'] === '' || row['Payment Amount'] == null
         ? Math.max(0, amount - (Number(row['Discount Amount']) || 0))
@@ -387,16 +388,18 @@
     }
     var value = escapeHtml(formatMoney(amount));
     if (!kind) return value;
-    var labels = { in:'Money In', out:'Money Out', opening:'Opening', adjustment:'Adjustment' };
+    var labels = { in:'Money In', out:'Money Out', opening:'Opening', adjustment:'Adjustment', 'sales-due':'Sales Due' };
     var hints = {
       in:'Customer payment received', out:'Customer credit refund paid',
-      opening:'Opening balance (no money moved)', adjustment:'Non-cash discount'
+      opening:'Opening balance (no money moved)', adjustment:'Non-cash discount',
+      'sales-due':'Unpaid sale amount added to customer due (no cash moved)'
     };
     var shapes = {
       in:'<path d="M17 7 7 17M17 17H7V7"/>',
       out:'<path d="M7 17 17 7M7 7h10v10"/>',
       opening:'<path d="M12 7v14"/><path d="M3 18V5a2 2 0 0 1 2-2h3a4 4 0 0 1 4 4 4 4 0 0 1 4-4h3a2 2 0 0 1 2 2v13a1 1 0 0 1-1 1h-4a4 4 0 0 0-4 2 4 4 0 0 0-4-2H4a1 1 0 0 1-1-1Z"/>',
-      adjustment:'<path d="M4 12h16"/>'
+      adjustment:'<path d="M4 12h16"/>',
+      'sales-due':'<path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8l-5-5H8Z"/><path d="M16 3v5h5M7 13h10M7 17h7"/>'
     };
     return '<span class="party-ledger-inline-money is-' + kind + '"><span>' + value + '</span>'
       + '<span class="party-ledger-money-caption" title="' + hints[kind] + '">'
