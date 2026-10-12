@@ -36,6 +36,45 @@
   .fin-led-money-amount.is-in, .fin-led-money-caption.is-in { color:var(--color-success); }
   .fin-led-money-amount.is-out, .fin-led-money-caption.is-out { color:var(--color-danger); }
   .fin-led-money-caption.is-opening { color:var(--color-text-muted); }
+
+  /* Semantic finance-balance colors: positive receivables/credits, negative payables/debits. */
+  .fin-led-balance-card {
+    border:1px solid var(--color-border);
+    transition:background .15s ease, border-color .15s ease, color .15s ease;
+  }
+  .fin-led-balance-note {
+    display:inline-flex; align-items:center; margin-top:6px; padding:2px 8px;
+    border-radius:999px; border:1px solid var(--color-border);
+    font:700 11px/1.2 var(--font-sans); color:var(--color-text-muted);
+    background:var(--color-surface);
+  }
+  .fin-led-balance-card.is-positive {
+    background:color-mix(in srgb, var(--color-success) 8%, var(--color-surface));
+    border-color:color-mix(in srgb, var(--color-success) 30%, var(--color-border));
+  }
+  .fin-led-balance-card.is-positive .stat-label,
+  .fin-led-balance-card.is-positive .label,
+  .fin-led-balance-card.is-positive .stat-value,
+  .fin-led-balance-card.is-positive .value,
+  .fin-led-balance-card.is-positive .fin-led-balance-note { color:var(--color-success); }
+  .fin-led-balance-card.is-positive .fin-led-balance-note {
+    background:color-mix(in srgb, var(--color-success) 10%, var(--color-surface));
+    border-color:color-mix(in srgb, var(--color-success) 30%, var(--color-border));
+  }
+  .fin-led-balance-card.is-negative {
+    background:color-mix(in srgb, var(--color-danger) 8%, var(--color-surface));
+    border-color:color-mix(in srgb, var(--color-danger) 30%, var(--color-border));
+  }
+  .fin-led-balance-card.is-negative .stat-label,
+  .fin-led-balance-card.is-negative .label,
+  .fin-led-balance-card.is-negative .stat-value,
+  .fin-led-balance-card.is-negative .value,
+  .fin-led-balance-card.is-negative .fin-led-balance-note { color:var(--color-danger); }
+  .fin-led-balance-card.is-negative .fin-led-balance-note {
+    background:color-mix(in srgb, var(--color-danger) 10%, var(--color-surface));
+    border-color:color-mix(in srgb, var(--color-danger) 30%, var(--color-border));
+  }
+  .fin-led-balance-card.is-neutral .fin-led-balance-note { display:none; }
 </style>
 <div class="toolbar">
   <input id="finLedDateFrom" type="date" style="max-width:150px;">
@@ -65,12 +104,12 @@
 </div>
 
 <div class="stat-grid" style="margin-bottom:16px;">
-  <div class="stat-card"><div class="stat-label">Owner Capital</div><div class="stat-value" id="finLedCapital">--</div></div>
-  <div class="stat-card"><div class="stat-label">Owner Advance</div><div class="stat-value" id="finLedOwnerAdvance">--</div></div>
-  <div class="stat-card"><div class="stat-label">Outstanding Loan</div><div class="stat-value" id="finLedLoan">--</div></div>
-  <div class="stat-card"><div class="stat-label">Lender Credit</div><div class="stat-value" id="finLedLenderCredit">--</div></div>
-  <div class="stat-card"><div class="stat-label">Borrower Receivable</div><div class="stat-value" id="finLedBorrowerReceivable">--</div></div>
-  <div class="stat-card"><div class="stat-label">Borrower Credit</div><div class="stat-value" id="finLedBorrowerCredit">--</div></div>
+  <div class="stat-card fin-led-balance-card" id="finLedCapitalCard"><div class="stat-label">Owner Capital</div><div class="stat-value" id="finLedCapital">--</div><div class="fin-led-balance-note" id="finLedCapitalNote"></div></div>
+  <div class="stat-card fin-led-balance-card" id="finLedOwnerAdvanceCard"><div class="stat-label">Owner Advance</div><div class="stat-value" id="finLedOwnerAdvance">--</div><div class="fin-led-balance-note" id="finLedOwnerAdvanceNote"></div></div>
+  <div class="stat-card fin-led-balance-card" id="finLedLoanCard"><div class="stat-label">Outstanding Loan</div><div class="stat-value" id="finLedLoan">--</div><div class="fin-led-balance-note" id="finLedLoanNote"></div></div>
+  <div class="stat-card fin-led-balance-card" id="finLedLenderCreditCard"><div class="stat-label">Lender Credit</div><div class="stat-value" id="finLedLenderCredit">--</div><div class="fin-led-balance-note" id="finLedLenderCreditNote"></div></div>
+  <div class="stat-card fin-led-balance-card" id="finLedBorrowerReceivableCard"><div class="stat-label">Borrower Receivable</div><div class="stat-value" id="finLedBorrowerReceivable">--</div><div class="fin-led-balance-note" id="finLedBorrowerReceivableNote"></div></div>
+  <div class="stat-card fin-led-balance-card" id="finLedBorrowerCreditCard"><div class="stat-label">Borrower Credit</div><div class="stat-value" id="finLedBorrowerCredit">--</div><div class="fin-led-balance-note" id="finLedBorrowerCreditNote"></div></div>
   <div class="stat-card"><div class="stat-label">Entries Shown</div><div class="stat-value" id="finLedCount">--</div></div>
 </div>
 
@@ -149,6 +188,16 @@
     summary: {}, selectedPerson: null, personCombo: null, _typesLoaded: false
   };
 
+  // Map each summary's business meaning to its approved visual debit/credit color.
+  var FIN_LED_BALANCE_META = {
+    ownerCapital: { kind:'positive', label:'Credit Balance' },
+    ownerAdvance: { kind:'negative', label:'Debit Balance' },
+    outstandingLoan: { kind:'negative', label:'Debit Balance' },
+    lenderCredit: { kind:'positive', label:'Credit Balance' },
+    borrowerReceivable: { kind:'positive', label:'Credit Balance' },
+    borrowerCredit: { kind:'negative', label:'Debit Balance' }
+  };
+
   function finLedMoney_(v) {
     var n = Number(v) || 0;
     return (finLedState.currencySymbol || '') + n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -225,14 +274,38 @@
     return finLedState._bootPromise;
   }
 
+  function finLedBalanceMeta_(key) {
+    return FIN_LED_BALANCE_META[key] || { kind:'neutral', label:'' };
+  }
+
+  function finLedBalanceKind_(amount, metaKey) {
+    var meta = finLedBalanceMeta_(metaKey);
+    return Number(amount) > 0 ? meta.kind : 'neutral';
+  }
+
+  function finLedSetBalanceCardState_(cardId, noteId, amount, metaKey) {
+    var card = document.getElementById(cardId);
+    var note = document.getElementById(noteId);
+    if (!card || !note) return;
+    var kind = finLedBalanceKind_(amount, metaKey);
+    card.classList.remove('is-positive', 'is-negative', 'is-neutral');
+    card.classList.add('is-' + kind);
+    note.textContent = kind === 'neutral' ? '' : finLedBalanceMeta_(metaKey).label;
+  }
+
+  function finLedSummaryCard_(valueId, amount, metaKey) {
+    document.getElementById(valueId).textContent = finLedMoney_(amount);
+    finLedSetBalanceCardState_(valueId + 'Card', valueId + 'Note', amount, metaKey);
+  }
+
   function finLedRenderSummary_(summary) {
     summary = summary || {};
-    document.getElementById('finLedCapital').textContent = finLedMoney_(summary.ownerCapital);
-    document.getElementById('finLedOwnerAdvance').textContent = finLedMoney_(summary.ownerAdvance);
-    document.getElementById('finLedLoan').textContent = finLedMoney_(summary.outstandingLoan);
-    document.getElementById('finLedLenderCredit').textContent = finLedMoney_(summary.lenderCredit);
-    document.getElementById('finLedBorrowerReceivable').textContent = finLedMoney_(summary.borrowerReceivable);
-    document.getElementById('finLedBorrowerCredit').textContent = finLedMoney_(summary.borrowerCredit);
+    finLedSummaryCard_('finLedCapital', summary.ownerCapital, 'ownerCapital');
+    finLedSummaryCard_('finLedOwnerAdvance', summary.ownerAdvance, 'ownerAdvance');
+    finLedSummaryCard_('finLedLoan', summary.outstandingLoan, 'outstandingLoan');
+    finLedSummaryCard_('finLedLenderCredit', summary.lenderCredit, 'lenderCredit');
+    finLedSummaryCard_('finLedBorrowerReceivable', summary.borrowerReceivable, 'borrowerReceivable');
+    finLedSummaryCard_('finLedBorrowerCredit', summary.borrowerCredit, 'borrowerCredit');
   }
 
   function finLedRenderSelectedPersonBalance_() {
@@ -267,7 +340,16 @@
 
     document.getElementById('finLedSelectedPersonName').textContent = person.name || 'Selected person';
     document.getElementById('finLedSelectedPersonBalances').innerHTML = balances.map(function (item) {
-      return '<div class="finance-selected-person-balance-item"><div class="label">' + escapeHtml(item.label) + '</div><div class="value">' + escapeHtml(finLedMoney_(item.value)) + '</div></div>';
+      var metaKey = {
+        'Owner Capital':'ownerCapital', 'Owner Advance':'ownerAdvance',
+        'Outstanding Loan':'outstandingLoan', 'Lender Credit':'lenderCredit',
+        'Borrower Receivable':'borrowerReceivable', 'Borrower Credit':'borrowerCredit'
+      }[item.label] || '';
+      var kind = finLedBalanceKind_(item.value, metaKey);
+      return '<div class="finance-selected-person-balance-item fin-led-balance-card is-' + kind + '">'
+        + '<div class="label">' + escapeHtml(item.label) + '</div>'
+        + '<div class="value">' + escapeHtml(finLedMoney_(item.value)) + '</div>'
+        + '<div class="fin-led-balance-note">' + (kind === 'neutral' ? '' : escapeHtml(finLedBalanceMeta_(metaKey).label)) + '</div></div>';
     }).join('');
     card.hidden = false;
   }
