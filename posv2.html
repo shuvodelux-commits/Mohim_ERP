@@ -726,7 +726,7 @@
     }
   }
 
-  /* HisabIQ-inspired POS presentation: compact, text-first, no product photos. */
+  /* HisabIQ-inspired product-first POS. Catalog is text-only: no images. */
   body.pos-v2-active #page-pos {
     max-width: 1440px;
     margin-inline: auto;
@@ -734,17 +734,12 @@
   }
 
   body.pos-v2-active #page-pos .pos-layout {
-    grid-template-areas:
-      "search customer"
-      "cart customer"
-      "quick customer";
     gap: 12px;
   }
 
   body.pos-v2-active #page-pos .pos-product-card,
   body.pos-v2-active #page-pos .pos-customer-section,
-  body.pos-v2-active #page-pos .pos-cart-section,
-  body.pos-v2-active #page-pos .pos-v2-quick-items {
+  body.pos-v2-active #page-pos .pos-cart-section {
     border: 1px solid var(--pos-v2-border);
     border-radius: 12px;
     background: var(--pos-v2-surface);
@@ -755,34 +750,31 @@
     padding: 12px !important;
   }
 
-  body.pos-v2-active #page-pos .pos-cart-section {
-    min-height: 320px;
-    max-height: min(66vh, 640px);
-    padding: 12px !important;
+  /* Show the *complete* product catalog above the cart, not Quick Items. */
+  body.pos-v2-active #page-pos .pos-product-card > .pos-section-head {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 30px;
+    margin: 0 0 9px;
   }
 
-  body.pos-v2-active #page-pos .pos-customer-section {
-    padding: 14px;
-  }
-
-  body.pos-v2-active #page-pos .pos-section-head {
-    min-height: 32px;
-    margin-bottom: 10px;
-  }
-
-  body.pos-v2-active #page-pos .pos-section-head h3 {
+  body.pos-v2-active #page-pos .pos-product-card > .pos-section-head h3 {
     font-size: 14px;
+    font-weight: 650;
     line-height: 22px;
+    margin: 0;
+    color: var(--pos-v2-ink);
   }
 
   body.pos-v2-active #page-pos .pos-search-drafts-row {
-    margin-bottom: 0;
     gap: 8px;
+    margin: 0 0 10px;
   }
 
   body.pos-v2-active #page-pos .pos-search-drafts-row .pos-product-search-box .search-input {
-    height: 40px;
     min-height: 40px;
+    height: 40px;
     font-size: 13px;
   }
 
@@ -792,12 +784,103 @@
     padding-inline: 12px;
   }
 
+  body.pos-v2-active #page-pos #posProductGrid,
+  body.pos-v2-active #page-pos #posProductGrid.mobile-search-idle {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-content: start;
+    gap: 8px;
+    max-height: min(38vh, 360px);
+    min-height: 110px;
+    overflow-y: auto;
+    padding: 1px 2px 5px 1px;
+    scrollbar-gutter: stable;
+  }
+
+  body.pos-v2-active #page-pos #posProductEmpty:not([hidden]) {
+    display: block !important;
+    margin: 6px 0;
+    padding: 14px 10px;
+    border-radius: 9px;
+    background: var(--pos-v2-quiet);
+    font-size: 12px;
+    color: var(--pos-v2-muted);
+    text-align: center;
+  }
+
+  body.pos-v2-active #page-pos #posProductEmpty[hidden] {
+    display: none !important;
+  }
+
+  body.pos-v2-active #page-pos .product-tile {
+    min-width: 0;
+    min-height: 106px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 11px 12px;
+    border: 1px solid var(--pos-v2-border);
+    border-radius: 10px;
+    background: var(--pos-v2-surface);
+    color: var(--pos-v2-ink);
+    text-align: left;
+    box-shadow: none;
+    touch-action: manipulation;
+    transition: border-color .14s, background-color .14s;
+  }
+
+  body.pos-v2-active #page-pos .product-tile:hover,
+  body.pos-v2-active #page-pos .product-tile.search-active {
+    border-color: var(--pos-v2-primary);
+    background: var(--pos-v2-primary-soft);
+    box-shadow: none;
+  }
+
+  body.pos-v2-active #page-pos .product-tile:focus-visible {
+    outline: 2px solid var(--pos-v2-primary);
+    outline-offset: 2px;
+  }
+
+  body.pos-v2-active #page-pos .product-tile .p-name {
+    font-size: 13px;
+    line-height: 18px;
+    font-weight: 650;
+    overflow-wrap: anywhere;
+  }
+
+  body.pos-v2-active #page-pos .product-tile .p-search-meta {
+    font-size: 10px;
+    line-height: 14px;
+    color: var(--pos-v2-muted);
+    overflow-wrap: anywhere;
+  }
+
+  body.pos-v2-active #page-pos .product-tile .p-price {
+    margin-top: auto;
+    color: var(--pos-v2-primary);
+    font-family: inherit;
+    font-variant-numeric: normal;
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  body.pos-v2-active #page-pos .product-tile .p-stock {
+    font-size: 10px;
+    line-height: 14px;
+    color: var(--pos-v2-muted);
+  }
+
+  body.pos-v2-active #page-pos .pos-cart-section {
+    min-height: 320px;
+    max-height: min(66vh, 640px);
+    padding: 12px !important;
+  }
+
   body.pos-v2-active #page-pos .pos-cart-columns {
     min-height: 36px;
     padding-block: 9px;
     background: var(--pos-v2-quiet);
     font-size: 11px;
-    letter-spacing: .02em;
   }
 
   body.pos-v2-active #page-pos .cart-row {
@@ -823,10 +906,13 @@
     font-size: 13px;
   }
 
+  body.pos-v2-active #page-pos .pos-customer-section {
+    padding: 14px;
+  }
+
   body.pos-v2-active #page-pos .pos-customer-section > label {
     display: block;
-    margin-top: 8px;
-    margin-bottom: 4px;
+    margin: 8px 0 4px;
     font-size: 11px;
     font-weight: 600;
     color: var(--pos-v2-text);
@@ -850,9 +936,9 @@
   }
 
   body.pos-v2-active #page-pos .totals-row.grand {
+    min-height: 70px;
     margin: 10px 0 6px;
     padding: 13px 12px;
-    min-height: 70px;
     border: 0;
     border-radius: 10px;
     background: #192940;
@@ -875,128 +961,24 @@
     font-weight: 650;
   }
 
-  body.pos-v2-active #page-pos .pos-v2-quick-items {
-    grid-area: quick;
-    min-width: 0;
-    padding: 12px;
-  }
-
-  body.pos-v2-active #page-pos .pos-v2-quick-items[hidden] {
-    display: none !important;
-  }
-
-  body.pos-v2-active #page-pos .pos-v2-quick-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 4px 12px;
-    margin-bottom: 10px;
-  }
-
-  body.pos-v2-active #page-pos .pos-v2-quick-head h3 {
-    margin: 0;
-    color: var(--pos-v2-ink);
-    font-size: 14px;
-    font-weight: 650;
-  }
-
-  body.pos-v2-active #page-pos .pos-v2-quick-head .bn-hint {
-    margin-left: 4px;
-    font-size: 11px;
-    font-weight: 400;
-  }
-
-  body.pos-v2-active #page-pos .pos-v2-quick-head small {
-    color: var(--pos-v2-muted);
-    font-size: 11px;
-  }
-
-  body.pos-v2-active #page-pos .pos-v2-quick-list {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 8px;
-  }
-
-  body.pos-v2-active #page-pos .pos-v2-quick-item {
-    position: relative;
-    min-height: 72px;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-    padding: 10px 30px 10px 11px;
-    border: 1px solid var(--pos-v2-border);
-    border-radius: 10px;
-    background: var(--pos-v2-surface);
-    color: var(--pos-v2-ink);
-    text-align: left;
-    font: inherit;
-    cursor: pointer;
-    touch-action: manipulation;
-    transition: border-color .14s, background-color .14s;
-  }
-
-  body.pos-v2-active #page-pos .pos-v2-quick-item:hover,
-  body.pos-v2-active #page-pos .pos-v2-quick-item:focus-visible {
-    border-color: var(--pos-v2-primary);
-    background: var(--pos-v2-primary-soft);
-  }
-
-  body.pos-v2-active #page-pos .pos-v2-quick-item:focus-visible {
-    outline: 2px solid var(--pos-v2-primary);
-    outline-offset: 2px;
-  }
-
-  body.pos-v2-active #page-pos .pos-v2-quick-name {
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 13px;
-    font-weight: 650;
-  }
-
-  body.pos-v2-active #page-pos .pos-v2-quick-price {
-    color: var(--pos-v2-text);
-    font-size: 12px;
-  }
-
-  body.pos-v2-active #page-pos .pos-v2-quick-stock {
-    color: var(--pos-v2-muted);
-    font-size: 10px;
-  }
-
-  body.pos-v2-active #page-pos .pos-v2-quick-plus {
-    position: absolute;
-    top: 11px;
-    right: 10px;
-    color: var(--pos-v2-primary);
-    font-size: 19px;
-    line-height: 1;
-    font-weight: 500;
-  }
-
   @media (min-width: 541px) and (max-width: 1023px) {
-    body.pos-v2-active #page-pos .pos-layout {
-      grid-template-areas: "search" "cart" "quick" "customer";
-    }
-    body.pos-v2-active #page-pos .pos-v2-quick-list {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+    body.pos-v2-active #page-pos #posProductGrid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      max-height: 340px;
     }
   }
 
   @media (max-width: 540px) {
-    body.pos-v2-active #page-pos .pos-layout {
-      grid-template-areas: "tabs" "search" "cart" "quick" "customer";
-      gap: 8px;
-    }
-    body.pos-v2-active #page-pos .pos-v2-quick-list {
+    body.pos-v2-active #page-pos #posProductGrid,
+    body.pos-v2-active #page-pos #posProductGrid.mobile-search-idle {
       grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 7px;
+      max-height: 44vh;
+      min-height: 100px;
     }
-    body.pos-v2-active #page-pos .pos-v2-quick-item {
-      min-height: 76px;
+    body.pos-v2-active #page-pos .product-tile {
+      min-height: 112px;
+      padding: 10px;
     }
     body.pos-v2-active #page-pos .pos-cart-section {
       max-height: none;
@@ -1005,15 +987,8 @@
       min-height: 0;
       padding-block: 9px;
     }
-    body.pos-v2-active #page-pos .pos-customer-section > label {
-      margin-top: 10px;
-    }
     body.pos-v2-active #page-pos .totals-row.grand {
       min-height: 74px;
-    }
-    body.pos-v2-active #page-pos[data-pos-v2-tab-state="customer"] .pos-v2-quick-items,
-    body.pos-v2-active #page-pos[data-pos-v2-tab-state="payment"] .pos-v2-quick-items {
-      display: none !important;
     }
   }
 
@@ -1156,7 +1131,6 @@
     if (!list || !document.body.classList.contains('pos-v2-active') || typeof posState === 'undefined') return;
 
     posV2EnsureCartNumberHeader_();
-    posV2RenderQuickItems_();
     var editing = posState.cartEditIndex !== null || posState.cartEntryIndex !== null;
     Array.prototype.forEach.call(list.children, function (row) {
       if (!row.classList || !row.classList.contains('cart-row')) return;
@@ -1343,98 +1317,12 @@
 
 
 
-  // Mirror HisabIQ's Quick Items as text-only buttons. No image model or upload
-  // is required: product names, stock and prices come from the existing POS bootstrap.
-  function posV2EnsureQuickItems_() {
+  // The existing pos.html catalog already has optimized search, stock display,
+  // keyboard selection, barcode entry and click-to-add. Reuse it as-is.
+  function posV2SetCatalogTitle_(active) {
     var page = document.getElementById('page-pos');
-    var layout = page && page.querySelector('.pos-layout');
-    if (!layout) return null;
-    var section = layout.querySelector('.pos-v2-quick-items');
-    if (section) return section;
-
-    section = document.createElement('section');
-    section.className = 'pos-v2-quick-items';
-    section.setAttribute('aria-labelledby', 'posV2QuickItemsTitle');
-    section.hidden = true;
-    section.innerHTML =
-      '<div class="pos-v2-quick-head">' +
-        '<h3 id="posV2QuickItemsTitle">Quick items <span class="bn-hint">· দ্রুত যোগ</span></h3>' +
-        '<small>Tap to add to cart</small>' +
-      '</div>' +
-      '<div class="pos-v2-quick-list"></div>';
-    section.addEventListener('click', function (event) {
-      var button = event.target && event.target.closest
-        ? event.target.closest('[data-pos-v2-quick-product]') : null;
-      if (!button || !document.body.classList.contains('pos-v2-active')) return;
-      var product = typeof posState !== 'undefined'
-        ? (posState.products || []).filter(function (item) {
-            return String(item.id) === String(button.dataset.posV2QuickProduct);
-          })[0] : null;
-      if (product && typeof posAddToCart_ === 'function') posAddToCart_(product);
-    });
-    layout.appendChild(section);
-    return section;
-  }
-
-  function posV2RenderQuickItems_() {
-    if (!document.body.classList.contains('pos-v2-active') || typeof posState === 'undefined') return;
-    var section = posV2EnsureQuickItems_();
-    if (!section) return;
-
-    var products = (posState.products || []).filter(function (product) {
-      return product && product.id != null && product.active !== false && Number(product.stock) > 0;
-    }).slice(0, 8);
-    section.hidden = products.length === 0;
-    var signature = products.map(function (product) {
-      return [product.id, product.name, product.stock, product.unit,
-        product.autoSellingPrice, product.sellingPrice].join('|');
-    }).join(';');
-    if (section.dataset.quickSignature === signature) return;
-    section.dataset.quickSignature = signature;
-
-    var list = section.querySelector('.pos-v2-quick-list');
-    if (!list) return;
-    list.textContent = '';
-    products.forEach(function (product) {
-      var price = product.autoSellingPrice !== undefined
-        ? product.autoSellingPrice : product.sellingPrice;
-      var unit = String(product.unit || '').trim();
-      var button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'pos-v2-quick-item';
-      button.dataset.posV2QuickProduct = String(product.id);
-      button.setAttribute('aria-label', 'Add ' + product.name + ' to cart');
-
-      var title = document.createElement('span');
-      title.className = 'pos-v2-quick-name';
-      title.textContent = product.name;
-      title.title = product.name;
-
-      var amount = document.createElement('span');
-      amount.className = 'pos-v2-quick-price';
-      amount.textContent = formatMoney(price) + (unit ? ' / ' + unit : '');
-
-      var stock = document.createElement('span');
-      stock.className = 'pos-v2-quick-stock';
-      stock.textContent = 'Stock ' + Number(product.stock) + (unit ? ' ' + unit : '');
-
-      var plus = document.createElement('span');
-      plus.className = 'pos-v2-quick-plus';
-      plus.setAttribute('aria-hidden', 'true');
-      plus.textContent = '+';
-
-      button.appendChild(title);
-      button.appendChild(amount);
-      button.appendChild(stock);
-      button.appendChild(plus);
-      list.appendChild(button);
-    });
-  }
-
-  function posV2RemoveQuickItems_() {
-    var page = document.getElementById('page-pos');
-    var section = page && page.querySelector('.pos-v2-quick-items');
-    if (section) section.remove();
+    var title = page && page.querySelector('.pos-product-card > .pos-section-head h3');
+    if (title) title.textContent = active ? 'Products · পণ্য' : 'Add Product';
   }
 
   var posV2SearchBound_ = false;
@@ -1753,14 +1641,13 @@
       posV2EnsureTabs_();
       posV2SelectTab_(page.getAttribute('data-pos-v2-tab-state') || 'cart');
       posV2EnsureSearchToolbar_();
-      posV2RenderQuickItems_();
-      posV2BindSearch_();
+      posV2SetCatalogTitle_(true);
       posV2BindCartReorder_();
     } else {
       posV2EndReorderDrag_(false);
       posV2RemoveTabs_();
       posV2RemoveSearchToolbar_();
-      posV2RemoveQuickItems_();
+      posV2SetCatalogTitle_(false);
       posV2RemoveReorderHandles_();
       posV2RemoveCartDecorations_();
       if (posV2CartReorderObserver_) posV2CartReorderObserver_.disconnect();
