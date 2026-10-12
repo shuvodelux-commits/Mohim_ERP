@@ -182,8 +182,14 @@ test('Qty Enter focuses Add Product and next Enter selects an available suggesti
   assert.deepStrictEqual(calls.slice(0, 3), ['render', 'decorate-v2-rows', 'focus-add'],
     'V2 must finish laying out cart rows BEFORE focusing Add Product');
   assert.strictEqual(typeof deferredFrame, 'function', 'the popup needs a paint-frame stabilization');
+  const openPopup = { hidden: false, _anchorInput: focusedInput };
+  document.getElementById = () => openPopup;
   deferredFrame();
-  assert.strictEqual(calls[3], 'open-dropdown',
+  assert.strictEqual(calls[3], 'reposition-dropdown',
+    'the initially opened popup must snap beneath the finalized Add Product input');
+  document.getElementById = () => null;
+  deferredFrame();
+  assert.strictEqual(calls[4], 'open-dropdown',
     'if a scroll event closed the popup, focus transition must reopen it automatically');
 
   const suggestions = runtime.matches('', 'add');
