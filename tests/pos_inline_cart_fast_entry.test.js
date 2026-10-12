@@ -148,7 +148,11 @@ test('Qty Enter focuses Add Product and next Enter selects an available suggesti
   };
   const calls = [];
   let deferredFrame = null;
-  const focusedInput = { parentNode: { querySelector: () => ({}) } };
+  const focusedInput = {
+    isConnected: true,
+    parentNode: { querySelector: () => ({}) },
+    focus() { document.activeElement = this; calls.push('restore-focus-without-enter'); }
+  };
   const document = {
     body: { classList: { contains: cls => cls === 'pos-v2-active' } },
     activeElement: focusedInput,
@@ -191,6 +195,26 @@ test('Qty Enter focuses Add Product and next Enter selects an available suggesti
   deferredFrame();
   assert.strictEqual(calls[4], 'open-dropdown',
     'if a scroll event closed the popup, focus transition must reopen it automatically');
+
+  // Reproduce the real browser failure: a cart DOM mutation detaches Qty,
+  // making document.body active while an Add Product dropdown stays visible.
+  // Typing must work immediately; no additional Enter may be required.
+  document.getElementById = () => openPopup;
+  document.activeElement = document.body;
+  const focusBefore = calls.length;
+  deferredFrame();
+  assert.deepStrictEqual(calls.slice(focusBefore),
+    ['restore-focus-without-enter', 'reposition-dropdown']);
+  assert.strictEqual(document.activeElement, focusedInput,
+    'Add Product must own the keyboard after Qty Enter, without another Enter');
+
+  // An intentional move to another real input must not be overridden.
+  const otherInput = { isConnected: true };
+  document.activeElement = otherInput;
+  const callsBeforeOtherInput = calls.length;
+  deferredFrame();
+  assert.strictEqual(document.activeElement, otherInput);
+  assert.strictEqual(calls.length, callsBeforeOtherInput);
 
   const suggestions = runtime.matches('', 'add');
   assert.deepStrictEqual(suggestions.map(p => p.id), ['4', '5'],
