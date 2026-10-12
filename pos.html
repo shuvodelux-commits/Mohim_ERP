@@ -1045,7 +1045,18 @@
       // Only act while the same Add Product input still owns keyboard focus.
       if (typeof requestAnimationFrame === 'function') requestAnimationFrame(function () {
         var input = document.querySelector('#posCartList .pos-cart-entry-row [data-cart-product-input][data-cart-product-mode="add"]');
-        if (!input || document.activeElement !== input) return;
+        if (!input || !input.isConnected) return;
+        if (document.activeElement !== input) {
+          // After the old Qty element is detached, focus can fall back to
+          // body while the floating popup remains visible. The next Enter
+          // previously only refocused Add Product, wasting a keystroke.
+          // Restore focus unless the user has deliberately selected another
+          // connected control in the meantime.
+          var active = document.activeElement;
+          if (active && active !== document.body && active.isConnected) return;
+          input.focus({ preventScroll: true });
+        }
+        if (document.activeElement !== input) return;
         var popup = document.getElementById('posCartProductPopup');
         if (!popup || popup.hidden || popup._anchorInput !== input) {
           var host = input.parentNode.querySelector('[data-cart-product-results]');
