@@ -266,6 +266,36 @@ test('Entering highlighted item works with numeric IDs and no extra Enter', () =
   assert.match(pos, /document\.addEventListener\('scroll', posKeepCartProductPopupAnchored_, true\)/);
 });
 
+test('clicking a detached dropdown option does not prematurely finish the Qty row', () => {
+  const state = { cartEntryIndex: 3 };
+  let finished = 0;
+  const document = {
+    getElementById(id) {
+      if (id === 'posCartList') {
+        return { querySelector() { return { contains() { return false; } }; } };
+      }
+      if (id === 'posCartProductPopup') {
+        return { contains() { return false; } };
+      }
+      return null;
+    }
+  };
+  const outsideClick = new Function('posState', 'document', 'posFinishCartEntry_',
+    functionSource('posCartEntryOutsideClick_') + '\nreturn posCartEntryOutsideClick_;'
+  )(state, document, () => { finished++; });
+
+  outsideClick({ target: {
+    closest(selector) {
+      return selector === '[data-cart-product-pick]' ? { dataset: { cartProductPick: '4' } } : null;
+    }
+  } });
+  assert.strictEqual(finished, 0,
+    'product selection click must not complete its active entry row after popup HTML is removed');
+
+  outsideClick({ target: { closest() { return null; } } });
+  assert.strictEqual(finished, 1, 'genuine outside click must still finish an entry');
+});
+
 test('purchase price reveal has room for long prices and eye sits inward from edge', () => {
   assert.match(css, /#page-pos \.cart-row \.c-name-title\s*\{[\s\S]*flex:\s*1\s+1\s+auto/);
   assert.match(css, /#page-pos \.cart-row \.c-cost\s*\{[^}]*margin-right:\s*8px/);
