@@ -3092,4 +3092,59 @@
 .party-ledger-corrections-toggle input{width:15px;height:15px;margin:0}
 @media(max-width:540px){.party-ledger-list-controls{width:100%;justify-content:space-between}.party-ledger-corrections-toggle{font-size:11px}}
 
+
+/* Shared Finance Ledger styling for Customer/Supplier balances and actual cash movement. */
+#page-customerLedger .party-ledger-balance-group {
+  display:flex; align-items:stretch; flex-wrap:wrap; gap:10px;
+  border:0!important; background:transparent!important; padding:0; min-width:0;
+}
+#page-customerLedger .party-ledger-balance-item {
+  min-width:150px; padding:10px 12px; border:1px solid var(--color-border);
+  border-radius:10px; background:var(--color-surface);
+}
+#page-customerLedger .party-ledger-balance-item.is-receivable {
+  background:color-mix(in srgb, var(--color-success) 8%, var(--color-surface));
+  border-color:color-mix(in srgb, var(--color-success) 30%, var(--color-border));
+}
+#page-customerLedger .party-ledger-balance-item.is-payable {
+  background:color-mix(in srgb, var(--color-danger) 8%, var(--color-surface));
+  border-color:color-mix(in srgb, var(--color-danger) 30%, var(--color-border));
+}
+#page-customerLedger .party-ledger-balance-item.is-receivable strong { color:var(--color-success); }
+#page-customerLedger .party-ledger-balance-item.is-payable strong { color:var(--color-danger); }
+#page-customerLedger .party-ledger-balance-item.is-neutral strong { color:var(--color-text); }
+#page-customerLedger .party-ledger-balance-item .party-ledger-balance-note,
+#page-supplierLedger .party-ledger-balance-box .party-ledger-balance-note {
+  display:inline-flex; width:max-content; padding:2px 7px; margin-top:5px;
+  border:1px solid currentColor; border-radius:999px;
+  font:700 10px/1.2 var(--font-sans); text-transform:none;
+}
+#page-customerLedger .party-ledger-balance-item .party-ledger-balance-note[hidden],
+#page-supplierLedger .party-ledger-balance-box .party-ledger-balance-note[hidden] { display:none; }
+#page-customerLedger .party-ledger-balance-item.is-receivable .party-ledger-balance-note { color:var(--color-success); }
+#page-customerLedger .party-ledger-balance-item.is-payable .party-ledger-balance-note { color:var(--color-danger); }
+#page-customerLedger .party-ledger-balance-item.is-neutral .party-ledger-balance-note { display:none; }
+#page-supplierLedger .party-ledger-balance-box.ledger-tone--due .party-ledger-balance-note { color:var(--color-danger); }
+#page-supplierLedger .party-ledger-balance-box.ledger-tone--advance .party-ledger-balance-note { color:var(--color-success); }
+#page-customerLedger .party-ledger-inline-money,
+#page-supplierLedger .party-ledger-inline-money {
+  display:inline-flex; flex-direction:column; align-items:flex-end; gap:3px;
+  white-space:nowrap;
+}
+#page-customerLedger .party-ledger-money-caption,
+#page-supplierLedger .party-ledger-money-caption {
+  display:inline-flex; align-items:center; gap:3px;
+  font:650 10px/1.2 var(--font-sans); white-space:nowrap;
+}
+#page-customerLedger .party-ledger-money-caption svg,
+#page-supplierLedger .party-ledger-money-caption svg { width:12px; height:12px; flex:none; }
+#page-customerLedger .party-ledger-inline-money.is-in,
+#page-supplierLedger .party-ledger-inline-money.is-in { color:var(--color-success); }
+#page-customerLedger .party-ledger-inline-money.is-out,
+#page-supplierLedger .party-ledger-inline-money.is-out { color:var(--color-danger); }
+#page-customerLedger .party-ledger-inline-money.is-opening .party-ledger-money-caption,
+#page-supplierLedger .party-ledger-inline-money.is-opening .party-ledger-money-caption,
+#page-customerLedger .party-ledger-inline-money.is-adjustment .party-ledger-money-caption,
+#page-supplierLedger .party-ledger-inline-money.is-adjustment .party-ledger-money-caption { color:var(--color-text-muted); }
+@media print { #page-customerLedger .party-ledger-balance-item { background:transparent!important; } }
 </style>
