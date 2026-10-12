@@ -31,6 +31,7 @@ check('Quick Items are a text-first view of the existing POS product data', () =
   assert.match(v2, /\.slice\(0,\s*8\)/);
   assert.match(v2, /title\.textContent\s*=\s*product\.name/);
   assert.match(v2, /amount\.textContent\s*=/);
+  assert.match(v2, /amount\.textContent\s*=\s*formatMoney\(price\)/);
   assert.match(v2, /stock\.textContent\s*=/);
   assert.match(v2, /posAddToCart_\(product\)/);
   assert.doesNotMatch(v2, /<img\b|document\.createElement\(['"]img['"]\)|product\.image/i);
