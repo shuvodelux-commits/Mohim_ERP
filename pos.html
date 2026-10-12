@@ -839,10 +839,14 @@
   }
 
   function posRenderCartProductResults_(input, host, mode, index) {
-    if (!input) return;
+    if (!input || document.activeElement !== input) return;
     if (host) { host.hidden = true; host.innerHTML = ''; }
     var popup = posCartProductPopup_();
     var html = posCartProductResultsHtml_(input.value, mode, index);
+    if (!html && !document.body.classList.contains('pos-v2-active')) {
+      posCloseCartProductPopup_();
+      return;
+    }
     popup.innerHTML = html || '<div class="pos-picker-empty">No matching products</div>';
     popup.hidden = false;
     popup.dataset.activeIndex = html ? '0' : '-1';
