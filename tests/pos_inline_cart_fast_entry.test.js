@@ -111,7 +111,7 @@ test('quantity Enter completes the active line and focuses the next Add Product 
 test('inline Add product and replace search support ArrowUp ArrowDown and Enter selected option', () => {
   const move = functionSource('posMoveCartProductActive_');
   const active = functionSource('posActiveCartProductOption_');
-  assert.match(move, /Arrow|delta|activeIndex|aria-selected|scrollIntoView/);
+  assert.match(move, /delta|activeIndex|aria-selected|popup\.scrollTop/);
   assert.match(active, /data-cart-product-pick/);
 
   const start = pos.indexOf("document.getElementById('posCartList').addEventListener('keydown'");
@@ -179,6 +179,70 @@ test('Qty Enter focuses Add Product and next Enter selects an available suggesti
   assert.strictEqual(state.cart[3].name, products[3].name);
   assert.deepStrictEqual(calls.slice(-2), ['render', 'focus-qty']);
   assert.strictEqual(calls.filter(x => x.startsWith('toast:')).length, 0);
+});
+
+test('ArrowDown and ArrowUp scroll the dropdown only, not the page', () => {
+  const items = [
+    { id: '101', label: 'A' },
+    { id: '102', label: 'B' },
+    { id: '103', label: 'C' }
+  ];
+  const popup = {
+    hidden: false,
+    scrollTop: 0,
+    dataset: { activeIndex: '0' },
+    getBoundingClientRect() { return { top: 100, bottom: 142 }; },
+    querySelectorAll() { return options; }
+  };
+  const options = items.map((item, i) => ({
+    id: 'pos-cart-product-option-' + i,
+    dataset: { cartProductPick: item.id },
+    classList: { toggle() {} },
+    setAttribute() {},
+    scrollIntoView() { throw new Error('Page scrolling is forbidden'); },
+    getBoundingClientRect() {
+      return { top: 100 + i * 36 - popup.scrollTop, bottom: 136 + i * 36 - popup.scrollTop };
+    }
+  }));
+  const input = {
+    attrs: { 'aria-controls': 'posCartProductPopup' },
+    getAttribute(key) { return this.attrs[key]; },
+    setAttribute(key, value) { this.attrs[key] = value; }
+  };
+  const document = { activeElement: input, getElementById() { return popup; } };
+  const handlers = new Function('document',
+    functionSource('posMoveCartProductActive_') + '\n' +
+    functionSource('posActiveCartProductOption_') + '\n' +
+    'return { move:posMoveCartProductActive_, active:posActiveCartProductOption_ };'
+  )(document);
+
+  assert.strictEqual(handlers.move(1), options[1]);
+  assert.strictEqual(input.attrs['aria-activedescendant'], options[1].id);
+  assert.ok(popup.scrollTop > 0, 'only popup scrollbar should move');
+  assert.strictEqual(handlers.move(1), options[2]);
+  assert.strictEqual(handlers.active(), options[2]);
+  assert.strictEqual(handlers.active().dataset.cartProductPick, '103');
+  assert.strictEqual(handlers.move(-1), options[1]);
+  assert.strictEqual(handlers.active().dataset.cartProductPick, '102');
+});
+
+test('Entering highlighted item works with numeric IDs and no extra Enter', () => {
+  const lookup = new Function('posState',
+    functionSource('posProductById_') + '\nreturn posProductById_;'
+  )({ products: [{ id: 102, name: '6" SWR Pipe RFL 4.2' }] });
+  assert.strictEqual(lookup('102').name, '6" SWR Pipe RFL 4.2');
+
+  const keyArea = pos.slice(
+    pos.indexOf("document.getElementById('posCartList').addEventListener('keydown'"),
+    pos.indexOf("document.getElementById('posCartList').addEventListener('scroll'")
+  );
+  assert.match(keyArea, /if \(!option\) \{[\s\S]*posRenderCartProductResults_\(e\.target, enterHost, pickerMode, enterIndex\);[\s\S]*option = posActiveCartProductOption_\(\)/);
+  assert.match(keyArea, /posChooseCartProduct_\(match, replaceIndex, pickerMode\)/);
+
+  const anchor = functionSource('posKeepCartProductPopupAnchored_');
+  assert.match(anchor, /posPlaceCartProductResults_\(input, popup\)/);
+  assert.match(anchor, /popup\.contains/);
+  assert.match(pos, /document\.addEventListener\('scroll', posKeepCartProductPopupAnchored_, true\)/);
 });
 
 test('purchase price reveal has room for long prices and eye sits inward from edge', () => {
