@@ -15,11 +15,17 @@ function functionSource(name) {
   const opening = pos.indexOf('{', start);
   let depth = 0, quote = '', escaped = false;
   for (let i = opening; i < pos.length; i++) {
-    const c = pos[i];
+    const c = pos[i], next = pos[i + 1];
     if (quote) {
       if (escaped) escaped = false;
       else if (c === '\\') escaped = true;
       else if (c === quote) quote = '';
+    } else if (c === '/' && next === '/') {
+      while (i < pos.length && pos[i] !== '\n') i++;
+    } else if (c === '/' && next === '*') {
+      i = pos.indexOf('*/', i + 2);
+      assert.notEqual(i, -1, 'Unclosed comment in ' + name);
+      i++;
     } else if (c === '"' || c === "'" || c === String.fromCharCode(96)) {
       quote = c;
     } else if (c === '{') depth++;
