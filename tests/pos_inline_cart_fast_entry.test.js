@@ -326,6 +326,19 @@ test('clicking a detached dropdown option does not prematurely finish the Qty ro
   assert.strictEqual(finished, 1, 'genuine outside click must still finish an entry');
 });
 
+test('POS V2 cost eye is centered in full product cell, including revealed value', () => {
+  const cell = v2.match(/body\\.pos-v2-active #page-pos \\.cart-row \\.c-name\\s*\\{([^}]*)\\}/);
+  const main = v2.match(/body\\.pos-v2-active #page-pos \\.cart-row \\.c-name-main\\s*\\{([^}]*)\\}/);
+  const eye = v2.match(/body\\.pos-v2-active #page-pos \\.cart-row \\.c-cost\\s*\\{([^}]*)\\}/);
+  assert.ok(cell && main && eye, 'POS V2 cost eye placement selectors must exist');
+  assert.match(cell[1], /position:\\s*relative/);
+  assert.match(main[1], /position:\\s*static/);
+  assert.match(eye[1], /position:\\s*absolute/);
+  assert.match(eye[1], /top:\\s*50%/);
+  assert.match(eye[1], /transform:\\s*translateY\\(-50%\\)/);
+  assert.match(v2, /body\\.pos-v2-active #page-pos \\.cart-row \\.c-cost\\.is-revealed\\s*\\{/);
+});
+
 test('purchase price reveal has room for long prices and eye sits inward from edge', () => {
   assert.match(css, /#page-pos \.cart-row \.c-name-title\s*\{[\s\S]*flex:\s*1\s+1\s+auto/);
   assert.match(css, /#page-pos \.cart-row \.c-cost\s*\{[^}]*margin-right:\s*8px/);
