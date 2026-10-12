@@ -10,7 +10,7 @@ const htmls = [
   'dashboard.html','finance.html','bank.html','daybook.html',
   'cashReconciliation.html','expenseList.html','expenseReport.html',
   'reports.html','customers.html','suppliers.html',
-  'vendorWorkspace.html','counter.html','pos.html'
+  'vendorWorkspace.html','counter.html','pos.html','returns.html'
 ];
 const ui = htmls.map(path => fs.readFileSync(path, 'utf8')).join('\n');
 const feature = js.slice(js.indexOf('  // ERP-wide visual semantics for cards/balances.'));
