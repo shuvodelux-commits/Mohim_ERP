@@ -1325,7 +1325,6 @@
     if (title) title.textContent = active ? 'Products · পণ্য' : 'Add Product';
   }
 
-  var posV2SearchBound_ = false;
   var posV2DraftRows_ = [];
 
   function posV2EnsureSearchToolbar_() {
@@ -1355,79 +1354,6 @@
     var actions = document.querySelector('#page-pos .pos-v2-search-actions');
     if (actions) actions.remove();
     if (typeof posCloseCartProductPopup_ === 'function') posCloseCartProductPopup_();
-  }
-
-  function posV2RenderSearchResults_() {
-    if (!document.body.classList.contains('pos-v2-active')) return;
-    var input = document.getElementById('posSearch');
-    if (!input || typeof posRenderCartProductResults_ !== 'function') return;
-    posRenderCartProductResults_(input, null, 'v2-search', null);
-  }
-
-  function posV2SearchKeydown_(event) {
-    if (!document.body.classList.contains('pos-v2-active')) return;
-    var input = event.currentTarget;
-    if (!input) return;
-
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      if (typeof posMoveCartProductActive_ === 'function') posMoveCartProductActive_(1);
-      return;
-    }
-
-    if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      if (typeof posMoveCartProductActive_ === 'function') posMoveCartProductActive_(-1);
-      return;
-    }
-
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      if (typeof posCloseCartProductPopup_ === 'function') posCloseCartProductPopup_();
-      if (typeof posClearProductSearch_ === 'function') posClearProductSearch_();
-      return;
-    }
-
-    if (event.key !== 'Enter') return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    posV2RenderSearchResults_();
-
-    var option = typeof posActiveCartProductOption_ === 'function' ? posActiveCartProductOption_() : null;
-    var product = option && typeof posProductById_ === 'function'
-      ? posProductById_(option.dataset.cartProductPick)
-      : null;
-    if (!product || typeof posChooseCartProduct_ !== 'function') return;
-
-    if (posChooseCartProduct_(product, null, 'v2-search')) {
-      if (typeof posCloseCartProductPopup_ === 'function') posCloseCartProductPopup_();
-      if (typeof posClearProductSearch_ === 'function') posClearProductSearch_();
-    }
-  }
-
-  function posV2BindSearch_() {
-    var input = document.getElementById('posSearch');
-    if (!input || posV2SearchBound_) return;
-    posV2SearchBound_ = true;
-
-    if (typeof posRenderCartProductResults_ === 'function') {
-      posRenderCartProductResults_(input, null, 'v2-search', null);
-    }
-    input.addEventListener('input', posV2RenderSearchResults_);
-    input.addEventListener('focus', posV2RenderSearchResults_);
-    input.addEventListener('keydown', posV2SearchKeydown_, true);
-
-    document.addEventListener('click', function (event) {
-      if (!document.body.classList.contains('pos-v2-active')) return;
-      var option = event.target && event.target.closest
-        ? event.target.closest('[data-cart-product-mode="v2-search"]')
-        : null;
-      if (!option) return;
-      if (typeof posClearProductSearch_ === 'function') posClearProductSearch_();
-    });
   }
 
   function posV2EnsureDraftModal_() {
