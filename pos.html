@@ -1170,6 +1170,14 @@
     return ' <button type="button" class="c-cost" data-cost-i="' + i + '" aria-label="Show purchase price">' + posCostEyeSvg_() + '</button>';
   }
 
+  // escapeHtml() protects text nodes but deliberately leaves quotes untouched.
+  // Product names such as 6" SWR Pipe must also be safe inside input attributes.
+  function posEscapeCartInputAttr_(value) {
+    return escapeHtml(String(value === null || value === undefined ? '' : value))
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   function posRenderCart_() {
     var list = document.getElementById('posCartList');
     list.innerHTML = '';
@@ -1186,7 +1194,7 @@
       var activeEntry = posState.cartEntryIndex === i;
       var productMode = activeEntry ? 'entry' : 'replace';
       var productCell = (editingProduct || activeEntry)
-        ? '<div class="c-name is-editing"><div class="pos-cart-inline-picker"><input type="search" autocomplete="off" data-cart-product-input data-cart-product-mode="' + productMode + '" data-i="' + i + '" value="' + escapeHtml(line.name) + '" aria-label="' + (activeEntry ? 'Product' : 'Replace ' + escapeHtml(line.name)) + '"><div class="pos-cart-product-results" data-cart-product-results data-i="' + i + '" role="listbox" hidden></div></div></div>'
+        ? '<div class="c-name is-editing"><div class="pos-cart-inline-picker"><input type="search" autocomplete="off" data-cart-product-input data-cart-product-mode="' + productMode + '" data-i="' + i + '" value="' + posEscapeCartInputAttr_(line.name) + '" aria-label="' + (activeEntry ? 'Product' : 'Replace ' + posEscapeCartInputAttr_(line.name)) + '"><div class="pos-cart-product-results" data-cart-product-results data-i="' + i + '" role="listbox" hidden></div></div></div>'
         : '<div class="c-name"><div class="c-name-main"><button type="button" class="c-name-title c-product-edit" data-cart-product-edit data-i="' + i + '" title="Change product">' + escapeHtml(line.name) + '</button>' + posCostMarkerHtml_(line, i) + '</div><div class="c-name-meta">' + escapeHtml(line.unit || '') + '</div></div>';
 
       var entryAttrs = activeEntry ? ' data-cart-entry-qty' : '';
