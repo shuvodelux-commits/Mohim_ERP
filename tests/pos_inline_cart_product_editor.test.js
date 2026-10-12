@@ -98,10 +98,11 @@ test('Qty Enter finishes the active row and focuses the new empty product row', 
 
 test('clicking an existing product opens the same searchable combobox and shows suggestions', () => {
   const render = functionSource('posRenderCart_');
-  const clickArea = pos.slice(
-    pos.indexOf("document.getElementById('posCartList').addEventListener('click'"),
-    pos.indexOf("document.getElementById('posCartList').addEventListener('change'", pos.indexOf("document.getElementById('posCartList').addEventListener('click'"))
-  );
+  // The cart has separate lightweight picker and edit click listeners.
+  // Extract the edit handler, not the earlier picker-click handler.
+  const editStart = pos.indexOf("var editProductBtn = e.target.closest('[data-cart-product-edit]')");
+  assert.notStrictEqual(editStart, -1, 'existing product edit handler is missing');
+  const clickArea = pos.slice(editStart, pos.indexOf("var productPickBtn =", editStart));
   assert.match(render, /data-cart-product-edit/);
   assert.match(render, /productMode\s*=\s*activeEntry\s*\?\s*['"]entry['"]\s*:\s*['"]replace['"]/);
   assert.match(render, /data-cart-product-mode="'\s*\+\s*productMode/);
