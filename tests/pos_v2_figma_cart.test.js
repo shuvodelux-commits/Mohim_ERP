@@ -49,11 +49,18 @@ test('posv2 does not duplicate operational POS controls or IDs', () => {
   assert.doesNotMatch(v2, /function\s+posLoad\s*\(/);
 });
 
-test('POS V2 applies the SherHisab compact design tokens only while active', () => {
+test('POS V2 ports HisabIQ cart and checkout appearance, scoped to the live POS route', () => {
   assert.match(v2, /body\.pos-v2-active\s+#page-pos/);
-  assert.match(v2, /--pos-v2-primary:\s*#1A56DB/i);
-  assert.match(v2, /font-family:\s*['"]Geist['"]/);
-  assert.match(v2, /grid-template-columns:\s*minmax\(0,\s*1fr\)\s+minmax\(300px,\s*23vw\)/);
+  assert.match(v2, /--pos-v2-primary:#0d9488/);
+  assert.match(v2, /grid-template-areas:"search search" "cart customer"/);
+  assert.match(v2, /pos-v2-page-heading/);
+  assert.match(v2, /pos-v2-customer-grid/);
+  assert.match(v2, /pos-v2-grand-block/);
+  assert.match(v2, /background:#192940/);
+  assert.match(v2, /pos-v2-payment-status/);
+  assert.match(v2, /pos-v2-pay-shortcuts/);
+  assert.match(v2, /posV2InstallHisabIQ_\(\)/);
+  assert.match(v2, /posV2UninstallHisabIQ_\(\)/);
 });
 
 test('POS V2 moves checkout into the customer rail while preserving shared runtime anchors', () => {
@@ -63,6 +70,18 @@ test('POS V2 moves checkout into the customer rail while preserving shared runti
   assert.match(v2, /pos-v2-checkout-anchor/);
   assert.match(v2, /insertBefore\(refs\.summary,\s*refs\.summaryAnchor\)/);
   assert.match(v2, /insertBefore\(refs\.actions,\s*refs\.actionsAnchor\)/);
+});
+
+test('HisabIQ panel retains Mohim customer phone history, draft and sales posting', () => {
+  assert.match(pos, /id="posHistoryBtn"/);
+  assert.match(pos, /serverCall\('findSalesByPhone', authToken, phone, customerId\)/);
+  assert.match(pos, /serverCall\('completeSale', authToken, payload\)/);
+  assert.match(pos, /serverCall\('updateSale', authToken, targetInvoiceId, payload\)/);
+  assert.match(pos, /id="posSaveDraftBtn"/);
+  assert.match(v2, /customerDetails\.appendChild\(customerActions\)/);
+  assert.match(v2, /paymentCard\.appendChild\(received\)/);
+  assert.match(v2, /posV2OriginalRecalc_\.apply\(this, arguments\)/);
+  assert.doesNotMatch(v2, /pos-v2-quick-items/);
 });
 
 test('POS V2 keeps the search-first cart workflow and responsive mobile tabs', () => {
