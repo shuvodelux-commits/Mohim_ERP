@@ -990,6 +990,105 @@
     }
   }
 
+
+/* Faithful HisabIQ POS composition; scoped to V2. Original Mohim controls remain active. */
+body.pos-v2-active {--pos-v2-bg:#f8fafb;--pos-v2-surface:#fff;--pos-v2-ink:#192329;--pos-v2-text:#34454f;--pos-v2-muted:#687781;--pos-v2-quiet:#f7f9fa;--pos-v2-border:#e1e7e8;--pos-v2-input:#dce3e5;--pos-v2-primary:#0d9488;--pos-v2-primary-soft:#f0fdfa;--pos-v2-success:#047857;--pos-v2-danger:#b42318}
+body.pos-v2-active #page-pos {max-width:1440px;width:100%;margin:auto;background:transparent;color:var(--pos-v2-ink);font-family:'Inter','Noto Sans Bengali',system-ui,sans-serif;font-variant-numeric:normal}
+body.pos-v2-active #page-pos .pos-layout {grid-template-columns:minmax(0,1fr) 340px;grid-template-areas:"search search" "cart customer";gap:16px;align-items:start}
+body.pos-v2-active #page-pos .pos-product-card {grid-area:search;display:flex;align-items:center;justify-content:space-between;padding:0!important;background:transparent;border:0;border-radius:0;box-shadow:none}
+body.pos-v2-active #page-pos .pos-product-card > .pos-section-head,body.pos-v2-active #page-pos .pos-product-card .pos-product-search-box,body.pos-v2-active #page-pos #posProductGrid,body.pos-v2-active #page-pos #posProductEmpty,body.pos-v2-active #page-pos .pos-recent-drafts {display:none!important}
+body.pos-v2-active #page-pos .pos-v2-page-heading {display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-width:0}
+body.pos-v2-active #page-pos .pos-v2-page-heading h2 {font-size:21px;line-height:1.35;font-weight:650;letter-spacing:-.02em;color:var(--pos-v2-ink);margin:0}
+body.pos-v2-active #page-pos .pos-v2-page-heading h2 span {font-size:13px;color:var(--pos-v2-muted);font-weight:400;letter-spacing:0}
+body.pos-v2-active #page-pos .pos-v2-keyboard-help {color:var(--pos-v2-muted);font-size:11px;margin:3px 0 0}
+body.pos-v2-active #page-pos .pos-search-drafts-row {margin:0;display:flex;align-items:center;gap:7px;width:auto;min-height:36px}
+body.pos-v2-active #page-pos .pos-v2-search-actions {display:flex;gap:7px;align-items:center}
+body.pos-v2-active #page-pos .pos-v2-search-actions .btn {min-height:36px;height:36px;border:1px solid var(--pos-v2-border);border-radius:7px;background:#fff;color:var(--pos-v2-text);padding:6px 11px;font-size:12px}
+body.pos-v2-active #page-pos .pos-v2-search-actions .btn.btn-primary {background:#0f766e;border-color:#0f766e;color:#fff}
+body.pos-v2-active #page-pos .pos-cart-section,body.pos-v2-active #page-pos .pos-customer-section {border:1px solid var(--pos-v2-border);border-radius:12px;background:#fff;box-shadow:0 1px 3px rgba(14,36,42,.06)}
+body.pos-v2-active #page-pos .pos-cart-section {grid-area:cart;min-height:360px;height:auto!important;max-height:none!important;overflow:hidden;display:flex;flex-direction:column;padding:0!important}
+body.pos-v2-active #page-pos .pos-cart-head {min-height:50px;padding:15px 16px 12px;margin:0}
+body.pos-v2-active #page-pos .pos-cart-head h3 {font-size:14px;font-weight:650}
+body.pos-v2-active #page-pos .pos-cart-head h3::after {content:' · পণ্য';font-size:12px;font-weight:400;color:var(--pos-v2-muted)}
+body.pos-v2-active #page-pos #posCartCount {display:inline-flex;min-width:23px;align-items:center;justify-content:center;padding:2px 6px;border-radius:16px;background:#f1f5f6;color:#46616a;font-size:11px}
+body.pos-v2-active #page-pos .pos-cart-columns,body.pos-v2-active #page-pos .cart-row {grid-template-columns:44px minmax(180px,1fr) 83px 70px 102px 105px 30px!important;column-gap:7px!important}
+body.pos-v2-active #page-pos .pos-cart-columns {min-height:38px;padding:10px 11px;border-top:1px solid var(--pos-v2-border);border-bottom:1px solid var(--pos-v2-border);background:#fafbfc;color:#77868c;font-size:10.5px;font-weight:600;letter-spacing:.03em;text-transform:uppercase}
+body.pos-v2-active #page-pos .cart-list {flex:0 1 auto;max-height:none;margin:0;overflow-x:auto;overflow-y:visible;scrollbar-gutter:auto}
+body.pos-v2-active #page-pos .cart-row {min-width:665px;min-height:62px;padding:10px 11px;background:#fff;border-bottom:1px solid var(--pos-v2-border)}
+body.pos-v2-active #page-pos .cart-row .c-name-title {font-size:13.5px;line-height:18px;font-weight:550;text-align:left}
+body.pos-v2-active #page-pos .cart-row .c-name-meta,body.pos-v2-active #page-pos .pos-v2-product-meta {margin-top:3px;font-size:10.5px;line-height:15px;color:var(--pos-v2-muted)}
+body.pos-v2-active #page-pos .cart-row .c-name-main {padding-right:30px}
+body.pos-v2-active #page-pos .cart-row .c-cost {right:0;top:2px;min-width:26px;max-width:26px;width:26px;justify-content:center;color:#85939c}
+body.pos-v2-active #page-pos .cart-row .c-cost.is-revealed {right:0;min-width:26px!important;max-width:98px!important;width:auto;padding:2px 5px;background:#fff;border:1px solid var(--pos-v2-border);border-radius:5px;z-index:1}
+body.pos-v2-active #page-pos .cart-row input,body.pos-v2-active #page-pos .pos-cart-inline-picker > input {height:36px;min-height:36px;max-width:100%;border:1px solid transparent;background:transparent;border-radius:6px;font-size:13px;font-variant-numeric:normal}
+body.pos-v2-active #page-pos .cart-row input:focus {background:#fff;border-color:#0d9488;outline:2px solid #99f6e4;outline-offset:0}
+body.pos-v2-active #page-pos .cart-row .c-line-total {font-size:13.5px;font-weight:650}
+body.pos-v2-active #page-pos .pos-cart-entry-row:not(.is-active) {background:#f0fdfa80}
+body.pos-v2-active #page-pos .pos-cart-entry-row:not(.is-active) .pos-cart-inline-picker > input {height:40px;min-height:40px;border:1px dashed #5eead4;background:#f0fdfa;border-radius:8px;font-size:13px}
+body.pos-v2-active #page-pos .pos-cart-entry-row .pos-cart-inline-picker > input:focus {border-style:solid;border-color:#0d9488;background:#fff}
+body.pos-v2-active .pos-cart-product-popup .pos-cart-product-option:hover,body.pos-v2-active .pos-cart-product-popup .pos-cart-product-option.is-active {background:#f0fdfa}
+body.pos-v2-active #page-pos .pos-customer-section {grid-area:customer;position:sticky;top:calc(var(--topbar-height) + 14px);width:100%;min-width:0;max-height:calc(100dvh - var(--topbar-height) - 24px);overflow-y:auto;overflow-x:hidden;padding:0!important;scrollbar-gutter:auto}
+body.pos-v2-active #page-pos .pos-customer-section > .pos-section-head {display:none}
+body.pos-v2-active #page-pos .pos-v2-checkout-heading {display:flex;justify-content:space-between;align-items:center;gap:8px;padding:15px 16px 12px;border-bottom:1px solid var(--pos-v2-border)}
+body.pos-v2-active #page-pos .pos-v2-checkout-heading strong {font-size:14px;font-weight:650;color:var(--pos-v2-ink)}
+body.pos-v2-active #page-pos .pos-v2-checkout-heading small {display:block;margin-top:4px;color:var(--pos-v2-muted);font-size:11px}
+body.pos-v2-active #page-pos .pos-v2-checkout-heading .pos-clear-link {padding:5px 8px;border-radius:6px;font-size:11px;color:#667780}
+body.pos-v2-active #page-pos .pos-v2-customer-details {padding:14px 16px 15px;margin:0;border-bottom:1px solid var(--pos-v2-border)}
+body.pos-v2-active #page-pos .pos-v2-panel-label {color:var(--pos-v2-text);font-size:11px;font-weight:600;letter-spacing:.025em}
+body.pos-v2-active #page-pos .pos-v2-panel-label span {color:var(--pos-v2-muted);font-weight:400;letter-spacing:0}
+body.pos-v2-active #page-pos .pos-v2-customer-grid {display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;margin-top:10px}
+body.pos-v2-active #page-pos .pos-v2-customer-field {min-width:0}
+body.pos-v2-active #page-pos .pos-v2-customer-field > label {display:block;margin-bottom:5px;color:var(--pos-v2-muted);font-size:10.5px;font-weight:500}
+body.pos-v2-active #page-pos .pos-v2-customer-input-wrap {position:relative;margin-bottom:0}
+body.pos-v2-active #page-pos .pos-v2-customer-input-wrap input {width:100%;min-width:0;min-height:37px;height:37px;padding:6px 8px 6px 32px;border:1px solid var(--pos-v2-border);border-radius:7px;background:#fff;font-size:12px}
+body.pos-v2-active #page-pos .pos-v2-customer-details .pos-customer-actions {display:flex;flex-wrap:wrap;gap:6px;margin:9px 0 0}
+body.pos-v2-active #page-pos .pos-v2-customer-details .pos-customer-actions .btn {min-height:31px;padding:4px 9px;border:1px solid var(--pos-v2-border);border-radius:7px;background:#fff;color:#0f766e;font-size:11px}
+body.pos-v2-active #page-pos .pos-v2-customer-details #posCustomerDueRow {margin:9px 0 0;padding:8px;border-radius:6px;background:#fff1f0;color:#b42318}
+body.pos-v2-active #page-pos .pos-v2-customer-details #posCustomerDueRow .v {color:#b42318}
+body.pos-v2-active #page-pos .pos-v2-customer-details .pos-customer-more-fields {margin-top:8px}
+body.pos-v2-active #page-pos .pos-checkout-summary {display:flex!important;flex-direction:column;gap:0;margin:0;padding:0;border:0}
+body.pos-v2-active #page-pos .pos-checkout-summary > .pos-checkout-fields,body.pos-v2-active #page-pos .pos-checkout-summary > .pos-checkout-totals {display:none!important}
+body.pos-v2-active #page-pos .pos-v2-calculations {display:grid;gap:3px;padding:13px 16px 9px}
+body.pos-v2-active #page-pos .pos-v2-calculations .totals-row {display:flex;justify-content:space-between;align-items:center;min-height:35px;color:#47565f;font-size:12px}
+body.pos-v2-active #page-pos .pos-v2-calculations input {width:105px;max-width:105px;height:35px;text-align:right;font-size:13px}
+body.pos-v2-active #page-pos .pos-v2-grand-block {margin:2px 16px 0;padding:13px 15px;background:#192940;border-radius:11px}
+body.pos-v2-active #page-pos .pos-v2-grand-block .totals-row.grand {display:flex;flex-direction:column;align-items:stretch;gap:2px;margin:0;min-height:auto;padding:0;background:transparent;border:0;color:#c3ced8;font-size:12px;font-weight:500}
+body.pos-v2-active #page-pos .pos-v2-grand-block .totals-row.grand > span:first-child::after {content:' · মোট';font-size:12px}
+body.pos-v2-active #page-pos .pos-v2-grand-block .totals-row.grand .v {color:#fff;font-size:33px;font-weight:650;letter-spacing:-.025em;line-height:1.2;text-align:right}
+body.pos-v2-active #page-pos .pos-v2-payment-block {padding:15px 16px 10px}
+body.pos-v2-active #page-pos .pos-v2-payment-block > .pos-v2-panel-label {margin-bottom:9px;color:var(--pos-v2-ink);font-size:13px}
+body.pos-v2-active #page-pos .pos-v2-payment-card {padding:10px;border:1px solid var(--pos-v2-border);border-radius:9px;background:#fafbfc}
+body.pos-v2-active #page-pos .pos-v2-payment-card .totals-row,body.pos-v2-active #page-pos .pos-v2-payment-card .pos-bank-account-row {display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:42px;padding:4px 0;color:var(--pos-v2-muted);font-size:11.5px}
+body.pos-v2-active #page-pos .pos-v2-payment-card .totals-row > span,body.pos-v2-active #page-pos .pos-v2-payment-card .pos-bank-account-row > label {flex:1 1 auto;min-width:95px}
+body.pos-v2-active #page-pos .pos-v2-payment-card input,body.pos-v2-active #page-pos .pos-v2-payment-card select {flex:0 1 55%;width:55%;min-width:0;max-width:none;min-height:37px;height:37px;padding:7px 9px;border:1px solid var(--pos-v2-border);background:#fff;border-radius:7px;font-size:12px}
+body.pos-v2-active #page-pos .pos-v2-payment-card #posAmountReceived {text-align:right;font-size:14px;font-weight:600}
+body.pos-v2-active #page-pos .pos-v2-pay-shortcuts {display:flex;gap:6px;margin-top:10px}
+body.pos-v2-active #page-pos .pos-v2-pay-shortcuts button {min-height:32px;padding:5px 11px;border:1px solid #99f6e4;background:#f0fdfa;border-radius:7px;color:#0f766e;font-size:11px;font-weight:600}
+body.pos-v2-active #page-pos .pos-v2-payment-status {display:grid;gap:4px;margin-top:10px;padding:11px;border-radius:9px;background:#f7f9fa}
+body.pos-v2-active #page-pos .pos-v2-payment-status .totals-row {display:flex!important;min-height:24px;justify-content:space-between;align-items:center;padding:0;margin:0;border:0;color:var(--pos-v2-text);font-size:12px}
+body.pos-v2-active #page-pos .pos-v2-payment-status #posDueRow .v {color:#b42318;font-weight:650}
+body.pos-v2-active #page-pos .pos-v2-payment-status #posChangeRow .v {color:#047857;font-weight:600}
+body.pos-v2-active #page-pos .pos-checkout-actions {display:flex;flex-direction:column;gap:8px;margin:0;padding:0 16px 16px}
+body.pos-v2-active #page-pos .pos-checkout-actions #posCompleteBtn {order:0;width:100%;min-height:48px;background:#0f766e;border:1px solid #0f766e;border-radius:8px;color:#fff;font-size:15px;font-weight:650}
+body.pos-v2-active #page-pos .pos-checkout-actions #posSaveDraftBtn {order:1;align-self:center;border:none;background:transparent;color:#0f766e;font-size:12px;font-weight:550}
+body.pos-v2-active #page-pos #posFormError {margin:0 16px}
+@media(min-width:1450px){body.pos-v2-active #page-pos .pos-layout {grid-template-columns:minmax(0,1fr) 380px}}
+@media(min-width:541px) and (max-width:1100px){body.pos-v2-active #page-pos .pos-layout {grid-template-columns:minmax(0,1fr);grid-template-areas:"search" "cart" "customer";gap:12px}body.pos-v2-active #page-pos .pos-customer-section {position:static;max-height:none}body.pos-v2-active #page-pos .pos-cart-section {min-height:0}}
+@media(max-width:540px){
+body.pos-v2-active #page-pos .pos-layout {grid-template-columns:1fr;grid-template-areas:"tabs" "search" "cart" "customer";gap:9px}
+body.pos-v2-active #page-pos .pos-v2-page-heading {align-items:flex-start;flex-direction:column}
+body.pos-v2-active #page-pos .pos-v2-page-heading h2 {font-size:19px}
+body.pos-v2-active #page-pos .pos-search-drafts-row,body.pos-v2-active #page-pos .pos-v2-search-actions {width:100%}
+body.pos-v2-active #page-pos .pos-v2-search-actions .btn {width:100%}
+body.pos-v2-active #page-pos .pos-cart-columns {display:none}
+body.pos-v2-active #page-pos .cart-list {overflow-x:visible}
+body.pos-v2-active #page-pos .cart-row {min-width:0;grid-template-columns:minmax(0,1fr) 56px 68px 80px 32px!important;padding:9px}
+body.pos-v2-active #page-pos .pos-cart-section {min-height:0;padding:0!important}
+body.pos-v2-active #page-pos .pos-customer-section {position:static!important;max-height:none!important}
+body.pos-v2-active #page-pos .pos-v2-grand-block .totals-row.grand .v {font-size:29px}
+body.pos-v2-active #page-pos .pos-checkout-actions {position:static;padding:0 16px 16px}
+}
+
 </style>
 
 <script>
@@ -1618,6 +1717,185 @@
     });
   }
 
+
+  // HisabIQ POS V2 presentation adapter. Move, never clone, the live Mohim form controls.
+  var posV2HisabIQ_ = null;
+  var posV2OriginalRecalc_ = null;
+
+  function posV2SyncPaymentStatus_() {
+    if (!document.body.classList.contains('pos-v2-active')) return;
+    var paid = document.getElementById('posV2PaidValue');
+    if (!paid || typeof posState === 'undefined') return;
+    var sum = (posState.cart || []).reduce(function (s, line) {
+      return s + (Number(line.lineTotal) || 0);
+    }, 0);
+    var total = Math.max(0, sum - (Number(document.getElementById('posDiscount').value) || 0));
+    var received = Math.max(0, Number(document.getElementById('posAmountReceived').value) || 0);
+    paid.textContent = formatMoney(Math.min(received, total));
+    document.getElementById('posDueAmountDisplay').textContent = formatMoney(Math.max(0, total - received));
+    document.getElementById('posChangeDue').textContent = formatMoney(Math.max(0, received - total));
+  }
+
+  function posV2InstallHisabIQ_() {
+    if (posV2HisabIQ_) return;
+    var page = document.getElementById('page-pos');
+    var productCard = page && page.querySelector('.pos-product-card');
+    var search = productCard && productCard.querySelector('.pos-search-drafts-row');
+    var customer = page && page.querySelector('.pos-customer-section');
+    var header = customer && customer.querySelector('.pos-section-head');
+    var summary = customer && customer.querySelector('.pos-checkout-summary');
+    var fields = summary && summary.querySelector('.pos-checkout-fields');
+    var totals = summary && summary.querySelector('.pos-checkout-totals');
+    if (!productCard || !search || !customer || !header || !summary || !fields || !totals) return;
+    var nameLabel = customer.querySelector('label');
+    var nameWrap = document.getElementById('posCustomerName').closest('.pos-customer-input-wrap');
+    var phoneLabel = nameWrap && nameWrap.nextElementSibling;
+    var phoneWrap = document.getElementById('posCustomerPhone').closest('.pos-customer-input-wrap');
+    var customerDue = document.getElementById('posCustomerDueRow');
+    var customerActions = customer.querySelector('.pos-customer-actions');
+    var customerExtra = document.getElementById('posCustomerMoreFields');
+    var clearCustomer = document.getElementById('posClearCustomerBtn');
+    var discount = document.getElementById('posDiscount').closest('.totals-row');
+    var received = document.getElementById('posAmountReceived').closest('.totals-row');
+    var method = document.getElementById('posPaymentMethodRow');
+    var bank = document.getElementById('posBankAccountRow');
+    var subtotal = document.getElementById('posSubtotal').closest('.totals-row');
+    var grand = document.getElementById('posGrandTotal').closest('.totals-row');
+    var change = document.getElementById('posChangeRow');
+    var due = document.getElementById('posDueRow');
+    if (!nameLabel || !nameWrap || !phoneLabel || phoneLabel.tagName !== 'LABEL' || !phoneWrap ||
+        !customerActions || !clearCustomer || !discount || !received || !method || !bank ||
+        !subtotal || !grand || !change || !due) return;
+
+    var pageHeading = document.createElement('div');
+    pageHeading.className = 'pos-v2-page-heading';
+    pageHeading.innerHTML = '<div><h2>New Sale <span>· নতুন বিক্রি</span></h2>' +
+      '<p class="pos-v2-keyboard-help">Add products in cart · Enter to select · Enter for quantity</p></div>';
+    productCard.insertBefore(pageHeading, search);
+    pageHeading.appendChild(search);
+
+    var invoiceHead = document.createElement('div');
+    invoiceHead.className = 'pos-v2-checkout-heading';
+    invoiceHead.innerHTML = '<div><strong>New invoice</strong><small>Sale &amp; customer details</small></div>';
+    invoiceHead.appendChild(clearCustomer);
+    customer.insertBefore(invoiceHead, header);
+
+    var customerDetails = document.createElement('div');
+    customerDetails.className = 'pos-v2-customer-details';
+    customerDetails.innerHTML = '<div class="pos-v2-panel-label">Invoice customer details <span>· কাস্টমার তথ্য</span></div>';
+    customer.insertBefore(customerDetails, header.nextSibling);
+    var grid = document.createElement('div');
+    grid.className = 'pos-v2-customer-grid';
+    customerDetails.appendChild(grid);
+    var nameField = document.createElement('div');
+    nameField.className = 'pos-v2-customer-field';
+    nameWrap.classList.add('pos-v2-customer-input-wrap');
+    nameField.appendChild(nameLabel);
+    nameField.appendChild(nameWrap);
+    grid.appendChild(nameField);
+    var phoneField = document.createElement('div');
+    phoneField.className = 'pos-v2-customer-field';
+    phoneWrap.classList.add('pos-v2-customer-input-wrap');
+    phoneField.appendChild(phoneLabel);
+    phoneField.appendChild(phoneWrap);
+    grid.appendChild(phoneField);
+    if (customerDue) customerDetails.appendChild(customerDue);
+    customerDetails.appendChild(customerActions);
+    if (customerExtra) customerDetails.appendChild(customerExtra);
+
+    var calc = document.createElement('div');
+    calc.className = 'pos-v2-calculations';
+    calc.appendChild(subtotal);
+    calc.appendChild(discount);
+    var totalBlock = document.createElement('div');
+    totalBlock.className = 'pos-v2-grand-block';
+    totalBlock.appendChild(grand);
+    var payment = document.createElement('div');
+    payment.className = 'pos-v2-payment-block';
+    payment.innerHTML = '<div class="pos-v2-panel-label">Payments <span>· পেমেন্ট</span></div>';
+    var paymentCard = document.createElement('div');
+    paymentCard.className = 'pos-v2-payment-card';
+    paymentCard.appendChild(method);
+    paymentCard.appendChild(bank);
+    paymentCard.appendChild(received);
+    payment.appendChild(paymentCard);
+    var shortcuts = document.createElement('div');
+    shortcuts.className = 'pos-v2-pay-shortcuts';
+    var exact = document.createElement('button');
+    exact.type = 'button';
+    exact.textContent = 'Exact amount';
+    exact.addEventListener('click', function () {
+      var sum = (posState.cart || []).reduce(function (s, item) {
+        return s + (Number(item.lineTotal) || 0);
+      }, 0);
+      var discount = Number(document.getElementById('posDiscount').value) || 0;
+      var input = document.getElementById('posAmountReceived');
+      input.value = String(Math.max(0, sum - discount));
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.focus();
+    });
+    shortcuts.appendChild(exact);
+    payment.appendChild(shortcuts);
+    var status = document.createElement('div');
+    status.className = 'pos-v2-payment-status';
+    status.innerHTML = '<div class="totals-row"><span>Paid</span><span class="v" id="posV2PaidValue">৳0</span></div>';
+    status.appendChild(change);
+    status.appendChild(due);
+    payment.appendChild(status);
+    summary.insertBefore(calc, fields);
+    summary.insertBefore(totalBlock, fields);
+    summary.insertBefore(payment, fields);
+
+    posV2HisabIQ_ = {productCard:productCard,search:search,pageHeading:pageHeading,
+      customer:customer,header:header,invoiceHead:invoiceHead,clearCustomer:clearCustomer,
+      customerDetails:customerDetails,nameLabel:nameLabel,nameWrap:nameWrap,
+      phoneLabel:phoneLabel,phoneWrap:phoneWrap,customerDue:customerDue,
+      customerActions:customerActions,customerExtra:customerExtra,
+      summary:summary,fields:fields,totals:totals,discount:discount,received:received,
+      method:method,bank:bank,subtotal:subtotal,grand:grand,change:change,due:due,
+      calc:calc,totalBlock:totalBlock,payment:payment};
+    if (!posV2OriginalRecalc_ && typeof posRecalcTotals_ === 'function') {
+      posV2OriginalRecalc_ = posRecalcTotals_;
+      posRecalcTotals_ = function () {
+        var result = posV2OriginalRecalc_.apply(this, arguments);
+        posV2SyncPaymentStatus_();
+        return result;
+      };
+    }
+    posV2SyncPaymentStatus_();
+  }
+
+  function posV2UninstallHisabIQ_() {
+    var n = posV2HisabIQ_;
+    if (!n) return;
+    n.productCard.insertBefore(n.search, n.pageHeading);
+    n.pageHeading.remove();
+    n.header.appendChild(n.clearCustomer);
+    n.customer.insertBefore(n.nameLabel, n.customerDetails);
+    n.customer.insertBefore(n.nameWrap, n.customerDetails);
+    n.customer.insertBefore(n.phoneLabel, n.customerDetails);
+    n.customer.insertBefore(n.phoneWrap, n.customerDetails);
+    n.nameWrap.classList.remove('pos-v2-customer-input-wrap');
+    n.phoneWrap.classList.remove('pos-v2-customer-input-wrap');
+    if (n.customerDue) n.customer.insertBefore(n.customerDue, n.customerDetails);
+    n.customer.insertBefore(n.customerActions, n.customerDetails);
+    if (n.customerExtra) n.customer.insertBefore(n.customerExtra, n.customerDetails);
+    n.customerDetails.remove();
+    n.invoiceHead.remove();
+    n.fields.appendChild(n.discount);
+    n.fields.appendChild(n.received);
+    n.fields.appendChild(n.method);
+    n.fields.appendChild(n.bank);
+    n.totals.appendChild(n.subtotal);
+    n.totals.appendChild(n.grand);
+    n.totals.appendChild(n.change);
+    n.totals.appendChild(n.due);
+    n.calc.remove();
+    n.totalBlock.remove();
+    n.payment.remove();
+    posV2HisabIQ_ = null;
+  }
+
   function posV2SetActive_(active) {
     var page = document.getElementById('page-pos');
     var customer = page && page.querySelector('.pos-customer-section');
@@ -1630,9 +1908,11 @@
       posV2EnsureTabs_();
       posV2SelectTab_(page.getAttribute('data-pos-v2-tab-state') || 'cart');
       posV2EnsureSearchToolbar_();
+      posV2InstallHisabIQ_();
       posV2BindSearch_();
       posV2BindCartReorder_();
     } else {
+      posV2UninstallHisabIQ_();
       posV2EndReorderDrag_(false);
       posV2RemoveTabs_();
       posV2RemoveSearchToolbar_();
