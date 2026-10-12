@@ -749,15 +749,16 @@
     posRenderCart_();
   }
 
-  function posCartProductMatches_(query) {
+  function posCartProductMatches_(query, mode) {
     var q = String(query || '').trim();
-    // Suggestions appear as soon as the cart's Add Product field is focused.
-    if (!q) return (posState.products || []).slice(0, 8);
+    // Only the inline cart picker suggests products before typing.
+    // The separate POS V2 toolbar search retains its prior blank-query behavior.
+    if (!q) return mode === 'v2-search' ? [] : (posState.products || []).slice(0, 8);
     return smartSearchProducts_(posState.products, q, 8);
   }
 
   function posCartProductResultsHtml_(query, mode, index) {
-    return posCartProductMatches_(query).map(function (product, optionIndex) {
+    return posCartProductMatches_(query, mode).map(function (product, optionIndex) {
       var unit = String(product.unit || '').trim();
       var category = String(product.category || '').trim();
       var brand = String(product.brand || '').trim();
@@ -843,6 +844,10 @@
     // V2 also initializes a separate top search field; never open its popup without focus.
     if (!input || document.activeElement !== input) return;
     if (host) { host.hidden = true; host.innerHTML = ''; }
+    if (mode === 'v2-search' && !String(input.value || '').trim()) {
+      posCloseCartProductPopup_();
+      return;
+    }
     var popup = posCartProductPopup_();
     var html = posCartProductResultsHtml_(input.value, mode, index);
     popup.innerHTML = html || '<div class="pos-picker-empty">No matching products</div>';
