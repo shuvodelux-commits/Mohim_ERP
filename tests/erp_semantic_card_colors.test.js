@@ -71,9 +71,15 @@ test('the explicit semantic-card configuration covers only real existing IDs', (
   }
 });
 
-test('receivables green, payable red, signed cash and profit follow their sign', () => {
+test('customer due red, supplier payable red, signed cash and profit follow their sign', () => {
   const {context:c} = harness({});
-  assert.equal(c.erpSemanticTone_(c.ERP_SEMANTIC_CARDS_.dashDue, '৳15,000'), 'positive');
+  assert.equal(c.erpSemanticTone_(c.ERP_SEMANTIC_CARDS_.dashDue, '৳15,000'), 'negative');
+  assert.equal(c.erpSemanticTone_(c.ERP_SEMANTIC_CARDS_.rsDue, '৳15,000'), 'negative');
+  assert.equal(c.erpSemanticLabel_(c.ERP_SEMANTIC_CARDS_.dashDue, 'negative'), 'To Receive');
+  assert.equal(c.erpSemanticTone_(c.ERP_SEMANTIC_INLINE_.counterCustomerDue, '৳500'), 'negative');
+  assert.equal(c.erpSemanticTone_(c.ERP_SEMANTIC_INLINE_.posDueAmountDisplay, '৳500'), 'negative');
+  assert.equal(c.erpSemanticTone_(c.ERP_SEMANTIC_INLINE_.counterCustomerAdvance, '৳200'), 'positive');
+  assert.equal(c.erpSemanticTone_(c.ERP_SEMANTIC_INLINE_.counterAdvanceRefundAvailable, '৳200'), 'positive');
   assert.equal(c.erpSemanticTone_(c.ERP_SEMANTIC_CARDS_.dashPayable, '৳5,000'), 'negative');
   assert.equal(c.erpSemanticTone_(c.ERP_SEMANTIC_CARDS_.dashCash, '৳-50'), 'negative');
   assert.equal(c.erpSemanticTone_(c.ERP_SEMANTIC_CARDS_.rfNet, '৳1,250.75'), 'positive');
@@ -103,8 +109,10 @@ test('zero and unset, Bangla digits, and accounting negatives are handled', () =
 
 test('party details correctly invert named customer/supplier credit', () => {
   const {context:c} = harness({});
-  assert.equal(c.erpSemanticTone_(c.ERP_SEMANTIC_DETAILS_.custDetailDue, '৳200'), 'positive');
-  assert.equal(c.erpSemanticTone_(c.ERP_SEMANTIC_DETAILS_.custDetailDue, 'Credit ৳200'), 'negative');
+  assert.equal(c.erpSemanticTone_(c.ERP_SEMANTIC_DETAILS_.custDetailDue, '৳200'), 'negative');
+  assert.equal(c.erpSemanticTone_(c.ERP_SEMANTIC_DETAILS_.custDetailDue, 'Credit ৳200'), 'positive');
+  assert.equal(c.erpSemanticLabel_(c.ERP_SEMANTIC_DETAILS_.custDetailDue, 'negative'), 'To Receive');
+  assert.equal(c.erpSemanticLabel_(c.ERP_SEMANTIC_DETAILS_.custDetailDue, 'positive'), 'Credit to Refund');
   assert.equal(c.erpSemanticTone_(c.ERP_SEMANTIC_DETAILS_.supDetailDue, '৳200'), 'negative');
   assert.equal(c.erpSemanticTone_(c.ERP_SEMANTIC_DETAILS_.supDetailDue, 'Credit ৳200'), 'positive');
   assert.equal(c.erpSemanticLabel_(c.ERP_SEMANTIC_DETAILS_.supDetailDue,'positive'),'Credit Available');
@@ -118,7 +126,7 @@ test('card updates when amount changes, not when note is painted; zero removes o
   assert.equal(notice.hidden, true);
   el.textContent='৳500';
   hooks.find(h => h.node === el).cb();
-  assert.ok(host.classList.contains('erp-semantic--positive'));
+  assert.ok(host.classList.contains('erp-semantic--negative'));
   assert.equal(notice.textContent,'To Receive');
   assert.equal(notice.hidden,false);
   el.textContent='৳0';
