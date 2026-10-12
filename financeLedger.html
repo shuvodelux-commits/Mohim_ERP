@@ -25,6 +25,17 @@
   }
   .finance-selected-person-balance-item .label { font-size:11px; font-weight:700; text-transform:uppercase; color:var(--color-text-muted); }
   .finance-selected-person-balance-item .value { margin-top:3px; font-size:19px; font-weight:750; }
+  /* Compact, accessible money-direction hints inside existing Debit/Credit cells only. */
+  .fin-led-money-value { display:inline-flex; flex-direction:column; align-items:flex-end; gap:3px; }
+  .fin-led-money-amount { display:block; white-space:nowrap; }
+  .fin-led-money-caption {
+    display:inline-flex; align-items:center; justify-content:flex-end; gap:3px;
+    font:600 10px/1.2 var(--font-sans); white-space:nowrap;
+  }
+  .fin-led-money-caption svg { width:12px; height:12px; flex:none; }
+  .fin-led-money-amount.is-in, .fin-led-money-caption.is-in { color:var(--color-success); }
+  .fin-led-money-amount.is-out, .fin-led-money-caption.is-out { color:var(--color-danger); }
+  .fin-led-money-caption.is-opening { color:var(--color-text-muted); }
 </style>
 <div class="toolbar">
   <input id="finLedDateFrom" type="date" style="max-width:150px;">
@@ -275,6 +286,41 @@
     }).catch(function (err) { showToast(err.message, 'error'); });
   }
 
+  // Display-only decoration. Backend debit/credit, balances, print and CSV stay unchanged.
+  // Opening entries have no cash movement and deliberately have zero raw debit/credit.
+  function finLedMoneyCell_(row, column) {
+    var type = finLedType_(row.transactionType);
+    var isOpening = !!(type && type.isOpening);
+    // An opening receivable belongs under Debit; capital/payable openings under Credit.
+    var openingColumn = type && type.account === 'borrowerReceivable' ? 'debit' : 'credit';
+    var openingHere = isOpening && column === openingColumn;
+    var amount = openingHere ? (Number(row.amount) || 0) : (Number(row[column]) || 0);
+    if (!amount) return '';
+
+    var kind = openingHere ? 'opening'
+      : type && type.cashDirection === 'in' && column === 'credit' ? 'in'
+      : type && type.cashDirection === 'out' && column === 'debit' ? 'out' : '';
+    var labels = { in:'Money In', out:'Money Out', opening:'Opening' };
+    var hints = {
+      in:'Money received', out:'Money paid out',
+      opening:'Opening balance (no cash or bank movement)'
+    };
+    var arrows = {
+      in:'<path d="M17 7 7 17M17 17H7V7"/>',
+      out:'<path d="M7 17 17 7M7 7h10v10"/>',
+      opening:'<path d="M12 7v14"/><path d="M3 18V5a2 2 0 0 1 2-2h3a4 4 0 0 1 4 4 4 4 0 0 1 4-4h3a2 2 0 0 1 2 2v13a1 1 0 0 1-1 1h-4a4 4 0 0 0-4 2 4 4 0 0 0-4-2H4a1 1 0 0 1-1-1Z"/>'
+    };
+    var caption = kind
+      ? '<span class="fin-led-money-caption is-' + kind + '" title="' + hints[kind] + '">'
+        + '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+        + arrows[kind] + '</svg>' + labels[kind] + '</span>'
+      : '';
+
+    return '<span class="fin-led-money-value">'
+      + '<span class="fin-led-money-amount' + (kind === 'in' || kind === 'out' ? ' is-' + kind : '') + '">'
+      + escapeHtml(finLedMoney_(amount)) + '</span>' + caption + '</span>';
+  }
+
   function finLedRender_() {
     var body = document.getElementById('finLedTableBody'); body.innerHTML = '';
     finLedState.rows.forEach(function (r, idx) {
@@ -284,8 +330,8 @@
         '<td>' + escapeHtml(r.financeId) + '</td><td>' + escapeHtml(r.transactionTypeLabel) + '</td>' +
         '<td>' + escapeHtml(r.accountLabel || '') + '</td><td>' + escapeHtml(r.person) + '</td>' +
         '<td>' + escapeHtml(r.paymentMethod || (finLedType_(r.transactionType) && finLedType_(r.transactionType).cashDirection === 'none' ? 'Opening' : '')) + '</td>' +
-        '<td class="num">' + (r.debit ? finLedMoney_(r.debit) : '') + '</td>' +
-        '<td class="num">' + (r.credit ? finLedMoney_(r.credit) : '') + '</td>' +
+        '<td class="num">' + finLedMoneyCell_(r, 'debit') + '</td>' +
+        '<td class="num">' + finLedMoneyCell_(r, 'credit') + '</td>' +
         '<td class="num">' + finLedMoney_(r.balance) + '</td><td>' + escapeHtml(r.createdBy) + '</td>' +
         '<td style="white-space:nowrap;"><button class="btn" data-act="menuTxn" data-idx="' + idx + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button></td>';
       body.appendChild(tr);
