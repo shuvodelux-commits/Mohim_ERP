@@ -181,6 +181,7 @@
     wireCalcPanel_();
     initSearchClearUx_();
     initTouchControls_();
+    initErpSemanticCards_();
 
     wireLoginForm_();
     brandLoginScreen_();
@@ -4224,5 +4225,149 @@
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeRowActionMenu_(); });
   window.addEventListener('resize', closeRowActionMenu_);
   window.addEventListener('scroll', closeRowActionMenu_, true);
+
+
+  // ERP-wide visual semantics for cards/balances. This does NOT alter accounting data.
+  // gain: positive is money/asset to receive; cost: positive is obligation/expense.
+  // signed: positive good, negative bad; alert: positive count is a problem.
+  // No semantic label is added to a neutral value or an informational total.
+  var ERP_SEMANTIC_CARDS_ = {
+    // Dashboard: purchases are intentionally not classified as cash out.
+    dashSales:['gain','Sales'], dashCollection:['gain','Collected'],
+    dashExpense:['cost','Expense'], dashDue:['gain','To Receive'],
+    dashPayable:['cost','To Pay'], dashBorrowerReceivable:['gain','To Receive'],
+    dashOutstandingLoan:['cost','To Pay'], dashCash:['signed','Available','Negative Balance'],
+    dashLowStockCount:['alert','Low Stock'],
+    // Finance transaction page: same semantics as Finance Ledger.
+    finCapitalStat:['gain','Credit Balance'], finOwnerAdvanceStat:['cost','Debit Balance'],
+    finLoanStat:['cost','Debit Balance'], finLenderCreditStat:['gain','Credit Balance'],
+    finBorrowerReceivableStat:['gain','Credit Balance'], finBorrowerCreditStat:['cost','Debit Balance'],
+    // Bank & Day Book: only actual cash movements are Money In / Money Out.
+    bnkLedIn:['gain','Money In'], bnkLedOut:['cost','Money Out'],
+    bnkLedClosing:['signed','Available','Negative Balance'],
+    dbTotalIn:['gain','Money In'], dbTotalOut:['cost','Money Out'],
+    dbTotalNet:['signed','Net In','Net Out'],
+    // Cash reconciliation: status counts, not cash flows.
+    cashRecBalanced:['gain','Balanced'], cashRecNeedsReview:['alert','Needs Review'],
+    // Expense history / expense report.
+    expHistTotal:['cost','Expense'], expHistFilteredTotal:['cost','Expense'],
+    expRepToday:['cost','Expense'], expRepMonth:['cost','Expense'],
+    expRepPeriodTotal:['cost','Expense'],
+    // Sales report.
+    rsGross:['gain','Sales'], rsReturned:['cost','Returns'],
+    rsNet:['gain','Net Sales'], rsPaid:['gain','Collected'], rsDue:['gain','To Receive'],
+    // Purchase report: these are purchases/obligations, not necessarily cash out.
+    rpGross:['cost','Purchases'], rpReturned:['gain','Returns'],
+    rpNet:['cost','Purchases'], rpPaid:['cost','Paid'], rpDue:['cost','To Pay'],
+    // Inventory: value is informational; margin & shortages have meaning.
+    rkMargin:['signed','Potential Gain','Potential Loss'],
+    rkLow:['alert','Low Stock'], rkOut:['alert','Out of Stock'],
+    // Cash report: beginning balance is informational; closing balance is signed.
+    rcIn:['gain','Money In'], rcOut:['cost','Money Out'],
+    rcClosing:['signed','Available','Negative Balance'],
+    rcCombClose:['signed','Available','Negative Balance'],
+    // Profit and loss.
+    rfRevenue:['gain','Revenue'], rfCogs:['cost','Cost'],
+    rfGross:['signed','Profit','Loss'], rfGrossPct:['signed','Margin','Loss'],
+    rfExpenses:['cost','Expense'], rfCustSettleDiscount:['cost','Discount Given'],
+    rfSupSettleDiscount:['gain','Discount Received'],
+    rfNet:['signed','Profit','Loss']
+  };
+
+  // Details are individual values inside an existing modal/card, not a new module layout.
+  var ERP_SEMANTIC_DETAILS_ = {
+    custDetailDue:['customer','To Receive','Credit to Refund'],
+    supDetailDue:['supplier','To Pay','Credit Available'],
+    vlDetailDue:['supplier','To Pay','Credit Available'],
+    vlDetailReceivable:['gain','To Receive','Owed by Business']
+  };
+  var ERP_SEMANTIC_INLINE_ = {
+    counterCustomerDue:['gain'], counterCustomerAdvance:['cost'],
+    counterCustomerBalance:['gain'], counterSupplierPayable:['cost'],
+    counterSupplierBalance:['cost'], counterAdvanceRefundAvailable:['cost'],
+    posCustomerDueValue:['gain'], posDueAmountDisplay:['gain'], posChangeDue:['cost'],
+    rtSelectedCustomerDue:['gain'],
+    rbCash:['signed'], rbBank:['signed'], rbMobileBanking:['signed'],
+    rbTotalAssets:['signed'], rbLoan:['cost'], rbTotalLiabilities:['cost'],
+    rbCapital:['gain'], rbTotalEquity:['signed']
+  };
+
+  function erpSemanticAmount_(value) {
+    var text = String(value == null ? '' : value).trim();
+    if (!/[0-9০-৯٠-٩۰-۹]/.test(text)) return null;
+    text = text.replace(/[০-৯]/g, function (v) { return String(v.charCodeAt(0) - 0x09E6); })
+      .replace(/[٠-٩]/g, function (v) { return String(v.charCodeAt(0) - 0x0660); })
+      .replace(/[۰-۹]/g, function (v) { return String(v.charCodeAt(0) - 0x06F0); })
+      .replace(/[−–]/g, '-');
+    var parens = /\(\s*[^)]*[0-9][^)]*\)/.test(text);
+    var cleaned = text.replace(/,/g, '').replace(/[^0-9.+-]/g, '');
+    var valueNum = parseFloat(cleaned);
+    return Number.isFinite(valueNum) ? (parens ? -Math.abs(valueNum) : valueNum) : null;
+  }
+
+  function erpSemanticTone_(rule, display) {
+    var value = erpSemanticAmount_(display);
+    if (value === null || Math.abs(value) < 0.005) return 'neutral';
+    var mode = rule && rule[0] || '';
+    var isCredit = /^\s*Credit\b/i.test(String(display));
+    if (mode === 'customer') return isCredit || value < 0 ? 'negative' : 'positive';
+    if (mode === 'supplier') return isCredit || value < 0 ? 'positive' : 'negative';
+    if (mode === 'signed') return value > 0 ? 'positive' : 'negative';
+    if (mode === 'alert') return value > 0 ? 'negative' : 'positive';
+    if (mode === 'gain') return value > 0 ? 'positive' : 'negative';
+    if (mode === 'cost') return value > 0 ? 'negative' : 'positive';
+    return 'neutral';
+  }
+
+  function erpSemanticLabel_(rule, tone) {
+    if (!rule || tone === 'neutral') return '';
+    if (rule[0] === 'customer' || rule[0] === 'supplier') {
+      return tone === 'positive' ? (rule[0] === 'customer' ? rule[1] : rule[2])
+        : (rule[0] === 'customer' ? rule[2] : rule[1]);
+    }
+    if (rule[0] === 'signed') return tone === 'positive' ? (rule[1] || '') : (rule[2] || '');
+    if (rule[0] === 'gain' && tone === 'negative') return rule[2] || 'Negative Balance';
+    if (rule[0] === 'cost' && tone === 'positive') return rule[2] || 'Credit Balance';
+    return rule[1] || '';
+  }
+
+  function erpSemanticUpdate_(element, host, note, rule) {
+    var tone = erpSemanticTone_(rule, element.textContent);
+    host.classList.remove('erp-semantic--positive', 'erp-semantic--negative', 'erp-semantic--neutral');
+    host.classList.add('erp-semantic--' + tone);
+    if (note) {
+      note.textContent = erpSemanticLabel_(rule, tone);
+      note.hidden = !note.textContent;
+    }
+    return tone;
+  }
+
+  function initErpSemanticCards_() {
+    if (typeof MutationObserver !== 'function') return;
+    function bind(id, rule, mode) {
+      var value = document.getElementById(id);
+      if (!value || value.dataset.erpSemanticBound === 'true') return;
+      var host = mode === 'card' ? value.closest('.stat-card')
+        : mode === 'detail' ? value.parentElement : value;
+      if (!host) return;
+      value.dataset.erpSemanticBound = 'true';
+      host.classList.add(mode === 'card' ? 'erp-semantic-card'
+        : mode === 'detail' ? 'erp-semantic-detail' : 'erp-semantic-inline');
+      var note = null;
+      if (mode !== 'inline') {
+        note = document.createElement('span');
+        note.className = 'erp-semantic-caption';
+        note.hidden = true;
+        host.appendChild(note);
+      }
+      var update = function () { erpSemanticUpdate_(value, host, note, rule); };
+      update();
+      var observer = new MutationObserver(update);
+      observer.observe(value, {childList:true, characterData:true, subtree:true});
+    }
+    Object.keys(ERP_SEMANTIC_CARDS_).forEach(function (id) { bind(id, ERP_SEMANTIC_CARDS_[id], 'card'); });
+    Object.keys(ERP_SEMANTIC_DETAILS_).forEach(function (id) { bind(id, ERP_SEMANTIC_DETAILS_[id], 'detail'); });
+    Object.keys(ERP_SEMANTIC_INLINE_).forEach(function (id) { bind(id, ERP_SEMANTIC_INLINE_[id], 'inline'); });
+  }
 
 </script>
