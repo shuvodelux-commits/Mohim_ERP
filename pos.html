@@ -820,6 +820,7 @@
     if (popup) {
       popup.hidden = true;
       popup.innerHTML = '';
+      popup._anchorInput = null;
     }
     Array.prototype.forEach.call(document.querySelectorAll('[aria-controls="posCartProductPopup"]'), function (input) {
       input.setAttribute('aria-expanded', 'false');
@@ -853,6 +854,21 @@
     host.style.top = Math.max(margin, Math.round(top)) + 'px';
   }
 
+  // Track the input rather than a fixed page position. When a desktop's
+  // content area scrolls, a body-level popup must follow the cart field.
+  // Scrolling inside the results panel must not move the popup itself.
+  function posKeepCartProductPopupAnchored_(event) {
+    var popup = document.getElementById('posCartProductPopup');
+    if (!popup || popup.hidden || !popup._anchorInput) return;
+    if (event && (event.target === popup || (popup.contains && popup.contains(event.target)))) return;
+    var input = popup._anchorInput;
+    if (!input.isConnected || document.activeElement !== input) {
+      posCloseCartProductPopup_();
+      return;
+    }
+    posPlaceCartProductResults_(input, popup);
+  }
+
   function posRenderCartProductResults_(input, host, mode, index) {
     // V2 also initializes a separate top search field; never open its popup without focus.
     if (!input || document.activeElement !== input) return;
@@ -862,6 +878,7 @@
       return;
     }
     var popup = posCartProductPopup_();
+    popup._anchorInput = input;
     var html = posCartProductResultsHtml_(input.value, mode, index);
     popup.innerHTML = html || '<div class="pos-picker-empty">No matching products</div>';
     popup.hidden = false;
@@ -1539,6 +1556,7 @@
 
   document.getElementById('posCartList').addEventListener('scroll', posCloseCartProductPopup_);
   window.addEventListener('resize', posCloseCartProductPopup_);
+  document.addEventListener('scroll', posKeepCartProductPopupAnchored_, true);
   document.addEventListener('mousedown', function (e) {
     var popup = document.getElementById('posCartProductPopup');
     if (!popup || popup.hidden) return;
