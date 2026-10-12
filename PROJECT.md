@@ -178,6 +178,15 @@ Names such as `Money In`/`Money Out` are reserved for confirmed monetary
 movement totals; purchases and sales on credit are not automatically cash flows.
 See `docs/erp-semantic-balance-card-audit.md` for all mapped and excluded modules.
 
+Supplier Ledger uses inline **Purchase Invoice** (gross Debit) and **Paid on
+Invoice** (projected paid Credit) labels for its purchase row. It also labels
+**Purchase Return** (Credit, reducing due), **Due Increased / Due Reduced**
+(purchase corrections), **Money Out** (supplier payments), **Opening**, and
+non-cash **Adjustment**. These labels are display-only in
+`supplierLedger.html`: purchase invoice totals and returns are not assumed
+to represent additional cash movement, and the existing `PartyLedger.gs`
+projection, balances, accounting columns, prints and actions are authoritative.
+
 ## 4. Navigation and permissions
 
 `UI.gs` owns two separate concepts:
