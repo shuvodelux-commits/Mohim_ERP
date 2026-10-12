@@ -40,15 +40,14 @@ test('Classic POS keeps its category and brand filters while V2 hides them', () 
   assert.match(v2, /body\.pos-v2-active\s+#page-pos\s+\.pos-product-filters\s*\{[^}]*display:\s*none\s*!important/s);
 });
 
-test('V2 top search reuses the cart picker interaction', () => {
-  const bind = functionSource(v2, 'posV2BindSearch_');
-  const keys = functionSource(v2, 'posV2SearchKeydown_');
-  assert.match(bind, /posRenderCartProductResults_/);
-  assert.match(bind, /v2-search/);
-  assert.match(keys, /posMoveCartProductActive_/);
-  assert.match(keys, /posActiveCartProductOption_/);
-  assert.match(keys, /posChooseCartProduct_/);
-  assert.match(keys, /stopImmediatePropagation/);
+test('V2 shows the existing complete product catalog, with original search handlers', () => {
+  assert.match(v2, /#posProductGrid\.mobile-search-idle\s*\{\s*display:\s*grid\s*!important/s);
+  assert.match(v2, /posV2SetCatalogTitle_\(true\)/);
+  assert.match(pos, /function\s+posRenderProductGrid_\s*\(/);
+  assert.match(pos, /posSearchEl_\.addEventListener\(['"]keydown['"]/);
+  assert.match(pos, /posAddToCart_\(p\)/);
+  assert.doesNotMatch(v2, /function\s+posV2BindSearch_\s*\(/);
+  assert.doesNotMatch(v2, /pos-v2-quick-items/);
 });
 
 test('V2 search toolbar provides Drafts and Add Product actions', () => {
