@@ -1089,6 +1089,14 @@ body.pos-v2-active #page-pos .pos-v2-grand-block .totals-row.grand .v {font-size
 body.pos-v2-active #page-pos .pos-checkout-actions {position:static;padding:0 16px 16px}
 }
 
+
+/* HisabIQ mobile composition stacks cart then checkout; no extra tab required. */
+@media (max-width:540px) {
+  body.pos-v2-active #page-pos .pos-layout {grid-template-areas:"search" "cart" "customer"}
+  body.pos-v2-active #page-pos .pos-v2-workflow-tabs {display:none!important}
+  body.pos-v2-active #page-pos[data-pos-v2-tab-state="cart"] .pos-customer-section {display:block!important}
+  body.pos-v2-active #page-pos .pos-v2-page-heading {padding:0 2px}
+}
 </style>
 
 <script>
@@ -1906,7 +1914,7 @@ body.pos-v2-active #page-pos .pos-checkout-actions {position:static;padding:0 16
       customer.appendChild(refs.summary);
       customer.appendChild(refs.actions);
       posV2EnsureTabs_();
-      posV2SelectTab_(page.getAttribute('data-pos-v2-tab-state') || 'cart');
+      posV2SelectTab_(window.innerWidth <= 540 ? 'cart' : (page.getAttribute('data-pos-v2-tab-state') || 'cart'));
       posV2EnsureSearchToolbar_();
       posV2InstallHisabIQ_();
       posV2BindSearch_();
