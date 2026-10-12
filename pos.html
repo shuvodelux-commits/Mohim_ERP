@@ -882,6 +882,9 @@
     var html = posCartProductResultsHtml_(input.value, mode, index);
     popup.innerHTML = html || '<div class="pos-picker-empty">No matching products</div>';
     popup.hidden = false;
+    // Result refresh resets activeIndex to zero; the scroll position must
+    // also reset, otherwise Enter can select an off-screen highlighted item.
+    popup.scrollTop = 0;
     popup.dataset.activeIndex = html ? '0' : '-1';
     input.setAttribute('role', 'combobox');
     input.setAttribute('aria-autocomplete', 'list');
