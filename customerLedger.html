@@ -23,11 +23,17 @@
         <div class="party-ledger-party-meta" id="customerLedgerPartyMeta"></div>
         <div class="party-ledger-status" id="customerLedgerPartyStatus"></div>
       </div>
-      <div class="party-ledger-balance-box">
-        <span>Current Due</span>
-        <strong id="customerLedgerBalance">0</strong>
-        <span style="margin-top:6px">Customer Credit</span>
-        <strong id="customerLedgerAdvance">0</strong>
+      <div class="party-ledger-balance-box party-ledger-balance-group">
+        <div class="party-ledger-balance-item is-neutral" id="customerLedgerDueCard">
+          <span>Current Due</span>
+          <strong id="customerLedgerBalance">0</strong>
+          <span class="party-ledger-balance-note" id="customerLedgerDueNote" hidden>To Receive</span>
+        </div>
+        <div class="party-ledger-balance-item is-neutral" id="customerLedgerCreditCard">
+          <span>Customer Credit</span>
+          <strong id="customerLedgerAdvance">0</strong>
+          <span class="party-ledger-balance-note" id="customerLedgerCreditNote" hidden>Credit to Refund</span>
+        </div>
       </div>
     </div>
 
@@ -248,7 +254,7 @@
     customerLedgerState.paymentContext = ctx || null;
     var credit = Number(ctx && ctx.customerCredit) || 0;
     document.getElementById('customerLedgerAdvance').textContent = formatMoney(credit);
-    partyLedgerPaintBalance_(document.getElementById('customerLedgerAdvance'), -credit);
+    customerLedgerPaintBalanceCard_('customerLedgerCreditCard', 'customerLedgerCreditNote', credit, 'is-payable');
     document.getElementById('customerLedgerAdvanceRefundBtn').disabled = !customerLedgerState.party || credit <= 0.004 || !customerLedgerCan_('customers', 'edit');
     customerLedgerFillInvoiceSelect_();
   }
@@ -309,7 +315,8 @@
       document.getElementById('customerLedgerReceiveBtn').disabled = true;
       document.getElementById('customerLedgerAdvanceRefundBtn').disabled = true;
       document.getElementById('customerLedgerAdvance').textContent = formatMoney(0);
-      partyLedgerPaintBalance_(document.getElementById('customerLedgerAdvance'), 0);
+      customerLedgerPaintBalanceCard_('customerLedgerCreditCard', 'customerLedgerCreditNote', 0, 'is-payable');
+      customerLedgerPaintBalanceCard_('customerLedgerDueCard', 'customerLedgerDueNote', 0, 'is-receivable');
       document.getElementById('customerLedgerPrintBtn').disabled = true;
       return;
     }
@@ -321,8 +328,7 @@
     statusEl.hidden = !statusEl.textContent;
     var balance = Number(party.balance) || 0;
     document.getElementById('customerLedgerBalance').textContent = formatMoney(Math.max(0, balance));
-    partyLedgerPaintBalance_(document.getElementById('customerLedgerBalance'), balance);
-    partyLedgerPaintBalance_(document.querySelector('#customerLedgerSelected .party-ledger-balance-box'), balance);
+    customerLedgerPaintBalanceCard_('customerLedgerDueCard', 'customerLedgerDueNote', Math.max(0, balance), 'is-receivable');
     document.getElementById('customerLedgerReceiveBtn').disabled = !party.canPay || !customerLedgerCan_('customers', 'edit');
     document.getElementById('customerLedgerPrintBtn').disabled = customerLedgerState.rows.length === 0 && !(customerLedgerState.page && customerLedgerState.page.hasOlder);
     document.getElementById('customerLedgerPageSize').value = String(customerLedgerState.pageSize);
@@ -353,11 +359,56 @@
     return {view:'View', print:'Print Invoice', edit:'Edit', return:'Sales Return', delete:'Delete'}[action] || action;
   }
 
+
+  // Balance-card decoration only; business balances and payment flows remain authoritative.
+  function customerLedgerPaintBalanceCard_(id, noteId, amount, kind) {
+    var card = document.getElementById(id);
+    var note = document.getElementById(noteId);
+    if (!card || !note) return;
+    card.classList.remove('is-neutral', 'is-receivable', 'is-payable');
+    card.classList.add(Number(amount) > 0 ? kind : 'is-neutral');
+    note.hidden = Number(amount) <= 0;
+  }
+
+  // Debit/Credit describe changes in dues; label actual cash movements only.
+  function customerLedgerAmountCell_(row, column) {
+    var amount = Number(row[column]) || 0;
+    if (!amount) return '';
+    var type = String(row['Type'] || '');
+    var kind = '';
+    if (type === 'Opening Balance') kind = 'opening';
+    else if (type === 'Payment' && column === 'Credit') {
+      var cash = row['Payment Amount'] === '' || row['Payment Amount'] == null
+        ? Math.max(0, amount - (Number(row['Discount Amount']) || 0))
+        : (Number(row['Payment Amount']) || 0);
+      kind = cash > 0 ? 'in' : 'adjustment';
+    } else if ((type === 'Advance Refund' || type === 'Credit Refund') && column === 'Debit') {
+      kind = 'out';
+    }
+    var value = escapeHtml(formatMoney(amount));
+    if (!kind) return value;
+    var labels = { in:'Money In', out:'Money Out', opening:'Opening', adjustment:'Adjustment' };
+    var hints = {
+      in:'Customer payment received', out:'Customer credit refund paid',
+      opening:'Opening balance (no money moved)', adjustment:'Non-cash discount'
+    };
+    var shapes = {
+      in:'<path d="M17 7 7 17M17 17H7V7"/>',
+      out:'<path d="M7 17 17 7M7 7h10v10"/>',
+      opening:'<path d="M12 7v14"/><path d="M3 18V5a2 2 0 0 1 2-2h3a4 4 0 0 1 4 4 4 4 0 0 1 4-4h3a2 2 0 0 1 2 2v13a1 1 0 0 1-1 1h-4a4 4 0 0 0-4 2 4 4 0 0 0-4-2H4a1 1 0 0 1-1-1Z"/>',
+      adjustment:'<path d="M4 12h16"/>'
+    };
+    return '<span class="party-ledger-inline-money is-' + kind + '"><span>' + value + '</span>'
+      + '<span class="party-ledger-money-caption" title="' + hints[kind] + '">'
+      + '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+      + shapes[kind] + '</svg>' + labels[kind] + '</span></span>';
+  }
+
   function customerLedgerRenderRows_() {
     var body = document.getElementById('customerLedgerBody');
     body.innerHTML = '';
     customerLedgerState.rows.forEach(function (row, index) {
-      var credit = row['Credit'] ? formatMoney(row['Credit']) : '';
+      var credit = customerLedgerAmountCell_(row, 'Credit');
       var displayType = row['Type'] === 'Advance Refund' ? 'Credit Refund' : (row['Type'] || '');
       var displayReference = row['Reference'] === 'ADVANCE REFUND' ? 'CREDIT REFUND' : (row['Reference'] || '');
       var discount = Number(row['Discount Amount']) || 0;
@@ -371,7 +422,7 @@
         '<td data-label="Date">' + escapeHtml(String(row['Date'] || '').slice(0,10)) + '</td>' +
         '<td data-label="Type">' + escapeHtml(displayType) + '</td>' +
         '<td data-label="Reference">' + escapeHtml(displayReference) + '</td>' +
-        '<td class="num ledger-txn--increase" data-label="Debit">' + (row['Debit'] ? escapeHtml(formatMoney(row['Debit'])) : '') + '</td>' +
+        '<td class="num ledger-txn--increase" data-label="Debit">' + customerLedgerAmountCell_(row, 'Debit') + '</td>' +
         '<td class="num ledger-txn--decrease" data-label="Credit">' + credit + '</td>' +
         '<td class="num ' + partyLedgerBalanceTone_(row['Balance']) + '" data-label="Balance">' + escapeHtml(formatMoney(Number(row['Balance']) || 0)) + '</td>' +
         '<td>' + (actions.length ? '<button class="btn" type="button" data-customer-ledger-action-index="' + index + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button>' : '') + '</td>';
