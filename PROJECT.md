@@ -170,8 +170,10 @@ Monetary/status card colors use explicit ID-to-business-semantics mappings in
 `javascript.html` (`ERP_SEMANTIC_CARDS_`, `ERP_SEMANTIC_DETAILS_`,
 `ERP_SEMANTIC_INLINE_`), with shared scoped styles in `style.html`.
 Configured card values are observed for display updates without altering
-module renderers or transaction data. Green is receivable/incoming/gain,
-red is payable/outgoing/cost, and zero or informational values are neutral.
+module renderers or transaction data. Green generally indicates available
+credit/incoming/gain, while red indicates due/payable/outgoing/cost. In particular,
+**Customer Due and Sales Due are red, Customer Credit is green**. Zero or
+informational values are neutral.
 Names such as `Money In`/`Money Out` are reserved for confirmed monetary
 movement totals; purchases and sales on credit are not automatically cash flows.
 See `docs/erp-semantic-balance-card-audit.md` for all mapped and excluded modules.
