@@ -1066,7 +1066,12 @@
     if (!activeRow || activeRow.contains(event.target)) return;
 
     var popup = document.getElementById('posCartProductPopup');
-    if (popup && popup.contains(event.target)) return;
+    // The popup's click handler removes its chosen option synchronously,
+    // before this document click listener runs. Even after that DOM removal,
+    // the original click target remains inside the detached option button.
+    // Never treat selecting a suggestion as clicking outside the active row.
+    if ((popup && popup.contains(event.target)) ||
+        (event.target && event.target.closest && event.target.closest('[data-cart-product-pick]'))) return;
 
     var nextAddInput = event.target && event.target.closest
       ? event.target.closest('[data-cart-product-input][data-cart-product-mode="add"]')
