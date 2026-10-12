@@ -31,11 +31,48 @@ test('selected inline product immediately shows canonical full name before qty t
   const render = functionSource('posRenderCart_');
   const start = functionSource('posStartCartEntry_');
   const focus = functionSource('posFocusCartEntryQty_');
-  assert.match(render, /value="'\s*\+\s*escapeHtml\(line\.name\)/);
+  assert.match(render, /value="'\s*\+\s*posEscapeCartInputAttr_\(line\.name\)/);
   assert.match(start, /posRenderCart_\(\);[\s\S]*posFocusCartEntryQty_\(\)/);
   assert.doesNotMatch(focus, /setTimeout\s*\(/);
   assert.match(focus, /input\.focus\(\)/);
   assert.match(focus, /input\.select\(\)/);
+});
+
+test('selected pipe names with double quotes remain complete in the active cart input', () => {
+  const escapeAttr = new Function('escapeHtml',
+    functionSource('posEscapeCartInputAttr_') + '\nreturn posEscapeCartInputAttr_;'
+  )(value => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'));
+
+  const pipe = '6" SWR Pipe RFL 4.2';
+  assert.strictEqual(escapeAttr(pipe), '6&quot; SWR Pipe RFL 4.2');
+  assert.strictEqual(escapeAttr('O\'Reilly & Sons 4" Pipe'), 'O&#39;Reilly &amp; Sons 4&quot; Pipe');
+
+  const cart = { children: [], appendChild(node) { this.children.push(node); }, insertAdjacentHTML() {} };
+  const nodes = {
+    posCartList: cart,
+    posCartCount: { textContent: '' },
+    posClearCartBtn: { disabled: false },
+    posSaveDraftBtn: { disabled: false }
+  };
+  const document = {
+    getElementById(id) { return nodes[id] || null; },
+    createElement() { return { innerHTML: '', className: '' }; }
+  };
+  const posState = {
+    cart: [{ productId: 'pipe6', name: pipe, unit: 'Foot', qty: 1,
+      unitPrice: 170, lineTotal: 170, priceMode: 'fixed' }],
+    cartEditIndex: null,
+    cartEntryIndex: 0
+  };
+  new Function('document', 'posState', 'posEscapeCartInputAttr_', 'escapeHtml',
+    'formatMoney', 'posShortagePanelHtml_', 'posEnhanceTabletSelects_', 'posRecalcTotals_',
+    functionSource('posRenderCart_') + '\nposRenderCart_();'
+  )(document, posState, escapeAttr, value => String(value), value => '৳' + value,
+    () => '', () => {}, () => {});
+  assert.strictEqual(cart.children.length, 2, 'active cart row and next empty add row');
+  assert.match(cart.children[0].innerHTML, /value="6&quot; SWR Pipe RFL 4\.2"/);
+  assert.match(cart.children[0].innerHTML, /aria-label="Product"/);
+  assert.strictEqual(posState.cart[0].name, pipe, 'canonical stored name must remain unchanged');
 });
 
 test('cart page Enter shortcut focuses Add Product without hijacking form controls or modals', () => {
