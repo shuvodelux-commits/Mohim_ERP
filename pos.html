@@ -1339,9 +1339,9 @@
         var input = document.querySelector('#posCartList [data-cart-product-input][data-cart-product-mode="replace"][data-i="' + editIndex + '"]');
         if (!input) return;
         var host = input.parentNode.querySelector('[data-cart-product-results]');
-        posRenderCartProductResults_(input, host, 'replace', editIndex);
         input.focus();
         input.select();
+        posRenderCartProductResults_(input, host, 'replace', editIndex);
       }, 0);
       return;
     }
