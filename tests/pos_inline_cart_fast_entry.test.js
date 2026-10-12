@@ -131,6 +131,56 @@ test('rendered cart search popup starts with one keyboard-active suggestion', ()
   assert.match(render, /is-active/);
 });
 
+test('Qty Enter focuses Add Product and next Enter selects an available suggestion', () => {
+  const products = [
+    { id: '1', name: '4" SWR Pipe RFL 2.9' },
+    { id: '2', name: '6" SWR Pipe RFL 4.2' },
+    { id: '3', name: '6" SWR Pipe RFL 3.1 mm' },
+    { id: '4', name: '4" SWR Pipe PPL 2.7' },
+    { id: '5', name: '4" SWR Pipe PPL Gold 2.7' }
+  ];
+  const state = {
+    products,
+    cart: products.slice(0, 3).map(p => ({ productId: p.id, name: p.name })),
+    cartEntryIndex: 2,
+    cartEditIndex: null
+  };
+  const calls = [];
+  const runtime = new Function('posState', 'smartSearchProducts_', 'showToast',
+    'posCreateCartLine_', 'posRenderCart_', 'posFocusCartEntryProduct_', 'posFocusCartEntryQty_',
+    functionSource('posCartProductMatches_') + '\n' +
+    functionSource('posFinishCartEntry_') + '\n' +
+    functionSource('posStartCartEntry_') + '\n' +
+    'return { matches:posCartProductMatches_, finish:posFinishCartEntry_, start:posStartCartEntry_ };'
+  )(state, (list, query, limit) =>
+      list.filter(p => p.name.toLowerCase().includes(query.toLowerCase())).slice(0, limit),
+    message => calls.push('toast:' + message),
+    p => ({ productId: p.id, name: p.name }),
+    () => calls.push('render'),
+    () => calls.push('focus-add'),
+    () => calls.push('focus-qty')
+  );
+
+  assert.strictEqual(runtime.finish(), true);
+  assert.strictEqual(state.cartEntryIndex, null);
+  assert.deepStrictEqual(calls.slice(0, 2), ['render', 'focus-add']);
+
+  const suggestions = runtime.matches('', 'add');
+  assert.deepStrictEqual(suggestions.map(p => p.id), ['4', '5'],
+    'do not highlight products already in the cart');
+  assert.strictEqual(runtime.matches('RFL', 'add').length, 0,
+    'typed Add Product search must also prevent duplicate selection');
+  assert.strictEqual(runtime.matches('', 'v2-search').length, 0,
+    'separate toolbar search retains blank-query behavior');
+
+  assert.strictEqual(runtime.start(suggestions[0]), true,
+    'first Enter on the highlighted new product succeeds');
+  assert.strictEqual(state.cart.length, 4);
+  assert.strictEqual(state.cart[3].name, products[3].name);
+  assert.deepStrictEqual(calls.slice(-2), ['render', 'focus-qty']);
+  assert.strictEqual(calls.filter(x => x.startsWith('toast:')).length, 0);
+});
+
 test('purchase price reveal has room for long prices and eye sits inward from edge', () => {
   assert.match(css, /#page-pos \.cart-row \.c-name-title\s*\{[\s\S]*flex:\s*1\s+1\s+auto/);
   assert.match(css, /#page-pos \.cart-row \.c-cost\s*\{[^}]*margin-right:\s*8px/);
