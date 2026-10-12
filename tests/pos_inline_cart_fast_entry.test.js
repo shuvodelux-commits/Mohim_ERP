@@ -127,6 +127,7 @@ test('inline Add product and replace search support ArrowUp ArrowDown and Enter 
 test('rendered cart search popup starts with one keyboard-active suggestion', () => {
   const render = functionSource('posRenderCartProductResults_');
   assert.match(render, /dataset\.activeIndex\s*=\s*html\s*\?\s*['"]0['"]\s*:\s*['"]-1['"]/);
+  assert.match(render, /popup\.scrollTop\s*=\s*0/, 'new suggestions must scroll to the highlighted first item');
   assert.match(render, /aria-selected/);
   assert.match(render, /is-active/);
 });
