@@ -751,17 +751,29 @@
 
   function posCartProductMatches_(query) {
     var q = String(query || '').trim();
-    if (!q) return [];
+    // POS V2 matches the HisabIQ combobox: focusing the empty cart product
+    // input opens 8 suggestions, without requiring any search keystrokes.
+    // Keep Classic POS's original empty-query behavior unchanged.
+    if (!q && !document.body.classList.contains('pos-v2-active')) return [];
     return smartSearchProducts_(posState.products, q, 8);
   }
 
   function posCartProductResultsHtml_(query, mode, index) {
-    return posCartProductMatches_(query).map(function (product) {
+    return posCartProductMatches_(query).map(function (product, optionIndex) {
       var stock = Number(product.stock) || 0;
-      return '<button type="button" class="pos-cart-product-option" role="option" data-cart-product-pick="' + escapeHtml(product.id) + '" data-cart-product-mode="' + mode + '"' +
+      var unit = String(product.unit || '');
+      var price = formatMoney(product.autoSellingPrice !== undefined ? product.autoSellingPrice : product.sellingPrice);
+      var meta = [product.brand || '', product.category || ''].filter(Boolean).join(' · ');
+      return '<button type="button" class="pos-cart-product-option" id="pos-cart-option-' + optionIndex + '" role="option" aria-selected="false" data-cart-product-pick="' + escapeHtml(String(product.id)) + '" data-cart-product-mode="' + mode + '"' +
         (index === null || index === undefined ? '' : ' data-i="' + index + '"') + '>' +
-          '<span>' + escapeHtml(product.name) + '</span>' +
-          '<small>' + escapeHtml(product.unit || '') + ' · Stock ' + stock + ' · ' + formatMoney(product.autoSellingPrice !== undefined ? product.autoSellingPrice : product.sellingPrice) + '</small>' +
+          '<span class="pos-picker-main">' +
+            '<span class="pos-picker-name">' + escapeHtml(product.name) + '</span>' +
+            (meta ? '<span class="pos-picker-meta">' + escapeHtml(meta) + '</span>' : '') +
+          '</span>' +
+          '<span class="pos-picker-details">' +
+            '<span class="pos-picker-price">' + price + (unit ? ' / ' + escapeHtml(unit) : '') + '</span>' +
+            '<span class="pos-picker-stock' + (stock <= 0 ? ' is-short' : '') + '">' + (stock <= 0 ? 'Out of stock' : 'Stock ' + stock + (unit ? ' ' + escapeHtml(unit) : '')) + '</span>' +
+          '</span>' +
         '</button>';
     }).join('');
   }
@@ -794,6 +806,10 @@
     if (!popup) return;
     popup.hidden = true;
     popup.innerHTML = '';
+    Array.prototype.forEach.call(document.querySelectorAll('[aria-controls="posCartProductPopup"]'), function (input) {
+      input.setAttribute('aria-expanded', 'false');
+      input.removeAttribute('aria-activedescendant');
+    });
   }
 
   function posPlaceCartProductResults_(input, host) {
@@ -803,14 +819,16 @@
     var viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
     var margin = 8;
     var gap = 4;
-    var width = Math.min(Math.max(inputRect.width, 300), Math.max(160, viewportWidth - (margin * 2)));
+    var v2Picker = document.body.classList.contains('pos-v2-active');
+    var width = Math.min(Math.max(inputRect.width, v2Picker ? 560 : 300), Math.max(160, viewportWidth - (margin * 2)));
     var left = Math.max(margin, Math.min(inputRect.left, viewportWidth - width - margin));
     host.style.width = Math.round(width) + 'px';
     host.style.left = Math.round(left) + 'px';
     host.style.right = 'auto';
     host.style.bottom = 'auto';
 
-    var resultHeight = Math.min(host.scrollHeight || 220, 220);
+    var maxHeight = v2Picker ? 340 : 220;
+    var resultHeight = Math.min(host.scrollHeight || maxHeight, maxHeight);
     var roomBelow = viewportHeight - inputRect.bottom - margin;
     var roomAbove = inputRect.top - margin;
     var openAbove = roomBelow < Math.min(resultHeight, 120) && roomAbove > roomBelow;
@@ -825,10 +843,15 @@
     if (host) { host.hidden = true; host.innerHTML = ''; }
     var popup = posCartProductPopup_();
     var html = posCartProductResultsHtml_(input.value, mode, index);
-    popup.innerHTML = html;
-    popup.hidden = !html;
+    popup.innerHTML = html || '<div class="pos-picker-empty">No matching products</div>';
+    popup.hidden = false;
     popup.dataset.activeIndex = html ? '0' : '-1';
-    if (!html) return;
+    input.setAttribute('role', 'combobox');
+    input.setAttribute('aria-autocomplete', 'list');
+    input.setAttribute('aria-controls', 'posCartProductPopup');
+    input.setAttribute('aria-expanded', 'true');
+    if (html) input.setAttribute('aria-activedescendant', 'pos-cart-option-0');
+    else input.removeAttribute('aria-activedescendant');
     Array.prototype.forEach.call(popup.querySelectorAll('[data-cart-product-pick]'), function (option, optionIndex) {
       var active = optionIndex === 0;
       option.classList.toggle('is-active', active);
@@ -852,6 +875,10 @@
       option.setAttribute('aria-selected', active ? 'true' : 'false');
     });
     var selected = options[activeIndex];
+    var focused = document.activeElement;
+    if (focused && focused.getAttribute && focused.getAttribute('aria-controls') === 'posCartProductPopup' && selected) {
+      focused.setAttribute('aria-activedescendant', selected.id);
+    }
     if (selected && selected.scrollIntoView) selected.scrollIntoView({ block: 'nearest' });
     return selected || null;
   }
@@ -1211,12 +1238,21 @@
     posRenderCart_();
   });
 
+  function posShowCartProductPicker_(input) {
+    if (!input || !input.hasAttribute('data-cart-product-input')) return;
+    var host = input.parentNode.querySelector('[data-cart-product-results]');
+    var mode = input.dataset.cartProductMode || 'replace';
+    var index = (mode === 'replace' || mode === 'entry') ? Number(input.dataset.i) : null;
+    posRenderCartProductResults_(input, host, mode, index);
+  }
+
   document.getElementById('posCartList').addEventListener('focusin', function (e) {
-    if (!e.target.hasAttribute('data-cart-product-input')) return;
-    var host = e.target.parentNode.querySelector('[data-cart-product-results]');
-    var mode = e.target.dataset.cartProductMode || 'replace';
-    var index = (mode === 'replace' || mode === 'entry') ? Number(e.target.dataset.i) : null;
-    posRenderCartProductResults_(e.target, host, mode, index);
+    posShowCartProductPicker_(e.target);
+  });
+
+  // Clicking an already-focused cart product field should reopen the list.
+  document.getElementById('posCartList').addEventListener('click', function (e) {
+    if (e.target.hasAttribute('data-cart-product-input')) posShowCartProductPicker_(e.target);
   });
 
   document.getElementById('posCartList').addEventListener('input', function (e) {
