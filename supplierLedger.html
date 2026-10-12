@@ -25,6 +25,7 @@
       <div class="party-ledger-balance-box">
         <span>Current Payable</span>
         <strong id="supplierLedgerBalance">0</strong>
+        <span class="party-ledger-balance-note" id="supplierLedgerBalanceNote" hidden></span>
       </div>
     </div>
 
@@ -246,6 +247,7 @@
       if (supplierLedgerState.partyCombo) supplierLedgerState.partyCombo.setSelected(null);
       document.getElementById('supplierLedgerMakePaymentBtn').disabled = true;
       document.getElementById('supplierLedgerPrintBtn').disabled = true;
+      document.getElementById('supplierLedgerBalanceNote').hidden = true;
       return;
     }
     if (supplierLedgerState.partyCombo) supplierLedgerState.partyCombo.setSelected(party);
@@ -258,6 +260,9 @@
     document.getElementById('supplierLedgerBalance').textContent = balance < 0 ? ('Credit ' + formatMoney(Math.abs(balance))) : formatMoney(balance);
     partyLedgerPaintBalance_(document.getElementById('supplierLedgerBalance'), balance);
     partyLedgerPaintBalance_(document.querySelector('#supplierLedgerSelected .party-ledger-balance-box'), balance);
+    var balanceNote = document.getElementById('supplierLedgerBalanceNote');
+    balanceNote.textContent = balance > 0.004 ? 'To Pay' : balance < -0.004 ? 'Credit Available' : '';
+    balanceNote.hidden = !balanceNote.textContent;
     document.getElementById('supplierLedgerMakePaymentBtn').disabled = !party.canPay || !supplierLedgerCan_('suppliers', 'edit');
     document.getElementById('supplierLedgerPrintBtn').disabled = supplierLedgerState.rows.length === 0 && !(supplierLedgerState.page && supplierLedgerState.page.hasOlder);
     document.getElementById('supplierLedgerPageSize').value = String(supplierLedgerState.pageSize);
@@ -288,11 +293,43 @@
     return {view:'View', edit:'Edit', return:'Purchase Return', delete:'Delete'}[action] || action;
   }
 
+
+  // Cash labels are separate from supplier ledger Debit/Credit accounting direction.
+  function supplierLedgerAmountCell_(row, column) {
+    var amount = Number(row[column]) || 0;
+    if (!amount) return '';
+    var type = String(row['Type'] || '');
+    var kind = '';
+    if (type === 'Opening Balance') kind = 'opening';
+    else if (type === 'Payment' && column === 'Credit') {
+      var cash = row['Payment Amount'] === '' || row['Payment Amount'] == null
+        ? Math.max(0, amount - (Number(row['Discount Amount']) || 0))
+        : (Number(row['Payment Amount']) || 0);
+      kind = cash > 0 ? 'out' : 'adjustment';
+    }
+    var value = escapeHtml(formatMoney(amount));
+    if (!kind) return value;
+    var labels = { out:'Money Out', opening:'Opening', adjustment:'Adjustment' };
+    var hints = {
+      out:'Supplier payment sent', opening:'Opening balance (no money moved)',
+      adjustment:'Non-cash discount'
+    };
+    var shapes = {
+      out:'<path d="M7 17 17 7M7 7h10v10"/>',
+      opening:'<path d="M12 7v14"/><path d="M3 18V5a2 2 0 0 1 2-2h3a4 4 0 0 1 4 4 4 4 0 0 1 4-4h3a2 2 0 0 1 2 2v13a1 1 0 0 1-1 1h-4a4 4 0 0 0-4 2 4 4 0 0 0-4-2H4a1 1 0 0 1-1-1Z"/>',
+      adjustment:'<path d="M4 12h16"/>'
+    };
+    return '<span class="party-ledger-inline-money is-' + kind + '"><span>' + value + '</span>'
+      + '<span class="party-ledger-money-caption" title="' + hints[kind] + '">'
+      + '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+      + shapes[kind] + '</svg>' + labels[kind] + '</span></span>';
+  }
+
   function supplierLedgerRenderRows_() {
     var body = document.getElementById('supplierLedgerBody');
     body.innerHTML = '';
     supplierLedgerState.rows.forEach(function (row, index) {
-      var credit = row['Credit'] ? formatMoney(row['Credit']) : '';
+      var credit = supplierLedgerAmountCell_(row, 'Credit');
       var discount = Number(row['Discount Amount']) || 0;
       var payment = (row['Payment Amount'] === '' || row['Payment Amount'] == null) ? (Number(row['Credit']) || 0) : (Number(row['Payment Amount']) || 0);
       if (row.sourceModule === 'supplierPayment' && discount > 0) {
@@ -304,7 +341,7 @@
         '<td data-label="Date">' + escapeHtml(String(row['Date'] || '').slice(0,10)) + '</td>' +
         '<td data-label="Type">' + escapeHtml(row['Type'] || '') + '</td>' +
         '<td data-label="Reference">' + escapeHtml(row['Reference'] || '') + '</td>' +
-        '<td class="num ledger-txn--increase" data-label="Debit">' + (row['Debit'] ? escapeHtml(formatMoney(row['Debit'])) : '') + '</td>' +
+        '<td class="num ledger-txn--increase" data-label="Debit">' + supplierLedgerAmountCell_(row, 'Debit') + '</td>' +
         '<td class="num ledger-txn--decrease" data-label="Credit">' + credit + '</td>' +
         '<td class="num ' + partyLedgerBalanceTone_(row['Balance']) + '" data-label="Balance">' + escapeHtml(formatMoney(Number(row['Balance']) || 0)) + '</td>' +
         '<td>' + (actions.length ? '<button class="btn" type="button" data-supplier-ledger-action-index="' + index + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button>' : '') + '</td>';
