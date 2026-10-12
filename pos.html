@@ -751,17 +751,29 @@
 
   function posCartProductMatches_(query) {
     var q = String(query || '').trim();
-    if (!q) return [];
+    // Suggestions appear as soon as the cart's Add Product field is focused.
+    if (!q) return (posState.products || []).slice(0, 8);
     return smartSearchProducts_(posState.products, q, 8);
   }
 
   function posCartProductResultsHtml_(query, mode, index) {
-    return posCartProductMatches_(query).map(function (product) {
+    return posCartProductMatches_(query).map(function (product, optionIndex) {
+      var unit = String(product.unit || '').trim();
+      var category = String(product.category || '').trim();
+      var brand = String(product.brand || '').trim();
       var stock = Number(product.stock) || 0;
-      return '<button type="button" class="pos-cart-product-option" role="option" data-cart-product-pick="' + escapeHtml(product.id) + '" data-cart-product-mode="' + mode + '"' +
+      var price = product.autoSellingPrice !== undefined ? product.autoSellingPrice : product.sellingPrice;
+      var stockLabel = stock > 0 ? String(stock) + (unit ? ' ' + unit : '') + ' available' : 'Out of stock';
+      return '<button type="button" class="pos-cart-product-option" id="pos-cart-product-option-' + optionIndex + '" role="option" data-cart-product-pick="' + escapeHtml(String(product.id)) + '" data-cart-product-mode="' + escapeHtml(String(mode || 'add')) + '"' +
         (index === null || index === undefined ? '' : ' data-i="' + index + '"') + '>' +
-          '<span>' + escapeHtml(product.name) + '</span>' +
-          '<small>' + escapeHtml(product.unit || '') + ' · Stock ' + stock + ' · ' + formatMoney(product.autoSellingPrice !== undefined ? product.autoSellingPrice : product.sellingPrice) + '</small>' +
+          '<span class="pos-picker-main">' +
+            '<span class="pos-picker-name">' + escapeHtml(product.name || '') + '</span>' +
+            '<span class="pos-picker-meta">Category: ' + escapeHtml(category || '—') + ' · Brand: ' + escapeHtml(brand || '—') + '</span>' +
+          '</span>' +
+          '<span class="pos-picker-details">' +
+            '<span class="pos-picker-price">' + formatMoney(price) + (unit ? '<span class="pos-picker-unit">/' + escapeHtml(unit) + '</span>' : '') + '</span>' +
+            '<span class="pos-picker-stock' + (stock <= 0 ? ' is-short' : '') + '">' + escapeHtml(stockLabel) + '</span>' +
+          '</span>' +
         '</button>';
     }).join('');
   }
@@ -791,9 +803,14 @@
 
   function posCloseCartProductPopup_() {
     var popup = document.getElementById('posCartProductPopup');
-    if (!popup) return;
-    popup.hidden = true;
-    popup.innerHTML = '';
+    if (popup) {
+      popup.hidden = true;
+      popup.innerHTML = '';
+    }
+    Array.prototype.forEach.call(document.querySelectorAll('[aria-controls="posCartProductPopup"]'), function (input) {
+      input.setAttribute('aria-expanded', 'false');
+      input.removeAttribute('aria-activedescendant');
+    });
   }
 
   function posPlaceCartProductResults_(input, host) {
@@ -803,14 +820,16 @@
     var viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
     var margin = 8;
     var gap = 4;
-    var width = Math.min(Math.max(inputRect.width, 300), Math.max(160, viewportWidth - (margin * 2)));
+    var isV2 = document.body.classList.contains('pos-v2-active');
+    var width = Math.min(Math.max(inputRect.width, isV2 ? 510 : 360), Math.max(160, viewportWidth - (margin * 2)));
     var left = Math.max(margin, Math.min(inputRect.left, viewportWidth - width - margin));
     host.style.width = Math.round(width) + 'px';
     host.style.left = Math.round(left) + 'px';
     host.style.right = 'auto';
     host.style.bottom = 'auto';
 
-    var resultHeight = Math.min(host.scrollHeight || 220, 220);
+    var maxHeight = isV2 ? 320 : 220;
+    var resultHeight = Math.min(host.scrollHeight || maxHeight, maxHeight);
     var roomBelow = viewportHeight - inputRect.bottom - margin;
     var roomAbove = inputRect.top - margin;
     var openAbove = roomBelow < Math.min(resultHeight, 120) && roomAbove > roomBelow;
@@ -821,14 +840,21 @@
   }
 
   function posRenderCartProductResults_(input, host, mode, index) {
-    if (!input) return;
+    // V2 also initializes a separate top search field; never open its popup without focus.
+    if (!input || document.activeElement !== input) return;
     if (host) { host.hidden = true; host.innerHTML = ''; }
     var popup = posCartProductPopup_();
     var html = posCartProductResultsHtml_(input.value, mode, index);
-    popup.innerHTML = html;
-    popup.hidden = !html;
+    popup.innerHTML = html || '<div class="pos-picker-empty">No matching products</div>';
+    popup.hidden = false;
     popup.dataset.activeIndex = html ? '0' : '-1';
-    if (!html) return;
+    input.setAttribute('role', 'combobox');
+    input.setAttribute('aria-autocomplete', 'list');
+    input.setAttribute('aria-haspopup', 'listbox');
+    input.setAttribute('aria-controls', 'posCartProductPopup');
+    input.setAttribute('aria-expanded', 'true');
+    if (html) input.setAttribute('aria-activedescendant', 'pos-cart-product-option-0');
+    else input.removeAttribute('aria-activedescendant');
     Array.prototype.forEach.call(popup.querySelectorAll('[data-cart-product-pick]'), function (option, optionIndex) {
       var active = optionIndex === 0;
       option.classList.toggle('is-active', active);
@@ -852,6 +878,10 @@
       option.setAttribute('aria-selected', active ? 'true' : 'false');
     });
     var selected = options[activeIndex];
+    var focused = document.activeElement;
+    if (focused && focused.getAttribute && focused.getAttribute('aria-controls') === 'posCartProductPopup' && selected) {
+      focused.setAttribute('aria-activedescendant', selected.id);
+    }
     if (selected && selected.scrollIntoView) selected.scrollIntoView({ block: 'nearest' });
     return selected || null;
   }
@@ -1219,6 +1249,15 @@
     posRenderCartProductResults_(e.target, host, mode, index);
   });
 
+  // Reopen suggestions by mouse/touch when the input was already focused (e.g. after Escape).
+  document.getElementById('posCartList').addEventListener('click', function (e) {
+    if (!e.target.hasAttribute('data-cart-product-input')) return;
+    var host = e.target.parentNode.querySelector('[data-cart-product-results]');
+    var mode = e.target.dataset.cartProductMode || 'replace';
+    var index = (mode === 'replace' || mode === 'entry') ? Number(e.target.dataset.i) : null;
+    posRenderCartProductResults_(e.target, host, mode, index);
+  });
+
   document.getElementById('posCartList').addEventListener('input', function (e) {
     if (e.target.tagName !== 'INPUT') return;
     if (e.target.hasAttribute('data-cart-product-input')) {
@@ -1299,9 +1338,9 @@
         var input = document.querySelector('#posCartList [data-cart-product-input][data-cart-product-mode="replace"][data-i="' + editIndex + '"]');
         if (!input) return;
         var host = input.parentNode.querySelector('[data-cart-product-results]');
-        posRenderCartProductResults_(input, host, 'replace', editIndex);
         input.focus();
         input.select();
+        posRenderCartProductResults_(input, host, 'replace', editIndex);
       }, 0);
       return;
     }
