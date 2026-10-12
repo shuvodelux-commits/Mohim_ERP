@@ -725,6 +725,298 @@
       background: var(--pos-v2-surface);
     }
   }
+
+  /* HisabIQ-inspired POS presentation: compact, text-first, no product photos. */
+  body.pos-v2-active #page-pos {
+    max-width: 1440px;
+    margin-inline: auto;
+    font-variant-numeric: normal;
+  }
+
+  body.pos-v2-active #page-pos .pos-layout {
+    grid-template-areas:
+      "search customer"
+      "cart customer"
+      "quick customer";
+    gap: 12px;
+  }
+
+  body.pos-v2-active #page-pos .pos-product-card,
+  body.pos-v2-active #page-pos .pos-customer-section,
+  body.pos-v2-active #page-pos .pos-cart-section,
+  body.pos-v2-active #page-pos .pos-v2-quick-items {
+    border: 1px solid var(--pos-v2-border);
+    border-radius: 12px;
+    background: var(--pos-v2-surface);
+    box-shadow: 0 1px 3px rgba(15, 23, 42, .05);
+  }
+
+  body.pos-v2-active #page-pos .pos-product-card {
+    padding: 12px !important;
+  }
+
+  body.pos-v2-active #page-pos .pos-cart-section {
+    min-height: 320px;
+    max-height: min(66vh, 640px);
+    padding: 12px !important;
+  }
+
+  body.pos-v2-active #page-pos .pos-customer-section {
+    padding: 14px;
+  }
+
+  body.pos-v2-active #page-pos .pos-section-head {
+    min-height: 32px;
+    margin-bottom: 10px;
+  }
+
+  body.pos-v2-active #page-pos .pos-section-head h3 {
+    font-size: 14px;
+    line-height: 22px;
+  }
+
+  body.pos-v2-active #page-pos .pos-search-drafts-row {
+    margin-bottom: 0;
+    gap: 8px;
+  }
+
+  body.pos-v2-active #page-pos .pos-search-drafts-row .pos-product-search-box .search-input {
+    height: 40px;
+    min-height: 40px;
+    font-size: 13px;
+  }
+
+  body.pos-v2-active #page-pos .pos-v2-search-actions .btn {
+    min-height: 40px;
+    height: 40px;
+    padding-inline: 12px;
+  }
+
+  body.pos-v2-active #page-pos .pos-cart-columns {
+    min-height: 36px;
+    padding-block: 9px;
+    background: var(--pos-v2-quiet);
+    font-size: 11px;
+    letter-spacing: .02em;
+  }
+
+  body.pos-v2-active #page-pos .cart-row {
+    min-height: 48px;
+    padding-block: 7px;
+  }
+
+  body.pos-v2-active #page-pos .cart-row .c-name-title {
+    font-size: 13px;
+    line-height: 18px;
+  }
+
+  body.pos-v2-active #page-pos .pos-v2-product-meta,
+  body.pos-v2-active #page-pos .cart-row .c-name-meta {
+    font-size: 10px;
+    line-height: 14px;
+  }
+
+  body.pos-v2-active #page-pos .cart-row input,
+  body.pos-v2-active #page-pos .pos-cart-inline-picker > input {
+    min-height: 34px;
+    height: 34px;
+    font-size: 13px;
+  }
+
+  body.pos-v2-active #page-pos .pos-customer-section > label {
+    display: block;
+    margin-top: 8px;
+    margin-bottom: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--pos-v2-text);
+  }
+
+  body.pos-v2-active #page-pos .pos-customer-section > label .bn-hint {
+    font-size: 10px;
+    font-weight: 400;
+    color: var(--pos-v2-muted);
+  }
+
+  body.pos-v2-active #page-pos .pos-customer-input-wrap input {
+    min-height: 38px;
+    height: 38px;
+    font-size: 13px;
+  }
+
+  body.pos-v2-active #page-pos .pos-checkout-summary {
+    margin-top: 14px;
+    padding-top: 12px;
+  }
+
+  body.pos-v2-active #page-pos .totals-row.grand {
+    margin: 10px 0 6px;
+    padding: 13px 12px;
+    min-height: 70px;
+    border: 0;
+    border-radius: 10px;
+    background: #192940;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  body.pos-v2-active #page-pos .totals-row.grand .v {
+    color: #fff;
+    font-size: 23px;
+    line-height: 1.2;
+    font-weight: 700;
+  }
+
+  body.pos-v2-active #page-pos .pos-checkout-actions .btn {
+    min-height: 44px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 650;
+  }
+
+  body.pos-v2-active #page-pos .pos-v2-quick-items {
+    grid-area: quick;
+    min-width: 0;
+    padding: 12px;
+  }
+
+  body.pos-v2-active #page-pos .pos-v2-quick-items[hidden] {
+    display: none !important;
+  }
+
+  body.pos-v2-active #page-pos .pos-v2-quick-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 4px 12px;
+    margin-bottom: 10px;
+  }
+
+  body.pos-v2-active #page-pos .pos-v2-quick-head h3 {
+    margin: 0;
+    color: var(--pos-v2-ink);
+    font-size: 14px;
+    font-weight: 650;
+  }
+
+  body.pos-v2-active #page-pos .pos-v2-quick-head .bn-hint {
+    margin-left: 4px;
+    font-size: 11px;
+    font-weight: 400;
+  }
+
+  body.pos-v2-active #page-pos .pos-v2-quick-head small {
+    color: var(--pos-v2-muted);
+    font-size: 11px;
+  }
+
+  body.pos-v2-active #page-pos .pos-v2-quick-list {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  body.pos-v2-active #page-pos .pos-v2-quick-item {
+    position: relative;
+    min-height: 72px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 10px 30px 10px 11px;
+    border: 1px solid var(--pos-v2-border);
+    border-radius: 10px;
+    background: var(--pos-v2-surface);
+    color: var(--pos-v2-ink);
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: border-color .14s, background-color .14s;
+  }
+
+  body.pos-v2-active #page-pos .pos-v2-quick-item:hover,
+  body.pos-v2-active #page-pos .pos-v2-quick-item:focus-visible {
+    border-color: var(--pos-v2-primary);
+    background: var(--pos-v2-primary-soft);
+  }
+
+  body.pos-v2-active #page-pos .pos-v2-quick-item:focus-visible {
+    outline: 2px solid var(--pos-v2-primary);
+    outline-offset: 2px;
+  }
+
+  body.pos-v2-active #page-pos .pos-v2-quick-name {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    font-weight: 650;
+  }
+
+  body.pos-v2-active #page-pos .pos-v2-quick-price {
+    color: var(--pos-v2-text);
+    font-size: 12px;
+  }
+
+  body.pos-v2-active #page-pos .pos-v2-quick-stock {
+    color: var(--pos-v2-muted);
+    font-size: 10px;
+  }
+
+  body.pos-v2-active #page-pos .pos-v2-quick-plus {
+    position: absolute;
+    top: 11px;
+    right: 10px;
+    color: var(--pos-v2-primary);
+    font-size: 19px;
+    line-height: 1;
+    font-weight: 500;
+  }
+
+  @media (min-width: 541px) and (max-width: 1023px) {
+    body.pos-v2-active #page-pos .pos-layout {
+      grid-template-areas: "search" "cart" "quick" "customer";
+    }
+    body.pos-v2-active #page-pos .pos-v2-quick-list {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 540px) {
+    body.pos-v2-active #page-pos .pos-layout {
+      grid-template-areas: "tabs" "search" "cart" "quick" "customer";
+      gap: 8px;
+    }
+    body.pos-v2-active #page-pos .pos-v2-quick-list {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    body.pos-v2-active #page-pos .pos-v2-quick-item {
+      min-height: 76px;
+    }
+    body.pos-v2-active #page-pos .pos-cart-section {
+      max-height: none;
+    }
+    body.pos-v2-active #page-pos .cart-row {
+      min-height: 0;
+      padding-block: 9px;
+    }
+    body.pos-v2-active #page-pos .pos-customer-section > label {
+      margin-top: 10px;
+    }
+    body.pos-v2-active #page-pos .totals-row.grand {
+      min-height: 74px;
+    }
+    body.pos-v2-active #page-pos[data-pos-v2-tab-state="customer"] .pos-v2-quick-items,
+    body.pos-v2-active #page-pos[data-pos-v2-tab-state="payment"] .pos-v2-quick-items {
+      display: none !important;
+    }
+  }
+
 </style>
 
 <script>
@@ -864,6 +1156,7 @@
     if (!list || !document.body.classList.contains('pos-v2-active') || typeof posState === 'undefined') return;
 
     posV2EnsureCartNumberHeader_();
+    posV2RenderQuickItems_();
     var editing = posState.cartEditIndex !== null || posState.cartEntryIndex !== null;
     Array.prototype.forEach.call(list.children, function (row) {
       if (!row.classList || !row.classList.contains('cart-row')) return;
@@ -1048,6 +1341,99 @@
     posV2EnhanceCartRows_();
   }
 
+
+
+  // Mirror HisabIQ's Quick Items as text-only buttons. No image model or upload
+  // is required: product names, stock and prices come from the existing POS bootstrap.
+  function posV2EnsureQuickItems_() {
+    var page = document.getElementById('page-pos');
+    var layout = page && page.querySelector('.pos-layout');
+    if (!layout) return null;
+    var section = layout.querySelector('.pos-v2-quick-items');
+    if (section) return section;
+
+    section = document.createElement('section');
+    section.className = 'pos-v2-quick-items';
+    section.setAttribute('aria-labelledby', 'posV2QuickItemsTitle');
+    section.hidden = true;
+    section.innerHTML =
+      '<div class="pos-v2-quick-head">' +
+        '<h3 id="posV2QuickItemsTitle">Quick items <span class="bn-hint">· দ্রুত যোগ</span></h3>' +
+        '<small>Tap to add to cart</small>' +
+      '</div>' +
+      '<div class="pos-v2-quick-list"></div>';
+    section.addEventListener('click', function (event) {
+      var button = event.target && event.target.closest
+        ? event.target.closest('[data-pos-v2-quick-product]') : null;
+      if (!button || !document.body.classList.contains('pos-v2-active')) return;
+      var product = typeof posProductById_ === 'function'
+        ? posProductById_(button.dataset.posV2QuickProduct) : null;
+      if (product && typeof posAddToCart_ === 'function') posAddToCart_(product);
+    });
+    layout.appendChild(section);
+    return section;
+  }
+
+  function posV2RenderQuickItems_() {
+    if (!document.body.classList.contains('pos-v2-active') || typeof posState === 'undefined') return;
+    var section = posV2EnsureQuickItems_();
+    if (!section) return;
+
+    var products = (posState.products || []).filter(function (product) {
+      return product && product.id != null && product.active !== false && Number(product.stock) > 0;
+    }).slice(0, 8);
+    section.hidden = products.length === 0;
+    var signature = products.map(function (product) {
+      return [product.id, product.name, product.stock, product.unit,
+        product.autoSellingPrice, product.sellingPrice].join('|');
+    }).join(';');
+    if (section.dataset.quickSignature === signature) return;
+    section.dataset.quickSignature = signature;
+
+    var list = section.querySelector('.pos-v2-quick-list');
+    if (!list) return;
+    list.textContent = '';
+    products.forEach(function (product) {
+      var price = product.autoSellingPrice !== undefined
+        ? product.autoSellingPrice : product.sellingPrice;
+      var unit = String(product.unit || '').trim();
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'pos-v2-quick-item';
+      button.dataset.posV2QuickProduct = String(product.id);
+      button.setAttribute('aria-label', 'Add ' + product.name + ' to cart');
+
+      var title = document.createElement('span');
+      title.className = 'pos-v2-quick-name';
+      title.textContent = product.name;
+      title.title = product.name;
+
+      var amount = document.createElement('span');
+      amount.className = 'pos-v2-quick-price';
+      amount.textContent = '৳' + formatMoney(price) + (unit ? ' / ' + unit : '');
+
+      var stock = document.createElement('span');
+      stock.className = 'pos-v2-quick-stock';
+      stock.textContent = 'Stock ' + Number(product.stock) + (unit ? ' ' + unit : '');
+
+      var plus = document.createElement('span');
+      plus.className = 'pos-v2-quick-plus';
+      plus.setAttribute('aria-hidden', 'true');
+      plus.textContent = '+';
+
+      button.appendChild(title);
+      button.appendChild(amount);
+      button.appendChild(stock);
+      button.appendChild(plus);
+      list.appendChild(button);
+    });
+  }
+
+  function posV2RemoveQuickItems_() {
+    var page = document.getElementById('page-pos');
+    var section = page && page.querySelector('.pos-v2-quick-items');
+    if (section) section.remove();
+  }
 
   var posV2SearchBound_ = false;
   var posV2DraftRows_ = [];
@@ -1365,12 +1751,14 @@
       posV2EnsureTabs_();
       posV2SelectTab_(page.getAttribute('data-pos-v2-tab-state') || 'cart');
       posV2EnsureSearchToolbar_();
+      posV2RenderQuickItems_();
       posV2BindSearch_();
       posV2BindCartReorder_();
     } else {
       posV2EndReorderDrag_(false);
       posV2RemoveTabs_();
       posV2RemoveSearchToolbar_();
+      posV2RemoveQuickItems_();
       posV2RemoveReorderHandles_();
       posV2RemoveCartDecorations_();
       if (posV2CartReorderObserver_) posV2CartReorderObserver_.disconnect();
