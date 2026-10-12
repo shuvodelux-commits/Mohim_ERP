@@ -301,7 +301,19 @@
     var type = String(row['Type'] || '');
     var kind = '';
     if (type === 'Opening Balance') kind = 'opening';
-    else if (type === 'Payment' && column === 'Credit') {
+    else if (type === 'Purchase' && column === 'Debit') {
+      // Supplier ledger projection shows the invoice gross here, not cash paid.
+      kind = 'purchase-invoice';
+    } else if (type === 'Purchase' && column === 'Credit' && row._synthetic) {
+      // Only the projected purchase row's Credit is the actual paid-on-invoice amount.
+      kind = 'invoice-payment';
+    } else if (type === 'Purchase Return Credit' && column === 'Credit') {
+      // Reduces supplier payable; no cash came in through this ledger transaction.
+      kind = 'purchase-return';
+    } else if (type === 'Purchase Update') {
+      // A purchase correction changes the payable, not necessarily the cash book.
+      kind = column === 'Debit' ? 'purchase-adjust-increase' : 'purchase-adjust-decrease';
+    } else if (type === 'Payment' && column === 'Credit') {
       var cash = row['Payment Amount'] === '' || row['Payment Amount'] == null
         ? Math.max(0, amount - (Number(row['Discount Amount']) || 0))
         : (Number(row['Payment Amount']) || 0);
@@ -309,15 +321,32 @@
     }
     var value = escapeHtml(formatMoney(amount));
     if (!kind) return value;
-    var labels = { out:'Money Out', opening:'Opening', adjustment:'Adjustment' };
+    var labels = {
+      out:'Money Out', opening:'Opening', adjustment:'Adjustment',
+      'purchase-invoice':'Purchase Invoice',
+      'invoice-payment':'Paid on Invoice',
+      'purchase-return':'Purchase Return',
+      'purchase-adjust-increase':'Due Increased',
+      'purchase-adjust-decrease':'Due Reduced'
+    };
     var hints = {
       out:'Supplier payment sent', opening:'Opening balance (no money moved)',
-      adjustment:'Non-cash discount'
+      adjustment:'Non-cash discount',
+      'purchase-invoice':'Purchase invoice amount; not necessarily paid',
+      'invoice-payment':'Payment recorded on this purchase invoice',
+      'purchase-return':'Supplier credit for returned goods; no money received',
+      'purchase-adjust-increase':'Purchase correction increased supplier payable',
+      'purchase-adjust-decrease':'Purchase correction reduced supplier payable'
     };
     var shapes = {
       out:'<path d="M7 17 17 7M7 7h10v10"/>',
       opening:'<path d="M12 7v14"/><path d="M3 18V5a2 2 0 0 1 2-2h3a4 4 0 0 1 4 4 4 4 0 0 1 4-4h3a2 2 0 0 1 2 2v13a1 1 0 0 1-1 1h-4a4 4 0 0 0-4 2 4 4 0 0 0-4-2H4a1 1 0 0 1-1-1Z"/>',
-      adjustment:'<path d="M4 12h16"/>'
+      adjustment:'<path d="M4 12h16"/>',
+      'purchase-invoice':'<path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8l-5-5H8Z"/><path d="M16 3v5h5M7 13h10M7 17h7"/>',
+      'invoice-payment':'<path d="M7 17 17 7M7 7h10v10"/>',
+      'purchase-return':'<path d="m9 14-4-4 4-4"/><path d="M5 10h9a5 5 0 0 1 0 10h-2"/>',
+      'purchase-adjust-increase':'<path d="M12 5v14M5 12h14"/>',
+      'purchase-adjust-decrease':'<path d="M5 12h14"/>'
     };
     return '<span class="party-ledger-inline-money is-' + kind + '"><span>' + value + '</span>'
       + '<span class="party-ledger-money-caption" title="' + hints[kind] + '">'
