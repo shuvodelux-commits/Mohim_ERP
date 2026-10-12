@@ -147,8 +147,18 @@ test('Qty Enter focuses Add Product and next Enter selects an available suggesti
     cartEditIndex: null
   };
   const calls = [];
+  let deferredFrame = null;
+  const focusedInput = { parentNode: { querySelector: () => ({}) } };
+  const document = {
+    body: { classList: { contains: cls => cls === 'pos-v2-active' } },
+    activeElement: focusedInput,
+    querySelector: () => focusedInput,
+    getElementById: () => null
+  };
   const runtime = new Function('posState', 'smartSearchProducts_', 'showToast',
     'posCreateCartLine_', 'posRenderCart_', 'posFocusCartEntryProduct_', 'posFocusCartEntryQty_',
+    'document', 'requestAnimationFrame', 'posV2EnhanceCartRows_',
+    'posRenderCartProductResults_', 'posPlaceCartProductResults_',
     functionSource('posCartProductMatches_') + '\n' +
     functionSource('posFinishCartEntry_') + '\n' +
     functionSource('posStartCartEntry_') + '\n' +
@@ -159,12 +169,22 @@ test('Qty Enter focuses Add Product and next Enter selects an available suggesti
     p => ({ productId: p.id, name: p.name }),
     () => calls.push('render'),
     () => calls.push('focus-add'),
-    () => calls.push('focus-qty')
+    () => calls.push('focus-qty'),
+    document,
+    fn => { deferredFrame = fn; },
+    () => calls.push('decorate-v2-rows'),
+    () => calls.push('open-dropdown'),
+    () => calls.push('reposition-dropdown')
   );
 
   assert.strictEqual(runtime.finish(), true);
   assert.strictEqual(state.cartEntryIndex, null);
-  assert.deepStrictEqual(calls.slice(0, 2), ['render', 'focus-add']);
+  assert.deepStrictEqual(calls.slice(0, 3), ['render', 'decorate-v2-rows', 'focus-add'],
+    'V2 must finish laying out cart rows BEFORE focusing Add Product');
+  assert.strictEqual(typeof deferredFrame, 'function', 'the popup needs a paint-frame stabilization');
+  deferredFrame();
+  assert.strictEqual(calls[3], 'open-dropdown',
+    'if a scroll event closed the popup, focus transition must reopen it automatically');
 
   const suggestions = runtime.matches('', 'add');
   assert.deepStrictEqual(suggestions.map(p => p.id), ['4', '5'],
