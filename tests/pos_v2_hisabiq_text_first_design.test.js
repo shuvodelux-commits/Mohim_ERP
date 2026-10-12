@@ -1,56 +1,127 @@
 'use strict';
 
-const fs = require('fs');
-const path = require('path');
-const assert = require('assert');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
 
 const root = path.resolve(__dirname, '..');
-const v2 = fs.readFileSync(path.join(root, 'posv2.html'), 'utf8');
 const pos = fs.readFileSync(path.join(root, 'pos.html'), 'utf8');
+const v2 = fs.readFileSync(path.join(root, 'posv2.html'), 'utf8');
 
-function check(name, fn) {
-  fn();
-  console.log('PASS', name);
+function functionSource(name) {
+  const start = pos.indexOf('function ' + name + '(');
+  assert.notEqual(start, -1, name + ' is missing');
+  const opening = pos.indexOf('{', start);
+  let depth = 0, quote = '', escaped = false;
+  for (let i = opening; i < pos.length; i++) {
+    const c = pos[i];
+    if (quote) {
+      if (escaped) escaped = false;
+      else if (c === '\\') escaped = true;
+      else if (c === quote) quote = '';
+    } else if (c === '"' || c === "'" || c === String.fromCharCode(96)) {
+      quote = c;
+    } else if (c === '{') depth++;
+    else if (c === '}' && --depth === 0) return pos.slice(start, i + 1);
+  }
+  throw new Error('Unclosed function: ' + name);
 }
 
-check('POS V2 visibly presents the existing complete product catalog', () => {
-  assert.match(v2, /#posProductGrid\.mobile-search-idle\s*\{\s*display:\s*grid\s*!important/i);
-  assert.match(v2, /function\s+posV2SetCatalogTitle_\s*\(/);
-  assert.match(v2, /posV2SetCatalogTitle_\(true\)/);
-  assert.match(v2, /Products · পণ্য/);
-  assert.match(v2, /grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/);
-  assert.match(v2, /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
-  assert.doesNotMatch(v2, /pos-v2-quick-items|function posV2RenderQuickItems_/);
+function check(label, fn) {
+  fn();
+  console.log('PASS', label);
+}
+const products = Array.from({length: 12}, (_, i) => ({
+  id: String(i + 1), name: 'Product ' + i, unit: 'pcs',
+  category: 'Hardware', brand: 'Test', sellingPrice: i + 10,
+  stock: i === 2 ? 0 : 10
+}));
+
+function sandbox(isV2) {
+  const world = {
+    posState: { products },
+    document: {body: {classList: {contains: name => isV2 && name === 'pos-v2-active'}}},
+    smartSearchProducts_: (all, query, limit) => all.filter(p =>
+      !query || p.name.toLowerCase().includes(String(query).toLowerCase())).slice(0, limit),
+    escapeHtml: value => String(value).replaceAll('&', '&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;'),
+    formatMoney: value => '৳' + Number(value)
+  };
+  vm.runInNewContext(functionSource('posCartProductMatches_') + '\n' +
+    functionSource('posCartProductResultsHtml_'), world);
+  return world;
+}
+
+check('empty inline product focus produces first eight suggestions in POS V2', () => {
+  const context = sandbox(true);
+  assert.equal(context.posCartProductMatches_('').length, 8);
+  assert.equal(context.posCartProductMatches_('   ').length, 8);
 });
 
-check('Product catalog reuses the actual POS products and search, not images', () => {
-  assert.match(pos, /function posRenderProductGrid_\s*\(/);
-  assert.match(pos, /smartSearchProducts_\(posState\.products,\s*q/);
-  assert.match(pos, /list\.forEach\(function\s*\(p,\s*idx\)/);
-  assert.match(pos, /className\s*=\s*'product-tile'/);
-  assert.match(pos, /escapeHtml\(p\.name\)/);
-  assert.match(pos, /formatMoney\(p\.autoSellingPrice/);
-  assert.match(pos, /escapeHtml\(p\.unit\s*\|\|\s*''\)/);
-  assert.match(pos, /posAddToCart_\(p\)/);
-  assert.doesNotMatch(v2, /<img\b|document\.createElement\(['"]img['"]\)|product\.image/i);
+check('Classic POS retains original blank-query behavior', () => {
+  assert.equal(sandbox(false).posCartProductMatches_('').length, 0);
 });
 
-check('Original POS keyboard and barcode workflow is preserved', () => {
-  assert.match(pos, /posSearchEl_\.addEventListener\(['"]keydown['"]/);
-  assert.match(pos, /smartProductHasExactCode_\(selected,\s*posSearchEl_\.value\)/);
-  assert.match(pos, /posAddToCart_\(selected\)/);
-  // Do not install the V2 dropdown handlers over the original catalog keyboard handlers.
-  assert.doesNotMatch(v2, /^\s+posV2BindSearch_\(\);\s*$/m);
+check('typed search works through the existing product matcher', () => {
+  const context = sandbox(true);
+  const results = context.posCartProductMatches_('Product 11');
+  assert.equal(results.length, 1);
+  assert.equal(results[0].id, '12');
 });
 
-check('Existing cart checkout and mobile tabs remain in place', () => {
+check('suggestions show name, category, price, stock and unit without photos', () => {
+  const context = sandbox(true);
+  const html = context.posCartProductResultsHtml_('', 'add', null);
+  assert.match(html, /pos-picker-name/);
+  assert.match(html, /Hardware/);
+  assert.match(html, /pos-picker-price/);
+  assert.match(html, /৳10/);
+  assert.match(html, /pos-picker-stock/);
+  assert.match(html, /pcs/);
+  assert.match(html, /Out of stock/);
+  assert.doesNotMatch(html, /<img/);
+  assert.match(html, /data-cart-product-pick="1"/);
+});
+
+check('popup appears on keyboard focus and click but not on initial un-focused activation', () => {
+  assert.match(pos, /addEventListener\('focusin', function \(e\) \{\s*posShowCartProductPicker_\(e\.target\)/);
+  assert.match(pos, /addEventListener\('click', function \(e\) \{\s*if \(e\.target\.hasAttribute\('data-cart-product-input'\)\)/);
+  assert.match(functionSource('posRenderCartProductResults_'), /document\.activeElement !== input/);
+  assert.match(functionSource('posRenderCartProductResults_'), /aria-expanded/);
+  assert.match(functionSource('posMoveCartProductActive_'), /aria-activedescendant/);
+  assert.match(functionSource('posCloseCartProductPopup_'), /aria-expanded.*false/);
+});
+
+check('live POS edit, Enter, Qty, shortcut, and shortage behavior remain attached', () => {
+  assert.match(pos, /function posChooseCartProduct_\(/);
+  assert.match(pos, /function posReplaceCartProduct_\(/);
+  assert.match(pos, /function posStartCartEntry_\(/);
+  assert.match(pos, /function posFinishCartEntry_\(/);
+  assert.match(pos, /posFocusCartEntryQty_\(\)/);
+  assert.match(pos, /posFocusCartEntryProduct_\(\)/);
+  assert.match(pos, /function posShortagePanelHtml_\(/);
+  assert.match(pos, /posActiveCartProductOption_\(\)/);
+  assert.match(pos, /function posHandleCartFastEntryKeydown_\(/);
+});
+
+check('POS V2 keeps the catalog hidden and its existing search toolbar', () => {
+  assert.match(v2, /#posProductGrid,[\s\S]*?display: none !important/);
+  assert.match(v2, /function posV2BindSearch_\(/);
+  assert.match(v2, /function posV2EnsureSearchToolbar_\(/);
+  assert.match(v2, /posV2BindSearch_\(\)/);
+  assert.doesNotMatch(v2, /pos-v2-quick-items|posV2SetCatalogTitle_/);
+  assert.match(v2, /body\.pos-v2-active \.pos-cart-product-popup \{/);
+});
+
+check('responsive combobox and checkout reuse existing shared DOM and payment workflow', () => {
+  assert.match(v2, /min-width:\s*541px/);
+  assert.match(v2, /max-width:\s*540px/);
   assert.match(v2, /customer\.appendChild\(refs\.summary\)/);
   assert.match(v2, /customer\.appendChild\(refs\.actions\)/);
-  assert.match(v2, /refs\.cart\.insertBefore\(refs\.summary,\s*refs\.summaryAnchor\)/);
-  assert.match(v2, /refs\.cart\.insertBefore\(refs\.actions,\s*refs\.actionsAnchor\)/);
-  assert.match(v2, /data-pos-v2-tab="cart"/);
-  assert.match(v2, /data-pos-v2-tab="customer"/);
   assert.match(v2, /data-pos-v2-tab="payment"/);
+  assert.match(pos, /id="posPaymentMethod"/);
+  assert.match(pos, /id="posSaveDraftBtn"/);
+  assert.match(pos, /id="posCompleteBtn"/);
 });
 
-console.log('POS HisabIQ product-catalog design checks passed.');
+console.log('POS HisabIQ inline focus-picker design checks passed.');
