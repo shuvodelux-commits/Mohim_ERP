@@ -109,5 +109,52 @@ test('cart line total uses normal sans/Inter family, not mono, in Classic and V2
   assert.match(v2, /body\.pos-v2-active #page-pos \.cart-row \.c-line-total\s*\{[^}]*font-family:\s*['"]Inter['"]/);
 });
 
+
+test('cart Add Product suggests products before typing and filters entered text', () => {
+  const sample = [
+    { id: '1', name: 'RFL Pipe', category: 'Pipe', brand: 'RFL', unit: 'Foot', stock: 400, autoSellingPrice: 70 },
+    { id: '2', name: 'Small Nail', category: 'Hardware', brand: 'ABC', unit: 'pcs', stock: 0, sellingPrice: 3 }
+  ];
+  const picker = new Function('posState', 'smartSearchProducts_', 'escapeHtml', 'formatMoney',
+    functionSource('posCartProductMatches_') + '\n' +
+    functionSource('posCartProductResultsHtml_') + '\n' +
+    'return {matches:posCartProductMatches_, html:posCartProductResultsHtml_};'
+  )({ products: sample },
+    (products, query, limit) => products.filter(p => p.name.toLowerCase().includes(query.toLowerCase())).slice(0, limit),
+    value => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'),
+    amount => '৳' + String(amount)
+  );
+  assert.strictEqual(picker.matches('').length, 2);
+  assert.strictEqual(picker.matches('  ').length, 2);
+  assert.strictEqual(picker.matches('pipe').length, 1);
+  assert.strictEqual(picker.matches('does-not-exist').length, 0);
+  const html = picker.html('', 'add', null);
+  for (const expected of ['RFL Pipe', 'Category: Pipe', 'Brand: RFL', '৳70', '/Foot', '400 Foot available', 'Out of stock']) {
+    assert.ok(html.includes(expected), 'dropdown should show ' + expected);
+  }
+  assert.doesNotMatch(html, /<img\b/i);
+  assert.match(html, /role="option"/);
+  assert.match(html, /pos-cart-product-option-0/);
+});
+
+test('cart dropdown opens on focus or click without changing other POS workflows', () => {
+  const start = pos.indexOf("document.getElementById('posCartList').addEventListener('focusin'");
+  const end = pos.indexOf("document.getElementById('posCartList').addEventListener('input'", start);
+  const handlers = pos.slice(start, end);
+  assert.match(handlers, /focusin/);
+  assert.match(handlers, /addEventListener\('click'/);
+  assert.match(handlers, /posRenderCartProductResults_/);
+  const render = functionSource('posRenderCartProductResults_');
+  const close = functionSource('posCloseCartProductPopup_');
+  assert.match(render, /document\.activeElement !== input/);
+  assert.match(render, /aria-expanded/);
+  assert.match(render, /aria-activedescendant/);
+  assert.match(close, /aria-expanded/);
+  assert.match(v2, /body\.pos-v2-active \.pos-cart-product-popup \.pos-picker-main/);
+  assert.match(v2, /grid-template-columns:\s*minmax\(0,\s*1fr\)\s+minmax\(300px,\s*23vw\)/);
+  assert.match(pos, /serverCall\('findSalesByPhone', authToken, phone, customerId\)/);
+  assert.match(pos, /serverCall\('completeSale', authToken, payload\)/);
+});
+
 console.log('\n' + pass + '/' + (pass + fail) + ' passed');
 if (fail) process.exit(1);
