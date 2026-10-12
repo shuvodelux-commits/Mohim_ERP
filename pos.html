@@ -751,10 +751,22 @@
 
   function posCartProductMatches_(query, mode) {
     var q = String(query || '').trim();
-    // Only the inline cart picker suggests products before typing.
-    // The separate POS V2 toolbar search retains its prior blank-query behavior.
-    if (!q) return mode === 'v2-search' ? [] : (posState.products || []).slice(0, 8);
-    return smartSearchProducts_(posState.products, q, 8);
+    // The Add Product row cannot add an item already present in this sale.
+    // Filter BEFORE taking eight suggestions, or the first highlighted item
+    // may be an unselectable duplicate (especially after Qty Enter).
+    var products = posState.products || [];
+    if (mode === 'add') {
+      var inCart = {};
+      (posState.cart || []).forEach(function (line) {
+        inCart[String(line.productId)] = true;
+      });
+      products = products.filter(function (product) {
+        return !inCart[String(product.id)];
+      });
+    }
+    // Keep V2 toolbar's blank-search behavior; that toolbar can increment Qty.
+    if (!q) return mode === 'v2-search' ? [] : products.slice(0, 8);
+    return smartSearchProducts_(products, q, 8);
   }
 
   function posCartProductResultsHtml_(query, mode, index) {
