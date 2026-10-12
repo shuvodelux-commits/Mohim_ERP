@@ -1033,7 +1033,28 @@
     if (posState.cartEntryIndex === null) return false;
     posState.cartEntryIndex = null;
     posRenderCart_();
-    if (focusNext !== false) posFocusCartEntryProduct_();
+    if (focusNext !== false) {
+      // V2 adds the row-number and drag-handle cells after cart rendering.
+      // Do this BEFORE focusing Add Product, so its bounding box is final
+      // when focusin positions the floating dropdown.
+      if (document.body.classList.contains('pos-v2-active') &&
+          typeof posV2EnhanceCartRows_ === 'function') posV2EnhanceCartRows_();
+      posFocusCartEntryProduct_();
+      // Some layout/scroll changes settle at the next paint. Re-anchor the
+      // current popup or reopen it if a scroll event closed it in between.
+      // Only act while the same Add Product input still owns keyboard focus.
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(function () {
+        var input = document.querySelector('#posCartList .pos-cart-entry-row [data-cart-product-input][data-cart-product-mode="add"]');
+        if (!input || document.activeElement !== input) return;
+        var popup = document.getElementById('posCartProductPopup');
+        if (!popup || popup.hidden || popup._anchorInput !== input) {
+          var host = input.parentNode.querySelector('[data-cart-product-results]');
+          posRenderCartProductResults_(input, host, 'add', null);
+        } else {
+          posPlaceCartProductResults_(input, popup);
+        }
+      });
+    }
     return true;
   }
 
