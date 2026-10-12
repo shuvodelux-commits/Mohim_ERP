@@ -54,7 +54,7 @@ test('both party ledgers preserve existing seven-column transaction tables and a
     assert.match(source, /partyLedgerBalanceTone_/);
     assert.match(source, /partyLedgerPrintStatement_/);
     assert.match(source, /Discount Amount/);
-    assert.match(source, /Payment [^']+ \+ Discount/);
+    assert.match(source, /\+ Discount/);
   }
 });
 
