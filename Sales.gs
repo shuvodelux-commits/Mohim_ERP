@@ -81,6 +81,9 @@ function getPosBootstrap(token) {
     // deletion is ever moved onto the soft-delete path the recycle view's
     // DELETED_VIEW_SOURCES_ entry already anticipates.
     const products = activeRows_('PRODUCTS').filter(function (p) { return p['Status'] !== 'Inactive'; });
+    const productsById = bundleProductMap_(products);
+    const bundleIds = products.filter(function (p) {return bundleProductType_(p) === 'Bundle';}).map(function (p) {return p['Product ID'];});
+    const bundleDefinitions = bundleIds.length ? getBundleDefinitions_(bundleIds,productsById,getAllRows_('BUNDLE_COMPONENTS')) : {};
     const customers = activeRows_('CUSTOMERS');
     const allLots = getAllRows_('STOCK_LOTS');
     const bankAccounts = getActiveBankAccountsForUI_();
@@ -107,7 +110,11 @@ function getPosBootstrap(token) {
 
     return ok_({
       products: products.map(function (p) {
-        const pricing = buildLotPricingLadder_(p['Product ID'], allLots, p);
+        const bundle = bundleProductType_(p) === 'Bundle';
+        const definition = bundle ? bundleDefinitions[p['Product ID']] : null;
+        const pricing = bundle
+          ? {segments: [], fallbackSellPrice:Number(p['Selling Price'])||0, autoSellingPrice:Number(p['Selling Price'])||0}
+          : buildLotPricingLadder_(p['Product ID'], allLots, p);
         const out = {
           id: p['Product ID'], name: p['Product Name'], brand: p['Brand'] || '',
           unit: p['Unit'], barcode: p['Barcode'] || '',
@@ -115,8 +122,9 @@ function getPosBootstrap(token) {
           lotPricing: pricing.segments,
           fallbackSellPrice: pricing.fallbackSellPrice,
           autoSellingPrice: pricing.autoSellingPrice,
-          stock: Number(p['Current Stock']) || 0,
-          category: p['Category']
+          stock: bundle ? getBundleAvailability_(definition,productsById) : (Number(p['Current Stock']) || 0),
+          category: p['Category'], productType: bundle ? 'Bundle' : 'Standard',
+          bundleRevision: bundle ? definition.revision : 0
         };
         if (showPurchasePrice) out.purchasePrice = Number(p['Purchase Price']) || 0;
         return out;
@@ -210,6 +218,8 @@ function completeSale(token, payload) {
     const productsById = {};
     activeRows_('PRODUCTS').forEach(function (p) { productsById[p['Product ID']] = p; });
     const allLots = getAllRows_('STOCK_LOTS');
+    const bundleIds = (payload.items || []).filter(function(item){return bundleProductType_(productsById[item.productId]) === 'Bundle';}).map(function(item){return item.productId;});
+    const bundleDefinitions = bundleIds.length ? getBundleDefinitions_(bundleIds,productsById,getAllRows_('BUNDLE_COMPONENTS')) : {};
     const vendorsById = {};
     getAllRows_('VENDORS').forEach(function (v) { vendorsById[v['Vendor ID']] = v; });
 
@@ -229,6 +239,11 @@ function completeSale(token, payload) {
 
       const product = productsById[item.productId];
       if (!product) throw new Error('Product ' + item.name + ' no longer exists.');
+      const isBundle = bundleProductType_(product) === 'Bundle';
+      if (isBundle && (!Number.isSafeInteger(qty) || Number(item.bundleRevision) !== bundleDefinitions[item.productId].revision)) {
+        throw new Error(item.name + ': bundle quantity must be whole sets and its recipe must be refreshed.');
+      }
+      if (isBundle && item.vendorId) throw new Error('Vendor sourcing is not supported inside a bundle sale.');
 
       // Decide the FIFO draw across every supplier lot. Selling past
       // available stock is allowed on
@@ -244,13 +259,16 @@ function completeSale(token, payload) {
       // vendor shortage. Negative-stock sales intentionally keep the existing
       // generic lot behavior.
       const requestedVendorId = sanitizeInput_(item.vendorId);
-      const plan = requestedVendorId
+      const plan = isBundle ? null : (requestedVendorId
         ? planSaleVendorConsumption_(item.productId, qty, allLots, product)
-        : planStockConsumption_(item.productId, qty, allLots, product);
+        : planStockConsumption_(item.productId, qty, allLots, product));
       // Automatic sale pricing is server-authoritative. Compute it before a
       // vendor resolution neutralizes plan.shortfall: shortage units still
       // sell at the product's current/default selling price.
-      const autoPricing = computePlanSellingPrice_(plan, qty);
+      const autoPricing = isBundle ? {
+        unitPrice: Number(product['Selling Price']) || 0,
+        lineTotal: roundMoney_(qty * (Number(product['Selling Price']) || 0))
+      } : computePlanSellingPrice_(plan, qty);
 
       // ---- Vendor/Consignment Sourcing: divert this line's shortfall away
       // from becoming an OVERSOLD lot, and onto a chosen vendor instead.
@@ -294,6 +312,7 @@ function completeSale(token, payload) {
       }
       lines.push({
         productId: item.productId, name: item.name, qty: qty, price: price, lineTotal: lineTotal, priceMode: priceMode,
+        productType: isBundle ? 'Bundle' : 'Standard', bundleRevision: isBundle ? bundleDefinitions[item.productId].revision : 0,
         rowIndex: product._rowIndex, newStock: currentStock - (qty - vendorQty),
         plan: plan,
         vendorId: requestedVendorId || '', vendorName: vendorRow ? vendorRow['Vendor Name'] : '',
@@ -301,6 +320,33 @@ function completeSale(token, payload) {
       });
       subtotal = roundMoney_(subtotal + lineTotal);
     });
+
+    // Aggregate once per physical component. The same Pipe may be sold on its
+    // own and inside several sets; planning separately would consume one lot
+    // twice and make the product stock cache disagree with the lot ledger.
+    const bundleLines = lines.filter(function(line){return line.productType === 'Bundle';});
+    const bundlePhysicalPlans = {}, bundlePlannedStandalone = {};
+    if (bundleLines.length) {
+      const firstDemand = buildSaleStockDemands_(bundleLines,bundleDefinitions,{});
+      const physicalIds = firstDemand.requirementsByProductId;
+      const involvedStandalone = lines.filter(function(line){
+        if (line.productType !== 'Standard' || !Object.prototype.hasOwnProperty.call(physicalIds,line.productId)) return false;
+        if (line.vendorId) throw new Error('Bundle and vendor-sourced standalone component must be sold on separate invoices: '+line.name);
+        bundlePlannedStandalone[line.productId] = true;
+        return true;
+      });
+      const demand = buildSaleStockDemands_(bundleLines.concat(involvedStandalone),bundleDefinitions,{});
+      Object.keys(demand.requirementsByProductId).forEach(function(productId){
+        const product = productsById[productId];
+        if (!product || bundleProductType_(product) !== 'Standard') throw new Error('Bundle component no longer exists.');
+        const qty = demand.requirementsByProductId[productId];
+        bundlePhysicalPlans[productId] = {
+          plan: planStockConsumption_(productId,qty,allLots,product),
+          product: product, qty:qty, owners:demand.ownersByProductId[productId],
+          newStock:(Number(product['Current Stock']) || 0)-qty
+        };
+      });
+    }
 
     const discount = isValidNonNegativeNumber_(payload.discount) ? Number(payload.discount) : 0;
     const grandTotal = Math.max(0, subtotal - discount);
@@ -392,9 +438,11 @@ function completeSale(token, payload) {
     lines.forEach(function (line) {
       saleItemRows.push({
         'Invoice ID': invoiceId, 'Product ID': line.productId, 'Product Name': line.name,
-        'Quantity': line.qty, 'Unit Price': line.price, 'Line Total': line.lineTotal
+        'Quantity': line.qty, 'Unit Price': line.price, 'Line Total': line.lineTotal,
+        'Sold Product Type': line.productType
       });
 
+      if (line.productType === 'Bundle' || bundlePlannedStandalone[line.productId]) return;
       // The plan was decided during validation; this only writes it.
       const consumption = applyStockConsumption_(line.plan);
       updateRowFields_('PRODUCTS', line.rowIndex, { 'Current Stock': line.newStock, 'Updated At': now });
@@ -403,17 +451,55 @@ function completeSale(token, payload) {
         stockMovementRows.push({
           'Movement ID': generateId_('STOCK_MOVEMENT'), 'Date': now, 'Product ID': line.productId,
           'Product Name': line.name, 'Type': 'Sale', 'Reference': invoiceId,
-          'Quantity In': '', 'Quantity Out': c.qty, 'Balance Stock': line.newStock, 'Notes': '', 'Lot ID': c.lotId
+          'Quantity In': '', 'Quantity Out': c.qty, 'Balance Stock': line.newStock, 'Notes': '', 'Lot ID': c.lotId,
+          'Source Sale Product ID': line.productId
         });
         const consumedLot = allLots.filter(function (l) { return l['Lot ID'] === c.lotId; })[0];
         saleItemLotRows.push({
           'Invoice ID': invoiceId, 'Product ID': line.productId, 'Lot ID': c.lotId,
           'Quantity': c.qty, 'Unit Cost': c.unitCost, 'Unit Sell Price': c.unitSellPrice, 'Created At': now,
-          'Supplier ID': consumedLot ? (consumedLot['Supplier ID'] || '') : ''
+          'Supplier ID': consumedLot ? (consumedLot['Supplier ID'] || '') : '',
+          'Source Sale Product ID': line.productId
+        });
+      });
+    });
+    const bundleSnapshotRows = [];
+    bundleLines.forEach(function(line) {
+      bundleDefinitions[line.productId].components.forEach(function(component){
+        bundleSnapshotRows.push({
+          'Invoice ID': invoiceId, 'Bundle Product ID': line.productId,
+          'Bundle Revision': line.bundleRevision,
+          'Component Product ID': component.productId,
+          'Quantity Per Set': component.qtyPerSet,
+          'Sets Sold': line.qty, 'Component Quantity Sold': line.qty*component.qtyPerSet,
+          Unit: component.unit, 'Created At': now
+        });
+      });
+    });
+    Object.keys(bundlePhysicalPlans).forEach(function(productId){
+      const physical = bundlePhysicalPlans[productId];
+      const consumption = applyStockConsumption_(physical.plan);
+      updateRowFields_('PRODUCTS',physical.product._rowIndex,{'Current Stock':physical.newStock,'Updated At':now});
+      const allocated = attributeBundleConsumption_(physical.owners,consumption);
+      allocated.forEach(function(c){
+        const consumedLot=allLots.filter(function(row){return row['Lot ID'] === c.lotId;})[0];
+        stockMovementRows.push({
+          'Movement ID':generateId_('STOCK_MOVEMENT'),'Date':now,'Product ID':productId,
+          'Product Name':physical.product['Product Name'],'Type':'Sale','Reference':invoiceId,
+          'Quantity In':'','Quantity Out':c.qty,'Balance Stock':physical.newStock,
+          'Notes':'Sold as '+c.sourceSaleProductId,'Lot ID':c.lotId,
+          'Source Sale Product ID':c.sourceSaleProductId
+        });
+        saleItemLotRows.push({
+          'Invoice ID':invoiceId,'Product ID':productId,'Lot ID':c.lotId,
+          'Quantity':c.qty,'Unit Cost':c.unitCost,'Unit Sell Price':c.unitSellPrice,
+          'Created At':now,'Supplier ID':consumedLot ? consumedLot['Supplier ID']||'' : '',
+          'Source Sale Product ID':c.sourceSaleProductId
         });
       });
     });
     appendRows_('SALE_ITEMS', saleItemRows);
+    if (bundleSnapshotRows.length) appendRows_('SALE_BUNDLE_COMPONENTS',bundleSnapshotRows);
     appendRows_('STOCK_MOVEMENT', stockMovementRows);
     appendRows_('SALE_ITEM_LOTS', saleItemLotRows);
 
