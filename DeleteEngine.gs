@@ -251,7 +251,9 @@ function deleteSalesInvoice(token, invoiceId, reason) {
     // SALE_ITEM_LOTS is the authoritative record of owned stock consumed and
     // is already net of returns. Vendor sourcing rows may later be edited or
     // deleted, so their current quantities cannot safely reconstruct stock.
-    var ownQtyByProduct = outstandingSaleOwnStockByProduct_(invoiceId, items, []);
+    var ownQtyByProduct = outstandingSaleOwnStockByProduct_(invoiceId, items.filter(function(i){
+      return i['Sold Product Type'] !== 'Bundle';
+    }), []);
     var itemByProduct = {};
     items.forEach(function (line) {
       if (!itemByProduct[line['Product ID']]) itemByProduct[line['Product ID']] = line;
@@ -262,10 +264,10 @@ function deleteSalesInvoice(token, invoiceId, reason) {
       return Number(ownQtyByProduct[productId]) > 0;
     }).map(function (productId) {
       var line = itemByProduct[productId];
-      if (!line || !productsById[productId]) {
+      if (!productsById[productId]) {
         throw new Error('A product on this invoice no longer exists. Repair the product reference before deleting the invoice.');
       }
-      return { productId: productId, productName: line['Product Name'], qty: Number(ownQtyByProduct[productId]) };
+      return { productId: productId, productName: line ? line['Product Name'] : productsById[productId]['Product Name'], qty: Number(ownQtyByProduct[productId]) };
     });
 
     // Vendor-sourced quantity never touched Current Stock/Stock Lots.
@@ -543,6 +545,19 @@ function deleteProduct(token, productId, reason) {
 
     var user = requireDeletePermission_(token, 'products', prod['Created At'] || formatDate_(new Date()));
 
+    // A standard product used inside any active set or sold bundle is
+    // required for future returns/deletions, even when its stock is zero.
+    var parentProducts = bundleProductMap_(activeRows_('PRODUCTS'));
+    var componentIsActive = getAllRows_('BUNDLE_COMPONENTS').some(function(c){
+      var parent=parentProducts[c['Bundle Product ID']];
+      return c['Component Product ID']===productId && parent &&
+        bundleProductType_(parent)==='Bundle' && parent.Status === 'Active' &&
+        Number(c.Revision) === (Number(parent['Bundle Revision'])||1);
+    });
+    var componentHasHistory = getAllRows_('SALE_BUNDLE_COMPONENTS').some(function(c){
+      return c['Component Product ID'] === productId;
+    });
+    if(componentIsActive || componentHasHistory) return fail_('This product is a component of a bundle or its sales history. Deactivate instead.');
     var stock = Number(prod['Current Stock']) || 0;
     if (Math.abs(stock) > 0.0001) {
       return fail_('This product still has ' + stock + ' in stock. Adjust it to zero first, or use Deactivate instead.');

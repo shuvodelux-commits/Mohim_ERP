@@ -272,6 +272,10 @@ function updatePurchaseInternal_(token, purchaseId, payload, options) {
 
     const productsById = {};
     getAllRows_('PRODUCTS').forEach(function (p) { productsById[p['Product ID']] = p; });
+    Object.keys(newQtyByProduct).forEach(function(productId){
+      const product=productsById[productId];
+      if (product && bundleProductType_(product) === 'Bundle') throw new Error('Bundle stock cannot be purchased; select individual components.');
+    });
 
     const lotByProduct = {};
     getAllRows_('STOCK_LOTS').forEach(function (l) {

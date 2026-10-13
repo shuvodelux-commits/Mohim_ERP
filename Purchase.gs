@@ -133,6 +133,7 @@ function createPurchase(token, payload) {
 
       const product = productsById[item.productId];
       if (!product || isDeleted_(product)) throw new Error('Product ' + item.name + ' no longer exists.');
+      if (bundleProductType_(product) === 'Bundle') throw new Error('Virtual bundle sets cannot be purchased as physical stock. Purchase the component products.');
 
       const currentStock = Number(product['Current Stock']) || 0;
 
