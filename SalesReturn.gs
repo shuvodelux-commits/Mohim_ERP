@@ -301,6 +301,7 @@ function getInvoiceForReturn(token, invoiceId) {
     const grandTotal = Number(sale['Grand Total']) || 0;
 
     const outstandingOwnQty = outstandingSaleOwnStockByProduct_(invoiceId, saleItems, returnItems);
+    const bundleSnapshots = getSaleBundleSnapshot_(invoiceId, getAllRows_('SALE_BUNDLE_COMPONENTS'));
 
     const returnedByProduct = {};
     let previouslyReturnedAmount = 0;
@@ -327,7 +328,9 @@ function getInvoiceForReturn(token, invoiceId) {
     const items = Object.keys(soldByProduct).map(function (key) {
       const si = soldByProduct[key];
       const already = returnedByProduct[key] || 0;
-      const available = Math.min(Math.max(0, si.soldQty - already), outstandingOwnQty[key] || 0);
+      const available = bundleSnapshots[key]
+        ? Math.max(0, si.soldQty - already)
+        : Math.min(Math.max(0, si.soldQty - already), outstandingOwnQty[key] || 0);
       const vendorSourced = Math.max(0, si.soldQty - already - available);
       const grossUnitPrice = si.soldQty > 0 ? si.grossValue / si.soldQty : si.unitPrice;
       const effectiveUnitPrice = effectiveTransactionUnitPrice_(grossUnitPrice, subtotal, grandTotal);
@@ -391,6 +394,7 @@ function prepareSalesReturn_(payload, options) {
   const returnItemsSoFar = returnItemsSource.filter(function (i) { return i['Invoice ID'] === payload.invoiceId; });
   const saleSubtotal = Number(sale['Subtotal']) || 0;
   const saleGrandTotal = Number(sale['Grand Total']) || 0;
+  const bundleSnapshots = getSaleBundleSnapshot_(payload.invoiceId, opts.bundleSnapshotRows || getAllRows_('SALE_BUNDLE_COMPONENTS'));
 
   const outstandingOwnQty = outstandingSaleOwnStockByProduct_(
     payload.invoiceId,
@@ -436,7 +440,10 @@ function prepareSalesReturn_(payload, options) {
     if (!soldRow) throw new Error((item.name || item.productId) + ' was not part of this invoice.');
 
     const alreadyReturned = returnedByProduct[item.productId] || 0;
-    const available = Math.min(Math.max(0, soldRow.soldQty - alreadyReturned), outstandingOwnQty[item.productId] || 0);
+    if (bundleSnapshots[item.productId] && !Number.isSafeInteger(qty)) throw new Error('Bundle return quantity must be whole sets.');
+    const available = bundleSnapshots[item.productId]
+      ? Math.max(0, soldRow.soldQty - alreadyReturned)
+      : Math.min(Math.max(0, soldRow.soldQty - alreadyReturned), outstandingOwnQty[item.productId] || 0);
     if (qty > available) throw new Error(soldRow.name + ': only ' + available + ' available to return.');
 
     const grossUnitPrice = soldRow.soldQty > 0 ? soldRow.grossValue / soldRow.soldQty : soldRow.unitPrice;
@@ -459,7 +466,8 @@ function prepareSalesReturn_(payload, options) {
       name: soldRow.name,
       qty: qty,
       price: storedUnitPrice,
-      lineTotal: lineTotal
+      lineTotal: lineTotal,
+      productType: bundleSnapshots[item.productId] ? 'Bundle' : 'Standard'
     };
   });
 
@@ -481,28 +489,39 @@ function prepareSalesReturn_(payload, options) {
     return map;
   })();
   const virtualProductStockById = opts.virtualProductStockById || {};
-  const stockChanges = validated.map(function (v) {
+  // Return a visible set only once in the financial return sheet, but
+  // restore *each physical component* at its original sale recipe ratio.
+  const physicalRestorations = [];
+  validated.forEach(function(v) {
+    if (v.productType === 'Bundle') {
+      const snapshot = bundleSnapshots[v.productId];
+      if (!snapshot || !snapshot.components.length) throw new Error('Original component details for this bundle cannot be found.');
+      snapshot.components.forEach(function(c) {
+        physicalRestorations.push({productId:c.productId,sourceSaleProductId:v.productId,qty:v.qty*c.qtyPerSet});
+      });
+    } else {
+      physicalRestorations.push({productId:v.productId,sourceSaleProductId:v.productId,qty:v.qty});
+    }
+  });
+  const stockChanges = physicalRestorations.map(function(v) {
     const product = productsById[v.productId];
-    if (!product) throw new Error(v.name + ' no longer exists as a product.');
-    if (!Object.prototype.hasOwnProperty.call(virtualProductStockById, v.productId)) {
+    if (!product) throw new Error('Original physical component no longer exists: '+v.productId);
+    if (!Object.prototype.hasOwnProperty.call(virtualProductStockById,v.productId)) {
       virtualProductStockById[v.productId] = Number(product['Current Stock']) || 0;
     }
     const newStock = (Number(virtualProductStockById[v.productId]) || 0) + v.qty;
     virtualProductStockById[v.productId] = newStock;
-    return {
-      productId: v.productId, name: v.name, qty: v.qty,
-      rowIndex: product._rowIndex, newStock: newStock
-    };
+    return {productId:v.productId,name:product['Product Name'],qty:v.qty,
+      sourceSaleProductId:v.sourceSaleProductId,rowIndex:product._rowIndex,newStock:newStock};
   });
-
   const restorationVirtualState = opts.restorationVirtualState || {};
-  const restorationPlans = validated.map(function (v) {
-    return planSaleReturnRestoration_(payload.invoiceId, v.productId, v.name, v.qty, {
-      saleItemLots: opts.consumptionRows,
-      stockLots: opts.stockLots,
-      products: opts.products || Object.keys(productsById).map(function (key) { return productsById[key]; }),
-      lotsById: opts.lotsById,
-      virtualState: restorationVirtualState
+  const restorationPlans = physicalRestorations.map(function(v){
+    const product = productsById[v.productId];
+    return planSaleReturnRestoration_(payload.invoiceId,v.productId,product['Product Name'],v.qty,{
+      saleItemLots:opts.consumptionRows,stockLots:opts.stockLots,
+      products:opts.products || Object.keys(productsById).map(function(k){return productsById[k];}),
+      lotsById:opts.lotsById,virtualState:restorationVirtualState,
+      sourceSaleProductId:v.sourceSaleProductId
     });
   });
 
@@ -597,7 +616,8 @@ function commitPreparedSalesReturn_(prepared, options) {
       'Return Quantity': v.qty,
       'Return Price': v.price,
       'Line Total': v.lineTotal,
-      'Pricing Basis': 'NetAfterInvoiceDiscount'
+      'Pricing Basis': 'NetAfterInvoiceDiscount',
+      'Sold Product Type': v.productType || 'Standard'
     };
   });
   const stockMovementRows = [];
@@ -613,7 +633,8 @@ function commitPreparedSalesReturn_(prepared, options) {
         'Movement ID': generateId_('STOCK_MOVEMENT'), 'Date': now, 'Product ID': c.productId,
         'Product Name': c.name, 'Type': 'Sales Return', 'Reference': returnId,
         'Quantity In': r.qty, 'Quantity Out': '', 'Balance Stock': c.newStock,
-        'Notes': opts.batchId ? ('Batch ' + opts.batchId) : '', 'Lot ID': r.lotId
+        'Notes': opts.batchId ? ('Batch ' + opts.batchId) : '', 'Lot ID': r.lotId,
+          'Source Sale Product ID': c.sourceSaleProductId
       });
     });
   });
