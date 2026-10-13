@@ -60,6 +60,7 @@ test('Sales Return search/detail use live customer settlement paid due and statu
   ctx.customerInvoiceSettlementSnapshot_ = () => ({ paidAmount: 100, dueAmount: 0, paymentStatus: 'Paid' });
   ctx.customerInvoiceCashCollected_ = () => 100;
   vm.createContext(ctx);
+  vm.runInContext(read('Bundles.gs'), ctx, { filename: 'Bundles.gs' });
   vm.runInContext(read('SalesReturn.gs'), ctx, { filename: 'SalesReturn.gs' });
 
   const search = ctx.searchInvoicesForReturn('T', 'INV-1');
