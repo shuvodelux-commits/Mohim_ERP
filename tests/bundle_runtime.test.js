@@ -169,3 +169,43 @@ test('return one of two sets restores original physical lots and only one bundle
  assert.equal(w.rows.CASH_BOOK.length,2);
  assert.deepEqual(w.rows.SALE_ITEM_LOTS.map(l=>l.Quantity),[5,10,1]);
 });
+
+
+test('historical bundle return uses sale-time recipe after master recipe changes',()=>{
+ const w=workbook(),sale=w.sell([w.kit()]);
+ assert.equal(sale.success,true,sale.message);
+ // Future sets now contain 99 pipes, but this old invoice contained 5.
+ w.rows.BUNDLE_COMPONENTS[0]['Quantity Per Set']=99;
+ w.rows.PRODUCTS.find(p=>p['Product ID']==='kit')['Bundle Revision']=2;
+ const opts={
+   sale:w.rows.SALES[0],saleItems:w.rows.SALE_ITEMS,returnItems:[],
+   consumptionRows:w.rows.SALE_ITEM_LOTS,stockLots:w.rows.STOCK_LOTS,
+   productsById:Object.fromEntries(w.rows.PRODUCTS.map(p=>[p['Product ID'],p])),
+   cashRefundAvailable:30000,
+   txDate:{dateStr:'2026-10-14',isBackdated:false,backdatedDays:0,reason:''}
+ };
+ const prepared=w.ctx.prepareSalesReturn_({invoiceId:sale.data.invoiceId,refundMethod:'Cash',items:[
+   {productId:'kit',qty:1,price:15000}
+ ]},opts);
+ w.ctx.commitPreparedSalesReturn_(prepared,{returnId:'RET-HISTORY',actingUser:{'User ID':'tester'}});
+ assert.deepEqual(w.state(),{pipe:95,elbow:70,motor:7,kit:0});
+});
+
+test('a bundle return against OVERSOLD component restores negative stock consistently',()=>{
+ const w=workbook(0),sale=w.sell([w.kit()]);
+ assert.equal(sale.success,true,sale.message);
+ const opts={
+   sale:w.rows.SALES[0],saleItems:w.rows.SALE_ITEMS,returnItems:[],
+   consumptionRows:w.rows.SALE_ITEM_LOTS,stockLots:w.rows.STOCK_LOTS,
+   productsById:Object.fromEntries(w.rows.PRODUCTS.map(p=>[p['Product ID'],p])),
+   cashRefundAvailable:30000,
+   txDate:{dateStr:'2026-10-14',isBackdated:false,backdatedDays:0,reason:''}
+ };
+ const prepared=w.ctx.prepareSalesReturn_({invoiceId:sale.data.invoiceId,refundMethod:'Cash',items:[
+   {productId:'kit',qty:1,price:15000}
+ ]},opts);
+ w.ctx.commitPreparedSalesReturn_(prepared,{returnId:'RET-NEG',actingUser:{'User ID':'tester'}});
+ assert.equal(w.state().motor,-1);
+ assert.equal(w.rows.STOCK_LOTS.filter(l=>l['Product ID']==='motor').reduce((n,l)=>n+Number(l['Remaining Quantity']||0),0),-1);
+ assert.equal(w.rows.SALE_ITEM_LOTS.find(l=>l['Product ID']==='motor').Quantity,1);
+});
