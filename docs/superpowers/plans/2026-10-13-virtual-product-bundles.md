@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-13-virtual-product-bundles-design.md`
 
-**Review state:** Documentation-only; do not execute until user approves. Work in an isolated feature branch based on refreshed `main`; never modify `legacy/`.
+**Implementation state (2026-10-13):** The virtual Bundle feature was implemented and merged in [PR #19](https://github.com/shuvodelux-commits/Mohim_ERP/pull/19). This document records the historical design and implementation plan; its unchecked tasks and pre-approval constraints are archival, not current execution instructions.
 
 ## Global Constraints
 
