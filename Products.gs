@@ -19,6 +19,9 @@ function getProductsBootstrap(token) {
   try {
     requirePermission_(token, "products", "view");
     const products = activeRows_("PRODUCTS");
+    const productMap = bundleProductMap_(products);
+    const bundleIds = products.filter(function (p) { return bundleProductType_(p) === 'Bundle'; }).map(function (p) { return p['Product ID']; });
+    const bundleDefinitions = bundleIds.length ? getBundleDefinitions_(bundleIds, productMap, getAllRows_('BUNDLE_COMPONENTS')) : {};
     const settings = getSettingsMap_();
     const categories = getAllRows_("PRODUCT_CATEGORIES").filter(function (c) {
       return c["Status"] !== "Inactive";
@@ -68,7 +71,8 @@ function getProductsBootstrap(token) {
 
     const productsWithValue = products.map(function (p) {
       const pid = p["Product ID"];
-      const currentStock = Number(p["Current Stock"]) || 0;
+      const isBundle = bundleProductType_(p) === 'Bundle';
+      const currentStock = isBundle ? 0 : (Number(p["Current Stock"]) || 0);
       const productCost = Number(p["Purchase Price"]) || 0;
       const stats = lotStatsByProduct[pid];
       let stockValue;
@@ -91,7 +95,10 @@ function getProductsBootstrap(token) {
       }
 
       return Object.assign({}, p, {
-        "Stock Value": stockValue,
+        'Product Type': isBundle ? 'Bundle' : 'Standard',
+        'Bundle Components': isBundle ? bundleDefinitions[p['Product ID']].components : [],
+        'Available Sets': isBundle ? getBundleAvailability_(bundleDefinitions[p['Product ID']],productMap) : 0,
+        "Stock Value": isBundle ? 0 : stockValue,
         "Unpriced Lot Count": stats ? (stats.unpricedInternalLotCount || 0) : 0,
         "Unpriced Remaining Quantity": stats ? (stats.unpricedInternalQty || 0) : 0
       });
@@ -115,6 +122,7 @@ function getProductsBootstrap(token) {
 }
 
 function addProduct(token, payload) {
+  if (payload && payload.productType === 'Bundle') return addBundleProduct(token, payload);
   const lock = LockService.getScriptLock();
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
@@ -202,6 +210,7 @@ function addProduct(token, payload) {
  * silently drift from Current Stock.
  */
 function updateProduct(token, productId, payload) {
+  if (payload && payload.productType === 'Bundle') return updateBundleProduct(token, productId, payload);
   const lock = LockService.getScriptLock();
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
@@ -223,6 +232,7 @@ function updateProduct(token, productId, payload) {
     const product = getAllRows_("PRODUCTS").filter(function (p) {
       return p["Product ID"] === productId;
     })[0];
+    if (bundleProductType_(product) === 'Bundle') throw new Error('Bundle stock cannot be edited. Change its components instead.');
     const currentStock = Number(product["Current Stock"]) || 0;
     const newStock = Number(payload.stock);
     const delta = newStock - currentStock;
@@ -303,6 +313,8 @@ function adjustStock(token, productId, deltaQty, note) {
     requireActiveCashSession_();
     const rowIndex = findRowIndex_("PRODUCTS", "Product ID", productId);
     if (rowIndex === -1) return fail_("Product not found.");
+    const product = getAllRows_('PRODUCTS').filter(function (p) { return p._rowIndex === rowIndex; })[0];
+    if (bundleProductType_(product) === 'Bundle') throw new Error('Bundle stock cannot be adjusted.');
     const delta = Number(deltaQty);
     if (isNaN(delta) || delta === 0)
       return fail_(
