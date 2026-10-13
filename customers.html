@@ -153,7 +153,7 @@
 
   function custLoad() {
     return withLoader(serverCall('getCustomersBootstrap', authToken)).then(function (data) {
-      custState.customers = data.customers;
+      custState.customers = data.customers.slice().reverse();
       custState.bankAccounts = data.bankAccounts;
       custState.currencySymbol = data.currencySymbol;
       custFillBankAccountSelect_(document.getElementById('custPayMethod').value);

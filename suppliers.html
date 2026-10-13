@@ -160,7 +160,7 @@
 
   function supLoad() {
     return withLoader(serverCall('getSuppliersBootstrap', authToken)).then(function (data) {
-      supState.suppliers = data.suppliers;
+      supState.suppliers = data.suppliers.slice().reverse();
       supState.currencySymbol = data.currencySymbol;
       supState.bankAccounts = data.bankAccounts;
       fillBankAccountSelect_(document.getElementById('supPayBankAccount'), supState.bankAccounts, document.getElementById('supPayMethod').value);

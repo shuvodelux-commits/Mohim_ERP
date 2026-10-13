@@ -273,7 +273,7 @@
 
   function prodLoad() {
     return withLoader(serverCall('getProductsBootstrap', authToken)).then(function (data) {
-      prodState.products = data.products;
+      prodState.products = data.products.slice().reverse();
       prodFillBundleSelector_();
       smartIndexProducts_(prodState.products);
       prodState.categories = data.categories;
