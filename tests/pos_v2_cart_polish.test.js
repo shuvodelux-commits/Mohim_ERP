@@ -18,9 +18,11 @@ function functionSource(source, name) {
   const start = source.indexOf('function ' + name + '(');
   assert.notStrictEqual(start, -1, 'missing function ' + name);
   const brace = source.indexOf('{', start);
-  let depth = 0, quote = null, escape = false;
+  let depth = 0, quote = null, escape = false, lineComment = false, blockComment = false;
   for (let i = brace; i < source.length; i++) {
-    const ch = source[i];
+    const ch = source[i], next = source[i + 1];
+    if (lineComment) { if (ch === '\n' || ch === '\r') lineComment = false; continue; }
+    if (blockComment) { if (ch === '*' && next === '/') { blockComment = false; i++; } continue; }
     if (quote) {
       if (escape) { escape = false; continue; }
       if (ch === '\\') { escape = true; continue; }
@@ -28,6 +30,8 @@ function functionSource(source, name) {
       continue;
     }
     if (ch === '"' || ch === "'" || ch === '`') { quote = ch; continue; }
+    if (ch === '/' && next === '/') { lineComment = true; i++; continue; }
+    if (ch === '/' && next === '*') { blockComment = true; i++; continue; }
     if (ch === '{') depth++;
     else if (ch === '}' && --depth === 0) return source.slice(start, i + 1);
   }
