@@ -18,9 +18,11 @@ function functionSource(source, name) {
   const start = source.indexOf('function ' + name + '(');
   assert.notStrictEqual(start, -1, 'missing function ' + name);
   const brace = source.indexOf('{', start);
-  let depth = 0, quote = null, escape = false;
+  let depth = 0, quote = null, escape = false, lineComment = false, blockComment = false;
   for (let i = brace; i < source.length; i++) {
-    const ch = source[i];
+    const ch = source[i], next = source[i + 1];
+    if (lineComment) { if (ch === '\n' || ch === '\r') lineComment = false; continue; }
+    if (blockComment) { if (ch === '*' && next === '/') { blockComment = false; i++; } continue; }
     if (quote) {
       if (escape) { escape = false; continue; }
       if (ch === '\\') { escape = true; continue; }
@@ -28,6 +30,8 @@ function functionSource(source, name) {
       continue;
     }
     if (ch === '"' || ch === "'" || ch === '`') { quote = ch; continue; }
+    if (ch === '/' && next === '/') { lineComment = true; i++; continue; }
+    if (ch === '/' && next === '*') { blockComment = true; i++; continue; }
     if (ch === '{') depth++;
     else if (ch === '}' && --depth === 0) return source.slice(start, i + 1);
   }
@@ -75,9 +79,12 @@ test('POS V2 adds metadata under completed product names and refreshes it after 
   assert.match(enhance, /innerHTML/);
 });
 
-test('POS V2 product grid reserves fixed space for the purchase-price eye', () => {
-  assert.match(v2, /body\.pos-v2-active\s+#page-pos\s+\.cart-row\s+\.c-name-main\s*\{[^}]*position:\s*relative[^}]*padding-right:/s);
-  assert.match(v2, /body\.pos-v2-active\s+#page-pos\s+\.cart-row\s+\.c-cost\s*\{[^}]*position:\s*absolute[^}]*right:\s*0/s);
+test('POS V2 purchase-price eye is vertically centered without overlapping product names', () => {
+  // The product cell is now the positioning context so the eye stays
+  // vertically centered even with a multi-line name or metadata below it.
+  assert.match(v2, /body\.pos-v2-active\s+#page-pos\s+\.cart-row\s+\.c-name\s*\{[^}]*position:\s*relative/s);
+  assert.match(v2, /body\.pos-v2-active\s+#page-pos\s+\.cart-row\s+\.c-name-main\s*\{[^}]*position:\s*static[^}]*padding-right:\s*76px/s);
+  assert.match(v2, /body\.pos-v2-active\s+#page-pos\s+\.cart-row\s+\.c-cost\s*\{[^}]*position:\s*absolute[^}]*right:\s*0[^}]*top:\s*50%[^}]*transform:\s*translateY\(-50%\)/s);
   assert.match(v2, /body\.pos-v2-active\s+#page-pos\s+\.cart-row\s+\.c-cost\.is-revealed\s*\{[^}]*right:\s*0/s);
 });
 
