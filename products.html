@@ -48,6 +48,9 @@
           <label>Product Name *<br><span class="bn-hint" style="display:inline;">পণ্যের নাম</span></label>
           <input id="prodName" type="text" placeholder="e.g. PVC Pipe 1&quot;">
         </div>
+        <div class="full"><label>Product Type</label>
+          <select id="prodType"><option value="Standard">Standard Product</option><option value="Bundle">Bundle / Set</option></select>
+        </div>
         <div>
           <label>Brand (optional)<br><span class="bn-hint" style="display:inline;">ব্র্যান্ড (ঐচ্ছিক)</span></label>
           <input id="prodBrand" type="text" placeholder="e.g. ACI, Samsung">
@@ -81,6 +84,16 @@
         <div>
           <label>Minimum Stock *<br><span class="bn-hint" style="display:inline;">সর্বনিম্ন মজুদ</span></label>
           <input id="prodMinStock" type="number" min="0" step="1" value="5">
+        </div>
+        <div class="full" id="prodBundleEditor" hidden>
+          <label>Products inside one set</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <select id="prodBundleSelect" aria-label="Bundle product" style="flex:2;min-width:140px"><option value="">Choose product...</option></select>
+            <input id="prodBundleQty" aria-label="Quantity per set" type="number" min="0.001" step="any" value="1" style="max-width:88px">
+            <button class="btn" type="button" id="prodBundleAddItem">Add</button>
+          </div>
+          <div id="prodBundleItems" style="margin-top:8px"></div>
+          <p class="bn-hint">Components deduct stock on sale. Shortages may go negative.</p>
         </div>
         <div class="full">
           <label>Barcode (optional)<br><span class="bn-hint" style="display:inline;">বারকোড (ঐচ্ছিক)</span></label>
@@ -246,7 +259,7 @@
 <div id="prodActionMenu" class="action-menu" role="menu" hidden></div>
 
 <script>
-  var prodState = { products: [], categories: [], units: [], lowStockThreshold: 5, editingId: null, addSource: '', stockEditingId: null, stockEditingName: '', stockEditingCurrent: 0, sortKey: '', sortDir: 'asc', currentLotsProduct: null, currentLots: [], lotCostSelected: null, unpricedLots: [] };
+  var prodState = { bundleItems: [], products: [], categories: [], units: [], lowStockThreshold: 5, editingId: null, addSource: '', stockEditingId: null, stockEditingName: '', stockEditingCurrent: 0, sortKey: '', sortDir: 'asc', currentLotsProduct: null, currentLots: [], lotCostSelected: null, unpricedLots: [] };
   var prodManageListMode_ = null; // 'category' | 'unit' — which list the shared Manage modal is currently showing
 
    /** Product delete. The server refuses if stock is non-zero or it is in use. */
@@ -261,6 +274,7 @@
   function prodLoad() {
     return withLoader(serverCall('getProductsBootstrap', authToken)).then(function (data) {
       prodState.products = data.products;
+      prodFillBundleSelector_();
       smartIndexProducts_(prodState.products);
       prodState.categories = data.categories;
       prodState.units = data.units;
@@ -349,8 +363,9 @@
     trigger.setAttribute('aria-expanded', 'true');
     menu.innerHTML =
       '<button type="button" class="action-menu-item" role="menuitem" data-menu-act="edit">Edit</button>' +
+      (product['Product Type'] === 'Bundle' ? '' :
       '<button type="button" class="action-menu-item" role="menuitem" data-menu-act="stock">Adjust Stock</button>' +
-      '<button type="button" class="action-menu-item" role="menuitem" data-menu-act="lots">View Lots</button>' +
+      '<button type="button" class="action-menu-item" role="menuitem" data-menu-act="lots">View Lots</button>') +
       '<button type="button" class="action-menu-item" role="menuitem" data-menu-act="toggle">' + (product['Status'] === 'Active' ? 'Deactivate' : 'Activate') + '</button>' +
       '<div class="action-menu-divider" role="separator"></div>' +
       '<button type="button" class="action-menu-item danger" role="menuitem" data-menu-act="del">Delete</button>';
@@ -459,21 +474,23 @@
     var body = document.getElementById('prodTableBody');
     body.innerHTML = '';
     rows.forEach(function (p) {
-      var lowStock = Number(p['Current Stock']) <= Number(p['Minimum Stock']);
+      var isBundle = p['Product Type'] === 'Bundle';
+       var lowStock = !isBundle && Number(p['Current Stock']) <= Number(p['Minimum Stock']);
       var statusBadge = p['Status'] === 'Active' ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-danger">Inactive</span>';
-      var stockCell = '<span>' + p['Current Stock'] + '</span>' + (lowStock ? ' <span class="badge badge-warning">Low</span>' : '');
+      var stockCell = isBundle ? '<span>' + (Number(p['Available Sets']) || 0) + ' sets</span>' :
+         '<span>' + p['Current Stock'] + '</span>' + (lowStock ? ' <span class="badge badge-warning">Low</span>' : '');
       var unpricedCount = Number(p['Unpriced Lot Count']) || 0;
       var unpricedBadge = unpricedCount > 0 ? ' <span class="badge badge-warning">Unpriced lots: ' + unpricedCount + '</span>' : '';
 
       var tr = document.createElement('tr');
       tr.innerHTML =
-        '<td>' + escapeHtml(p['Product Name']) + unpricedBadge + '<div style="font-size:11px;color:var(--color-text-muted);">' +
+        '<td>' + escapeHtml(p['Product Name']) + (isBundle ? ' <span class="badge">Bundle</span>' : '') + unpricedBadge + '<div style="font-size:11px;color:var(--color-text-muted);">' +
           escapeHtml([p['Brand'] || '', p['Unit'] || ''].filter(Boolean).join(' · ')) + '</div></td>' +
         '<td>' + escapeHtml(p['Category'] || '') + '</td>' +
-        '<td class="num">' + formatMoney(p['Purchase Price']) + '</td>' +
+        '<td class="num">' + (isBundle ? '—' : formatMoney(p['Purchase Price'])) + '</td>' +
         '<td class="num">' + formatMoney(p['Selling Price']) + '</td>' +
         '<td class="num">' + stockCell + '</td>' +
-        '<td class="num">' + formatMoney(p['Stock Value']) + '</td>' +
+        '<td class="num">' + (isBundle ? '—' : formatMoney(p['Stock Value'])) + '</td>' +
         '<td>' + statusBadge + '</td>' +
         '<td style="white-space:nowrap;">' +
           '<button class="btn" data-act="menu" data-id="' + p['Product ID'] + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button>' +
@@ -558,8 +575,48 @@
   window.addEventListener('resize', prodCloseActionMenu_);
   window.addEventListener('scroll', prodCloseActionMenu_, true);
 
+  function prodFillBundleSelector_() {
+    var select = document.getElementById('prodBundleSelect');
+    select.innerHTML = '<option value="">Choose product...</option>' +
+      prodState.products.filter(function(p){return (p['Product Type'] || 'Standard') !== 'Bundle' && p.Status === 'Active';})
+      .map(function(p){return '<option value="'+escapeHtml(p['Product ID'])+'">'+escapeHtml(p['Product Name'])+' ('+escapeHtml(p.Unit||'pcs')+')</option>';}).join('');
+  }
+  function prodBundleRender_() {
+    document.getElementById('prodBundleItems').innerHTML = prodState.bundleItems.map(function(item,i) {
+      var p=prodState.products.filter(function(x){return x['Product ID']===item.productId;})[0];
+      return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--color-border);">' +
+        '<span style="flex:1;">'+escapeHtml(p?p['Product Name']:item.productId)+'</span>' +
+        '<strong>'+Number(item.qtyPerSet)+' '+escapeHtml(p?p.Unit||'pcs':'')+'</strong>' +
+        '<button class="btn" type="button" data-bundle-remove="'+i+'">Remove</button></div>';
+    }).join('');
+  }
+  function prodBundleToggle_() {
+    var bundle=document.getElementById('prodType').value==='Bundle';
+    document.getElementById('prodBundleEditor').hidden=!bundle;
+    ['prodPurchasePrice','prodStock','prodMinStock'].forEach(function(id){document.getElementById(id).parentElement.hidden=bundle;});
+    document.getElementById('prodUnit').parentElement.parentElement.hidden=bundle;
+    if(bundle){document.getElementById('prodStock').value=0;document.getElementById('prodMinStock').value=0;document.getElementById('prodPurchasePrice').value=0;}
+    prodBundleRender_();
+  }
+  document.getElementById('prodType').addEventListener('change',prodBundleToggle_);
+  document.getElementById('prodBundleAddItem').addEventListener('click',function(){
+    var id=document.getElementById('prodBundleSelect').value,qty=Number(document.getElementById('prodBundleQty').value);
+    if(!id||!Number.isFinite(qty)||qty<=0){showToast('Choose a product and positive quantity.','error');return;}
+    if(prodState.bundleItems.some(function(x){return x.productId===id;})){showToast('Product already added.','error');return;}
+    prodState.bundleItems.push({productId:id,qtyPerSet:qty});
+    document.getElementById('prodBundleSelect').value='';
+    prodBundleRender_();
+  });
+  document.getElementById('prodBundleItems').addEventListener('click',function(e){
+    var btn=e.target.closest('[data-bundle-remove]');if(!btn)return;
+    prodState.bundleItems.splice(Number(btn.dataset.bundleRemove),1);prodBundleRender_();
+  });
   function prodOpenAddModal_(source) {
     prodState.editingId = null;
+    prodState.bundleItems = [];
+    document.getElementById('prodType').value = 'Standard';
+    document.getElementById('prodType').disabled = false;
+    prodBundleToggle_();
     prodState.addSource = source || 'products';
     document.getElementById('prodModalTitle').textContent = 'Add Product';
     ['prodName', 'prodBrand', 'prodCategory', 'prodUnit', 'prodPurchasePrice', 'prodSellingPrice', 'prodBarcode'].forEach(function (id) { document.getElementById(id).value = ''; });
@@ -577,6 +634,10 @@
   function prodOpenEdit_(product) {
     prodState.addSource = '';
     prodState.editingId = product['Product ID'];
+    prodState.bundleItems = (product['Bundle Components'] || []).map(function(c){return {productId:c.productId,qtyPerSet:c.qtyPerSet};});
+    document.getElementById('prodType').value = product['Product Type'] === 'Bundle' ? 'Bundle' : 'Standard';
+    document.getElementById('prodType').disabled = true;
+    prodBundleToggle_();
     document.getElementById('prodModalTitle').textContent = 'Edit Product';
     document.getElementById('prodName').value = product['Product Name'];
     document.getElementById('prodBrand').value = product['Brand'] || '';
@@ -687,7 +748,9 @@
       sellingPrice: document.getElementById('prodSellingPrice').value,
       stock: document.getElementById('prodStock').value,
       minStock: document.getElementById('prodMinStock').value,
-      barcode: document.getElementById('prodBarcode').value.trim()
+      barcode: document.getElementById('prodBarcode').value.trim(),
+      productType: document.getElementById('prodType').value,
+      components: prodState.bundleItems.slice()
     };
     var errEl = document.getElementById('prodFormError');
     errEl.style.display = 'none';
