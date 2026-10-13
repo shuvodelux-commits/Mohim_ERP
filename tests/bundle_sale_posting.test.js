@@ -24,7 +24,7 @@ test('selling a bundle writes only a parent SALE_ITEMS row while posting physica
 test('bundle price is the own Selling Price, not sum of component individual prices',()=>{
  const src=read('Sales.gs');
  assert.match(src,/product\['Selling Price'\]/);
- assert.match(src,/isBundle \? \{ unitPrice:/);
+ assert.match(src,/isBundle \? \{\s*unitPrice:/);
 });
 test('customer money and sale header still post exactly once outside component loop',()=>{
  const src=read('Sales.gs');
