@@ -88,7 +88,12 @@
         <div class="full" id="prodBundleEditor" hidden>
           <label>Products inside one set</label>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <select id="prodBundleSelect" aria-label="Bundle product" style="flex:2;min-width:140px"><option value="">Choose product...</option></select>
+            <div class="combo-wrap smart-search-box" style="flex:2;min-width:140px">
+              <input id="prodBundleSearch" class="search-input" type="search" autocomplete="off" spellcheck="false"
+                placeholder="Search name, barcode, brand..." aria-label="Search bundle component" role="combobox"
+                aria-autocomplete="list" aria-controls="prodBundleResults" aria-expanded="false">
+              <button type="button" class="smart-search-clear" id="prodBundleClear" aria-label="Clear component search" title="Clear search" hidden>&#10005;</button>
+            </div>
             <input id="prodBundleQty" aria-label="Quantity per set" type="number" min="0.001" step="any" value="1" style="max-width:88px">
             <button class="btn" type="button" id="prodBundleAddItem">Add</button>
           </div>
@@ -274,7 +279,6 @@
   function prodLoad() {
     return withLoader(serverCall('getProductsBootstrap', authToken)).then(function (data) {
       prodState.products = data.products.slice().reverse();
-      prodFillBundleSelector_();
       smartIndexProducts_(prodState.products);
       prodState.categories = data.categories;
       prodState.units = data.units;
@@ -575,12 +579,162 @@
   window.addEventListener('resize', prodCloseActionMenu_);
   window.addEventListener('scroll', prodCloseActionMenu_, true);
 
-  function prodFillBundleSelector_() {
-    var select = document.getElementById('prodBundleSelect');
-    select.innerHTML = '<option value="">Choose product...</option>' +
-      prodState.products.filter(function(p){return (p['Product Type'] || 'Standard') !== 'Bundle' && p.Status === 'Active';})
-      .map(function(p){return '<option value="'+escapeHtml(p['Product ID'])+'">'+escapeHtml(p['Product Name'])+' ('+escapeHtml(p.Unit||'pcs')+')</option>';}).join('');
+  // The bundle picker reuses the ERP's ranked product search. Its popup
+  // lives on <body> so the product modal's scroll area cannot clip it.
+  var prodBundleMatches_ = [];
+  var prodBundleActiveIndex_ = -1;
+
+  function prodBundlePopup_() {
+    var popup = document.getElementById('prodBundleResults');
+    if (popup) return popup;
+    popup = document.createElement('div');
+    popup.id = 'prodBundleResults';
+    popup.className = 'combo-list';
+    popup.setAttribute('role', 'listbox');
+    popup.hidden = true;
+    popup.style.position = 'fixed';
+    popup.style.zIndex = '1000';
+    popup.style.maxHeight = 'min(240px, 40vh)';
+    document.body.appendChild(popup);
+    popup.addEventListener('mousedown', function (e) {
+      if (e.target.closest('[data-bundle-pick]')) e.preventDefault();
+    });
+    popup.addEventListener('click', function (e) {
+      var option = e.target.closest('[data-bundle-pick]');
+      if (option) prodBundleChoose_(Number(option.dataset.bundlePick));
+    });
+    return popup;
   }
+
+  function prodBundleCloseSearch_() {
+    var popup = document.getElementById('prodBundleResults');
+    if (popup) { popup.hidden = true; popup.innerHTML = ''; }
+    prodBundleMatches_ = [];
+    prodBundleActiveIndex_ = -1;
+    document.getElementById('prodBundleSearch').setAttribute('aria-expanded', 'false');
+  }
+
+  function prodBundleSyncClear_() {
+    document.getElementById('prodBundleClear').hidden =
+      !document.getElementById('prodBundleSearch').value;
+  }
+
+  function prodBundleResetSearch_() {
+    var input = document.getElementById('prodBundleSearch');
+    input.value = '';
+    input.dataset.selectedId = '';
+    prodBundleCloseSearch_();
+    prodBundleSyncClear_();
+  }
+
+  function prodBundleHighlight_() {
+    var popup = prodBundlePopup_();
+    Array.prototype.forEach.call(popup.querySelectorAll('[data-bundle-pick]'), function (option, index) {
+      var active = index === prodBundleActiveIndex_;
+      option.classList.toggle('active', active);
+      option.setAttribute('aria-selected', active ? 'true' : 'false');
+      if (active && option.scrollIntoView) option.scrollIntoView({ block: 'nearest' });
+    });
+  }
+
+  function prodBundlePlaceSearch_() {
+    var input = document.getElementById('prodBundleSearch');
+    var popup = prodBundlePopup_();
+    var rect = input.getBoundingClientRect();
+    var width = Math.min(Math.max(rect.width, 280), window.innerWidth - 16);
+    var height = Math.min(popup.scrollHeight || 240, 240);
+    var below = window.innerHeight - rect.bottom - 8;
+    var above = rect.top - 8;
+    var top = below < Math.min(height, 120) && above > below
+      ? rect.top - height - 4 : rect.bottom + 4;
+    popup.style.left = Math.round(Math.max(8, Math.min(rect.left, window.innerWidth - width - 8))) + 'px';
+    popup.style.top = Math.round(Math.max(8, Math.min(top, window.innerHeight - height - 8))) + 'px';
+    popup.style.width = Math.round(width) + 'px';
+  }
+
+  function prodBundleShowSearch_() {
+    var input = document.getElementById('prodBundleSearch');
+    var query = input.value.trim();
+    if (!query || input.dataset.selectedId || document.getElementById('prodBundleEditor').hidden) {
+      prodBundleCloseSearch_();
+      return;
+    }
+    var available = prodState.products.filter(function (p) {
+      return (p['Product Type'] || 'Standard') !== 'Bundle' &&
+        p.Status === 'Active' &&
+        !prodState.bundleItems.some(function (item) { return item.productId === p['Product ID']; });
+    });
+    prodBundleMatches_ = smartSearchProducts_(available, query, 12);
+    prodBundleActiveIndex_ = prodBundleMatches_.length ? 0 : -1;
+    var popup = prodBundlePopup_();
+    popup.innerHTML = prodBundleMatches_.map(function (p, index) {
+      var unit = p.Unit || 'pcs';
+      var stock = Number(p['Current Stock']) || 0;
+      return '<button type="button" class="counter-combo-option combo-option" role="option" data-bundle-pick="' + index + '">' +
+        '<span><strong>' + escapeHtml(p['Product Name']) + '</strong><small>' +
+        escapeHtml([p.Brand, p.Category, p.Barcode].filter(Boolean).join(' · ')) +
+        '</small></span><span class="counter-combo-meta">Stock ' +
+        escapeHtml(String(stock) + ' ' + unit) + '</span></button>';
+    }).join('') || '<div class="combo-option-empty">No matching products</div>';
+    popup.hidden = false;
+    input.setAttribute('aria-expanded', 'true');
+    prodBundlePlaceSearch_();
+    prodBundleHighlight_();
+  }
+
+  function prodBundleChoose_(index) {
+    var product = prodBundleMatches_[index];
+    if (!product) return;
+    var input = document.getElementById('prodBundleSearch');
+    input.dataset.selectedId = product['Product ID'];
+    input.value = product['Product Name'] + ' (' + (product.Unit || 'pcs') + ')';
+    prodBundleCloseSearch_();
+    prodBundleSyncClear_();
+    var qty = document.getElementById('prodBundleQty');
+    qty.focus();
+    qty.select();
+  }
+
+  var prodBundleSearchInput_ = document.getElementById('prodBundleSearch');
+  prodBundleSearchInput_.addEventListener('focus', prodBundleShowSearch_);
+  prodBundleSearchInput_.addEventListener('input', function () {
+    prodBundleSearchInput_.dataset.selectedId = '';
+    prodBundleSyncClear_();
+    prodBundleShowSearch_();
+  });
+  prodBundleSearchInput_.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { prodBundleCloseSearch_(); return; }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (prodBundlePopup_().hidden) { prodBundleShowSearch_(); return; }
+      if (prodBundleMatches_.length) {
+        prodBundleActiveIndex_ = Math.max(0, Math.min(prodBundleMatches_.length - 1,
+          prodBundleActiveIndex_ + (e.key === 'ArrowDown' ? 1 : -1)));
+        prodBundleHighlight_();
+      }
+    } else if (e.key === 'Enter' && !prodBundlePopup_().hidden && prodBundleMatches_.length) {
+      e.preventDefault();
+      prodBundleChoose_(prodBundleActiveIndex_);
+    }
+  });
+  document.getElementById('prodBundleClear').addEventListener('click', function () {
+    prodBundleResetSearch_();
+    prodBundleSearchInput_.focus();
+  });
+  document.getElementById('prodBundleQty').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); document.getElementById('prodBundleAddItem').click(); }
+  });
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('#prodBundleSearch') &&
+        !e.target.closest('#prodBundleResults') &&
+        !e.target.closest('#prodBundleClear')) prodBundleCloseSearch_();
+  });
+  window.addEventListener('resize', prodBundleCloseSearch_);
+  document.addEventListener('scroll', function (e) {
+    var popup = document.getElementById('prodBundleResults');
+    if (!popup || !popup.contains(e.target)) prodBundleCloseSearch_();
+  }, true);
+
   function prodBundleRender_() {
     document.getElementById('prodBundleItems').innerHTML = prodState.bundleItems.map(function(item,i) {
       var p=prodState.products.filter(function(x){return x['Product ID']===item.productId;})[0];
@@ -596,16 +750,19 @@
     ['prodPurchasePrice','prodStock','prodMinStock'].forEach(function(id){document.getElementById(id).parentElement.hidden=bundle;});
     document.getElementById('prodUnit').parentElement.parentElement.hidden=bundle;
     if(bundle){document.getElementById('prodStock').value=0;document.getElementById('prodMinStock').value=0;document.getElementById('prodPurchasePrice').value=0;}
+    if (!bundle) prodBundleCloseSearch_();
     prodBundleRender_();
   }
   document.getElementById('prodType').addEventListener('change',prodBundleToggle_);
   document.getElementById('prodBundleAddItem').addEventListener('click',function(){
-    var id=document.getElementById('prodBundleSelect').value,qty=Number(document.getElementById('prodBundleQty').value);
-    if(!id||!Number.isFinite(qty)||qty<=0){showToast('Choose a product and positive quantity.','error');return;}
+    var id=document.getElementById('prodBundleSearch').dataset.selectedId,qty=Number(document.getElementById('prodBundleQty').value);
+    if(!id||!Number.isFinite(qty)||qty<=0){showToast('Select a product from search and enter a positive quantity.','error');return;}
     if(prodState.bundleItems.some(function(x){return x.productId===id;})){showToast('Product already added.','error');return;}
     prodState.bundleItems.push({productId:id,qtyPerSet:qty});
-    document.getElementById('prodBundleSelect').value='';
+    prodBundleResetSearch_();
+    document.getElementById('prodBundleQty').value = 1;
     prodBundleRender_();
+    document.getElementById('prodBundleSearch').focus();
   });
   document.getElementById('prodBundleItems').addEventListener('click',function(e){
     var btn=e.target.closest('[data-bundle-remove]');if(!btn)return;
@@ -614,6 +771,8 @@
   function prodOpenAddModal_(source) {
     prodState.editingId = null;
     prodState.bundleItems = [];
+    prodBundleResetSearch_();
+    document.getElementById('prodBundleQty').value = 1;
     document.getElementById('prodType').value = 'Standard';
     document.getElementById('prodType').disabled = false;
     prodBundleToggle_();
@@ -635,6 +794,8 @@
     prodState.addSource = '';
     prodState.editingId = product['Product ID'];
     prodState.bundleItems = (product['Bundle Components'] || []).map(function(c){return {productId:c.productId,qtyPerSet:c.qtyPerSet};});
+    prodBundleResetSearch_();
+    document.getElementById('prodBundleQty').value = 1;
     document.getElementById('prodType').value = product['Product Type'] === 'Bundle' ? 'Bundle' : 'Standard';
     document.getElementById('prodType').disabled = true;
     prodBundleToggle_();
