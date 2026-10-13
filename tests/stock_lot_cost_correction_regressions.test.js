@@ -52,7 +52,13 @@ function loadProductFunctions(names, overrides = {}) {
   const source = read('Products.gs');
   const context = { console, ...overrides };
   vm.createContext(context);
-  const body = names.map(name => fnSource(source, name)).join('\n') +
+  // Products now depends on these real shared bundle helpers even when
+  // a legacy Standard product is under test. Load the implementations
+  // rather than replacing them with test-only identity stubs.
+  const bundleSource = read('Bundles.gs');
+  const shared = ['bundleProductType_', 'bundleProductMap_'];
+  const body = shared.map(name => fnSource(bundleSource, name)).join('\n') + '\n' +
+    names.map(name => fnSource(source, name)).join('\n') +
     '\nthis.__api = {' + names.join(',') + '};';
   vm.runInContext(body, context, { filename: 'Products.gs' });
   return context.__api;

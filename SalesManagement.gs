@@ -98,6 +98,31 @@ function buildSalesInvoiceProfitMetrics_(sales, saleItems, returnItems, duplicat
       economicReturnLineAmount_(ri, parent['Subtotal'], parent['Grand Total']));
   });
 
+  // A sold virtual set is costed by its physical parts, not a phantom
+  // SALE_ITEM_LOTS row for the parent Bundle product ID.
+  const snapshotsByInvoice = {};
+  getAllRows_('SALE_BUNDLE_COMPONENTS').forEach(function(r){
+    const id=String(r['Invoice ID']||'');
+    if(!inScope[id])return;
+    if(!snapshotsByInvoice[id])snapshotsByInvoice[id]=[];
+    snapshotsByInvoice[id].push(r);
+  });
+  Object.keys(snapshotsByInvoice).forEach(function(id){
+    const initial={...soldQty[id]},ret={...returnedQty[id]};
+    snapshotsByInvoice[id].forEach(function(r){
+      const bundleId=String(r['Bundle Product ID']||'');
+      const physicalId=String(r['Component Product ID']||'');
+      const perSet=Number(r['Quantity Per Set'])||0;
+      addQty_(soldQty,id,physicalId,(Number(initial[bundleId])||0)*perSet);
+      addQty_(returnedQty,id,physicalId,(Number(ret[bundleId])||0)*perSet);
+    });
+    snapshotsByInvoice[id].forEach(function(r){
+      const bundleId=String(r['Bundle Product ID']||'');
+      delete soldQty[id][bundleId];
+      if(returnedQty[id])delete returnedQty[id][bundleId];
+    });
+  });
+
   getAllRows_('SALE_ITEM_LOTS').forEach(function (lot) {
     const id = String(lot['Invoice ID'] || '');
     if (!inScope[id]) return;
@@ -312,7 +337,9 @@ function restoreSaleStockEffectForVendorSourcing_(invoiceId, productId, productN
 
   const consumedRows = getAllRows_('SALE_ITEM_LOTS')
     .filter(function (r) {
-      return r['Invoice ID'] === invoiceId && r['Product ID'] === productId && (Number(r['Quantity']) || 0) > 0;
+      return r['Invoice ID'] === invoiceId && r['Product ID'] === productId &&
+        String(r['Source Sale Product ID'] || r['Product ID']) === String(productId) &&
+        (Number(r['Quantity']) || 0) > 0;
     })
     .sort(function (a, b) { return b._rowIndex - a._rowIndex; });
 
@@ -380,6 +407,7 @@ function getSaleForUpdate(token, invoiceId) {
     const hasReturn = activeSalesReturnItems_().some(function (ri) { return ri['Invoice ID'] === invoiceId; });
     if (hasReturn) return fail_('This invoice has Sales Return records and can no longer be updated. Use Sales Return for further corrections.');
 
+
     const sessions = getAllRows_('CASH_SESSIONS');
     const session = findSessionForTimestamp_(sessions, sale['Created At']);
     if (!session || session['Status'] !== 'Open') {
@@ -387,6 +415,7 @@ function getSaleForUpdate(token, invoiceId) {
     }
 
     const items = getAllRows_('SALE_ITEMS').filter(function (i) { return i['Invoice ID'] === invoiceId; });
+    const savedBundles = getSaleBundleSnapshot_(invoiceId, getAllRows_('SALE_BUNDLE_COMPONENTS'));
 
     const vendorByKey = {};
     getAllRows_('VENDOR_SOURCING').filter(function (v) {
@@ -404,6 +433,8 @@ function getSaleForUpdate(token, invoiceId) {
         const v = vendorByKey[i['Product ID']];
         return {
           productId: i['Product ID'], name: i['Product Name'], qty: Number(i['Quantity']) || 0, unitPrice: Number(i['Unit Price']) || 0,
+          productType: savedBundles[i['Product ID']] ? 'Bundle' : (i['Sold Product Type'] || 'Standard'),
+          bundleRevision: savedBundles[i['Product ID']] ? savedBundles[i['Product ID']].revision : 0,
           lineTotal: (i['Line Total'] !== '' && i['Line Total'] !== null && i['Line Total'] !== undefined && isValidNonNegativeNumber_(i['Line Total']))
             ? Number(i['Line Total']) : roundMoney_((Number(i['Quantity']) || 0) * (Number(i['Unit Price']) || 0)),
           vendorId: v ? v['Vendor ID'] : '', vendorName: v ? v['Vendor Name'] : '',
@@ -444,6 +475,8 @@ function updateSaleInternal_(token, invoiceId, payload, options) {
     const sale = findUniqueSalesRow_(invoiceId);
     if (!sale) return fail_('Invoice not found.');
     if (isDeleted_(sale)) return fail_('This invoice has been deleted.');
+
+
     const originalDate = safeDateOnly_(sale['Date']);
     const editDate = originalDate;
     const dateChanged = editDate !== originalDate;
@@ -451,6 +484,7 @@ function updateSaleInternal_(token, invoiceId, payload, options) {
 
     const hasReturn = activeSalesReturnItems_().some(function (ri) { return ri['Invoice ID'] === invoiceId; });
     if (hasReturn) return fail_('This invoice has Sales Return records and can no longer be updated. Use Sales Return for further corrections.');
+
 
     
       const sessions = getAllRows_('CASH_SESSIONS');
@@ -466,6 +500,8 @@ function updateSaleInternal_(token, invoiceId, payload, options) {
 
     // Keyed by Product ID. A product can appear only once on an invoice.
     const oldItems = getAllRows_('SALE_ITEMS').filter(function (i) { return i['Invoice ID'] === invoiceId; });
+    const bundleSnapshotRows = getAllRows_('SALE_BUNDLE_COMPONENTS').filter(function(r){return r['Invoice ID']===invoiceId;});
+    const oldBundleSnapshots = getSaleBundleSnapshot_(invoiceId,bundleSnapshotRows);
     const oldQtyByKey = {};
     const oldItemByKey = {};
     oldItems.forEach(function (i) {
@@ -481,7 +517,15 @@ function updateSaleInternal_(token, invoiceId, payload, options) {
     const oldConsumptionRows = getAllRows_('SALE_ITEM_LOTS').filter(function (l) {
       return l['Invoice ID'] === invoiceId;
     });
-    const oldOwnQtyByKey = outstandingSaleOwnStockByProduct_(invoiceId, oldItems, [], oldConsumptionRows);
+    // Historical bundle component lots belong to the kit, not to a
+    // standalone line selling the same physical Pipe or Motor.
+    const standaloneItems = oldItems.filter(function(row){
+      return !oldBundleSnapshots[row['Product ID']] && row['Sold Product Type'] !== 'Bundle';
+    });
+    const standaloneConsumptionRows = oldConsumptionRows.filter(function(row){
+      return String(row['Source Sale Product ID'] || row['Product ID']) === String(row['Product ID']);
+    });
+    const oldOwnQtyByKey = outstandingSaleOwnStockByProduct_(invoiceId,standaloneItems,[],standaloneConsumptionRows);
 
     const vendorsById = {};
     getAllRows_('VENDORS').forEach(function (v) { vendorsById[v['Vendor ID']] = v; });
@@ -515,6 +559,17 @@ function updateSaleInternal_(token, invoiceId, payload, options) {
     const planningLots = allLots;
     const productsById = {};
     getAllRows_('PRODUCTS').forEach(function (p) { productsById[p['Product ID']] = p; });
+    const bundleEdit = planBundleInvoiceEdit_({
+      invoiceId:invoiceId,oldItems:oldItems,newItems:payload.items,
+      snapshotRows:bundleSnapshotRows,productsById:productsById,
+      definitionRows:getAllRows_('BUNDLE_COMPONENTS'),
+      consumptionRows:oldConsumptionRows,stockLots:allLots,allLots:allLots
+    });
+    const bundleIdsInEdit = {};
+    Object.keys(oldBundleSnapshots).forEach(function(id){bundleIdsInEdit[id]=true;});
+    payload.items.forEach(function(item){
+      if(bundleProductType_(productsById[item.productId])==='Bundle')bundleIdsInEdit[item.productId]=true;
+    });
 
     // Existing active vendor sourcing on this invoice, keyed the same way —
     // at most one active row per key by construction (completeSale/
@@ -553,6 +608,7 @@ function updateSaleInternal_(token, invoiceId, payload, options) {
     }
 
     Object.keys(allKeys).forEach(function (key) {
+      if (bundleIdsInEdit[key]) return; // bundle is one visible invoice item
       const oldQty = oldQtyByKey[key] || 0;
       const newQty = newQtyByKey[key] || 0;
       const totalDelta = newQty - oldQty;
@@ -708,6 +764,11 @@ function updateSaleInternal_(token, invoiceId, payload, options) {
       });
     });
 
+    bundleEdit.changes.forEach(function(c){
+      if(stockChanges.some(function(standalone){return standalone.productId===c.productId;})) {
+        throw new Error('Edit the bundle and standalone '+c.name+' in separate operations to preserve FIFO attribution.');
+      }
+    });
     const discount = isValidNonNegativeNumber_(payload.discount) ? Number(payload.discount) : 0;
     const grandTotal = Math.max(0, subtotal - discount);
 
@@ -793,7 +854,8 @@ function updateSaleInternal_(token, invoiceId, payload, options) {
       const qty = Number(item.qty), price = Number(item.unitPrice);
       return {
         'Invoice ID': invoiceId, 'Product ID': item.productId, 'Product Name': item.name,
-        'Quantity': qty, 'Unit Price': price, 'Line Total': newLineTotalByKey[item.productId]
+        'Quantity': qty, 'Unit Price': price, 'Line Total': newLineTotalByKey[item.productId],
+        'Sold Product Type': bundleIdsInEdit[item.productId] ? 'Bundle' : 'Standard'
       };
     }));
 
@@ -813,13 +875,14 @@ function updateSaleInternal_(token, invoiceId, payload, options) {
           });
           appendRow_('SALE_ITEM_LOTS', {
             'Invoice ID': invoiceId, 'Product ID': c.productId, 'Lot ID': cons.lotId,
-            'Quantity': cons.qty, 'Unit Cost': cons.unitCost, 'Unit Sell Price': cons.unitSellPrice, 'Created At': now
+            'Quantity': cons.qty, 'Unit Cost': cons.unitCost, 'Unit Sell Price': cons.unitSellPrice, 'Created At': now,
+            'Source Sale Product ID': c.productId
           });
         });
       } else {
         const restored = c.restoreForVendorSourcing
           ? restoreSaleStockEffectForVendorSourcing_(invoiceId, c.productId, c.name, Math.abs(c.delta), invoiceId + '-SOURCE-RECLASS')
-          : restoreStockToLots_(invoiceId, c.productId, c.name, Math.abs(c.delta), invoiceId + '-UPDATE');
+          : restoreStockToLots_(invoiceId, c.productId, c.name, Math.abs(c.delta), invoiceId + '-UPDATE', undefined, c.productId);
         restored.forEach(function (r) {
           appendRow_('STOCK_MOVEMENT', {
             'Movement ID': generateId_('STOCK_MOVEMENT'), 'Date': now, 'Product ID': c.productId,
@@ -829,6 +892,8 @@ function updateSaleInternal_(token, invoiceId, payload, options) {
         });
       }
     });
+
+    applyBundleInvoiceEdit_(invoiceId,bundleEdit,now);
 
     // Vendor/Consignment Sourcing: reverse any old arrangement a changed
     // line carried, then post any freshly-decided one — reverse-then-

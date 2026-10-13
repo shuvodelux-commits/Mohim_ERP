@@ -38,7 +38,7 @@ function fixture() {
     getSettingsMap_: () => ({}), invalidateDerivedCachesForSheet_: () => {}
   };
   vm.createContext(ctx);
-  for (const file of ['Utils.gs', 'DeleteEngine.gs', 'StockLots.gs', 'SettlementDiscount.gs', 'CustomerSettlement.gs', 'SupplierSettlement.gs', 'CashBook.gs', 'BankBook.gs', 'Purchase.gs', 'PurchaseManagement.gs', 'PurchaseReturn.gs', 'Customer.gs', 'Suppliers.gs', 'Expense.gs', 'FinanceModule.gs', 'Vendors.gs']) {
+  for (const file of ['Utils.gs', 'DeleteEngine.gs', 'StockLots.gs', 'Bundles.gs', 'SettlementDiscount.gs', 'CustomerSettlement.gs', 'SupplierSettlement.gs', 'CashBook.gs', 'BankBook.gs', 'Purchase.gs', 'PurchaseManagement.gs', 'PurchaseReturn.gs', 'Customer.gs', 'Suppliers.gs', 'Expense.gs', 'FinanceModule.gs', 'Vendors.gs']) {
     vm.runInContext(fs.readFileSync(path.join(root, file), 'utf8'), ctx, { filename: file });
   }
   Object.assign(ctx, {

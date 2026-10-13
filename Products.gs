@@ -19,6 +19,18 @@ function getProductsBootstrap(token) {
   try {
     requirePermission_(token, "products", "view");
     const products = activeRows_("PRODUCTS");
+    const productMap = bundleProductMap_(products);
+    const bundleIds = products.filter(function (p) { return bundleProductType_(p) === 'Bundle'; }).map(function (p) { return p['Product ID']; });
+    const bundleDefinitions = {}, bundleErrorById = {};
+    const recipeRows = bundleIds.length ? getAllRows_('BUNDLE_COMPONENTS') : [];
+    bundleIds.forEach(function (id) {
+      try { bundleDefinitions[id] = getBundleDefinitions_([id], productMap, recipeRows)[id]; }
+      catch(err) {
+        bundleErrorById[id] = err.message;
+        const product=productMap[id];
+        bundleDefinitions[id]=getStoredBundleDefinition_(id,product['Bundle Revision'],recipeRows);
+      }
+    });
     const settings = getSettingsMap_();
     const categories = getAllRows_("PRODUCT_CATEGORIES").filter(function (c) {
       return c["Status"] !== "Inactive";
@@ -68,7 +80,8 @@ function getProductsBootstrap(token) {
 
     const productsWithValue = products.map(function (p) {
       const pid = p["Product ID"];
-      const currentStock = Number(p["Current Stock"]) || 0;
+      const isBundle = bundleProductType_(p) === 'Bundle';
+      const currentStock = isBundle ? 0 : (Number(p["Current Stock"]) || 0);
       const productCost = Number(p["Purchase Price"]) || 0;
       const stats = lotStatsByProduct[pid];
       let stockValue;
@@ -91,7 +104,12 @@ function getProductsBootstrap(token) {
       }
 
       return Object.assign({}, p, {
-        "Stock Value": stockValue,
+        'Product Type': isBundle ? 'Bundle' : 'Standard',
+        'Bundle Components': isBundle ? bundleDefinitions[p['Product ID']].components : [],
+        'Bundle Error': isBundle ? (bundleErrorById[p['Product ID']]||'') : '',
+        'Available Sets': isBundle && !bundleErrorById[p['Product ID']] ?
+          getBundleAvailability_(bundleDefinitions[p['Product ID']],productMap) : 0,
+        "Stock Value": isBundle ? 0 : stockValue,
         "Unpriced Lot Count": stats ? (stats.unpricedInternalLotCount || 0) : 0,
         "Unpriced Remaining Quantity": stats ? (stats.unpricedInternalQty || 0) : 0
       });
@@ -115,6 +133,7 @@ function getProductsBootstrap(token) {
 }
 
 function addProduct(token, payload) {
+  if (payload && payload.productType === 'Bundle') return addBundleProduct(token, payload);
   const lock = LockService.getScriptLock();
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
@@ -202,6 +221,7 @@ function addProduct(token, payload) {
  * silently drift from Current Stock.
  */
 function updateProduct(token, productId, payload) {
+  if (payload && payload.productType === 'Bundle') return updateBundleProduct(token, productId, payload);
   const lock = LockService.getScriptLock();
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
@@ -223,6 +243,7 @@ function updateProduct(token, productId, payload) {
     const product = getAllRows_("PRODUCTS").filter(function (p) {
       return p["Product ID"] === productId;
     })[0];
+    if (bundleProductType_(product) === 'Bundle') throw new Error('Bundle stock cannot be edited. Change its components instead.');
     const currentStock = Number(product["Current Stock"]) || 0;
     const newStock = Number(payload.stock);
     const delta = newStock - currentStock;
@@ -312,6 +333,7 @@ function adjustStock(token, productId, deltaQty, note) {
     const product = getAllRows_("PRODUCTS").filter(function (p) {
       return p["Product ID"] === productId;
     })[0];
+    if (bundleProductType_(product) === 'Bundle') throw new Error('Bundle stock cannot be adjusted.');
     const newStock = (Number(product["Current Stock"]) || 0) + delta;
     if (delta > 0 && (Number(product["Purchase Price"]) || 0) <= 0)
       return fail_("Set this product's Purchase Price before adding stock.");
@@ -368,17 +390,35 @@ function adjustStock(token, productId, deltaQty, note) {
 }
 
 function setProductStatus(token, productId, status) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     requirePermission_(token, "products", "edit");
     const rowIndex = findRowIndex_("PRODUCTS", "Product ID", productId);
     if (rowIndex === -1) return fail_("Product not found.");
+    const newStatus = status === "Active" ? "Active" : "Inactive";
+    if (newStatus === "Inactive") {
+      const allProducts = getAllRows_("PRODUCTS");
+      const byId = bundleProductMap_(allProducts);
+      const isUsed = getAllRows_("BUNDLE_COMPONENTS").some(function (component) {
+        if (String(component["Component Product ID"]) !== String(productId)) return false;
+        const parent = byId[component["Bundle Product ID"]];
+        return parent && bundleProductType_(parent) === "Bundle" &&
+          parent.Status === "Active" && !isDeleted_(parent) &&
+          Number(component.Revision) === (Number(parent["Bundle Revision"]) || 1) &&
+          String(component.Status || "").toLowerCase() === "active";
+      });
+      if (isUsed) throw new Error("This product is used by an active bundle. Deactivate or change that bundle first.");
+    }
     updateRowFields_("PRODUCTS", rowIndex, {
-      Status: status === "Active" ? "Active" : "Inactive",
-      "Updated At": new Date(),
+      Status: newStatus,
+      "Updated At": new Date()
     });
-    return ok_({ id: productId, status: status });
+    return ok_({ id: productId, status: newStatus });
   } catch (err) {
     logError_("setProductStatus", err);
     return fail_(err.message);
+  } finally {
+    lock.releaseLock();
   }
 }

@@ -327,6 +327,9 @@ test('profit calculation reads each transaction sheet once for any number of lin
     SALES_RETURN_ITEMS: 1,
     SALE_ITEM_LOTS: 1,
     VENDOR_SOURCING: 1,
-    EXPENSES: 1
+    EXPENSES: 1,
+    // Historical recipes are needed for coverage, but must be fetched once
+    // for the whole report, not once per product/invoice.
+    SALE_BUNDLE_COMPONENTS: 1
   });
 });

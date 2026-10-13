@@ -12,7 +12,7 @@ function workbook(seed = {}) {
   let locked = false, serial = 0;
   const rows = key => tables[key] || (tables[key] = []);
   const ctx = vm.createContext({ console, Date, Math, JSON, CONFIG: { LOCK_TIMEOUT_MS: 1000 } });
-  for (const name of ['Utils.gs', 'Customer.gs', 'DeleteEngine.gs', 'StockLots.gs', 'Sales.gs', 'SalesManagement.gs', 'SalesReturn.gs']) {
+  for (const name of ['Utils.gs', 'Customer.gs', 'DeleteEngine.gs', 'StockLots.gs', 'Bundles.gs', 'Sales.gs', 'SalesManagement.gs', 'SalesReturn.gs']) {
     vm.runInContext(fs.readFileSync(path.join(__dirname, '..', name), 'utf8'), ctx, { filename: name });
   }
   const mutate = (key, action) => { assert.equal(locked, true, 'transaction write must hold ScriptLock'); writes.push(key); return action(); };
