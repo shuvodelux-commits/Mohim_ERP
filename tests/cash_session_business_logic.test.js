@@ -335,6 +335,7 @@ test('POS bootstrap propagates an active-session repository outage', () => {
   const { context, load } = runtime({
     PRODUCTS: [], CUSTOMERS: [], STOCK_LOTS: [], CASH_SESSIONS: []
   }, { failRead: 'CASH_SESSIONS' });
+  load('Bundles.gs');
   load('Sales.gs');
 
   const result = context.getPosBootstrap('TOKEN');
