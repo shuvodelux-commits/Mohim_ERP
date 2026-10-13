@@ -83,7 +83,7 @@ function workbook(withStandalone) {
     resolveBankAccount_:()=>({id:'',name:''}),isBankLikePaymentMethod_:()=>false,
     computeBackdateInfo_:()=>({isBackdated:false,backdatedDays:0}),
     actorName_:()=>'tester',generateId_:prefix=>prefix+'-'+(++sequence),
-    getSettingsMap_:()=>({}),computeInvoiceDueDate_:()=>'',buildInvoiceShopPayload_:()=>({}),
+    getSettingsMap_:()=>({}),isSettingEnabled_:()=>false,computeInvoiceDueDate_:()=>'',buildInvoiceShopPayload_:()=>({}),
     updateRowFields_:(key,index,fields)=>{
       const row=read(key).find(item=>item._rowIndex===index);
       assert.ok(row,'Missing '+key+' row '+index);
