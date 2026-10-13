@@ -404,6 +404,9 @@ function getSaleForUpdate(token, invoiceId) {
 
     const hasReturn = activeSalesReturnItems_().some(function (ri) { return ri['Invoice ID'] === invoiceId; });
     if (hasReturn) return fail_('This invoice has Sales Return records and can no longer be updated. Use Sales Return for further corrections.');
+    if (getAllRows_('SALE_BUNDLE_COMPONENTS').some(function(r){return r['Invoice ID']===invoiceId;})) {
+      return fail_('Bundle invoice editing is not available in this preview. Use Sales Return for corrections.');
+    }
 
     const sessions = getAllRows_('CASH_SESSIONS');
     const session = findSessionForTimestamp_(sessions, sale['Created At']);
@@ -469,6 +472,13 @@ function updateSaleInternal_(token, invoiceId, payload, options) {
     const sale = findUniqueSalesRow_(invoiceId);
     if (!sale) return fail_('Invoice not found.');
     if (isDeleted_(sale)) return fail_('This invoice has been deleted.');
+    if (getAllRows_('SALE_BUNDLE_COMPONENTS').some(function(r){return r['Invoice ID']===invoiceId;})) {
+      return fail_('Bundle invoice editing is not available in this preview. Use Sales Return for corrections.');
+    }
+    const productMapForEdit = bundleProductMap_(getAllRows_('PRODUCTS'));
+    if (payload.items.some(function(i){return bundleProductType_(productMapForEdit[i.productId])==='Bundle';})) {
+      return fail_('Cannot add a bundle while updating an existing invoice. Create a new sale.');
+    }
     const originalDate = safeDateOnly_(sale['Date']);
     const editDate = originalDate;
     const dateChanged = editDate !== originalDate;
@@ -476,6 +486,9 @@ function updateSaleInternal_(token, invoiceId, payload, options) {
 
     const hasReturn = activeSalesReturnItems_().some(function (ri) { return ri['Invoice ID'] === invoiceId; });
     if (hasReturn) return fail_('This invoice has Sales Return records and can no longer be updated. Use Sales Return for further corrections.');
+    if (getAllRows_('SALE_BUNDLE_COMPONENTS').some(function(r){return r['Invoice ID']===invoiceId;})) {
+      return fail_('Bundle invoice editing is not available in this preview. Use Sales Return for corrections.');
+    }
 
     
       const sessions = getAllRows_('CASH_SESSIONS');
