@@ -397,6 +397,8 @@ function planSaleReturnRestoration_(invoiceId, productId, productName, qty, opti
 
   const supplierId = opts.supplierId;
   const scoped = supplierId !== undefined && supplierId !== null;
+  const sourceSaleProductId = opts.sourceSaleProductId;
+  const scopedSource = sourceSaleProductId !== undefined && sourceSaleProductId !== null;
   const saleItemLots = opts.saleItemLots || getAllRows_('SALE_ITEM_LOTS');
   const stockLots = opts.stockLots || getAllRows_('STOCK_LOTS');
   const products = opts.products || getAllRows_('PRODUCTS');
@@ -407,7 +409,8 @@ function planSaleReturnRestoration_(invoiceId, productId, productName, qty, opti
   const consumedRows = saleItemLots
     .filter(function (r) {
       return r['Invoice ID'] === invoiceId && r['Product ID'] === productId &&
-        (!scoped || r['Supplier ID'] === supplierId);
+        (!scoped || r['Supplier ID'] === supplierId) &&
+        (!scopedSource || String(r['Source Sale Product ID'] || r['Product ID']) === String(sourceSaleProductId));
     })
     .sort(function (a, b) { return b._rowIndex - a._rowIndex; });
 
