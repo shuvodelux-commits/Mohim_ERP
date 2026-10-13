@@ -39,7 +39,14 @@ test('customer and supplier main ledger rows color debit credit and signed runni
     assert.match(s, /class="num ledger-txn--increase" data-label="Debit"/);
     assert.match(s, /class="num ledger-txn--decrease" data-label="Credit"/);
     assert.match(s, /partyLedgerBalanceTone_\(row\['Balance'\]\)/);
-    assert.match(s, /partyLedgerPaintBalance_\(document\.querySelector\(/);
+    if (p === 'customerLedger.html') {
+      // Customer ledger has separate Due and Credit cards, not a single
+      // signed supplier-style card. Both use semantic card tones.
+      assert.match(s, /customerLedgerPaintBalanceCard_\('customerLedgerDueCard', 'customerLedgerDueNote'/);
+      assert.match(s, /customerLedgerPaintBalanceCard_\('customerLedgerCreditCard', 'customerLedgerCreditNote'/);
+    } else {
+      assert.match(s, /partyLedgerPaintBalance_\(document\.querySelector\(/);
+    }
     assert.match(s, /partyLedgerPaintBalance_\(document\.getElementById\('(?:customer|supplier)LedgerPayBalanceAfter'\), after\)/);
     assert.match(s, /customerLedgerRenderPagination_|supplierLedgerRenderPagination_/);
   }
@@ -64,5 +71,5 @@ test('supplier legacy debit-credit correction remains a separate PR, no change t
   const source = read('PartyLedger.gs');
   assert.match(source, /balance = roundMoney_\(balance \+ \(Number\(r\['Debit'\]\) \|\| 0\) - \(Number\(r\['Credit'\]\) \|\| 0\)\)/);
   const css = read('style.html');
-  assert.match(css, /Current sheet\/ledger convention: Debit increases due, Credit settles due/);
+  assert.match(css, /Both current customer and supplier sheet views use debit=increased due,[\s\S]*?credit=decreased due/);
 });
