@@ -664,7 +664,7 @@
         '<div class="p-name">' + escapeHtml(p.name) + '</div>' +
         (meta ? '<div class="p-search-meta">' + escapeHtml(meta) + '</div>' : '') +
         '<div class="p-price">' + formatMoney(p.autoSellingPrice !== undefined ? p.autoSellingPrice : p.sellingPrice) + '</div>' +
-        '<div class="p-stock" style="' + stockColor + '">' + stock + ' ' + escapeHtml(p.unit || '') + ' in stock</div>';
+        '<div class="p-stock" style="' + stockColor + '">' + stock + ' ' + escapeHtml(p.unit || '') + (p.productType === 'Bundle' ? ' available from components · negative sale allowed' : ' in stock') + '</div>';
       tile.addEventListener('mouseenter', function () { posState.searchActiveIndex = idx; posApplySearchHighlight_(); });
       tile.addEventListener('click', function () {
         posState.searchActiveIndex = idx;
@@ -684,6 +684,10 @@
   function posComputeAutoPricing_(product, qty) {
     var quantity = Number(qty) || 0;
     if (quantity <= 0) return { unitPrice: 0, lineTotal: 0 };
+    if (product && product.productType === 'Bundle') {
+      var price = Number(product.sellingPrice) || 0;
+      return {unitPrice: price, lineTotal: Math.round((quantity * price + Number.EPSILON)*100)/100};
+    }
     var need = quantity;
     var total = 0;
     var segments = (product && product.lotPricing) || [];
@@ -727,6 +731,8 @@
       productId: product.id,
       name: product.name,
       unit: product.unit,
+      productType: product.productType || 'Standard',
+      bundleRevision: product.bundleRevision || 0,
       unitPrice: pricing.unitPrice,
       lineTotal: pricing.lineTotal,
       priceMode: 'auto',
@@ -1186,6 +1192,11 @@
    * shortfall, so callers can just conditionally append the result.
    */
   function posShortagePanelHtml_(line, i) {
+    if (line.productType === 'Bundle') {
+      var setsAvailable = posLineAvailableStock_(line);
+      if (line.qty <= setsAvailable) return '';
+      return '<div style="font-size:12px;color:var(--color-danger);padding:5px 8px;">Some bundle components may become negative. Sale is allowed.</div>';
+    }
     var available = posLineAvailableStock_(line);
     var shortfall = line.qty - available;
     if (shortfall <= 0) return '';
@@ -1941,6 +1952,7 @@
         return { productId: line.productId, name: line.name, unit: line.unit || '', qty: Number(line.qty)||0,
           unitPrice: Number(line.unitPrice)||0, lineTotal: Number(line.lineTotal)||0,
           savedPriceMode: line.savedPriceMode || line.priceMode || 'manual', shortageResolution: line.shortageResolution || 'negative',
+          productType: line.productType || 'Standard', bundleRevision: line.bundleRevision || 0,
           vendorId: line.vendorId || '', vendorName: line.vendorName || '', vendorUnitCost: line.vendorUnitCost === '' ? '' : Number(line.vendorUnitCost),
           serialSelections: Array.isArray(line.serialSelections) ? line.serialSelections : [], warrantyData: line.warrantyData || null };
       }),
@@ -2016,7 +2028,8 @@
     posState.cart=(draft.items||[]).map(function(item){
       var product=posState.products.filter(function(p){return p.id===item.productId;})[0]||null;
       return {productId:item.productId,name:item.name,unit:item.unit||(product?product.unit:''),qty:Number(item.qty)||1,unitPrice:Number(item.unitPrice)||0,lineTotal:Number(item.lineTotal)||0,
-        priceMode:'fixed',savedPriceMode:item.savedPriceMode||'manual',shortageResolution:item.shortageResolution||'negative',vendorId:item.vendorId||'',vendorName:item.vendorName||'',vendorUnitCost:item.vendorUnitCost,
+        priceMode:'fixed',savedPriceMode:item.savedPriceMode||'manual',shortageResolution:item.shortageResolution||'negative',
+        productType:item.productType||'Standard',bundleRevision:item.bundleRevision||0,vendorId:item.vendorId||'',vendorName:item.vendorName||'',vendorUnitCost:item.vendorUnitCost,
         serialSelections:Array.isArray(item.serialSelections)?item.serialSelections:[],warrantyData:item.warrantyData||null,unavailable:!product};
     });
     document.getElementById('posCustomerName').value=draft.customerName||''; document.getElementById('posCustomerName').dataset.customerId=draft.customerId||'';
@@ -2109,9 +2122,10 @@
       customerFatherName: document.getElementById('posCustomerFatherName').value.trim(),
       customerAddress: document.getElementById('posCustomerAddress').value.trim(),
       items: posState.cart.map(function (l) {
-        var item = { productId: l.productId, name: l.name, qty: l.qty, unitPrice: l.unitPrice, priceMode: l.priceMode || 'manual', shortageResolution: l.shortageResolution || 'negative' };
+        var item = { productId: l.productId, name: l.name, qty: l.qty, unitPrice: l.unitPrice, priceMode: l.priceMode || 'manual', shortageResolution: l.shortageResolution || 'negative',
+          bundleRevision: l.bundleRevision || 0, productType: l.productType || 'Standard' };
         var shortfall = l.qty - posLineAvailableStock_(l);
-        if (shortfall > 0 && l.shortageResolution === 'vendor' && l.vendorId) {
+        if (l.productType !== 'Bundle' && shortfall > 0 && l.shortageResolution === 'vendor' && l.vendorId) {
           item.vendorId = l.vendorId;
           item.vendorUnitCost = Number(l.vendorUnitCost) || 0;
         }
@@ -2378,6 +2392,8 @@
           lineTotal: lineTotal,
           priceMode: 'manual',
           savedPriceMode: 'manual',
+          productType: product.productType || 'Standard',
+          bundleRevision: product.bundleRevision || 0,
           qty: qty,
           shortageResolution: item.shortageResolution || 'negative',
           vendorId: item.vendorId || '',
@@ -2434,6 +2450,13 @@ function posLoadUpdateInvoice_(inv, reason, mode) {
     // a stock cap to reconcile against this invoice's own consumption.
     inv.items.forEach(function (item) {
       var product = posState.products.filter(function (p) { return p.id === item.productId; })[0];
+      // An old sold kit remains editable using its immutable invoice recipe
+      // even if staff has since deactivated it for *new* sales.
+      if (!product && item.productType === 'Bundle') {
+        product = {id:item.productId,name:item.name || 'Bundle',unit:'set',
+          sellingPrice:Number(item.unitPrice)||0,productType:'Bundle',
+          bundleRevision:Number(item.bundleRevision)||0};
+      }
       if (!product) { skipped.push(item.name); return; }
       var qty = Number(item.qty) || 1;
       var vendorQty = Number(item.vendorQty) || 0;
@@ -2442,7 +2465,12 @@ function posLoadUpdateInvoice_(inv, reason, mode) {
         ? Number(item.lineTotal) : Math.round((qty * storedPrice + Number.EPSILON) * 100) / 100;
       posState.cart.push({
         productId: product.id,
-        name: product.name, unit: product.unit, unitPrice: storedPrice, lineTotal: storedLineTotal, priceMode: 'manual', qty: qty,
+        name: item.name || product.name, unit: product.unit, unitPrice: storedPrice,
+        lineTotal: storedLineTotal, priceMode: 'manual', qty: qty,
+        productType: item.productType || product.productType || 'Standard',
+        // Edit an old invoice against its original saved recipe. New sales
+        // and duplicate invoices intentionally use the current master recipe.
+        bundleRevision: item.bundleRevision || product.bundleRevision || 0,
         // Vendor/Consignment Sourcing state already on file for this line
         // (getSaleForUpdate returns it) — pre-fills the shortage chooser so
         // editing shows what's already there instead of looking new.
