@@ -2307,6 +2307,13 @@ function posLoadUpdateInvoice_(inv, reason, mode) {
     // a stock cap to reconcile against this invoice's own consumption.
     inv.items.forEach(function (item) {
       var product = posState.products.filter(function (p) { return p.id === item.productId; })[0];
+      // An old sold kit remains editable using its immutable invoice recipe
+      // even if staff has since deactivated it for *new* sales.
+      if (!product && item.productType === 'Bundle') {
+        product = {id:item.productId,name:item.name || 'Bundle',unit:'set',
+          sellingPrice:Number(item.unitPrice)||0,productType:'Bundle',
+          bundleRevision:Number(item.bundleRevision)||0};
+      }
       if (!product) { skipped.push(item.name); return; }
       var qty = Number(item.qty) || 1;
       var vendorQty = Number(item.vendorQty) || 0;
