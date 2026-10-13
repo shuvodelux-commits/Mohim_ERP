@@ -339,3 +339,78 @@ function planBundleInvoiceEdit_(options) {
   });
   return {changes:result,snapshots:snapshots};
 }
+
+
+/**
+ * Commit a previously validated historical bundle edit inside the existing
+ * updateSaleInternal_ lock/write phase. All sale revenue is still recorded
+ * solely in SALE_ITEMS by the ordinary invoice update implementation.
+ */
+function applyBundleInvoiceEdit_(invoiceId, prepared, now) {
+  const changes = prepared && prepared.changes || [];
+  const stockLots = changes.length ? getAllRows_('STOCK_LOTS') : [];
+  const stockLotById = {};
+  stockLots.forEach(function(lot){stockLotById[lot['Lot ID']] = lot;});
+  const movementRows = [], evidenceRows = [];
+  changes.forEach(function(change){
+    if (change.plan) {
+      const consumed = applyStockConsumption_(change.plan);
+      const attributed = attributeBundleConsumption_(change.positiveOwners,consumed);
+      attributed.forEach(function(row) {
+        const source = stockLotById[row.lotId];
+        movementRows.push({
+          'Movement ID':generateId_('STOCK_MOVEMENT'),
+          'Date':now,'Product ID':change.productId,'Product Name':change.name,
+          Type:'Sale Update',Reference:invoiceId,'Quantity In':'','Quantity Out':row.qty,
+          'Balance Stock':change.newStock,'Notes':'Bundle invoice updated',
+          'Lot ID':row.lotId,'Source Sale Product ID':row.sourceSaleProductId
+        });
+        evidenceRows.push({
+          'Invoice ID':invoiceId,'Product ID':change.productId,'Lot ID':row.lotId,
+          Quantity:row.qty,'Unit Cost':row.unitCost,'Unit Sell Price':row.unitSellPrice,
+          'Created At':now,'Supplier ID':source ? source['Supplier ID'] || '' : '',
+          'Source Sale Product ID':row.sourceSaleProductId
+        });
+      });
+    } else {
+      (change.restorations || []).forEach(function(item) {
+        const restored = applySaleReturnRestorationPlan_(item.plan,invoiceId+'-UPDATE');
+        restored.forEach(function(row) {
+          movementRows.push({
+            'Movement ID':generateId_('STOCK_MOVEMENT'),
+            'Date':now,'Product ID':change.productId,'Product Name':change.name,
+            Type:'Sale Update',Reference:invoiceId,'Quantity In':row.qty,'Quantity Out':'',
+            'Balance Stock':change.newStock,'Notes':'Bundle invoice updated',
+            'Lot ID':row.lotId,'Source Sale Product ID':item.sourceSaleProductId
+          });
+        });
+      });
+    }
+    updateRowFields_('PRODUCTS',change.rowIndex,{
+      'Current Stock':change.newStock,'Updated At':now
+    });
+  });
+  if (movementRows.length) appendRows_('STOCK_MOVEMENT',movementRows);
+  if (evidenceRows.length) appendRows_('SALE_ITEM_LOTS',evidenceRows);
+
+  (prepared && prepared.snapshots || []).forEach(function(snapshot) {
+    if (snapshot.existingRows.length) {
+      snapshot.existingRows.forEach(function(row) {
+        updateRowFields_('SALE_BUNDLE_COMPONENTS',row._rowIndex,{
+          'Sets Sold':snapshot.newQty,
+          'Component Quantity Sold':snapshot.newQty * Number(row['Quantity Per Set'])
+        });
+      });
+    } else if (snapshot.newQty > 0) {
+      appendRows_('SALE_BUNDLE_COMPONENTS',snapshot.components.map(function(c) {
+        return {
+          'Invoice ID':invoiceId,'Bundle Product ID':snapshot.bundleId,
+          'Bundle Revision':snapshot.revision,'Component Product ID':c.productId,
+          'Quantity Per Set':c.qtyPerSet,'Sets Sold':snapshot.newQty,
+          'Component Quantity Sold':snapshot.newQty*c.qtyPerSet,
+          Unit:c.unit,'Created At':now
+        };
+      }));
+    }
+  });
+}
