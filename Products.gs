@@ -313,8 +313,6 @@ function adjustStock(token, productId, deltaQty, note) {
     requireActiveCashSession_();
     const rowIndex = findRowIndex_("PRODUCTS", "Product ID", productId);
     if (rowIndex === -1) return fail_("Product not found.");
-    const product = getAllRows_('PRODUCTS').filter(function (p) { return p._rowIndex === rowIndex; })[0];
-    if (bundleProductType_(product) === 'Bundle') throw new Error('Bundle stock cannot be adjusted.');
     const delta = Number(deltaQty);
     if (isNaN(delta) || delta === 0)
       return fail_(
@@ -324,6 +322,7 @@ function adjustStock(token, productId, deltaQty, note) {
     const product = getAllRows_("PRODUCTS").filter(function (p) {
       return p["Product ID"] === productId;
     })[0];
+    if (bundleProductType_(product) === 'Bundle') throw new Error('Bundle stock cannot be adjusted.');
     const newStock = (Number(product["Current Stock"]) || 0) + delta;
     if (delta > 0 && (Number(product["Purchase Price"]) || 0) <= 0)
       return fail_("Set this product's Purchase Price before adding stock.");
