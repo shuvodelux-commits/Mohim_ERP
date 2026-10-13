@@ -2315,7 +2315,12 @@ function posLoadUpdateInvoice_(inv, reason, mode) {
         ? Number(item.lineTotal) : Math.round((qty * storedPrice + Number.EPSILON) * 100) / 100;
       posState.cart.push({
         productId: product.id,
-        name: product.name, unit: product.unit, unitPrice: storedPrice, lineTotal: storedLineTotal, priceMode: 'manual', qty: qty,
+        name: item.name || product.name, unit: product.unit, unitPrice: storedPrice,
+        lineTotal: storedLineTotal, priceMode: 'manual', qty: qty,
+        productType: item.productType || product.productType || 'Standard',
+        // Edit an old invoice against its original saved recipe. New sales
+        // and duplicate invoices intentionally use the current master recipe.
+        bundleRevision: item.bundleRevision || product.bundleRevision || 0,
         // Vendor/Consignment Sourcing state already on file for this line
         // (getSaleForUpdate returns it) — pre-fills the shortage chooser so
         // editing shows what's already there instead of looking new.
