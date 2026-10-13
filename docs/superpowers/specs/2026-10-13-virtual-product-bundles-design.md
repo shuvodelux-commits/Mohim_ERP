@@ -1,7 +1,7 @@
 # Virtual Product Bundles — Design Specification
 
 **Date:** 2026-10-13  
-**Status:** Proposed for written-spec review; no implementation authorized  
+**Status:** Implemented in [PR #19](https://github.com/shuvodelux-commits/Mohim_ERP/pull/19); this is the original design snapshot, and historical pre-implementation observations below remain archival.  
 **Project:** Mohim ERP (Apps Script / Google Sheets); source of truth: `shuvodelux-commits/Mohim_ERP` main  
 **Decision:** Virtual sales kits, not physically pre-assembled stock. Negative component stock is permitted using the existing OVERSOLD-lot policy.
 
