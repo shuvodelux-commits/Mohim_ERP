@@ -98,6 +98,31 @@ function buildSalesInvoiceProfitMetrics_(sales, saleItems, returnItems, duplicat
       economicReturnLineAmount_(ri, parent['Subtotal'], parent['Grand Total']));
   });
 
+  // A sold virtual set is costed by its physical parts, not a phantom
+  // SALE_ITEM_LOTS row for the parent Bundle product ID.
+  const snapshotsByInvoice = {};
+  getAllRows_('SALE_BUNDLE_COMPONENTS').forEach(function(r){
+    const id=String(r['Invoice ID']||'');
+    if(!inScope[id])return;
+    if(!snapshotsByInvoice[id])snapshotsByInvoice[id]=[];
+    snapshotsByInvoice[id].push(r);
+  });
+  Object.keys(snapshotsByInvoice).forEach(function(id){
+    const initial={...soldQty[id]},ret={...returnedQty[id]};
+    snapshotsByInvoice[id].forEach(function(r){
+      const bundleId=String(r['Bundle Product ID']||'');
+      const physicalId=String(r['Component Product ID']||'');
+      const perSet=Number(r['Quantity Per Set'])||0;
+      addQty_(soldQty,id,physicalId,(Number(initial[bundleId])||0)*perSet);
+      addQty_(returnedQty,id,physicalId,(Number(ret[bundleId])||0)*perSet);
+    });
+    snapshotsByInvoice[id].forEach(function(r){
+      const bundleId=String(r['Bundle Product ID']||'');
+      delete soldQty[id][bundleId];
+      if(returnedQty[id])delete returnedQty[id][bundleId];
+    });
+  });
+
   getAllRows_('SALE_ITEM_LOTS').forEach(function (lot) {
     const id = String(lot['Invoice ID'] || '');
     if (!inScope[id]) return;

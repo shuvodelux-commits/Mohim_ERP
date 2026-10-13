@@ -671,7 +671,7 @@ function computeProfit_(range) {
     if (!inScope[id]) return;
     const lineCost = (Number(l['Quantity']) || 0) * (Number(l['Unit Cost']) || 0);
     cogs += lineCost;
-    bucket_(l['Product ID'], '').cost += lineCost;
+    bucket_(l['Source Sale Product ID'] || l['Product ID'], '').cost += lineCost;
     addInvoiceProductQty_(costQtyByInvoiceProduct, id, l['Product ID'], Number(l['Quantity']) || 0);
   });
 
@@ -712,6 +712,24 @@ function computeProfit_(range) {
   const grossProfit = netRevenue - cogs;
   const settlementDiscount = computeSettlementDiscountProfit_(range);
   const netProfit = roundMoney_(grossProfit - expenses + settlementDiscount.netProfitImpact);
+  // Replace virtual kit quantity with the physical inventory quantities
+  // required by the saved sale-time recipe. Returns already reduced parent
+  // quantity and net consumed lot evidence independently.
+  getAllRows_('SALE_BUNDLE_COMPONENTS').forEach(function(snapshot){
+    const invoiceId=snapshot['Invoice ID'];
+    if (!inScope[invoiceId]) return;
+    const byId=netQtyByInvoiceProduct[invoiceId]||{};
+    const bundleId=snapshot['Bundle Product ID'];
+    if (!Object.prototype.hasOwnProperty.call(byId,bundleId)) return;
+    const sets=Number(byId[bundleId])||0;
+    // Each component row supplies a separate required physical quantity.
+    const componentId=snapshot['Component Product ID'];
+    addInvoiceProductQty_(netQtyByInvoiceProduct,invoiceId,componentId,sets*(Number(snapshot['Quantity Per Set'])||0));
+  });
+  getAllRows_('SALE_BUNDLE_COMPONENTS').forEach(function(snapshot){
+    const invoiceId=snapshot['Invoice ID'];
+    if (netQtyByInvoiceProduct[invoiceId]) delete netQtyByInvoiceProduct[invoiceId][snapshot['Bundle Product ID']];
+  });
   const missing = sales.filter(function (s) {
     const id = s['Invoice ID'];
     const required = netQtyByInvoiceProduct[id] || {};
