@@ -17,7 +17,7 @@ function workbook(seed = {}) {
   const rows = key => tables[key] || (tables[key] = []);
   const ctx = vm.createContext({ console, Date, Math, JSON, CONFIG: { LOCK_TIMEOUT_MS: 1000 } });
 
-  for (const name of ['Utils.gs', 'CustomerSettlement.gs', 'StockLots.gs', 'SalesReturn.gs']) {
+  for (const name of ['Utils.gs', 'CustomerSettlement.gs', 'StockLots.gs', 'Bundles.gs', 'SalesReturn.gs']) {
     vm.runInContext(read(name), ctx, { filename: name });
   }
 
