@@ -92,6 +92,8 @@ function validateSalesDraftPayload_(payload) {
       vendorId: cleanDraftText_(item.vendorId),
       vendorName: cleanDraftText_(item.vendorName),
       vendorUnitCost: item.vendorUnitCost === '' || item.vendorUnitCost === undefined ? '' : Number(item.vendorUnitCost),
+      productType: item.productType === 'Bundle' ? 'Bundle' : 'Standard',
+      bundleRevision: Number.isSafeInteger(Number(item.bundleRevision)) ? Number(item.bundleRevision) : 0,
       serialSelections: Array.isArray(item.serialSelections) ? item.serialSelections : [],
       warrantyData: item.warrantyData || null
     };

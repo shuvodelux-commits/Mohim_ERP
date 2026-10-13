@@ -1809,6 +1809,7 @@
         return { productId: line.productId, name: line.name, unit: line.unit || '', qty: Number(line.qty)||0,
           unitPrice: Number(line.unitPrice)||0, lineTotal: Number(line.lineTotal)||0,
           savedPriceMode: line.savedPriceMode || line.priceMode || 'manual', shortageResolution: line.shortageResolution || 'negative',
+          productType: line.productType || 'Standard', bundleRevision: line.bundleRevision || 0,
           vendorId: line.vendorId || '', vendorName: line.vendorName || '', vendorUnitCost: line.vendorUnitCost === '' ? '' : Number(line.vendorUnitCost),
           serialSelections: Array.isArray(line.serialSelections) ? line.serialSelections : [], warrantyData: line.warrantyData || null };
       }),
@@ -1884,7 +1885,8 @@
     posState.cart=(draft.items||[]).map(function(item){
       var product=posState.products.filter(function(p){return p.id===item.productId;})[0]||null;
       return {productId:item.productId,name:item.name,unit:item.unit||(product?product.unit:''),qty:Number(item.qty)||1,unitPrice:Number(item.unitPrice)||0,lineTotal:Number(item.lineTotal)||0,
-        priceMode:'fixed',savedPriceMode:item.savedPriceMode||'manual',shortageResolution:item.shortageResolution||'negative',vendorId:item.vendorId||'',vendorName:item.vendorName||'',vendorUnitCost:item.vendorUnitCost,
+        priceMode:'fixed',savedPriceMode:item.savedPriceMode||'manual',shortageResolution:item.shortageResolution||'negative',
+        productType:item.productType||'Standard',bundleRevision:item.bundleRevision||0,vendorId:item.vendorId||'',vendorName:item.vendorName||'',vendorUnitCost:item.vendorUnitCost,
         serialSelections:Array.isArray(item.serialSelections)?item.serialSelections:[],warrantyData:item.warrantyData||null,unavailable:!product};
     });
     document.getElementById('posCustomerName').value=draft.customerName||''; document.getElementById('posCustomerName').dataset.customerId=draft.customerId||'';
@@ -2247,6 +2249,8 @@
           lineTotal: lineTotal,
           priceMode: 'manual',
           savedPriceMode: 'manual',
+          productType: product.productType || 'Standard',
+          bundleRevision: product.bundleRevision || 0,
           qty: qty,
           shortageResolution: item.shortageResolution || 'negative',
           vendorId: item.vendorId || '',
