@@ -508,9 +508,11 @@ function applySaleReturnRestorationPlan_(plan, fallbackReference) {
 }
 
 /** Compatibility wrapper for existing single-return callers. */
-function restoreStockToLots_(invoiceId, productId, productName, qty, fallbackReference, supplierId) {
+function restoreStockToLots_(invoiceId, productId, productName, qty, fallbackReference, supplierId, sourceSaleProductId) {
   return applySaleReturnRestorationPlan_(
-    planSaleReturnRestoration_(invoiceId, productId, productName, qty, { supplierId: supplierId }),
+    planSaleReturnRestoration_(invoiceId, productId, productName, qty, {
+      supplierId: supplierId, sourceSaleProductId: sourceSaleProductId
+    }),
     fallbackReference
   );
 }
