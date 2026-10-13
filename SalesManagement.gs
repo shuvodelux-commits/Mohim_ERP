@@ -337,7 +337,9 @@ function restoreSaleStockEffectForVendorSourcing_(invoiceId, productId, productN
 
   const consumedRows = getAllRows_('SALE_ITEM_LOTS')
     .filter(function (r) {
-      return r['Invoice ID'] === invoiceId && r['Product ID'] === productId && (Number(r['Quantity']) || 0) > 0;
+      return r['Invoice ID'] === invoiceId && r['Product ID'] === productId &&
+        String(r['Source Sale Product ID'] || r['Product ID']) === String(productId) &&
+        (Number(r['Quantity']) || 0) > 0;
     })
     .sort(function (a, b) { return b._rowIndex - a._rowIndex; });
 
@@ -873,13 +875,14 @@ function updateSaleInternal_(token, invoiceId, payload, options) {
           });
           appendRow_('SALE_ITEM_LOTS', {
             'Invoice ID': invoiceId, 'Product ID': c.productId, 'Lot ID': cons.lotId,
-            'Quantity': cons.qty, 'Unit Cost': cons.unitCost, 'Unit Sell Price': cons.unitSellPrice, 'Created At': now
+            'Quantity': cons.qty, 'Unit Cost': cons.unitCost, 'Unit Sell Price': cons.unitSellPrice, 'Created At': now,
+            'Source Sale Product ID': c.productId
           });
         });
       } else {
         const restored = c.restoreForVendorSourcing
           ? restoreSaleStockEffectForVendorSourcing_(invoiceId, c.productId, c.name, Math.abs(c.delta), invoiceId + '-SOURCE-RECLASS')
-          : restoreStockToLots_(invoiceId, c.productId, c.name, Math.abs(c.delta), invoiceId + '-UPDATE');
+          : restoreStockToLots_(invoiceId, c.productId, c.name, Math.abs(c.delta), invoiceId + '-UPDATE', undefined, c.productId);
         restored.forEach(function (r) {
           appendRow_('STOCK_MOVEMENT', {
             'Movement ID': generateId_('STOCK_MOVEMENT'), 'Date': now, 'Product ID': c.productId,
