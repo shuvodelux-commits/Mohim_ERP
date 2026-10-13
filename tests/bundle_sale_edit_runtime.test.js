@@ -137,6 +137,9 @@ test('bundle invoice edit preserves original recipe, parent-only print and compl
   assert.equal(w.sheet.SALE_ITEMS[0]['Line Total'],45000);
   assert.equal(w.sheet.SALE_BUNDLE_COMPONENTS[0]['Sets Sold'],3);
   assert.equal(w.sheet.SALE_BUNDLE_COMPONENTS[0]['Quantity Per Set'],5);
+  const grossAfterIncrease=w.ctx.buildSalesInvoiceProfitMetrics_(w.sheet.SALES,w.sheet.SALE_ITEMS,[],{});
+  assert.equal(grossAfterIncrease['INV-1'].costComplete,true);
+  assert.equal(grossAfterIncrease['INV-1'].profit,34500);
 
   assert.equal(w.edit(1).success,true,JSON.stringify(w.errors));
   assert.equal(w.quantity('pipe'),95);
@@ -146,6 +149,9 @@ test('bundle invoice edit preserves original recipe, parent-only print and compl
   assert.equal(w.edit(1,16000).success,true,JSON.stringify(w.errors));
   assert.deepEqual(w.sheet.PRODUCTS.map(row=>row['Current Stock']),stockBefore);
   assert.deepEqual(w.sheet.SALE_ITEM_LOTS.map(row=>row.Quantity),fifoBefore);
+  const grossAfterPrice=w.ctx.buildSalesInvoiceProfitMetrics_(w.sheet.SALES,w.sheet.SALE_ITEMS,[],{});
+  assert.equal(grossAfterPrice['INV-1'].costComplete,true);
+  assert.equal(grossAfterPrice['INV-1'].profit,12500);
 
   const print=w.ctx.buildInvoicePayload_('INV-1');
   assert.equal(print.items.length,1);
