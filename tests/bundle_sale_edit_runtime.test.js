@@ -190,3 +190,55 @@ test('standalone Pipe remains its own invoice line and is not counted as a bundl
     .reduce((n,r)=>n+Number(r.Quantity),0),15);
  assert.deepEqual(w.errors,[]);
 });
+
+
+test('removing the parent kit line restores all its components, leaving standalone product untouched',()=>{
+  const w=workbook(true);
+  const result=w.ctx.updateSaleInternal_('token','INV-1',{
+    reason:'Remove set',customerName:'Test',customerPhone:'01700000000',
+    paymentType:'Cash',paymentMethod:'Cash',discount:0,
+    items:[{productId:'pipe',name:'Pipe',qty:1,unitPrice:120}]
+  },{});
+  assert.equal(result.success,true,JSON.stringify(w.errors));
+  assert.equal(w.sheet.SALE_ITEMS.length,1);
+  assert.equal(w.sheet.SALE_ITEMS[0]['Product ID'],'pipe');
+  assert.equal(w.quantity('pipe'),99);
+  assert.equal(w.quantity('motor'),8);
+  assert.equal(w.sheet.SALE_BUNDLE_COMPONENTS[0]['Sets Sold'],0);
+  assert.equal(w.sheet.SALE_ITEM_LOTS.filter(row=>row['Source Sale Product ID']==='kit')
+    .reduce((n,row)=>n+Number(row.Quantity),0),0);
+  assert.equal(w.sheet.SALE_ITEM_LOTS.filter(row=>row['Source Sale Product ID']==='pipe')
+    .reduce((n,row)=>n+Number(row.Quantity),0),1);
+  assert.equal(w.ctx.buildInvoicePayload_('INV-1').items.length,1);
+  assert.deepEqual(w.errors,[]);
+});
+
+test('adding a new bundle to a standard invoice consumes the current revision only',()=>{
+  const w=workbook(true);
+  w.sheet.SALE_ITEMS=w.sheet.SALE_ITEMS.filter(row=>row['Product ID']==='pipe');
+  w.sheet.SALE_ITEMS.forEach((row,i)=>row._rowIndex=i+2);
+  w.sheet.SALE_BUNDLE_COMPONENTS=[];
+  w.sheet.SALE_ITEM_LOTS=w.sheet.SALE_ITEM_LOTS.filter(row=>row['Source Sale Product ID']==='pipe');
+  w.sheet.SALE_ITEM_LOTS.forEach((row,i)=>row._rowIndex=i+2);
+  w.sheet.STOCK_LOTS[0]['Remaining Quantity']=99;
+  w.sheet.STOCK_LOTS[1]['Remaining Quantity']=8;
+  w.sheet.PRODUCTS[0]['Current Stock']=99;
+  w.sheet.PRODUCTS[1]['Current Stock']=8;
+  Object.assign(w.sheet.SALES[0],{Subtotal:120,'Grand Total':120,'Paid Amount':120});
+  const result=w.ctx.updateSaleInternal_('token','INV-1',{
+    reason:'Add set',customerName:'Test',customerPhone:'01700000000',
+    paymentType:'Cash',paymentMethod:'Cash',discount:0,
+    items:[
+      {productId:'pipe',name:'Pipe',qty:1,unitPrice:120},
+      {productId:'kit',name:'Tubewell Set',qty:1,unitPrice:15000,bundleRevision:2}
+    ]
+  },{});
+  assert.equal(result.success,true,JSON.stringify(w.errors));
+  assert.equal(w.quantity('pipe'),91);
+  assert.equal(w.quantity('motor'),7);
+  assert.equal(w.sheet.SALE_ITEMS.length,2);
+  assert.equal(w.sheet.SALE_BUNDLE_COMPONENTS[0]['Bundle Revision'],2);
+  assert.equal(w.sheet.SALE_BUNDLE_COMPONENTS[0]['Quantity Per Set'],8);
+  assert.equal(w.ctx.buildInvoicePayload_('INV-1').items.length,2);
+  assert.deepEqual(w.errors,[]);
+});
