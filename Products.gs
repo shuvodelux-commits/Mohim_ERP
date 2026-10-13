@@ -379,17 +379,35 @@ function adjustStock(token, productId, deltaQty, note) {
 }
 
 function setProductStatus(token, productId, status) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     requirePermission_(token, "products", "edit");
     const rowIndex = findRowIndex_("PRODUCTS", "Product ID", productId);
     if (rowIndex === -1) return fail_("Product not found.");
+    const newStatus = status === "Active" ? "Active" : "Inactive";
+    if (newStatus === "Inactive") {
+      const allProducts = getAllRows_("PRODUCTS");
+      const byId = bundleProductMap_(allProducts);
+      const isUsed = getAllRows_("BUNDLE_COMPONENTS").some(function (component) {
+        if (String(component["Component Product ID"]) !== String(productId)) return false;
+        const parent = byId[component["Bundle Product ID"]];
+        return parent && bundleProductType_(parent) === "Bundle" &&
+          parent.Status === "Active" && !isDeleted_(parent) &&
+          Number(component.Revision) === (Number(parent["Bundle Revision"]) || 1) &&
+          String(component.Status || "").toLowerCase() === "active";
+      });
+      if (isUsed) throw new Error("This product is used by an active bundle. Deactivate or change that bundle first.");
+    }
     updateRowFields_("PRODUCTS", rowIndex, {
-      Status: status === "Active" ? "Active" : "Inactive",
-      "Updated At": new Date(),
+      Status: newStatus,
+      "Updated At": new Date()
     });
-    return ok_({ id: productId, status: status });
+    return ok_({ id: productId, status: newStatus });
   } catch (err) {
     logError_("setProductStatus", err);
     return fail_(err.message);
+  } finally {
+    lock.releaseLock();
   }
 }
