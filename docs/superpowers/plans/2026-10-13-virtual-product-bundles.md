@@ -73,7 +73,7 @@
 
 **Files**
 - Create: `Bundles.gs`, `tests/bundle_definition.test.js`
-- Modify: `Products.gs`, `DeleteEngine.gs`
+- Modify: `Products.gs`, `DeleteEngine.gs`, `Purchase.gs`, `PurchaseManagement.gs`
 
 **Interfaces**
 - `validateBundleDefinition_(bundleId, components, productsById)` → normalized array of `{productId, qtyPerSet, unit}` or throws.
@@ -85,9 +85,9 @@
 
 - [ ] **2.1 Failing tests:** one bundle with three components; duplicates, nested, deleted/inactive, 0/NaN and fractional set count reject; revision increments only on changed recipe; inactive historic component doesn't prevent old reversal; blank legacy Product Type is Standard; capacity floor=min; product stock adjustment/purchase/delete guards reject bundle or referenced component.
 - [ ] **2.2 Run:** `node --test tests/bundle_definition.test.js` → FAIL.
-- [ ] **2.3 Implement:** `Bundles.gs`, Products service functions; extend `DeleteEngine.gs::deleteProduct` component-reference guard; no direct Sheet calls from UI.
+- [ ] **2.3 Implement:** `Bundles.gs`, Products service functions; extend `DeleteEngine.gs::deleteProduct` component-reference guard, and `Purchase.gs::createPurchase` plus `PurchaseManagement.gs` purchase-update validation to disallow bundle IDs; no direct Sheet calls from UI.
 - [ ] **2.4 Verify:** bundle-definition tests and `node --test tests/audit_sales_stock.test.js` → PASS.
-- [ ] **2.5 Commit:** `git add Bundles.gs Products.gs DeleteEngine.gs tests/bundle_definition.test.js && git commit -m "feat(bundle): manage virtual bundle recipes"`.
+- [ ] **2.5 Commit:** `git add Bundles.gs Products.gs DeleteEngine.gs Purchase.gs PurchaseManagement.gs tests/bundle_definition.test.js && git commit -m "feat(bundle): manage virtual bundle recipes"`.
 
 ### Task 3: Products editor UX without changing standard-product flow
 
@@ -126,7 +126,7 @@
 - `getPosBootstrap(token)`: return Bundle product records with `productType='Bundle'`, `bundleRevision`, `availableSets`, sale price and component warning data; do not expose cost to users without existing `posCost` permission.
 - `completeSale(token,payload)`: verify bundle revision, integer set qty, and server-side component recipe. Standard vendor sourcing unchanged; bundle ignores/rejects `vendorId/vendorUnitCost`. In `priceMode='auto'` take Bundle Selling Price, never component lot ladder; `fixed` retains native draft price integrity. Expand, aggregate, validate all, plan FIFO, allocate per owner, then write one SALE_ITEMS row per visible line, physical stock/lot/movement per component, attributed SALE_ITEM_LOTS, SALE_BUNDLE_COMPONENTS and one financial sale.
 
-- [ ] **5.1 Failing VM-workbook tests:** 2 sets @15000 = 30000 with one SALE_ITEMS line and -10/-20/-2; zero-stock motor produces oversold; component+standalone overlap; subtotal/discount/cash+due only once; stale revision/no component failure before any transaction write; no vendor sourcing for bundle; ordinary standalone vendor sourcing stays passing.
+- [ ] **5.1 Failing VM-workbook tests:** 2 sets @15000 = 30000 with one SALE_ITEMS line and -10/-20/-2; zero-stock motor produces oversold; component+standalone overlap; subtotal/discount/cash+due only once; stale revision/no component failure before any transaction write; no vendor sourcing for bundle; reject shared-component mixed cart when standalone line requires vendor sourcing (ask user to split invoices); ordinary standalone vendor sourcing stays passing.
 - [ ] **5.2 Run:** `node --test tests/bundle_sale_posting.test.js` → FAIL.
 - [ ] **5.3 Implement:** server posting and UI product search/cart inclusion with original Enter flow; use existing movement and finance services.
 - [ ] **5.4 Verify:** new tests, `node --test tests/audit_sales_stock.test.js tests/sale_update_sourcing_reconciliation.test.js` → PASS.
