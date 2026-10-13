@@ -710,7 +710,8 @@
   }
 
   function posProductById_(productId) {
-    return posState.products.filter(function (p) { return p.id === productId; })[0] || null;
+    // data-* attributes are always strings; Sheets may supply numeric IDs.
+    return posState.products.filter(function (p) { return String(p.id) === String(productId); })[0] || null;
   }
 
   function posApplyAutomaticPricing_(line) {
@@ -755,19 +756,44 @@
     posRenderCart_();
   }
 
-  function posCartProductMatches_(query) {
+  function posCartProductMatches_(query, mode) {
     var q = String(query || '').trim();
-    if (!q) return [];
-    return smartSearchProducts_(posState.products, q, 8);
+    // The Add Product row cannot add an item already present in this sale.
+    // Filter BEFORE taking eight suggestions, or the first highlighted item
+    // may be an unselectable duplicate (especially after Qty Enter).
+    var products = posState.products || [];
+    if (mode === 'add') {
+      var inCart = {};
+      (posState.cart || []).forEach(function (line) {
+        inCart[String(line.productId)] = true;
+      });
+      products = products.filter(function (product) {
+        return !inCart[String(product.id)];
+      });
+    }
+    // Keep V2 toolbar's blank-search behavior; that toolbar can increment Qty.
+    if (!q) return mode === 'v2-search' ? [] : products.slice(0, 8);
+    return smartSearchProducts_(products, q, 8);
   }
 
   function posCartProductResultsHtml_(query, mode, index) {
-    return posCartProductMatches_(query).map(function (product) {
+    return posCartProductMatches_(query, mode).map(function (product, optionIndex) {
+      var unit = String(product.unit || '').trim();
+      var category = String(product.category || '').trim();
+      var brand = String(product.brand || '').trim();
       var stock = Number(product.stock) || 0;
-      return '<button type="button" class="pos-cart-product-option" role="option" data-cart-product-pick="' + escapeHtml(product.id) + '" data-cart-product-mode="' + mode + '"' +
+      var price = product.autoSellingPrice !== undefined ? product.autoSellingPrice : product.sellingPrice;
+      var stockLabel = stock > 0 ? String(stock) + (unit ? ' ' + unit : '') + ' available' : 'Out of stock';
+      return '<button type="button" class="pos-cart-product-option" id="pos-cart-product-option-' + optionIndex + '" role="option" data-cart-product-pick="' + escapeHtml(String(product.id)) + '" data-cart-product-mode="' + escapeHtml(String(mode || 'add')) + '"' +
         (index === null || index === undefined ? '' : ' data-i="' + index + '"') + '>' +
-          '<span>' + escapeHtml(product.name) + '</span>' +
-          '<small>' + escapeHtml(product.unit || '') + ' · Stock ' + stock + ' · ' + formatMoney(product.autoSellingPrice !== undefined ? product.autoSellingPrice : product.sellingPrice) + '</small>' +
+          '<span class="pos-picker-main">' +
+            '<span class="pos-picker-name">' + escapeHtml(product.name || '') + '</span>' +
+            '<span class="pos-picker-meta">Category: ' + escapeHtml(category || '—') + ' · Brand: ' + escapeHtml(brand || '—') + '</span>' +
+          '</span>' +
+          '<span class="pos-picker-details">' +
+            '<span class="pos-picker-price">' + formatMoney(price) + (unit ? '<span class="pos-picker-unit">/' + escapeHtml(unit) + '</span>' : '') + '</span>' +
+            '<span class="pos-picker-stock' + (stock <= 0 ? ' is-short' : '') + '">' + escapeHtml(stockLabel) + '</span>' +
+          '</span>' +
         '</button>';
     }).join('');
   }
@@ -797,9 +823,15 @@
 
   function posCloseCartProductPopup_() {
     var popup = document.getElementById('posCartProductPopup');
-    if (!popup) return;
-    popup.hidden = true;
-    popup.innerHTML = '';
+    if (popup) {
+      popup.hidden = true;
+      popup.innerHTML = '';
+      popup._anchorInput = null;
+    }
+    Array.prototype.forEach.call(document.querySelectorAll('[aria-controls="posCartProductPopup"]'), function (input) {
+      input.setAttribute('aria-expanded', 'false');
+      input.removeAttribute('aria-activedescendant');
+    });
   }
 
   function posPlaceCartProductResults_(input, host) {
@@ -809,14 +841,16 @@
     var viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
     var margin = 8;
     var gap = 4;
-    var width = Math.min(Math.max(inputRect.width, 300), Math.max(160, viewportWidth - (margin * 2)));
+    var isV2 = document.body.classList.contains('pos-v2-active');
+    var width = Math.min(Math.max(inputRect.width, isV2 ? 510 : 360), Math.max(160, viewportWidth - (margin * 2)));
     var left = Math.max(margin, Math.min(inputRect.left, viewportWidth - width - margin));
     host.style.width = Math.round(width) + 'px';
     host.style.left = Math.round(left) + 'px';
     host.style.right = 'auto';
     host.style.bottom = 'auto';
 
-    var resultHeight = Math.min(host.scrollHeight || 220, 220);
+    var maxHeight = isV2 ? 320 : 220;
+    var resultHeight = Math.min(host.scrollHeight || maxHeight, maxHeight);
     var roomBelow = viewportHeight - inputRect.bottom - margin;
     var roomAbove = inputRect.top - margin;
     var openAbove = roomBelow < Math.min(resultHeight, 120) && roomAbove > roomBelow;
@@ -826,15 +860,45 @@
     host.style.top = Math.max(margin, Math.round(top)) + 'px';
   }
 
+  // Track the input rather than a fixed page position. When a desktop's
+  // content area scrolls, a body-level popup must follow the cart field.
+  // Scrolling inside the results panel must not move the popup itself.
+  function posKeepCartProductPopupAnchored_(event) {
+    var popup = document.getElementById('posCartProductPopup');
+    if (!popup || popup.hidden || !popup._anchorInput) return;
+    if (event && (event.target === popup || (popup.contains && popup.contains(event.target)))) return;
+    var input = popup._anchorInput;
+    if (!input.isConnected || document.activeElement !== input) {
+      posCloseCartProductPopup_();
+      return;
+    }
+    posPlaceCartProductResults_(input, popup);
+  }
+
   function posRenderCartProductResults_(input, host, mode, index) {
-    if (!input) return;
+    // V2 also initializes a separate top search field; never open its popup without focus.
+    if (!input || document.activeElement !== input) return;
     if (host) { host.hidden = true; host.innerHTML = ''; }
+    if (mode === 'v2-search' && !String(input.value || '').trim()) {
+      posCloseCartProductPopup_();
+      return;
+    }
     var popup = posCartProductPopup_();
+    popup._anchorInput = input;
     var html = posCartProductResultsHtml_(input.value, mode, index);
-    popup.innerHTML = html;
-    popup.hidden = !html;
+    popup.innerHTML = html || '<div class="pos-picker-empty">No matching products</div>';
+    popup.hidden = false;
+    // Result refresh resets activeIndex to zero; the scroll position must
+    // also reset, otherwise Enter can select an off-screen highlighted item.
+    popup.scrollTop = 0;
     popup.dataset.activeIndex = html ? '0' : '-1';
-    if (!html) return;
+    input.setAttribute('role', 'combobox');
+    input.setAttribute('aria-autocomplete', 'list');
+    input.setAttribute('aria-haspopup', 'listbox');
+    input.setAttribute('aria-controls', 'posCartProductPopup');
+    input.setAttribute('aria-expanded', 'true');
+    if (html) input.setAttribute('aria-activedescendant', 'pos-cart-product-option-0');
+    else input.removeAttribute('aria-activedescendant');
     Array.prototype.forEach.call(popup.querySelectorAll('[data-cart-product-pick]'), function (option, optionIndex) {
       var active = optionIndex === 0;
       option.classList.toggle('is-active', active);
@@ -858,7 +922,20 @@
       option.setAttribute('aria-selected', active ? 'true' : 'false');
     });
     var selected = options[activeIndex];
-    if (selected && selected.scrollIntoView) selected.scrollIntoView({ block: 'nearest' });
+    var focused = document.activeElement;
+    if (focused && focused.getAttribute && focused.getAttribute('aria-controls') === 'posCartProductPopup' && selected) {
+      focused.setAttribute('aria-activedescendant', selected.id);
+    }
+    // The popup lives on document.body and is fixed-position. scrollIntoView()
+    // can also move its scrollable ancestors/the page, leaving a visually
+    // highlighted option that can no longer be clicked at the expected place.
+    // Move only the popup's own scrollbar; keep focus on the product input.
+    if (selected && selected.getBoundingClientRect && popup.getBoundingClientRect) {
+      var popupRect = popup.getBoundingClientRect();
+      var optionRect = selected.getBoundingClientRect();
+      if (optionRect.bottom > popupRect.bottom) popup.scrollTop += optionRect.bottom - popupRect.bottom + 2;
+      else if (optionRect.top < popupRect.top) popup.scrollTop -= popupRect.top - optionRect.top + 2;
+    }
     return selected || null;
   }
 
@@ -962,7 +1039,39 @@
     if (posState.cartEntryIndex === null) return false;
     posState.cartEntryIndex = null;
     posRenderCart_();
-    if (focusNext !== false) posFocusCartEntryProduct_();
+    if (focusNext !== false) {
+      // V2 adds the row-number and drag-handle cells after cart rendering.
+      // Do this BEFORE focusing Add Product, so its bounding box is final
+      // when focusin positions the floating dropdown.
+      if (document.body.classList.contains('pos-v2-active') &&
+          typeof posV2EnhanceCartRows_ === 'function') posV2EnhanceCartRows_();
+      posFocusCartEntryProduct_();
+      // Some layout/scroll changes settle at the next paint. Re-anchor the
+      // current popup or reopen it if a scroll event closed it in between.
+      // Only act while the same Add Product input still owns keyboard focus.
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(function () {
+        var input = document.querySelector('#posCartList .pos-cart-entry-row [data-cart-product-input][data-cart-product-mode="add"]');
+        if (!input || !input.isConnected) return;
+        if (document.activeElement !== input) {
+          // After the old Qty element is detached, focus can fall back to
+          // body while the floating popup remains visible. The next Enter
+          // previously only refocused Add Product, wasting a keystroke.
+          // Restore focus unless the user has deliberately selected another
+          // connected control in the meantime.
+          var active = document.activeElement;
+          if (active && active !== document.body && active.isConnected) return;
+          input.focus({ preventScroll: true });
+        }
+        if (document.activeElement !== input) return;
+        var popup = document.getElementById('posCartProductPopup');
+        if (!popup || popup.hidden || popup._anchorInput !== input) {
+          var host = input.parentNode.querySelector('[data-cart-product-results]');
+          posRenderCartProductResults_(input, host, 'add', null);
+        } else {
+          posPlaceCartProductResults_(input, popup);
+        }
+      });
+    }
     return true;
   }
 
@@ -974,7 +1083,12 @@
     if (!activeRow || activeRow.contains(event.target)) return;
 
     var popup = document.getElementById('posCartProductPopup');
-    if (popup && popup.contains(event.target)) return;
+    // The popup's click handler removes its chosen option synchronously,
+    // before this document click listener runs. Even after that DOM removal,
+    // the original click target remains inside the detached option button.
+    // Never treat selecting a suggestion as clicking outside the active row.
+    if ((popup && popup.contains(event.target)) ||
+        (event.target && event.target.closest && event.target.closest('[data-cart-product-pick]'))) return;
 
     var nextAddInput = event.target && event.target.closest
       ? event.target.closest('[data-cart-product-input][data-cart-product-mode="add"]')
@@ -1146,6 +1260,14 @@
     return ' <button type="button" class="c-cost" data-cost-i="' + i + '" aria-label="Show purchase price">' + posCostEyeSvg_() + '</button>';
   }
 
+  // escapeHtml() protects text nodes but deliberately leaves quotes untouched.
+  // Product names such as 6" SWR Pipe must also be safe inside input attributes.
+  function posEscapeCartInputAttr_(value) {
+    return escapeHtml(String(value === null || value === undefined ? '' : value))
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   function posRenderCart_() {
     var list = document.getElementById('posCartList');
     list.innerHTML = '';
@@ -1162,7 +1284,7 @@
       var activeEntry = posState.cartEntryIndex === i;
       var productMode = activeEntry ? 'entry' : 'replace';
       var productCell = (editingProduct || activeEntry)
-        ? '<div class="c-name is-editing"><div class="pos-cart-inline-picker"><input type="search" autocomplete="off" data-cart-product-input data-cart-product-mode="' + productMode + '" data-i="' + i + '" value="' + escapeHtml(line.name) + '" aria-label="' + (activeEntry ? 'Product' : 'Replace ' + escapeHtml(line.name)) + '"><div class="pos-cart-product-results" data-cart-product-results data-i="' + i + '" role="listbox" hidden></div></div></div>'
+        ? '<div class="c-name is-editing"><div class="pos-cart-inline-picker"><input type="search" autocomplete="off" data-cart-product-input data-cart-product-mode="' + productMode + '" data-i="' + i + '" value="' + posEscapeCartInputAttr_(line.name) + '" aria-label="' + (activeEntry ? 'Product' : 'Replace ' + posEscapeCartInputAttr_(line.name)) + '"><div class="pos-cart-product-results" data-cart-product-results data-i="' + i + '" role="listbox" hidden></div></div></div>'
         : '<div class="c-name"><div class="c-name-main"><button type="button" class="c-name-title c-product-edit" data-cart-product-edit data-i="' + i + '" title="Change product">' + escapeHtml(line.name) + '</button>' + posCostMarkerHtml_(line, i) + '</div><div class="c-name-meta">' + escapeHtml(line.unit || '') + '</div></div>';
 
       var entryAttrs = activeEntry ? ' data-cart-entry-qty' : '';
@@ -1223,6 +1345,15 @@
   });
 
   document.getElementById('posCartList').addEventListener('focusin', function (e) {
+    if (!e.target.hasAttribute('data-cart-product-input')) return;
+    var host = e.target.parentNode.querySelector('[data-cart-product-results]');
+    var mode = e.target.dataset.cartProductMode || 'replace';
+    var index = (mode === 'replace' || mode === 'entry') ? Number(e.target.dataset.i) : null;
+    posRenderCartProductResults_(e.target, host, mode, index);
+  });
+
+  // Reopen suggestions by mouse/touch when the input was already focused (e.g. after Escape).
+  document.getElementById('posCartList').addEventListener('click', function (e) {
     if (!e.target.hasAttribute('data-cart-product-input')) return;
     var host = e.target.parentNode.querySelector('[data-cart-product-results]');
     var mode = e.target.dataset.cartProductMode || 'replace';
@@ -1310,9 +1441,9 @@
         var input = document.querySelector('#posCartList [data-cart-product-input][data-cart-product-mode="replace"][data-i="' + editIndex + '"]');
         if (!input) return;
         var host = input.parentNode.querySelector('[data-cart-product-results]');
-        posRenderCartProductResults_(input, host, 'replace', editIndex);
         input.focus();
         input.select();
+        posRenderCartProductResults_(input, host, 'replace', editIndex);
       }, 0);
       return;
     }
@@ -1422,15 +1553,18 @@
     if (!e.target.hasAttribute('data-cart-product-input')) return;
     var pickerMode = e.target.dataset.cartProductMode || 'replace';
 
-    if (e.key === 'ArrowDown') {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
-      posMoveCartProductActive_(1);
-      return;
-    }
-
-    if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      posMoveCartProductActive_(-1);
+      var popupForArrow = document.getElementById('posCartProductPopup');
+      var wasOpen = !!(popupForArrow && !popupForArrow.hidden);
+      if (!wasOpen) {
+        var pickerHost = e.target.parentNode.querySelector('[data-cart-product-results]');
+        var pickerIndex = (pickerMode === 'replace' || pickerMode === 'entry') ? Number(e.target.dataset.i) : null;
+        posRenderCartProductResults_(e.target, pickerHost, pickerMode, pickerIndex);
+      }
+      // Opening a list selects its first option. Only advance when it was
+      // already open, so ArrowDown on a newly focused input does not skip it.
+      if (wasOpen) posMoveCartProductActive_(e.key === 'ArrowDown' ? 1 : -1);
       return;
     }
 
@@ -1455,6 +1589,14 @@
 
     if (e.key !== 'Enter') return;
     var option = posActiveCartProductOption_();
+    if (!option) {
+      // A Qty -> Add Product focus transition can leave the popup closed.
+      // Resolve the first eligible suggestion on THIS Enter, not the next one.
+      var enterHost = e.target.parentNode.querySelector('[data-cart-product-results]');
+      var enterIndex = (pickerMode === 'replace' || pickerMode === 'entry') ? Number(e.target.dataset.i) : null;
+      posRenderCartProductResults_(e.target, enterHost, pickerMode, enterIndex);
+      option = posActiveCartProductOption_();
+    }
     if (!option) return;
     var match = posProductById_(option.dataset.cartProductPick);
     if (!match) return;
@@ -1465,6 +1607,7 @@
 
   document.getElementById('posCartList').addEventListener('scroll', posCloseCartProductPopup_);
   window.addEventListener('resize', posCloseCartProductPopup_);
+  document.addEventListener('scroll', posKeepCartProductPopupAnchored_, true);
   document.addEventListener('mousedown', function (e) {
     var popup = document.getElementById('posCartProductPopup');
     if (!popup || popup.hidden) return;
