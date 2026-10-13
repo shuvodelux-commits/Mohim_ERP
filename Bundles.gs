@@ -217,3 +217,125 @@ function updateBundleProduct(token, bundleId, payload) {
     return fail_(err.message);
   } finally {lock.releaseLock();}
 }
+
+
+/**
+ * Read-only stock plan for editing visible bundle sale lines. Existing parent
+ * recipes always come from SALE_BUNDLE_COMPONENTS, never the editable master.
+ * For safety, an invoice edit may not move the same physical product both in
+ * and out across different bundle lines at once: those edits can be split.
+ */
+function planBundleInvoiceEdit_(options) {
+  const opts = options || {};
+  const invoiceId = String(opts.invoiceId || '');
+  const oldItems = opts.oldItems || [];
+  const newItems = opts.newItems || [];
+  const productsById = opts.productsById || {};
+  const historicalRows = (opts.snapshotRows || []).filter(function(r) {
+    return String(r['Invoice ID']) === invoiceId;
+  });
+  const historical = getSaleBundleSnapshot_(invoiceId, historicalRows);
+  const oldById = {}, newById = {};
+  oldItems.forEach(function(item) { oldById[String(item['Product ID'])] = item; });
+  newItems.forEach(function(item) { newById[String(item.productId)] = item; });
+  const bundleIds = {};
+  Object.keys(historical).forEach(function(id) { bundleIds[id] = true; });
+  oldItems.forEach(function(row) {
+    if (row['Sold Product Type'] === 'Bundle') bundleIds[String(row['Product ID'])] = true;
+  });
+  newItems.forEach(function(item) {
+    if (bundleProductType_(productsById[item.productId]) === 'Bundle') {
+      bundleIds[String(item.productId)] = true;
+    }
+  });
+  const newBundleIds = Object.keys(bundleIds).filter(function(id) {
+    return !oldById[id] && newById[id] && !historical[id];
+  });
+  const current = newBundleIds.length
+    ? getBundleDefinitions_(newBundleIds, productsById, opts.definitionRows || [])
+    : {};
+  const snapshots = [], changesByPhysical = {};
+  function physicalEntry_(id) {
+    const product = productsById[id];
+    if (!product || bundleProductType_(product) !== 'Standard') {
+      throw new Error('Bundle component record is unavailable: ' + id);
+    }
+    if (!changesByPhysical[id]) changesByPhysical[id] = {
+      productId: id, name: product['Product Name'] || id,
+      rowIndex: product._rowIndex, product: product, positiveOwners: [],
+      negativeOwners: [], delta: 0, newStock: Number(product['Current Stock']) || 0
+    };
+    return changesByPhysical[id];
+  }
+  Object.keys(bundleIds).forEach(function(id) {
+    const old = oldById[id], updated = newById[id];
+    const oldQty = old ? Number(old['Quantity']) || 0 : 0;
+    const newQty = updated ? Number(updated.qty) : 0;
+    if (updated && (!Number.isSafeInteger(newQty) || newQty <= 0)) {
+      throw new Error('Bundle quantity must be positive whole sets: ' + id);
+    }
+    if (oldQty && !historical[id]) throw new Error('Original bundle recipe is missing for invoice ' + invoiceId);
+    const recipe = oldQty ? historical[id] : current[id];
+    if (!recipe && newQty > 0) throw new Error('Bundle recipe unavailable: ' + id);
+    if (!oldQty && newQty > 0 && Number(updated.bundleRevision) !== recipe.revision) {
+      throw new Error('Bundle recipe changed. Refresh the POS product before saving.');
+    }
+    if (newQty === oldQty) return;
+    const components = recipe.components;
+    if (!components || !components.length) throw new Error('Bundle has no historical components: ' + id);
+    snapshots.push({
+      bundleId: id, oldQty: oldQty, newQty: newQty, revision: recipe.revision,
+      components: components,
+      existingRows: historicalRows.filter(function(r) {return String(r['Bundle Product ID']) === id;})
+    });
+    components.forEach(function(c) {
+      const difference = (newQty - oldQty) * c.qtyPerSet;
+      if (!Number.isFinite(difference) || !difference) throw new Error('Invalid bundle component quantity.');
+      const entry = physicalEntry_(c.productId);
+      entry.delta += difference;
+      const owner = {sourceSaleProductId:id,physicalProductId:c.productId,qty:Math.abs(difference)};
+      (difference > 0 ? entry.positiveOwners : entry.negativeOwners).push(owner);
+    });
+  });
+  const products = Object.keys(productsById).map(function(k){return productsById[k];});
+  const virtualState = {};
+  const result = [];
+  Object.keys(changesByPhysical).forEach(function(id) {
+    const entry = changesByPhysical[id];
+    if (entry.positiveOwners.length && entry.negativeOwners.length) {
+      throw new Error('Bundle edits increase and decrease ' + entry.name + ' in the same update. Edit these sets separately.');
+    }
+    entry.newStock -= entry.delta;
+    if (entry.positiveOwners.length) {
+      const qty = entry.positiveOwners.reduce(function(sum,o){return sum+o.qty;},0);
+      entry.plan = planStockConsumption_(id,qty,opts.allLots || [],entry.product);
+    }
+    if (entry.negativeOwners.length) {
+      entry.restorations = entry.negativeOwners.map(function(owner) {
+        // The original consumption evidence is mandatory for a bundled sale.
+        const available = (opts.consumptionRows || []).filter(function(row) {
+          return String(row['Invoice ID']) === invoiceId &&
+            String(row['Product ID']) === id &&
+            String(row['Source Sale Product ID'] || row['Product ID']) === owner.sourceSaleProductId;
+        }).reduce(function(sum,row) {return sum + (Number(row['Quantity']) || 0);},0);
+        if (available + 0.0000001 < owner.qty) {
+          throw new Error('Cannot safely restore missing bundle FIFO evidence for ' + entry.name);
+        }
+        return {
+          sourceSaleProductId:owner.sourceSaleProductId,
+          plan:planSaleReturnRestoration_(
+            invoiceId,id,entry.name,owner.qty,{
+              sourceSaleProductId:owner.sourceSaleProductId,
+              saleItemLots:opts.consumptionRows || [],
+              stockLots:opts.stockLots || opts.allLots || [],
+              products:products,
+              virtualState:virtualState
+            }
+          )
+        };
+      });
+    }
+    result.push(entry);
+  });
+  return {changes:result,snapshots:snapshots};
+}
