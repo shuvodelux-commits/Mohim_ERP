@@ -340,9 +340,15 @@ function completeSale(token, payload) {
         const product = productsById[productId];
         if (!product || bundleProductType_(product) !== 'Standard') throw new Error('Bundle component no longer exists.');
         const qty = demand.requirementsByProductId[productId];
+        const fifoPlan = planStockConsumption_(productId,qty,allLots,product);
+        // Preflight the parent allocation before posting any invoice or lot.
+        // applyStockConsumption_ later assigns actual OVERSOLD lot IDs.
+        const virtualDraws=fifoPlan.draws.map(function(d){return {lotId:d.lotId,qty:d.take,unitCost:d.unitCost,unitSellPrice:d.unitSellPrice};});
+        if(fifoPlan.shortfall>0)virtualDraws.push({lotId:'__PREVIEW_OVERSOLD__',qty:fifoPlan.shortfall,unitCost:fifoPlan.fallbackPrice,unitSellPrice:fifoPlan.fallbackSellPrice});
+        attributeBundleConsumption_(demand.ownersByProductId[productId],virtualDraws);
         bundlePhysicalPlans[productId] = {
-          plan: planStockConsumption_(productId,qty,allLots,product),
-          product: product, qty:qty, owners:demand.ownersByProductId[productId],
+          plan: fifoPlan, product: product, qty:qty,
+          owners:demand.ownersByProductId[productId],
           newStock:(Number(product['Current Stock']) || 0)-qty
         };
       });
