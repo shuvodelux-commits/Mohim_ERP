@@ -21,7 +21,16 @@ function getProductsBootstrap(token) {
     const products = activeRows_("PRODUCTS");
     const productMap = bundleProductMap_(products);
     const bundleIds = products.filter(function (p) { return bundleProductType_(p) === 'Bundle'; }).map(function (p) { return p['Product ID']; });
-    const bundleDefinitions = bundleIds.length ? getBundleDefinitions_(bundleIds, productMap, getAllRows_('BUNDLE_COMPONENTS')) : {};
+    const bundleDefinitions = {}, bundleErrorById = {};
+    const recipeRows = bundleIds.length ? getAllRows_('BUNDLE_COMPONENTS') : [];
+    bundleIds.forEach(function (id) {
+      try { bundleDefinitions[id] = getBundleDefinitions_([id], productMap, recipeRows)[id]; }
+      catch(err) {
+        bundleErrorById[id] = err.message;
+        const product=productMap[id];
+        bundleDefinitions[id]=getStoredBundleDefinition_(id,product['Bundle Revision'],recipeRows);
+      }
+    });
     const settings = getSettingsMap_();
     const categories = getAllRows_("PRODUCT_CATEGORIES").filter(function (c) {
       return c["Status"] !== "Inactive";
@@ -97,7 +106,9 @@ function getProductsBootstrap(token) {
       return Object.assign({}, p, {
         'Product Type': isBundle ? 'Bundle' : 'Standard',
         'Bundle Components': isBundle ? bundleDefinitions[p['Product ID']].components : [],
-        'Available Sets': isBundle ? getBundleAvailability_(bundleDefinitions[p['Product ID']],productMap) : 0,
+        'Bundle Error': isBundle ? (bundleErrorById[p['Product ID']]||'') : '',
+        'Available Sets': isBundle && !bundleErrorById[p['Product ID']] ?
+          getBundleAvailability_(bundleDefinitions[p['Product ID']],productMap) : 0,
         "Stock Value": isBundle ? 0 : stockValue,
         "Unpriced Lot Count": stats ? (stats.unpricedInternalLotCount || 0) : 0,
         "Unpriced Remaining Quantity": stats ? (stats.unpricedInternalQty || 0) : 0

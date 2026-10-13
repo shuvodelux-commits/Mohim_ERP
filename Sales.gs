@@ -83,7 +83,12 @@ function getPosBootstrap(token) {
     const products = activeRows_('PRODUCTS').filter(function (p) { return p['Status'] !== 'Inactive'; });
     const productsById = bundleProductMap_(products);
     const bundleIds = products.filter(function (p) {return bundleProductType_(p) === 'Bundle';}).map(function (p) {return p['Product ID'];});
-    const bundleDefinitions = bundleIds.length ? getBundleDefinitions_(bundleIds,productsById,getAllRows_('BUNDLE_COMPONENTS')) : {};
+    const bundleDefinitions = {}, bundleUnavailableById = {};
+    const recipeRows = bundleIds.length ? getAllRows_('BUNDLE_COMPONENTS') : [];
+    bundleIds.forEach(function (id) {
+      try { bundleDefinitions[id] = getBundleDefinitions_([id],productsById,recipeRows)[id]; }
+      catch(err) { bundleUnavailableById[id] = err.message; }
+    });
     const customers = activeRows_('CUSTOMERS');
     const allLots = getAllRows_('STOCK_LOTS');
     const bankAccounts = getActiveBankAccountsForUI_();
@@ -109,7 +114,7 @@ function getPosBootstrap(token) {
       hasPermission_(actingUser, 'posCost', 'view');
 
     return ok_({
-      products: products.map(function (p) {
+      products: products.filter(function (p) { return !bundleUnavailableById[p['Product ID']]; }).map(function (p) {
         const bundle = bundleProductType_(p) === 'Bundle';
         const definition = bundle ? bundleDefinitions[p['Product ID']] : null;
         const pricing = bundle

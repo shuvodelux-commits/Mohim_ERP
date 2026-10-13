@@ -54,6 +54,20 @@ function getBundleDefinitions_(bundleIds, productsById, componentRows) {
   });
   return definitions;
 }
+function getStoredBundleDefinition_(bundleId, revision, rows) {
+  return {
+    bundleId: String(bundleId),
+    revision: Number(revision) || 1,
+    components: (rows || []).filter(function(row){
+      return String(row['Bundle Product ID']) === String(bundleId) &&
+        Number(row.Revision) === (Number(revision) || 1) &&
+        String(row.Status || '').toLowerCase() === 'active';
+    }).map(function(row){
+      return {productId:String(row['Component Product ID']||''),
+        qtyPerSet:Number(row['Quantity Per Set']),unit:String(row.Unit||'')};
+    })
+  };
+}
 function getBundleAvailability_(definition, productsById) {
   if (!definition || !definition.components || !definition.components.length) return 0;
   return Math.max(0, Math.min.apply(null, definition.components.map(function (c) {
@@ -184,7 +198,7 @@ function updateBundleProduct(token, bundleId, payload) {
       throw new Error('A product with this name already exists.');
     }
     const components = validateBundleDefinition_(bundleId, payload.components, bundleProductMap_(products));
-    const before = getBundleDefinitions_([bundleId], bundleProductMap_(products), getAllRows_('BUNDLE_COMPONENTS'))[bundleId];
+    const before = getStoredBundleDefinition_(bundleId,Number(p['Bundle Revision'])||1,getAllRows_('BUNDLE_COMPONENTS'));
     const signature = values => JSON.stringify(values.map(function (c) {return [c.productId, c.qtyPerSet, c.unit];}).sort(function (a,b) {return a[0].localeCompare(b[0]);}));
     const changed = signature(before.components) !== signature(components);
     const revision = (Number(p['Bundle Revision']) || 1) + (changed ? 1 : 0);
