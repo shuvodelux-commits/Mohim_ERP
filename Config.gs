@@ -34,6 +34,8 @@ const CONFIG = {
   // ---- Sheet names ----------------------------------------------------
   SHEETS: {
     PRODUCTS: "Products",
+    BUNDLE_COMPONENTS: "Bundle Components",
+    SALE_BUNDLE_COMPONENTS: "Sale Bundle Components",
     SUPPLIERS: "Suppliers",
     SUPPLIER_LEDGER: "Supplier Ledger",
     STOCK_LOTS: "Stock Lots",
@@ -104,7 +106,29 @@ const CONFIG = {
       "Is Deleted",
       "Deleted By",
       "Deleted At",
-      "Delete Reason"
+      "Delete Reason",
+      "Product Type",
+      "Bundle Revision"
+    ],
+    BUNDLE_COMPONENTS: [
+      "Bundle Product ID",
+      "Component Product ID",
+      "Quantity Per Set",
+      "Unit",
+      "Revision",
+      "Status",
+      "Updated At"
+    ],
+    SALE_BUNDLE_COMPONENTS: [
+      "Invoice ID",
+      "Bundle Product ID",
+      "Bundle Revision",
+      "Component Product ID",
+      "Quantity Per Set",
+      "Sets Sold",
+      "Component Quantity Sold",
+      "Unit",
+      "Created At"
     ],
     SUPPLIERS: [
       "Supplier ID",
@@ -272,6 +296,7 @@ const CONFIG = {
       "Quantity",
       "Unit Price",
       "Line Total",
+      "Sold Product Type",
 
     ],
     CUSTOMERS: [
@@ -428,6 +453,7 @@ const CONFIG = {
       "Balance Stock",
       "Notes",
       "Lot ID",
+      "Source Sale Product ID",
     ],
     // new HEADERS entries:
     STOCK_LOTS: [
@@ -461,6 +487,7 @@ const CONFIG = {
       // Multi-supplier sale lineage. Sales.gs already supplies this value;
       // declaring it here makes Database.gs persist it on live sheets.
       "Supplier ID",
+      "Source Sale Product ID",
 
     ],
     STOCK_LOT_COST_CORRECTIONS: [
@@ -530,6 +557,7 @@ const CONFIG = {
       // New rows store the already-discounted/economic return value. Blank
       // legacy rows are interpreted as pre-discount values by reports.
       "Pricing Basis",
+      "Sold Product Type",
     ],
     PURCHASE_RETURN: [
       "Return ID",
