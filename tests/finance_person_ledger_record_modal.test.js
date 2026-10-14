@@ -31,3 +31,11 @@ test('new entry from person ledger preselects current finance person and role',(
  assert.match(page,/finPerson/);
  assert.match(page,/transactionTypes/);
 });
+
+test('selected person and role are locked while posting in the Person Ledger modal',()=>{
+ assert.match(page,/function finEntryRoleLock_\(/);
+ assert.match(page,/t\.role !== role/);
+ assert.match(page,/option\.disabled/);
+ assert.match(page,/document\.getElementById\('finPerson'\)\.value\s*=\s*person\.id/);
+ assert.match(read('style.html'),/#fplNewModal \.form-grid > div:has\(#finPerson\)/);
+});
