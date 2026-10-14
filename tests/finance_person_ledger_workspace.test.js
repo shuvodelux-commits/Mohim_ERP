@@ -38,3 +38,8 @@ test('search supports Enter and keyboard arrow selection on the finance-only lis
  assert.match(ui,/key==='Enter'/);
  assert.match(ui,/getElementById\('fplPeopleList'\)\.addEventListener\('keydown'/);
 });
+
+test('mobile first entry stays on people list until user selects a person',()=>{
+ assert.match(ui,/window\.matchMedia\('\(max-width:820px\)'\)/);
+ assert.match(ui,/if\(isNarrow && !finPersonLedgerState\.personId\)return;/);
+});
