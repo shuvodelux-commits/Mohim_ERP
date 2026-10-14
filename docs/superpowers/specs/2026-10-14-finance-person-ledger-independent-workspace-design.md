@@ -1,8 +1,8 @@
 # Mohim ERP — Independent Finance Person Ledger Workspace (Revised Design)
 
 **Date:** 2026-10-14  
-**Status:** Proposed revision, awaiting user approval of written specification  
-**Reference:** User's two-pane Person Ledger screenshot in the Oct 14 discussion, adapted to **only Finance people**.  
+**Status:** Approved visual design on 2026-10-14; implementation pending plan review  
+**Reference:** User's two-pane Person Ledger screenshot and the subsequently approved generated UI mockup in the Oct 14 discussion, adapted to **only Finance people**. The screenshot's example amounts, roles and ledger transaction combinations are illustrative, NOT accounting test vectors; authoritative debit/credit comes from the existing Finance metadata and row balances.  
 **Repository:** `shuvodelux-commits/Mohim_ERP`  
 **Revision of:** Previous Finance Person Ledger proposal already in PR #25. That PR's current nested `All Transactions | Person Ledger` UI is **not the approved final layout**.
 
@@ -104,6 +104,6 @@ Expected code paths to review and adjust on PR #25 (exact paths may be refined d
 
 ## 7. Delivery and safety
 
-The currently open PR #25 and preview `@1` deploy still use the **previous**, rejected nested button layout. This document **does not** mean the revised design has been implemented. Upon approval of this written design, the next step is a separate Superpowers implementation plan and subsequent code revision of PR #25, followed by thorough tests and preview-only deployment with the existing preview Script/Deployment IDs.
+The currently open PR #25 and preview `@1` deploy still use the **previous**, rejected nested button layout. This document **does not** mean the revised design has been implemented. Following approval of this visual design, the next step is the Superpowers implementation plan review and subsequent code revision of PR #25, followed by thorough tests and preview-only deployment with the existing preview Script/Deployment IDs.
 
-**User-confirmed scope:** "Only finance people." The second user-supplied screenshot determines the overall two-pane layout. Any visual details not supported by the screenshot are bounded by existing Mohim ERP styles and UX patterns.
+**User-confirmed scope:** "Only finance people." The second user-supplied screenshot determines the overall two-pane layout; the generated mockup was explicitly approved on 2026-10-14. Any visual details not supported by the screenshot are bounded by existing Mohim ERP styles and UX patterns.
