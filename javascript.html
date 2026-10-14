@@ -4402,7 +4402,7 @@
         if (input) restorePristineZero_(input);
       }
     }, true);
-    document.addEventListener('focusout', function (event) {
+    document.addEventListener('blur', function (event) {
       var input = numericTarget_(event);
       if (!input) return;
       restorePristineZero_(input);
