@@ -638,7 +638,8 @@
   document.getElementById('finLedPersonExportBtn').addEventListener('click',function(){document.getElementById('finLedExportBtn').click();});
   document.getElementById('finLedPersonNewTxnBtn').addEventListener('click',function(){
     if (!finLedState.selectedPerson || finLedState.selectedPerson.status==='Inactive')return;
-    goToPage('finance'); // Use existing Business Finance transaction form.
+    if (typeof finState !== 'undefined') finState.pendingLedgerPersonId=finLedState.selectedPerson.id;
+    goToPage('finance'); // Reuse existing Business Finance form and its transaction RPC.
   });
 
   function finLedRender_() {
@@ -836,7 +837,7 @@
       if(!p||!st)return;
       printLedgerRange({title:'Finance Person Ledger — '+p.name,
         subtitle:'From '+(document.getElementById('finLedPersonDateFrom').value||'Beginning')+
-          ' to '+(document.getElementById('finLedPersonDateTo').value||'Today'),
+          ' to '+(document.getElementById('finLedPersonDateTo').value||'All dates'),
         columns:FIN_LED_PERSON_COLUMNS,rows:st.rows,
         footer:'Opening Balance: '+finLedMoney_(st.opening)+' | Closing Balance: '+finLedMoney_(st.closing)});
       return;
