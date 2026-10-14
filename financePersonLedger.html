@@ -1,0 +1,11 @@
+<div class="finance-person-workspace" id="financePersonLedgerWorkspace">
+  <aside class="card" id="fplPeoplePanel"><h3>Finance People <span class="bn-hint">অর্থ লেনদেনের ব্যক্তি</span></h3><p class="bn-hint">Select an Owner, Lender or Borrower.</p></aside>
+  <main class="card" id="fplDetailPanel"><p class="empty-state">Select a finance person to view their ledger.</p></main>
+</div>
+<script>
+  var finPersonLedgerState = { persons: [], personId: '', account: '', rows: [], balances: {}, transactionTypes: [] };
+  function financePersonLedgerLoad() { return withLoader(serverCall('getFinanceBootstrap',authToken)).then(function(data){
+    finPersonLedgerState.persons=data.personsAll||[];
+    finPersonLedgerState.transactionTypes=data.transactionTypes||[];
+  }).catch(function(err){showToast(err.message,'error');}); }
+</script>
