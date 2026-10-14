@@ -1,7 +1,7 @@
 'use strict';
 const {test}=require('node:test'), assert=require('node:assert/strict'), fs=require('node:fs'),path=require('node:path');
 const read=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8');
-const ui=read('financePersonLedger.html'),server=read('FinanceModule.gs'),style=read('style.html');
+const ui=read('financePersonLedger.html'),server=read('FinanceModule.gs'),style=read('style.html'),finance=read('finance.html');
 test('bootstrap adds per-person finance balance map from existing signed calculator',()=>{
  assert.match(server,/personBalances\s*:\s*financePersonBalancesForUI_\(/);
  assert.match(server,/function financePersonBalancesForUI_\(/);
@@ -26,7 +26,8 @@ test('record transaction and view details open modals, not navigate to Business 
  assert.doesNotMatch(ui,/goToPage\('finance'\)/);
 });
 test('record and view use same Finance monetary APIs',()=>{
- assert.match(ui,/addFinanceTransaction|finSaveBtn/);
+ assert.match(ui,/finEntryFormCard/);
+ assert.match(finance,/serverCall\('addFinanceTransaction'/);
  assert.match(ui,/finLedOpenView_|finPersonLedgerView_/);
  assert.match(ui,/finLedOpenEdit_|finPersonLedgerEdit_/);
 });
