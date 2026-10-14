@@ -30,3 +30,10 @@ test('record and view use same Finance monetary APIs',()=>{
  assert.match(ui,/finLedOpenView_|finPersonLedgerView_/);
  assert.match(ui,/finLedOpenEdit_|finPersonLedgerEdit_/);
 });
+
+test('search supports Enter and keyboard arrow selection on the finance-only list',()=>{
+ assert.match(ui,/getElementById\('fplSearch'\)\.addEventListener\('keydown'/);
+ assert.match(ui,/key==='ArrowDown'/);
+ assert.match(ui,/key==='Enter'/);
+ assert.match(ui,/getElementById\('fplPeopleList'\)\.addEventListener\('keydown'/);
+});
