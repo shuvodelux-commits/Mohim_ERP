@@ -120,3 +120,20 @@ test('hidden supplier ID does not create a second touch dropdown control',()=>{
  assert.equal(c.result.internal,false,'internal purchase supplier ID must not spawn visible dropdown');
  assert.equal(c.result.normal,true,'visible ERP select controls must retain touch behavior');
 });
+
+test('touch enhancer cannot insert a visible trigger for the supplier ID store',()=>{
+ const shouldStart=shared.indexOf('  function touchSelectShouldEnhance_(select) {');
+ const shouldEnd=shared.indexOf('  function touchSelectLabel_(select) {',shouldStart);
+ const enhanceStart=shared.indexOf('  function enhanceTouchSelect_(select) {');
+ const enhanceEnd=shared.indexOf('  function enhanceTouchSelects_(root) {',enhanceStart);
+ assert.ok(shouldStart>=0&&shouldEnd>shouldStart&&enhanceStart>=0&&enhanceEnd>enhanceStart);
+ let inserted=0;
+ const internal={
+   tagName:'SELECT',dataset:{touchSelectSkip:'true'},classList:{add(){}},
+   insertAdjacentElement(){inserted++;}
+ };
+ vm.runInNewContext(shared.slice(shouldStart,shouldEnd)+shared.slice(enhanceStart,enhanceEnd)+
+   '\nenhanceTouchSelect_(internal)',{internal});
+ assert.equal(inserted,0,'Only search field + New button must be visible');
+ assert.equal(internal._touchSelectTrigger,undefined);
+});
