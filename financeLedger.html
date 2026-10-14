@@ -545,6 +545,7 @@
     document.getElementById('finLedAllModeBtn').setAttribute('aria-pressed', String(!isPerson));
     document.getElementById('finLedPersonModeBtn').setAttribute('aria-pressed', String(isPerson));
     var combo = document.querySelector('.finance-ledger-person-combobox');
+    combo.classList.toggle('party-ledger-combobox', isPerson);
     if (isPerson) document.getElementById('finLedPersonSearchSlot').appendChild(combo);
     else {
       var home = document.getElementById('finLedPersonSearchHome');
