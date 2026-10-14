@@ -238,6 +238,7 @@
     return withLoader(serverCall('getFinanceBootstrap',authToken)).then(function(data){
       finPersonLedgerState.persons=data.personsAll||[];
       finPersonLedgerState.transactionTypes=data.transactionTypes||[];
+      if (typeof finLedState !== 'undefined') finLedState.transactionTypes=finPersonLedgerState.transactionTypes;
       finPersonLedgerState.bankAccounts=data.bankAccounts||[];
       finPersonLedgerState.currencySymbol=data.currencySymbol||'';
       finPersonLedgerState.balances=data.personBalances||{};
@@ -251,6 +252,23 @@
     }).catch(function(err){showToast(err.message,'error');});
   }
   document.getElementById('fplSearch').addEventListener('input',finPersonLedgerRenderPeople_);
+  document.getElementById('fplSearch').addEventListener('keydown',function(e){
+    var first=document.querySelector('#fplPeopleList button[data-person-id]');
+    if(!first)return;
+    if(e.key==='Enter'){e.preventDefault();first.click();}
+    if(e.key==='ArrowDown'){e.preventDefault();first.focus();}
+  });
+  document.getElementById('fplPeopleList').addEventListener('keydown',function(e){
+    var selected=e.target.closest('button[data-person-id]');
+    if(!selected)return;
+    if(e.key==='Enter'||e.key===' '){e.preventDefault();selected.click();return;}
+    if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+      var buttons=Array.prototype.slice.call(this.querySelectorAll('button[data-person-id]'));
+      var index=buttons.indexOf(selected),next=index+(e.key==='ArrowDown'?1:-1);
+      if(next>=0&&next<buttons.length){e.preventDefault();buttons[next].focus();}
+    }
+    if(e.key==='Escape'){document.getElementById('fplSearch').focus();}
+  });
   document.getElementById('fplRoleFilters').addEventListener('click',function(event){
     var button=event.target.closest('button[data-fpl-role]');if(!button)return;
     finPersonLedgerState.role=button.dataset.fplRole;
