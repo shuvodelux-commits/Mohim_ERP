@@ -403,6 +403,35 @@
       + escapeHtml(finLedMoney_(amount)) + '</span>' + caption + '</span>';
   }
 
+  // BEGIN FINANCE PERSON STATEMENT
+  // UI-only projection of existing Finance relationship balances. Never change money postings.
+  function finLedPersonStatementRows_(rows, account, dateFrom, dateTo) {
+    var chronological = (rows || []).map(function (row, index) {
+      return { row:row, sourceIndex:index };
+    }).filter(function (entry) { return entry.row.account === account; }).reverse();
+    var opening = 0;
+    var closing = 0;
+    var visible = [];
+    chronological.forEach(function (entry) {
+      var r = entry.row;
+      var type = finLedType_(r.transactionType);
+      var amount = Number(r.amount) || 0;
+      var increase = !!(type && type.balanceEffect > 0);
+      var debitsIncrease = account === 'borrowerReceivable';
+      var debit = (increase === debitsIncrease) ? amount : 0;
+      var credit = (increase !== debitsIncrease) ? amount : 0;
+      if (dateFrom && r.date < dateFrom) opening = Number(r.balance) || 0;
+      if (!dateTo || r.date <= dateTo) closing = Number(r.balance) || 0;
+      if ((!dateFrom || r.date >= dateFrom) && (!dateTo || r.date <= dateTo)) {
+        visible.push(Object.assign({}, r, {
+          debit: debit, credit: credit, sourceIndex: entry.sourceIndex
+        }));
+      }
+    });
+    return { rows:visible.reverse(), opening:opening, closing:closing };
+  }
+  // END FINANCE PERSON STATEMENT
+
   function finLedRender_() {
     var body = document.getElementById('finLedTableBody'); body.innerHTML = '';
     finLedState.rows.forEach(function (r, idx) {
