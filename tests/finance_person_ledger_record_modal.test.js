@@ -26,7 +26,8 @@ test('modals are visible from the independent Person Ledger route',()=>{
  assert.match(page,/finLedOpenView_/);
 });
 test('new entry from person ledger preselects current finance person and role',()=>{
- assert.match(page,/finRenderTypeOptions_/);
+ assert.match(page,/finLoad\(\)/);
+ assert.match(finance,/finRenderTypeOptions_/);
  assert.match(page,/finUpdateHint_/);
  assert.match(page,/finPerson/);
  assert.match(page,/transactionTypes/);
