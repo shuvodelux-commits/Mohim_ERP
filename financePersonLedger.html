@@ -320,6 +320,13 @@
   document.getElementById('fplPrintBtn').addEventListener('click',function(){finPersonLedgerPrint_(false);});
   document.getElementById('fplExportBtn').addEventListener('click',function(){finPersonLedgerPrint_(true);});
 
+  // Disable other relationship transaction types while a person/role is locked.
+  function finEntryRoleLock_(role) {
+    Array.prototype.forEach.call(document.getElementById('finType').options,function(option) {
+      var t=finState.transactionTypes.filter(function(t){return t.key===option.value;})[0];
+      if(t) { option.disabled=t.role !== role;option.hidden=t.role !== role; }
+    });
+  }
   // The EXISTING Finance form is mounted in the Record modal, never cloned.
   function finPersonLedgerRecordOpen_() {
     var person=finPersonLedgerPerson_(),role=finPersonLedgerState.account;
@@ -328,6 +335,7 @@
       if(currentPage!=='financePersonLedger'||finPersonLedgerState.personId!==person.id)return;
       var card=document.getElementById('finEntryFormCard');
       document.getElementById('fplRecordFormSlot').appendChild(card);
+      finEntryRoleLock_(role);
       var first=finState.transactionTypes.filter(function(t){return t.role===role&&!t.isOpening;})[0];
       if(!first)first=finState.transactionTypes.filter(function(t){return t.role===role;})[0];
       document.getElementById('finType').value=first?first.key:'';
@@ -341,6 +349,7 @@
     closeModal('fplNewModal');
     var home=document.getElementById('finEntryFormHome'),form=document.getElementById('finEntryFormCard');
     if(home&&form&&home.parentNode)home.parentNode.insertBefore(form,home.nextSibling);
+    if(typeof finRenderTypeOptions_==='function')finRenderTypeOptions_();
   }
   function finEntryAfterSave_() {
     var modal=document.getElementById('fplNewModal');
@@ -349,6 +358,11 @@
       return financePersonLedgerLoad();
     }
   }
+  document.getElementById('finType').addEventListener('change',function(){
+    if(document.getElementById('fplNewModal').hidden)return;
+    var p=finPersonLedgerPerson_();
+    if(p)document.getElementById('finPerson').value=p.id;
+  });
   document.getElementById('fplRecordBtn').addEventListener('click',finPersonLedgerRecordOpen_);
   document.getElementById('fplRecordClose').addEventListener('click',finPersonLedgerCloseRecord_);
   document.getElementById('fplRecordCancel').addEventListener('click',finPersonLedgerCloseRecord_);
