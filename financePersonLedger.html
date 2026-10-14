@@ -317,7 +317,9 @@
         if(action==='delete')finLedDelete_(id);
       });
     }
-    var btn=e.target.closest('button[data-finance-id]');if(btn)finPersonLedgerView_(btn.dataset.financeId);
+    var btn=e.target.closest('button[data-finance-id]');if(btn){finPersonLedgerView_(btn.dataset.financeId);return;}
+    var row=e.target.closest('tr[data-finance-id]');
+    if(row)finPersonLedgerView_(row.dataset.financeId);
   });
   function finPersonLedgerView_(id) { finLedOpenView_(id); }
   function finPersonLedgerRefreshAfterMutation_(){return financePersonLedgerLoad();}
