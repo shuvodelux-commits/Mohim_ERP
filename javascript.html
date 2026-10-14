@@ -4369,4 +4369,45 @@
     Object.keys(ERP_SEMANTIC_INLINE_).forEach(function (id) { bind(id, ERP_SEMANTIC_INLINE_[id], 'inline'); });
   }
 
+
+  // BEGIN ERP ZERO AMOUNT ENTRY
+  // Preserve native number spinners and each module's calculation/event handlers.
+  // A preset zero is temporarily blank while editing; no synthetic input/change events.
+  (function initErpZeroAmountEntry_() {
+    var pristine = new WeakMap();
+    function numericTarget_(event) {
+      var input = event && event.target;
+      return input && input.tagName === 'INPUT' && input.type === 'number' ? input : null;
+    }
+    function restorePristineZero_(input) {
+      var entry = pristine.get(input);
+      if (entry && !entry.edited && input.value === '') input.value = '0';
+    }
+    document.addEventListener('focusin', function (event) {
+      var input = numericTarget_(event);
+      if (!input || input.disabled || input.readOnly || input.value !== '0') return;
+      if (input.getAttribute('aria-readonly') === 'true' || input.getAttribute('data-erp-keep-zero') === 'true') return;
+      if (input.min !== '' && Number(input.min) > 0) return;
+      pristine.set(input, {edited: false});
+      input.value = '';
+    }, true);
+    document.addEventListener('input', function (event) {
+      var input = numericTarget_(event);
+      var entry = input && pristine.get(input);
+      if (entry) entry.edited = true;
+    }, true);
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter') {
+        var input = numericTarget_(event);
+        if (input) restorePristineZero_(input);
+      }
+    }, true);
+    document.addEventListener('blur', function (event) {
+      var input = numericTarget_(event);
+      if (!input) return;
+      restorePristineZero_(input);
+      pristine.delete(input);
+    }, true);
+  }());
+  // END ERP ZERO AMOUNT ENTRY
 </script>
