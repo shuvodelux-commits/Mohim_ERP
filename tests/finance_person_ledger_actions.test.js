@@ -20,3 +20,9 @@ test('Finance posting still uses confirmation and one addFinanceTransaction call
  assert.match(finance,/runConfirmedAction/);
  assert.equal((finance.match(/serverCall\('addFinanceTransaction'/g)||[]).length,1);
 });
+
+test('View then Edit bootstraps Finance metadata before existing edit form',()=>{
+ assert.match(ledger,/function finLedOpenEdit_\(financeId\)\s*\{/);
+ assert.match(ledger,/if \(!finLedState\._typesLoaded\) return finLedEnsureLoaded_\(\)/);
+ assert.match(person,/finLedState\.currencySymbol=finPersonLedgerState\.currencySymbol/);
+});
