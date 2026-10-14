@@ -3584,6 +3584,8 @@
 
   function touchSelectShouldEnhance_(select) {
     if (!select || select.tagName !== 'SELECT') return false;
+    // A hidden, ID-only select behind a searchable combobox needs no visual touch proxy.
+    if (select.dataset && select.dataset.touchSelectSkip === 'true') return false;
     return true;
   }
 
