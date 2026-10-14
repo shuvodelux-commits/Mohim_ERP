@@ -120,11 +120,28 @@ function getOutstandingLoan_() {
   return financeBalanceSummary_(activeRows_('FINANCE_TRANSACTIONS')).outstandingLoan;
 }
 
+/** Existing authoritative signed balances, projected read-only for finance-person list. */
+function financePersonBalancesForUI_(persons, transactions) {
+  const signed = financeSignedBalances_(transactions, null, financePersonNameAliasMap_(persons));
+  const result = {};
+  (persons || []).forEach(function (person) {
+    const b = signed['id:' + person.id] || {};
+    result[person.id] = {
+      owner: Number(b.owner) || 0,
+      loanPayable: Number(b.loanPayable) || 0,
+      borrowerReceivable: Number(b.borrowerReceivable) || 0
+    };
+  });
+  return result;
+}
+
 function getFinanceBootstrap(token) {
   try {
     requirePermission_(token, 'finance', 'view');
     const settings = getSettingsMap_();
-    const summary = financeBalanceSummary_(activeRows_('FINANCE_TRANSACTIONS'));
+    const financeTransactions = activeRows_('FINANCE_TRANSACTIONS');
+    const personsAll = getAllFinancePersonsForUI_();
+    const summary = financeBalanceSummary_(financeTransactions);
     return ok_({
       transactionTypes: FINANCE_TRANSACTION_TYPES.map(function (t) {
         return {
@@ -135,7 +152,8 @@ function getFinanceBootstrap(token) {
       paymentMethods: FINANCE_PAYMENT_METHODS,
       bankAccounts: getActiveBankAccountsForUI_(),
       persons: getActiveFinancePersonsForUI_(),
-      personsAll: getAllFinancePersonsForUI_(),
+      personsAll: personsAll,
+      personBalances: financePersonBalancesForUI_(personsAll, financeTransactions),
       summary: summary,
       ownerCapital: summary.ownerCapital,
       ownerAdvance: summary.ownerAdvance,
