@@ -248,6 +248,9 @@
       var id=finPersonLedgerState.personId;
       finPersonLedgerRenderPeople_();
       if(id&&finPersonLedgerPerson_())return finPersonLedgerFetch_();
+      var isNarrow=typeof window!=='undefined' && window.matchMedia &&
+        window.matchMedia('(max-width:820px)').matches;
+      if(isNarrow && !finPersonLedgerState.personId)return;
       var first=finPersonLedgerState.persons[0];
       if(first)return finPersonLedgerSelect_(first.id);
       document.getElementById('fplDetailEmpty').hidden=false;
