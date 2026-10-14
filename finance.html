@@ -301,6 +301,18 @@
       finFillBankAccountSelect_(document.getElementById('finPaymentMethod').value);
       if (!document.getElementById('finDate').value) document.getElementById('finDate').value = data.today || finToday_();
       finUpdateHint_();
+      // Person Ledger navigation may preselect an existing finance person.
+      // Do not create any new save/posting path or bypass the type-role filter.
+      if (finState.pendingLedgerPersonId) {
+        var pendingId = finState.pendingLedgerPersonId;
+        finState.pendingLedgerPersonId = '';
+        document.getElementById('finType').value = '';
+        finUpdateHint_();
+        var personInput = document.getElementById('finPerson');
+        if (Array.prototype.some.call(personInput.options, function (option) { return option.value === pendingId; })) {
+          personInput.value = pendingId;
+        }
+      }
     }).catch(function (err) { showToast(err.message, 'error'); });
   }
 
