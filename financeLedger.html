@@ -497,6 +497,9 @@
   }
 
   function finLedOpenEdit_(financeId) {
+    if (!finLedState._typesLoaded) return finLedEnsureLoaded_().then(function () {
+      if (finLedState._typesLoaded) finLedOpenEdit_(financeId);
+    });
     withLoader(serverCall('getFinanceTransactionForEdit', authToken, financeId)).then(function (data) {
       var t = data || {}; finLedState.editingId = financeId;
       document.getElementById('finLedEditId').textContent = financeId;
