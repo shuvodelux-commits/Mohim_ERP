@@ -1,3 +1,25 @@
+<style>
+  /* Reuse Counter/Customer Ledger party combobox for Purchase supplier selection. */
+  #purSupplierCombo { flex:1 1 auto; min-width:0; }
+  #purSupplierCombo > input { width:100%; padding-right:72px; }
+  #purSupplierCombo .erp-search-clear { right:36px; }
+  #purSupplierToggle {
+    position:absolute; right:5px; top:50%; transform:translateY(-50%);
+    z-index:2; width:30px; height:30px; min-height:0; padding:0;
+    border:0; border-radius:6px; background:transparent; color:var(--color-text-muted);
+    cursor:pointer; font:600 18px/1 var(--font-sans);
+  }
+  #purSupplierToggle:hover, #purSupplierToggle:focus-visible {
+    color:var(--color-primary-dark); background:var(--color-primary-light);
+  }
+  #purSupplierCombo .party-search-right-text {
+    flex:0 0 auto; max-width:48%; text-align:right; white-space:normal;
+    font:700 11px/1.4 var(--font-sans); color:var(--color-text-muted);
+  }
+  @media(max-width:540px) {
+    #purSupplierCombo .party-search-right-text {max-width:42%; font-size:10px;}
+  }
+</style>
 <div class="tabs">
   <button class="tab-btn active" data-tab="purNew">New Purchase<span class="bn-hint">নতুন মাল কেনা</span></button>
   <button class="tab-btn" data-tab="purHistory">Purchase Invoice<span class="bn-hint">কেনার তালিকা</span></button>
@@ -14,11 +36,17 @@
   <div class="card">
     <div class="form-grid" style="margin-bottom: 16px">
       <div>
-        <label>Supplier * <span class="bn-hint" style="display:inline;">— সাপ্লায়ার</span></label>
+        <label for="purSupplierSearch">Supplier * <span class="bn-hint" style="display:inline;">— সাপ্লায়ার</span></label>
         <div style="display: flex; gap: 8px">
-          <select id="purSupplier" style="flex: 1">
-            <option value="">Select supplier...</option>
-          </select>
+          <!-- Keep the original supplier ID select as the purchase/save source of truth. -->
+          <select id="purSupplier" hidden aria-hidden="true" tabindex="-1"><option value="">Select supplier...</option></select>
+          <div class="counter-combobox purchase-supplier-combobox" id="purSupplierCombo">
+            <input id="purSupplierSearch" type="search" data-search-clear="on"
+              autocomplete="off" spellcheck="false" placeholder="Search supplier by name or phone..."
+              aria-label="Search supplier by name or phone">
+            <button id="purSupplierToggle" type="button" aria-label="Show suppliers" title="Show suppliers" tabindex="-1">⌄</button>
+            <div id="purSupplierResults" class="counter-combo-results party-ledger-party-results" role="listbox" hidden></div>
+          </div>
           <button type="button" class="btn" id="purQuickSupplierBtn">
             + New
           </button>
@@ -444,7 +472,7 @@
   var purState = {
     products: [], suppliers: [], categories: [], bankAccounts: [], cart: [], currencySymbol: "",
     history: [], updatePurchaseId: null, updateReason: null,
-    cartEntryIndex: null, cartEditIndex: null
+    cartEntryIndex: null, cartEditIndex: null, supplierCombo: null
   };
 
   document.querySelectorAll("#page-purchase .tab-btn").forEach(function (btn) {
@@ -599,6 +627,7 @@
   function purPopulateUpdateForm_(p, mode, reason) {
     document.querySelector('#page-purchase .tab-btn[data-tab="purNew"]').click();
     document.getElementById('purSupplier').value = p.supplierId;
+    purFillSupplierSelect_();
     purFillProductPicker_();
     document.getElementById('purDate').value = p.date;
     document.getElementById('purDate').disabled = true;
@@ -650,6 +679,7 @@
     purState.cartEntryIndex = null;
     purState.cartEditIndex = null;
     document.getElementById("purSupplier").value = "";
+    purFillSupplierSelect_();
     purFillProductPicker_();
     document.getElementById("purNotes").value = "";
     document.getElementById("purDiscount").value = 0;
@@ -713,6 +743,43 @@
         '<option value="' + s.id + '">' + escapeHtml(s.name) + "</option>";
     });
     if (current) sel.value = current;
+
+    // Reuse the single existing ERP party combobox; the hidden select retains
+    // the original supplier ID, invoice confirmation, cart and save behavior.
+    if (!purState.supplierCombo) {
+      var input = document.getElementById('purSupplierSearch');
+      purState.supplierCombo = createPartySearchCombobox_({
+        input: input, results: document.getElementById('purSupplierResults'),
+        toggleButton: document.getElementById('purSupplierToggle'),
+        getItems: function () { return purState.suppliers; },
+        displayText: function (supplier) {
+          return String(supplier.name || '') + (supplier.phone ? ' (' + supplier.phone + ')' : '');
+        },
+        rightText: function (supplier) {
+          var due = Number(supplier.currentDue) || 0;
+          return Math.abs(due) < 0.005 ? 'Settled · ' + formatMoney(0)
+            : (due > 0 ? 'Payable · ' : 'Supplier Credit · ') + formatMoney(Math.abs(due));
+        },
+        emptyText: 'No matching suppliers', limit: 50, showAllOnEmpty: true,
+        onSelect: function (supplier) {
+          sel.value = supplier.id;
+          sel.dispatchEvent(new Event('change', { bubbles: true }));
+        },
+        onClear: function () {
+          sel.value = '';
+          sel.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      });
+      // A typed but UNSELECTED supplier name must never post against an old ID.
+      input.addEventListener('input', function () {
+        if (!input.dataset.selectedId && sel.value) {
+          sel.value = '';
+          sel.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      });
+    }
+    var selected = purState.suppliers.filter(function (supplier) { return supplier.id === sel.value; })[0] || null;
+    purState.supplierCombo.setSelected(selected);
   }
 
   function purProductById_(productId) {
@@ -1030,9 +1097,10 @@
       if (!name) return;
       withLoader(serverCall("addSupplier", authToken, { name: name }))
         .then(function (res) {
-          purState.suppliers.push({ id: res.id, name: name });
+          purState.suppliers.push({ id: res.id, name: name, phone: '', currentDue: 0 });
           purFillSupplierSelect_();
           document.getElementById("purSupplier").value = res.id;
+          purState.supplierCombo.setSelected(purState.suppliers[purState.suppliers.length - 1]);
           purFillProductPicker_();
           document.getElementById("purQuickSupplierName").value = "";
           document.getElementById("purQuickSupplierRow").style.display = "none";
@@ -1305,7 +1373,10 @@
         document.getElementById('purPaidAmount').value = 0;
         document.getElementById('purPaymentMethod').value = 'Cash';
         document.getElementById('purBankAccountRow').style.display = 'none';
-        if (isUpdate) document.getElementById('purSupplier').value = '';
+        if (isUpdate) {
+          document.getElementById('purSupplier').value = '';
+          purFillSupplierSelect_();
+        }
         document.getElementById('purNotes').value = '';
         document.getElementById('purDate').value = purToday_();
         document.getElementById('purBackdatedReason').value = '';
