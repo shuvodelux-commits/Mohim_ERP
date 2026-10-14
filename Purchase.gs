@@ -72,7 +72,15 @@ function getPurchaseBootstrap(token) {
         };
       }),
       categories: categories.map(function (c) { return { id: c['Category ID'], name: c['Category Name'] }; }),
-      suppliers: suppliers.map(function (s) { return { id: s['Supplier ID'], name: s['Supplier Name'] }; }),      // Purchase Invoice (the History tab) now gets its full, live-editable
+      suppliers: suppliers.map(function (s) {
+        return {
+          id: s['Supplier ID'], name: s['Supplier Name'],
+          phone: s['Phone'] || '',
+          // Existing authoritative supplier due maintained by Purchase/Payment/Settlement.
+          // Negative means supplier credit; do not recompute or post here.
+          currentDue: Number(s['Current Due']) || 0
+        };
+      }),      // Purchase Invoice (the History tab) now gets its full, live-editable
       // list from getPurchaseManagementList instead of a capped last-15
       // snapshot here, the same split Sales already has between
       // getPurchaseBootstrap and getPurchaseManagementList/SalesManagement.gs.
