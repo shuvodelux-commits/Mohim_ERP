@@ -156,3 +156,15 @@
 **Current state:** This file is an **implementation plan**, not executed changes. PR #25 still contains the old nested UI until Tasks 1–7 are implemented and tested.
 
 **Proposed execution:** Native sequential TDD on PR #25 with an independent final review, because the same Finance form/ledger handlers must be moved safely without duplicating their mutation logic. No merge or deploy until explicit authorization.
+
+## Implementation evidence / remaining release gates (2026-10-14)
+
+**Implemented on PR #25:** Independent three-tab navigation (Business Finance | Person Ledger | Finance Ledger), separate `financePersonLedger.html`, two-pane finance-only list/profile/ledger, read-only per-person balance map via `getFinanceBootstrap`, accounting relationship statement, keyboard search selection, mobile list-first flow, Record modal with the existing Finance form, existing View/Edit/Delete modals, statement print/export, and preservation of the original Finance Ledger page.
+
+**Verification performed:** 29/29 targeted tests passed in an isolated V8 source harness against the actual latest PR files; scripts parse; static page IDs are unique; mocked runtime verified bootstrap → personId-scoped finance query → lender ledger and modal open/lock/restore. These are **not equivalent to a real Node project checkout or browser verification**.
+
+**Still pending before production/preview deployment:** run the full `node --test tests/*.test.js` in the actual preview worktree; confirm PR #27's separate test harness fix in the integration branch; inspect UI on desktop, tablet and phone; actual transaction create/view/edit/delete including Backdated and inactive access; review print/export and permissions against a nonproduction Apps Script copy; fresh independent code review. Draft PR must remain unmerged until those gates pass.
+
+**Known historical source concern:** `financePersonNameAliasMap_` in existing server code assigns a legacy name-only finance row to one ID when two Finance people share the same normalized name. New UI has not changed that existing global algorithm. Person-ID-bearing rows remain individually keyed; ambiguous name-only rows need a separate accounting migration/identity audit before asserting they belong to a specific person.
+
+**Safety:** No `clasp push` or deployment occurred during this implementation. The GitHub `main` branch remains unchanged.
