@@ -36,20 +36,20 @@ function number(value='0', opts={}) {
 test('preset zero is ready for typing, including decimal values', () => {
   const ui=setup();const el=number();
   ui.dispatch('focusin',el);assert.equal(el.value,'');
-  el.value='500.25';ui.dispatch('input',el);ui.dispatch('focusout',el);
+  el.value='500.25';ui.dispatch('input',el);ui.dispatch('blur',el);
   assert.equal(el.value,'500.25');
 });
 test('untouched zero is restored on blur and before Enter workflows', () => {
   const ui=setup();const el=number();ui.dispatch('focusin',el);
   assert.equal(el.value,'');ui.dispatch('keydown',el,{key:'Enter'});
-  assert.equal(el.value,'0');ui.dispatch('focusout',el);assert.equal(el.value,'0');
-  const next=number();ui.dispatch('focusin',next);ui.dispatch('focusout',next);
+  assert.equal(el.value,'0');ui.dispatch('blur',el);assert.equal(el.value,'0');
+  const next=number();ui.dispatch('focusin',next);ui.dispatch('blur',next);
   assert.equal(next.value,'0');
 });
 test('intentionally cleared entry is not silently changed to zero', () => {
   const ui=setup();const el=number();ui.dispatch('focusin',el);
   el.value='50';ui.dispatch('input',el);
-  el.value='';ui.dispatch('input',el);ui.dispatch('focusout',el);
+  el.value='';ui.dispatch('input',el);ui.dispatch('blur',el);
   assert.equal(el.value,'');
 });
 test('nonzero, positive-min, read-only, disabled, and opted-out fields are untouched', () => {
@@ -62,5 +62,5 @@ test('nonzero, positive-min, read-only, disabled, and opted-out fields are untou
 test('delegation supports dynamic fields and native spinner input events', () => {
   const ui=setup();const el=number();
   ui.dispatch('focusin',el);el.value='1';ui.dispatch('input',el);
-  ui.dispatch('focusout',el);assert.equal(el.value,'1');
+  ui.dispatch('blur',el);assert.equal(el.value,'1');
 });
