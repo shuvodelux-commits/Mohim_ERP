@@ -26,3 +26,8 @@ test('View then Edit bootstraps Finance metadata before existing edit form',()=>
  assert.match(ledger,/if \(!finLedState\._typesLoaded\) return finLedEnsureLoaded_\(\)/);
  assert.match(person,/finLedState\.currencySymbol=finPersonLedgerState\.currencySymbol/);
 });
+
+test('clicking the ledger row opens View modal, not just the particulars button',()=>{
+ assert.match(person,/e\.target\.closest\('tr\[data-finance-id\]'\)/);
+ assert.match(person,/finPersonLedgerView_\(row\.dataset\.financeId\)/);
+});
