@@ -1,6 +1,7 @@
 'use strict';
 const {test}=require('node:test'), assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
-const html=fs.readFileSync(path.join(__dirname,'..','financeLedger.html'),'utf8');
+const html=fs.readFileSync(path.join(__dirname,'..','financePersonLedger.html'),'utf8');
+const financeLedger=fs.readFileSync(path.join(__dirname,'..','financeLedger.html'),'utf8');
 const types={
  'Opening Loan':{account:'loanPayable',balanceEffect:1},'Loan Received':{account:'loanPayable',balanceEffect:1},'Loan Repayment':{account:'loanPayable',balanceEffect:-1},
  'Opening Borrower Loan':{account:'borrowerReceivable',balanceEffect:1},'Borrower Repayment':{account:'borrowerReceivable',balanceEffect:-1},
@@ -9,17 +10,18 @@ const types={
 function statement(rows,account,from='',to=''){
  const b=html.indexOf('// BEGIN FINANCE PERSON STATEMENT'),e=html.indexOf('// END FINANCE PERSON STATEMENT',b);
  assert.ok(b>=0&&e>b,'missing person statement read-only projection');
- const ctx={rows,account,from,to,finLedType_:key=>types[key]};
- vm.runInNewContext(html.slice(b,e)+'\nresult=finLedPersonStatementRows_(rows,account,from,to)',ctx);
+ const ctx={rows,account,from,to,finPersonLedgerType_:key=>types[key]};
+ vm.runInNewContext(html.slice(b,e)+'\nresult=finPersonLedgerStatementRows_(rows,account,from,to)',ctx);
  return JSON.parse(JSON.stringify(ctx.result));
 }
 function r(id,date,type,amount,balance,account){return {financeId:id,date,transactionType:type,amount,balance,account,personId:'P1'};}
 const loan=[r('F3','2026-10-14','Loan Repayment',5000,25000,'loanPayable'),r('F2','2026-10-10','Loan Received',10000,30000,'loanPayable'),r('F1','2026-10-01','Opening Loan',20000,20000,'loanPayable')];
-test('Person Ledger reuses customer ledger cards, table and pagination without removing Finance All Transactions',()=>{
- for(const id of ['finLedAllView','finLedPersonView','finLedPersonBody','finLedPersonPageSize','finLedPersonPrevBtn','finLedPersonNextBtn']) assert.ok(html.includes('id="'+id+'"'),id);
- for(const c of ['party-ledger-workspace','party-ledger-toolbar','party-ledger-party-card','party-ledger-balance-box','party-ledger-list-card','party-ledger-pagination','mobile-card-table']) assert.ok(html.includes(c),c);
- for(const fn of ['finLedTableBody','finLedOpenEdit_','finLedDelete_','finLedCsvRows_']) assert.ok(html.includes(fn),fn);
- assert.equal((html.match(/id="finLedPersonSearch"/g)||[]).length,1);
+test('independent Finance Person Ledger preserves original Finance Ledger transactions',()=>{
+ for(const id of ['financePersonLedgerWorkspace','fplPeopleList','fplDetailPanel','fplTransactionBody','fplPageSize','fplPrev','fplNext'])assert.ok(html.includes('id="'+id+'"'),id);
+ assert.match(html,/fplRoleFilters/);
+ assert.match(html,/fplSelectedName/);
+ assert.match(financeLedger,/id="finLedTableBody"/);
+ assert.doesNotMatch(financeLedger,/id="finLedPersonView"/);
 });
 test('lender relationship debits and credits include opening amount, unlike cash direction',()=>{
  const s=statement(loan,'loanPayable');
@@ -43,6 +45,6 @@ test('empty period preserves full-history opening and closing balances',()=>{
 test('date range filters display but not historical balance arithmetic',()=>{
  const s=statement(loan,'loanPayable','2026-10-10','2026-10-14');assert.equal(s.opening,20000);assert.equal(s.closing,25000);assert.deepEqual(s.rows.map(x=>x.financeId),['F3','F2']);
 });
-test('filtered person statement rows retain original source indexes for existing action menu',()=>{
- const s=statement(loan,'loanPayable','2026-10-10','2026-10-14');assert.deepEqual(s.rows.map(x=>x.sourceIndex),[0,1]);
+test('filtered person statement retains exact source Finance IDs for existing action menu',()=>{
+ const s=statement(loan,'loanPayable','2026-10-10','2026-10-14');assert.deepEqual(s.rows.map(x=>x.financeId),['F3','F2']);
 });
