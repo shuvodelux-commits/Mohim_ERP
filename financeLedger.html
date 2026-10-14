@@ -75,11 +75,47 @@
     border-color:color-mix(in srgb, var(--color-danger) 30%, var(--color-border));
   }
   .fin-led-balance-card.is-neutral .fin-led-balance-note { display:none; }
+  /* Person Ledger: use the existing Customer Ledger component hierarchy. */
+  #finLedAllView[hidden], #finLedPersonView[hidden] { display:none !important; }
+  .fin-led-mode-tabs { display:flex; align-items:center; gap:6px; margin:0 0 12px; }
+  .fin-led-mode-tabs .btn[aria-pressed="true"] {
+    border-color:var(--color-primary); color:var(--color-primary-dark);
+    background:var(--color-primary-light);
+  }
+  #finLedPersonSearchSlot .finance-ledger-person-combobox { width:100%; max-width:none !important; }
+  .fin-led-person-roles { display:flex; gap:6px; flex-wrap:wrap; margin-top:9px; }
+  .fin-led-person-roles .btn { min-height:32px; padding:5px 10px; font-size:12px; }
+  .fin-led-person-roles .btn[aria-pressed="true"] {
+    background:var(--color-primary-light); border-color:var(--color-primary);
+    color:var(--color-primary-dark);
+  }
+  .fin-led-person-period {
+    display:flex; align-items:end; flex-wrap:wrap; gap:9px;
+    padding:10px 16px; border-bottom:1px solid var(--color-border);
+  }
+  .fin-led-person-period label { margin:0; flex:0 1 155px; font-size:12px; }
+  .fin-led-person-period input { margin-top:4px; width:100%; }
+  #finLedPersonBalanceCard.is-positive strong, #finLedPersonBalanceCard.is-positive .party-ledger-balance-note {color:var(--color-success);}
+  #finLedPersonBalanceCard.is-negative strong, #finLedPersonBalanceCard.is-negative .party-ledger-balance-note {color:var(--color-danger);}
+  .fin-led-person-current-note {display:block; color:var(--color-text-muted); font-size:11px; margin-top:4px; }
+  @media (max-width:540px) {
+    .fin-led-mode-tabs .btn { flex:1; }
+    .fin-led-person-period { padding:10px 12px; }
+    .fin-led-person-period label { flex:1 1 120px; }
+    #finLedPersonView .party-ledger-toolbar-actions { grid-template-columns:1fr 1fr; }
+    #finLedPersonExportBtn {grid-column:1/-1;}
+  }
 </style>
+<div class="fin-led-mode-tabs" role="group" aria-label="Finance Ledger view">
+  <button class="btn" id="finLedAllModeBtn" type="button" aria-pressed="true">All Transactions</button>
+  <button class="btn" id="finLedPersonModeBtn" type="button" aria-pressed="false">Person Ledger</button>
+</div>
+<div id="finLedAllView">
 <div class="toolbar">
   <input id="finLedDateFrom" type="date" style="max-width:150px;">
   <input id="finLedDateTo" type="date" style="max-width:150px;">
   <select id="finLedTypeFilter" style="max-width:190px;"><option value="">All transaction types</option></select>
+  <span id="finLedPersonSearchHome" hidden></span>
   <div class="counter-combobox finance-ledger-person-combobox" style="max-width:250px; min-width:210px;">
     <input id="finLedPersonSearch" type="search" data-search-clear="on" autocomplete="off" spellcheck="false" placeholder="Select or search person..." aria-label="Select or search finance person">
     <button id="finLedPersonToggle" class="finance-ledger-person-toggle" type="button" aria-label="Show finance people" title="Show people" tabindex="-1">⌄</button>
@@ -128,6 +164,67 @@
     </table>
   </div>
   <div class="empty-state" id="finLedEmpty" hidden>No finance transactions match these filters.</div>
+</div>
+
+</div>
+<div class="party-ledger-workspace" id="finLedPersonView" hidden>
+  <div class="party-ledger-toolbar card">
+    <div class="party-ledger-selector-wrap">
+      <label for="finLedPersonSearch">Finance Person</label>
+      <div id="finLedPersonSearchSlot"></div>
+    </div>
+    <div class="party-ledger-toolbar-actions">
+      <button class="btn btn-primary" id="finLedPersonNewTxnBtn" type="button" disabled>Record Transaction</button>
+      <button class="btn" id="finLedPersonPrintBtn" type="button" disabled>Print Ledger</button>
+      <button class="btn" id="finLedPersonExportBtn" type="button" disabled>Export</button>
+    </div>
+  </div>
+
+  <div class="party-ledger-empty card" id="finLedPersonSelectEmpty">Select a finance person to view their ledger.</div>
+
+  <div id="finLedPersonSelected" hidden>
+    <div class="party-ledger-party-card card">
+      <div class="party-ledger-party-copy">
+        <h3 id="finLedPersonName"></h3>
+        <div class="party-ledger-party-meta" id="finLedPersonMeta"></div>
+        <div class="fin-led-person-roles" id="finLedPersonRoles"></div>
+      </div>
+      <div class="party-ledger-balance-box" id="finLedPersonBalanceCard">
+        <span id="finLedPersonBalanceLabel">Current Balance</span>
+        <strong id="finLedPersonBalance">0</strong>
+        <span class="party-ledger-balance-note" id="finLedPersonBalanceNote"></span>
+        <small class="fin-led-person-current-note">Complete history</small>
+      </div>
+    </div>
+
+    <div class="party-ledger-list-card card">
+      <div class="party-ledger-list-head">
+        <div><h3>Transactions</h3><span class="bn-hint" style="display:inline;">সর্বশেষ লেনদেন আগে</span></div>
+        <div class="party-ledger-list-controls">
+          <label class="party-ledger-page-size" for="finLedPersonPageSize">Show
+            <select id="finLedPersonPageSize"><option value="50">50</option><option value="100">100</option><option value="200">200</option></select>
+          </label>
+        </div>
+      </div>
+      <div class="fin-led-person-period">
+        <label for="finLedPersonDateFrom">From Date<input type="date" id="finLedPersonDateFrom"></label>
+        <label for="finLedPersonDateTo">To Date<input type="date" id="finLedPersonDateTo"></label>
+        <span class="bn-hint">তারিখ অনুযায়ী দেখুন</span>
+      </div>
+      <div class="table-scroll party-ledger-table-scroll">
+        <table class="mobile-card-table party-ledger-table">
+          <thead><tr><th>Date</th><th>Type</th><th>Reference</th><th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th><th></th></tr></thead>
+          <tbody id="finLedPersonBody"></tbody>
+        </table>
+      </div>
+      <div class="empty-state" id="finLedPersonEmpty" hidden>No finance transactions match these dates.</div>
+      <div class="party-ledger-pagination">
+        <button class="btn" id="finLedPersonPrevBtn" type="button" disabled>&larr; Previous</button>
+        <span id="finLedPersonPageLabel">Page 1</span>
+        <button class="btn" id="finLedPersonNextBtn" type="button" disabled>Next &rarr;</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- View modal -->
