@@ -106,3 +106,17 @@ test('selected supplier ID and result balances stay correct while switching and 
  config.onClear();
  assert.equal(sel.value,'');
 });
+
+test('hidden supplier ID does not create a second touch dropdown control',()=>{
+ assert.match(ui,/<select\s+id="purSupplier"[^>]*hidden[^>]*data-touch-select-skip="true"/);
+ assert.match(ui, /#purSupplier\s*\{\s*display:\s*none\s*!important\s*;?\s*\}/);
+ const start=shared.indexOf('  function touchSelectShouldEnhance_(select) {');
+ const end=shared.indexOf('  function touchSelectLabel_(select) {',start);
+ assert.ok(start>=0&&end>start,'use the real ERP touch select enhancer predicate');
+ const c={};
+ vm.runInNewContext(shared.slice(start,end)+
+   "result={internal:touchSelectShouldEnhance_({tagName:'SELECT',dataset:{touchSelectSkip:'true'}}),"+
+   "normal:touchSelectShouldEnhance_({tagName:'SELECT',dataset:{}})}",c);
+ assert.equal(c.result.internal,false,'internal purchase supplier ID must not spawn visible dropdown');
+ assert.equal(c.result.normal,true,'visible ERP select controls must retain touch behavior');
+});
