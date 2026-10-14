@@ -282,7 +282,8 @@
 <script>
   var finLedState = {
     rows: [], bankAccounts: [], transactionTypes: [], persons: [], currencySymbol: '', editingId: null,
-    summary: {}, selectedPerson: null, personCombo: null, _typesLoaded: false
+    summary: {}, selectedPerson: null, personCombo: null, _typesLoaded: false,
+    mode:'all', personAccount:'', personPage:1, personStatement:null
   };
 
   // Map each summary's business meaning to its approved visual debit/credit color.
@@ -331,7 +332,7 @@
       toggleButton: document.getElementById('finLedPersonToggle'),
       getItems: function () { return finLedState.persons || []; }, displayText: finLedPersonDisplay_,
       emptyText: 'No matching finance people', limit: Math.max(1, finLedState.persons.length), showAllOnEmpty: true,
-      onSelect: function () { finLedLoad(); }, onClear: function () { finLedLoad(); }
+      onSelect: function () { finLedState.personAccount='';finLedState.personPage=1;finLedLoad(); }, onClear: function () { finLedState.personAccount='';finLedState.personPage=1;finLedLoad(); }
     });
     return finLedState.personCombo;
   }
@@ -453,7 +454,12 @@
 
   function finLedLoad() {
     if (!finLedState._typesLoaded) return finLedBootstrap_();
-    return withLoader(serverCall('getFinanceLedger', authToken, finLedFilters_())).then(function (d) {
+    var filters=finLedFilters_();
+    if (finLedState.mode === 'person') {
+      // Reuse the existing Finance RPC to obtain complete person history; date/role filters remain client-side.
+      filters.dateFrom='';filters.dateTo='';filters.transactionType='';filters.query='';
+    }
+    return withLoader(serverCall('getFinanceLedger', authToken, filters)).then(function (d) {
       finLedState.rows = d.rows || [];
       finLedState.currencySymbol = d.currencySymbol || finLedState.currencySymbol;
       finLedState.summary = d.summary || {};
@@ -462,6 +468,7 @@
       finLedRenderSelectedPersonBalance_();
       document.getElementById('finLedCount').textContent = finLedState.rows.length;
       finLedRender_();
+      if (finLedState.mode === 'person') finLedRenderPersonLedger_();
     }).catch(function (err) { showToast(err.message, 'error'); });
   }
 
@@ -529,6 +536,111 @@
   }
   // END FINANCE PERSON STATEMENT
 
+  // UI extension only: shared Customer Ledger markup; existing Finance backend and actions.
+  function finLedSwitchMode_(mode) {
+    var isPerson = mode === 'person';
+    finLedState.mode = isPerson ? 'person' : 'all';
+    document.getElementById('finLedAllView').hidden = isPerson;
+    document.getElementById('finLedPersonView').hidden = !isPerson;
+    document.getElementById('finLedAllModeBtn').setAttribute('aria-pressed', String(!isPerson));
+    document.getElementById('finLedPersonModeBtn').setAttribute('aria-pressed', String(isPerson));
+    var combo = document.querySelector('.finance-ledger-person-combobox');
+    if (isPerson) document.getElementById('finLedPersonSearchSlot').appendChild(combo);
+    else {
+      var home = document.getElementById('finLedPersonSearchHome');
+      home.parentNode.insertBefore(combo, home.nextSibling);
+    }
+    finLedState.personPage = 1;
+    finLedLoad();
+  }
+
+  function finLedRenderPersonLedger_() {
+    var person = finLedState.selectedPerson;
+    document.getElementById('finLedPersonSelectEmpty').hidden = !!person;
+    document.getElementById('finLedPersonSelected').hidden = !person;
+    document.getElementById('finLedPersonNewTxnBtn').disabled = !person || person.status === 'Inactive';
+    document.getElementById('finLedPersonPrintBtn').disabled = !person;
+    document.getElementById('finLedPersonExportBtn').disabled = !person;
+    if (!person) { finLedState.personStatement=null;return; }
+    var accounts = {Owner:'owner',Lender:'loanPayable',Borrower:'borrowerReceivable'};
+    var roles = finLedPersonRoles_(person);
+    if (!roles.some(function(r){return accounts[r]===finLedState.personAccount;})) {
+      finLedState.personAccount = accounts[roles[0]] || 'owner';
+    }
+    document.getElementById('finLedPersonName').textContent = person.name || 'Finance Person';
+    document.getElementById('finLedPersonMeta').textContent = (person.phone ? person.phone + ' · ' : '')+(person.status||'Active');
+    document.getElementById('finLedPersonRoles').innerHTML = roles.map(function(role){
+      var account=accounts[role];
+      return '<button class="btn" type="button" data-fin-person-account="' + account +
+        '" aria-pressed="' + (account===finLedState.personAccount) + '">' + escapeHtml(role) + '</button>';
+    }).join('');
+    var sum=finLedState.summary||{};
+    var account=finLedState.personAccount;
+    var balance=account==='owner' ? (Number(sum.ownerCapital)||0)-(Number(sum.ownerAdvance)||0)
+      :account==='loanPayable' ? (Number(sum.outstandingLoan)||0)-(Number(sum.lenderCredit)||0)
+      :(Number(sum.borrowerReceivable)||0)-(Number(sum.borrowerCredit)||0);
+    var isNeg=balance<0;
+    var labels=account==='owner' ? (isNeg?['Owner Advance','ফেরত দিতে হবে']:['Owner Capital','মালিকের মূলধন'])
+      :account==='loanPayable' ? (isNeg?['Lender Credit','আপনি পাবেন']:['Current Loan Payable','আপনাকে দিতে হবে'])
+      :(isNeg?['Borrower Credit','ফেরত দিতে হবে']:['Borrower Receivable','আপনি পাবেন']);
+    document.getElementById('finLedPersonBalanceLabel').textContent=labels[0];
+    document.getElementById('finLedPersonBalance').textContent=finLedMoney_(Math.abs(balance));
+    document.getElementById('finLedPersonBalanceNote').textContent=balance?labels[1]:'Settled';
+    var card=document.getElementById('finLedPersonBalanceCard');
+    card.classList.remove('is-positive','is-negative','is-neutral');
+    card.classList.add(!balance?'is-neutral':account==='loanPayable'?(balance>0?'is-negative':'is-positive')
+      :account==='borrowerReceivable'?(balance>0?'is-positive':'is-negative'):(balance>0?'is-positive':'is-negative'));
+    var st=finLedPersonStatementRows_(finLedState.rows,account,
+      document.getElementById('finLedPersonDateFrom').value,document.getElementById('finLedPersonDateTo').value);
+    finLedState.personStatement=st;
+    var size=Number(document.getElementById('finLedPersonPageSize').value)||50;
+    var pages=Math.max(1,Math.ceil(st.rows.length/size));
+    finLedState.personPage=Math.min(pages,Math.max(1,finLedState.personPage));
+    var offset=(finLedState.personPage-1)*size;
+    var body=document.getElementById('finLedPersonBody');body.innerHTML='';
+    st.rows.slice(offset,offset+size).forEach(function(row){
+      var tr=document.createElement('tr');
+      var type=finLedType_(row.transactionType);
+      tr.innerHTML='<td data-label="Date">'+escapeHtml(row.date)+'</td>'+
+        '<td data-label="Type">'+escapeHtml(row.transactionTypeLabel||row.transactionType)+
+          (type&&type.isOpening?'<div class="party-ledger-row-note">Opening — no current-day cash movement</div>':'')+'</td>'+
+        '<td data-label="Reference">'+escapeHtml(row.referenceNo||row.financeId)+'</td>'+
+        '<td class="num" data-label="Debit">'+(row.debit?escapeHtml(finLedMoney_(row.debit)):'')+'</td>'+
+        '<td class="num" data-label="Credit">'+(row.credit?escapeHtml(finLedMoney_(row.credit)):'')+'</td>'+
+        '<td class="num" data-label="Balance">'+escapeHtml(finLedMoney_(row.balance))+'</td>'+
+        '<td data-label="Actions"><button class="btn" type="button" data-act="menuTxn" data-idx="'+row.sourceIndex+
+          '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button></td>';
+      body.appendChild(tr);
+    });
+    document.getElementById('finLedPersonEmpty').hidden=st.rows.length>0;
+    document.getElementById('finLedPersonPageLabel').textContent='Page '+finLedState.personPage;
+    document.getElementById('finLedPersonPrevBtn').disabled=finLedState.personPage<=1;
+    document.getElementById('finLedPersonNextBtn').disabled=finLedState.personPage>=pages;
+    if(typeof enhanceMobileCardTables_==='function')enhanceMobileCardTables_(document.getElementById('finLedPersonView'));
+  }
+
+  document.getElementById('finLedAllModeBtn').addEventListener('click',function(){finLedSwitchMode_('all');});
+  document.getElementById('finLedPersonModeBtn').addEventListener('click',function(){finLedSwitchMode_('person');});
+  document.getElementById('finLedPersonRoles').addEventListener('click',function(e){
+    var btn=e.target.closest('button[data-fin-person-account]');if(!btn)return;
+    finLedState.personAccount=btn.dataset.finPersonAccount;finLedState.personPage=1;finLedRenderPersonLedger_();
+  });
+  ['finLedPersonDateFrom','finLedPersonDateTo','finLedPersonPageSize'].forEach(function(id){
+    document.getElementById(id).addEventListener('change',function(){finLedState.personPage=1;finLedRenderPersonLedger_();});
+  });
+  document.getElementById('finLedPersonPrevBtn').addEventListener('click',function(){
+    finLedState.personPage=Math.max(1,finLedState.personPage-1);finLedRenderPersonLedger_();
+  });
+  document.getElementById('finLedPersonNextBtn').addEventListener('click',function(){
+    finLedState.personPage++;finLedRenderPersonLedger_();
+  });
+  document.getElementById('finLedPersonPrintBtn').addEventListener('click',function(){document.getElementById('finLedPrintBtn').click();});
+  document.getElementById('finLedPersonExportBtn').addEventListener('click',function(){document.getElementById('finLedExportBtn').click();});
+  document.getElementById('finLedPersonNewTxnBtn').addEventListener('click',function(){
+    if (!finLedState.selectedPerson || finLedState.selectedPerson.status==='Inactive')return;
+    goToPage('finance'); // Use existing Business Finance transaction form.
+  });
+
   function finLedRender_() {
     var body = document.getElementById('finLedTableBody'); body.innerHTML = '';
     finLedState.rows.forEach(function (r, idx) {
@@ -555,7 +667,8 @@
   function finLedFillBankAccountSelect_(paymentMethod) { fillBankAccountSelect_(document.getElementById('finLedEditBankAccount'), finLedState.bankAccounts, paymentMethod); }
   function finLedRowByIdx_(idx) { return finLedState.rows[Number(idx)]; }
 
-  document.getElementById('finLedTableBody').addEventListener('click', function (e) {
+  ['finLedTableBody','finLedPersonBody'].forEach(function (id) {
+  document.getElementById(id).addEventListener('click', function (e) {
     var btn = e.target.closest('button[data-act="menuTxn"]'); if (!btn) return;
     var row = finLedRowByIdx_(btn.dataset.idx); if (!row) return;
     openRowActionMenu_(btn, [
@@ -565,6 +678,7 @@
       if (action === 'edit') finLedOpenEdit_(row.financeId);
       if (action === 'delete') finLedDelete_(row.financeId);
     });
+  });
   });
 
   function finLedOpenViewById_(financeId) {
@@ -682,6 +796,13 @@
   }
 
   // ---------------- Print / Export ----------------
+  var FIN_LED_PERSON_COLUMNS = [
+    {key:'date',label:'Date'}, {key:'transactionTypeLabel',label:'Type'},
+    {key:'financeId',label:'Reference',value:function(r){return r.referenceNo||r.financeId||'';}},
+    {key:'debit',label:'Debit',align:'right',value:function(r){return r.debit?finLedMoney_(r.debit):'';}},
+    {key:'credit',label:'Credit',align:'right',value:function(r){return r.credit?finLedMoney_(r.credit):'';}},
+    {key:'balance',label:'Balance',align:'right',value:function(r){return finLedMoney_(r.balance);}}
+  ];
   var FIN_LED_COLUMNS = [
     { key:'date', label:'Date' }, { key:'financeId', label:'Finance ID' }, { key:'transactionTypeLabel', label:'Type' },
     { key:'accountLabel', label:'Account' }, { key:'person', label:'Party' }, { key:'paymentMethod', label:'Method' },
@@ -710,6 +831,16 @@
   }
 
   document.getElementById('finLedPrintBtn').addEventListener('click', function () {
+    if (finLedState.mode === 'person') {
+      var p=finLedState.selectedPerson,st=finLedState.personStatement;
+      if(!p||!st)return;
+      printLedgerRange({title:'Finance Person Ledger — '+p.name,
+        subtitle:'From '+(document.getElementById('finLedPersonDateFrom').value||'Beginning')+
+          ' to '+(document.getElementById('finLedPersonDateTo').value||'Today'),
+        columns:FIN_LED_PERSON_COLUMNS,rows:st.rows,
+        footer:'Opening Balance: '+finLedMoney_(st.opening)+' | Closing Balance: '+finLedMoney_(st.closing)});
+      return;
+    }
     var f = finLedFilters_();
     var personTitle = finLedState.selectedPerson ? (' — ' + finLedState.selectedPerson.name) : '';
     printLedgerRange({ title:'Finance Ledger' + personTitle,
@@ -718,6 +849,14 @@
   });
 
   document.getElementById('finLedExportBtn').addEventListener('click', function () {
+    if(finLedState.mode==='person') {
+      var st=finLedState.personStatement;
+      if(!finLedState.selectedPerson||!st)return;
+      var csv=[{date:'Opening Balance',balance:st.opening}].concat(st.rows);
+      csv.push({date:'Closing Balance',balance:st.closing});
+      exportRowsToCsv({filename:'finance-person-ledger',columns:FIN_LED_PERSON_COLUMNS,rows:csv});
+      return;
+    }
     if (!finLedState.rows.length) { showToast('Nothing to export.', 'error'); return; }
     var suffix = finLedState.selectedPerson ? '-' + String(finLedState.selectedPerson.name || '').replace(/[^a-z0-9]+/gi,'-').replace(/^-|-$/g,'').toLowerCase() : '';
     exportRowsToCsv({ filename:'finance-ledger' + suffix, columns:FIN_LED_COLUMNS, rows:finLedCsvRows_() });
