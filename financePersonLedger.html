@@ -292,7 +292,7 @@
       var id=menu.dataset.fplMenu;
       return openRowActionMenu_(menu,[{action:'view',label:'View'},{action:'edit',label:'Edit'},{divider:true},{action:'delete',label:'Delete',danger:true}],function(action){
         if(action==='view')finPersonLedgerView_(id);
-        if(action==='edit')finLedOpenEdit_(id);
+        if(action==='edit')finPersonLedgerEdit_(id);
         if(action==='delete')finLedDelete_(id);
       });
     }
@@ -319,4 +319,56 @@
   }
   document.getElementById('fplPrintBtn').addEventListener('click',function(){finPersonLedgerPrint_(false);});
   document.getElementById('fplExportBtn').addEventListener('click',function(){finPersonLedgerPrint_(true);});
+
+  // The EXISTING Finance form is mounted in the Record modal, never cloned.
+  function finPersonLedgerRecordOpen_() {
+    var person=finPersonLedgerPerson_(),role=finPersonLedgerState.account;
+    if(!person || person.status==='Inactive')return;
+    return finLoad().then(function(){
+      if(currentPage!=='financePersonLedger'||finPersonLedgerState.personId!==person.id)return;
+      var card=document.getElementById('finEntryFormCard');
+      document.getElementById('fplRecordFormSlot').appendChild(card);
+      var first=finState.transactionTypes.filter(function(t){return t.role===role&&!t.isOpening;})[0];
+      if(!first)first=finState.transactionTypes.filter(function(t){return t.role===role;})[0];
+      document.getElementById('finType').value=first?first.key:'';
+      finUpdateHint_();
+      document.getElementById('finPerson').value=person.id;
+      document.getElementById('fplRecordPersonInfo').textContent=person.name+' · '+role;
+      openModal('fplNewModal');
+    }).catch(function(err){showToast(err.message,'error');});
+  }
+  function finPersonLedgerCloseRecord_() {
+    closeModal('fplNewModal');
+    var home=document.getElementById('finEntryFormHome'),form=document.getElementById('finEntryFormCard');
+    if(home&&form&&home.parentNode)home.parentNode.insertBefore(form,home.nextSibling);
+  }
+  function finEntryAfterSave_() {
+    var modal=document.getElementById('fplNewModal');
+    if(modal&&modal.hidden===false){
+      finPersonLedgerCloseRecord_();
+      return financePersonLedgerLoad();
+    }
+  }
+  document.getElementById('fplRecordBtn').addEventListener('click',finPersonLedgerRecordOpen_);
+  document.getElementById('fplRecordClose').addEventListener('click',finPersonLedgerCloseRecord_);
+  document.getElementById('fplRecordCancel').addEventListener('click',finPersonLedgerCloseRecord_);
+  document.getElementById('fplNewModal').addEventListener('click',function(event){
+    if(event.target===this)finPersonLedgerCloseRecord_();
+  });
+  document.addEventListener('keydown',function(event){
+    if(event.key==='Escape'&&!document.getElementById('fplNewModal').hidden){
+      // Do not close an underlying form while the global financial confirmation is visible.
+      var confirm=document.querySelector('.modal-overlay:not([hidden]):not(#fplNewModal)');
+      if(!confirm)finPersonLedgerCloseRecord_();
+    }
+  });
+  // Reuse the already-existing Finance Ledger View/Edit modal DOM and handlers,
+  // but don't leave those dialogs trapped under its hidden page section.
+  ['finLedViewModal','finLedEditModal'].forEach(function(id){
+    var modal=document.getElementById(id);
+    if(modal&&modal.parentNode!==document.body)document.body.appendChild(modal);
+  });
+  function finPersonLedgerEdit_(id) {
+    return finLedEnsureLoaded_().then(function(){finLedOpenEdit_(id);});
+  }
 </script>
