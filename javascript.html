@@ -1051,7 +1051,10 @@
           row.setAttribute('role', 'option');
           row.dataset.idx = String(index);
           row.innerHTML = '<span><strong>' + escapeHtml(item.name || '') + '</strong>' +
-            (item.phone ? '<small>' + escapeHtml(item.phone) + '</small>' : '') + '</span>';
+            (item.phone ? '<small>' + escapeHtml(item.phone) + '</small>' : '') + '</span>' +
+            (typeof config.rightText === 'function'
+              ? '<span class="party-search-right-text">' + escapeHtml(String(config.rightText(item) || '')) + '</span>'
+              : '');
           results.appendChild(row);
         });
         activeIndex = 0;
