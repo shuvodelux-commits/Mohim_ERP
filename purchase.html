@@ -1,5 +1,7 @@
 <style>
   /* Reuse Counter/Customer Ledger party combobox for Purchase supplier selection. */
+  /* This is only an ID/option store: never render it as a native or touch dropdown. */
+  #purSupplier { display: none !important; }
   #purSupplierCombo { flex:1 1 auto; min-width:0; }
   #purSupplierCombo > input { width:100%; padding-right:72px; }
   #purSupplierCombo .erp-search-clear { right:36px; }
@@ -39,7 +41,7 @@
         <label for="purSupplierSearch">Supplier * <span class="bn-hint" style="display:inline;">— সাপ্লায়ার</span></label>
         <div style="display: flex; gap: 8px">
           <!-- Keep the original supplier ID select as the purchase/save source of truth. -->
-          <select id="purSupplier" hidden aria-hidden="true" tabindex="-1"><option value="">Select supplier...</option></select>
+          <select id="purSupplier" hidden data-touch-select-skip="true" aria-hidden="true" tabindex="-1"><option value="">Select supplier...</option></select>
           <div class="counter-combobox purchase-supplier-combobox" id="purSupplierCombo">
             <input id="purSupplierSearch" type="search" data-search-clear="on"
               autocomplete="off" spellcheck="false" placeholder="Search supplier by name or phone..."
