@@ -109,8 +109,8 @@ const NAV_ITEMS = [
     key: 'finance', label: 'Business Finance', icon: 'finance', bn: 'মালিকের টাকা ও ঋণ', sidebarGroup: 4, sidebarOrder: 120,
     children: [
       { key: 'finance',       label: 'Business Finance', bn: 'টাকা জমা বা তোলা' },
-      { key: 'financeLedger', label: 'Finance Ledger',   bn: 'লেনদেনের হিসাব', permKey: 'finance' },
-      { key: 'financePersonLedger', label: 'Person Ledger', bn: 'ব্যক্তির হিসাব', permKey: 'finance' }
+      { key: 'financePersonLedger', label: 'Person Ledger', bn: 'ব্যক্তির হিসাব', permKey: 'finance' },
+      { key: 'financeLedger', label: 'Finance Ledger',   bn: 'লেনদেনের হিসাব', permKey: 'finance' }
     ]
   },
   { key: 'daybook',   label: 'Day Book',      icon: 'daybook', bn: 'আজকের সব লেনদেন', sidebarGroup: 4, sidebarOrder: 90 },
