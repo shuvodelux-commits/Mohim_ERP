@@ -173,8 +173,10 @@
     document.querySelector('.fpl-balance').className='fpl-balance '+meta.css;
     document.getElementById('fplRecordBtn').disabled=p.status==='Inactive';
     var types=finPersonLedgerState.transactionTypes.filter(function(t){return t.role===finPersonLedgerState.account;});
-    document.getElementById('fplTypeFilter').innerHTML='<option value="">All Transactions</option>'+types.map(function(t){
+    var typeFilter=document.getElementById('fplTypeFilter'),keepType=typeFilter.value;
+    typeFilter.innerHTML='<option value="">All Transactions</option>'+types.map(function(t){
       return '<option value="'+escapeHtml(t.key)+'">'+escapeHtml(t.label)+'</option>';}).join('');
+    if(types.some(function(t){return t.key===keepType;}))typeFilter.value=keepType;
     finPersonLedgerRenderLedger_();
   }
   function finPersonLedgerRenderLedger_() {
