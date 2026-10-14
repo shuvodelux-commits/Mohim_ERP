@@ -11,6 +11,7 @@ test('Finance has independent three-tab navigation with finance permission',()=>
  const children=match[1];
  for(const key of ['finance','financeLedger','financePersonLedger'])assert.match(children,new RegExp("key:\\s*'"+key+"'"));
  assert.match(children,/key:\s*'financePersonLedger'[^\n]*permKey:\s*'finance'/);
+ assert.ok(children.indexOf("key: 'financePersonLedger'") < children.indexOf("key: 'financeLedger'"), 'approved Person Ledger middle tab order');
 });
 test('Person Ledger owns separate page and reload registration',()=>{
  assert.match(html,/<section class="page" id="page-financePersonLedger" data-page="financePersonLedger" hidden>/);
