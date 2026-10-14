@@ -3214,4 +3214,89 @@
   .erp-semantic-caption { display:none!important; }
 }
 
+
+/* Finance Person Ledger — approved two-pane workspace, scoped to one independent page. */
+#page-financePersonLedger .finance-person-workspace {
+  display:grid; grid-template-columns:minmax(260px,30%) minmax(0,1fr); gap:12px; align-items:start;
+}
+#page-financePersonLedger .fpl-people { padding:0; overflow:hidden; position:sticky; top:14px; }
+#page-financePersonLedger .fpl-people-head {padding:16px 16px 4px;}
+#page-financePersonLedger h3 {margin:0; font-size:17px;}
+#page-financePersonLedger .fpl-people-head .bn-hint {display:block; font-size:11px; margin-top:3px;}
+#page-financePersonLedger .fpl-search-wrap {padding:8px 12px;}
+#page-financePersonLedger .fpl-role-filters {display:flex;flex-wrap:wrap;gap:5px;padding:4px 12px 12px;}
+#page-financePersonLedger .fpl-role-filters .btn {font-size:12px; padding:5px 9px; min-height:32px;}
+#page-financePersonLedger .fpl-role-filters .active,
+#page-financePersonLedger .fpl-role-chips [aria-pressed="true"] {
+  background:var(--color-primary-light); border-color:var(--color-primary); color:var(--color-primary-dark);
+}
+#page-financePersonLedger .fpl-list-head {display:flex;justify-content:space-between;padding:9px 13px;border-block:1px solid var(--color-border);color:var(--color-text-muted);font-size:11px;font-weight:700;}
+#page-financePersonLedger .fpl-people-list {max-height:calc(100dvh - 300px);min-height:140px;overflow-y:auto;}
+#page-financePersonLedger .fpl-person {
+  display:flex;gap:10px;align-items:flex-start;text-align:left;width:100%;
+  border:0;border-left:3px solid transparent;border-bottom:1px solid var(--color-border);
+  border-radius:0;background:var(--color-surface);padding:12px;cursor:pointer;color:var(--color-text);font-family:var(--font);
+}
+#page-financePersonLedger .fpl-person:hover {background:var(--color-bg);}
+#page-financePersonLedger .fpl-person.selected {background:var(--color-primary-light);border-left-color:var(--color-primary);}
+#page-financePersonLedger .fpl-avatar {display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;border-radius:50%;height:46px;width:46px;background:var(--color-primary);color:white;font-size:18px;font-weight:700;}
+#page-financePersonLedger .fpl-avatar.small {height:38px;width:38px;font-size:13px;}
+#page-financePersonLedger .fpl-person-info {display:grid;gap:4px;min-width:0;flex:1;}
+#page-financePersonLedger .fpl-person-info strong {overflow-wrap:anywhere;font-size:13px;}
+#page-financePersonLedger .fpl-person-info small {font-size:11px;color:var(--color-text-muted);}
+#page-financePersonLedger .fpl-person-money {display:grid;text-align:right;gap:3px;max-width:40%;}
+#page-financePersonLedger .fpl-mini-balance {font-size:12px;font-weight:700;white-space:normal;}
+#page-financePersonLedger .fpl-mini-balance small {display:block;font-size:10px;font-weight:500;}
+#page-financePersonLedger .positive {color:var(--color-success);}
+#page-financePersonLedger .negative {color:var(--color-danger);}
+#page-financePersonLedger .neutral {color:var(--color-text-muted);}
+#page-financePersonLedger .fpl-detail {min-width:0;}
+#page-financePersonLedger .fpl-detail-empty {padding:50px 20px;text-align:center;}
+#page-financePersonLedger .fpl-profile {padding:16px;margin-bottom:12px;}
+#page-financePersonLedger .fpl-profile-content {display:flex;align-items:flex-start;gap:12px;}
+#page-financePersonLedger .fpl-profile-info {flex:1;min-width:0;}
+#page-financePersonLedger .fpl-profile-info h3 {overflow-wrap:anywhere;}
+#page-financePersonLedger .fpl-person-meta {font-size:12px;color:var(--color-text-muted);margin:7px 0;}
+#page-financePersonLedger .fpl-role-chips {display:flex;gap:6px;flex-wrap:wrap;}
+#page-financePersonLedger .fpl-role-chips .btn {font-size:11px;padding:5px 8px;min-height:30px;}
+#page-financePersonLedger .fpl-balance {min-width:145px;text-align:right;display:grid;gap:3px;}
+#page-financePersonLedger .fpl-balance strong {font-size:23px;line-height:1.2;font-family:var(--font-sans);}
+#page-financePersonLedger .fpl-balance small {font-size:10px;text-transform:uppercase;letter-spacing:.02em;}
+#page-financePersonLedger .fpl-balance span {font-size:11px;}
+#page-financePersonLedger .fpl-actions {display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid var(--color-border);}
+#page-financePersonLedger .fpl-ledger {padding:0;overflow:hidden;}
+#page-financePersonLedger .fpl-filters {display:flex;align-items:end;gap:8px;flex-wrap:wrap;padding:14px 12px;}
+#page-financePersonLedger .fpl-filters label {margin:0;font-size:11px;min-width:110px;flex:0 1 130px;}
+#page-financePersonLedger .fpl-filters label.fpl-search-ledger {flex:1 1 170px;}
+#page-financePersonLedger .fpl-filters label.fpl-pagesize {flex:0 0 72px;min-width:70px;}
+#page-financePersonLedger .fpl-filters input,
+#page-financePersonLedger .fpl-filters select {margin-top:4px;min-height:36px;}
+#page-financePersonLedger .fpl-period {display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;padding:10px 14px;background:var(--color-bg);border-block:1px solid var(--color-border);}
+#page-financePersonLedger .fpl-period span {font-size:12px;color:var(--color-text-muted);}
+#page-financePersonLedger .fpl-period strong {font-family:var(--font-sans);color:var(--color-text);}
+#page-financePersonLedger .fpl-table th {white-space:nowrap;}
+#page-financePersonLedger .fpl-table td {vertical-align:top;}
+#page-financePersonLedger .fpl-table td small {display:block;color:var(--color-text-muted);font-size:11px;margin-top:3px;overflow-wrap:anywhere;}
+#page-financePersonLedger .fpl-row-link {font:600 13px var(--font);color:var(--color-text);background:none;border:0;padding:0;cursor:pointer;text-align:left;}
+#page-financePersonLedger .fpl-row-link:hover {color:var(--color-primary);text-decoration:underline;}
+#page-financePersonLedger .fpl-back {display:none;margin-bottom:12px;}
+@media(max-width:820px) {
+  #page-financePersonLedger .finance-person-workspace {grid-template-columns:minmax(0,1fr);}
+  #page-financePersonLedger .fpl-people {position:static;}
+  #page-financePersonLedger .fpl-people-list {max-height:none;}
+  #page-financePersonLedger .finance-person-workspace .fpl-detail {display:none;}
+  #page-financePersonLedger .finance-person-workspace.show-person .fpl-detail {display:block;}
+  #page-financePersonLedger .finance-person-workspace.show-person .fpl-people {display:none;}
+  #page-financePersonLedger .fpl-back {display:inline-flex;}
+}
+@media(max-width:540px) {
+  #page-financePersonLedger .fpl-profile-content {flex-wrap:wrap;}
+  #page-financePersonLedger .fpl-balance {width:100%;text-align:left;padding:8px 0 0 58px;}
+  #page-financePersonLedger .fpl-actions .btn {flex:1 1 45%;min-height:42px;}
+  #page-financePersonLedger .fpl-actions #fplRecordBtn {flex-basis:100%;}
+  #page-financePersonLedger .fpl-filters label {flex:1 1 120px;}
+  #page-financePersonLedger .fpl-filters .fpl-search-ledger {flex-basis:100%;}
+  #page-financePersonLedger .fpl-period span {flex:1 1 46%;}
+}
+
 </style>
