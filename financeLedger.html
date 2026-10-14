@@ -626,7 +626,15 @@
     finLedState.personAccount=btn.dataset.finPersonAccount;finLedState.personPage=1;finLedRenderPersonLedger_();
   });
   ['finLedPersonDateFrom','finLedPersonDateTo','finLedPersonPageSize'].forEach(function(id){
-    document.getElementById(id).addEventListener('change',function(){finLedState.personPage=1;finLedRenderPersonLedger_();});
+    document.getElementById(id).addEventListener('change',function(){
+      var from=document.getElementById('finLedPersonDateFrom').value;
+      var to=document.getElementById('finLedPersonDateTo').value;
+      if(from&&to&&from>to) {
+        this.value='';
+        showToast('From Date must not be after To Date.','error');
+      }
+      finLedState.personPage=1;finLedRenderPersonLedger_();
+    });
   });
   document.getElementById('finLedPersonPrevBtn').addEventListener('click',function(){
     finLedState.personPage=Math.max(1,finLedState.personPage-1);finLedRenderPersonLedger_();
