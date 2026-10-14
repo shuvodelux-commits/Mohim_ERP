@@ -16,6 +16,7 @@ test('Person Ledger owns separate page and reload registration',()=>{
  assert.match(html,/<section class="page" id="page-financePersonLedger" data-page="financePersonLedger" hidden>/);
  assert.match(html,/<\?!= include\('financePersonLedger'\); \?>/);
  assert.match(js,/financePersonLedger:\s*'financePersonLedgerLoad'/);
+ assert.match(js,/key === 'financePersonLedger' && typeof financePersonLedgerLoad === 'function'/);
  assert.match(person,/function financePersonLedgerLoad\(/);
 });
 test('original Finance Ledger has no second mode-tab switch or person workspace',()=>{
