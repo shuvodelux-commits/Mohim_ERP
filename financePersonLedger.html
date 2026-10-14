@@ -243,6 +243,7 @@
       if (typeof finLedState !== 'undefined') finLedState.transactionTypes=finPersonLedgerState.transactionTypes;
       finPersonLedgerState.bankAccounts=data.bankAccounts||[];
       finPersonLedgerState.currencySymbol=data.currencySymbol||'';
+      if (typeof finLedState !== 'undefined') finLedState.currencySymbol=finPersonLedgerState.currencySymbol;
       finPersonLedgerState.balances=data.personBalances||{};
       var id=finPersonLedgerState.personId;
       finPersonLedgerRenderPeople_();
