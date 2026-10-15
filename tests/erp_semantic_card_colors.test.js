@@ -13,8 +13,15 @@ const htmls = [
   'vendorWorkspace.html','counter.html','pos.html','returns.html'
 ];
 const ui = htmls.map(path => fs.readFileSync(path, 'utf8')).join('\n');
-const feature = js.slice(js.indexOf('  // ERP-wide visual semantics for cards/balances.'));
+// Scope this VM fixture to semantic-card helpers only. Newer top-level UI
+// initializers (such as zero-amount field event delegation) need a real DOM.
+const featureStart = js.indexOf('  // ERP-wide visual semantics for cards/balances.');
+const featureEnd = js.indexOf('  // BEGIN ERP ZERO AMOUNT ENTRY', featureStart);
+assert.ok(featureStart >= 0 && featureEnd > featureStart,
+  'The semantic-card section must end before the unrelated zero-input initializer');
+const feature = js.slice(featureStart, featureEnd);
 assert.match(feature, /function initErpSemanticCards_\(/);
+assert.doesNotMatch(feature, /initErpZeroAmountEntry_/);
 
 function harness(elements) {
   const hooks = [];
