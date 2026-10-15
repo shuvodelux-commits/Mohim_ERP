@@ -449,8 +449,13 @@
     });
   }
 
+  function finLedRowForView_(financeId) {
+    var rows = currentPage === 'financePersonLedger' && typeof finPersonLedgerState !== 'undefined'
+      ? finPersonLedgerState.rows : finLedState.rows;
+    return rows.filter(function(r){return r.financeId===financeId;})[0] || null;
+  }
   function finLedOpenView_(financeId) {
-    var row = finLedState.rows.filter(function (r) { return r.financeId === financeId; })[0];
+    var row = finLedRowForView_(financeId);
     if (!row) { showToast('That transaction is not in the current filter — clear filters and try again.', 'error'); return; }
     document.getElementById('finLedViewId').textContent = row.financeId;
     document.getElementById('finLedViewDate').textContent = row.date;
@@ -492,6 +497,9 @@
   }
 
   function finLedOpenEdit_(financeId) {
+    if (!finLedState._typesLoaded) return finLedEnsureLoaded_().then(function () {
+      if (finLedState._typesLoaded) finLedOpenEdit_(financeId);
+    });
     withLoader(serverCall('getFinanceTransactionForEdit', authToken, financeId)).then(function (data) {
       var t = data || {}; finLedState.editingId = financeId;
       document.getElementById('finLedEditId').textContent = financeId;
@@ -546,13 +554,13 @@
       message: hasMoneyMovement ? 'This will update the posted transaction and its Cash/Bank and finance effects.' : 'This changes the historical ERP cash baseline, not current Cash Session turnover.',
       details:details, confirmLabel:'Update Transaction', loadingLabel:'Updating...', trigger:document.getElementById('finLedEditSaveBtn')
     }, function () { return withLoader(serverCall('updateFinanceTransaction', authToken, financeId, payload)).then(function () {
-      closeModal('finLedEditModal'); showToast('Finance transaction updated', 'success'); finLedLoad(); reloadPage_('finance'); reloadPage_('dashboard'); reloadPage_('daybook');
+      closeModal('finLedEditModal'); showToast('Finance transaction updated', 'success'); finLedLoad(); reloadPage_('finance'); reloadPage_('dashboard'); reloadPage_('daybook'); if (currentPage === 'financePersonLedger' && typeof finPersonLedgerRefreshAfterMutation_ === 'function') finPersonLedgerRefreshAfterMutation_();
     }); }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
   });
 
   function finLedDelete_(financeId) {
     confirmDelete({ title:'Delete finance transaction', summary:'<p>This removes the Finance row and reverses its Cash/Bank effect when the transaction has money movement.</p>',
-      fn:'deleteFinanceTransaction', args:[financeId], reloadPages:['financeLedger','finance','daybook','dashboard'], onDone:function () { finLedLoad(); } });
+      fn:'deleteFinanceTransaction', args:[financeId], reloadPages:['financeLedger','finance','daybook','dashboard'], onDone:function () { finLedLoad(); if (currentPage === 'financePersonLedger' && typeof finPersonLedgerRefreshAfterMutation_ === 'function') finPersonLedgerRefreshAfterMutation_(); } });
   }
 
   // ---------------- Print / Export ----------------
