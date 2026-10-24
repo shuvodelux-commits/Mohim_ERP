@@ -40,29 +40,29 @@ test('Finance Ledger renders a selected-person balance card from complete-histor
   assert.match(ledger, /function\s+finLedRenderSelectedPersonBalance_/);
   assert.match(ledger, /finLedState\.selectedPerson/);
   assert.match(ledger, /finLedState\.summary/);
-  assert.match(ledger, /Outstanding Loan/);
-  assert.match(ledger, /Lender Advance/);
-  assert.match(ledger, /Borrower Receivable/);
-  assert.match(ledger, /Borrower Advance/);
-  assert.match(ledger, /Owner Capital/);
-  assert.match(ledger, /Owner Advance/);
+  assert.match(ledger, /Lender Credit/);
+  assert.match(ledger, /Lender Debit/);
+  assert.match(ledger, /Borrower Debit/);
+  assert.match(ledger, /Borrower Credit/);
+  assert.match(ledger, /Owner Credit/);
+  assert.match(ledger, /Owner Debit/);
 });
 
-test('transaction selectors retain original names while advance balances are unambiguous', () => {
+test('finance balance cards use transaction vocabulary', () => {
   assert.match(server, /key:'Loan Received', label:'Lender Credit'/);
   assert.match(server, /key:'Borrower Repayment', label:'Borrower Credit'/);
-  assert.ok(finance.includes('class="stat-label">Lender Advance</div>'));
-  assert.ok(finance.includes('class="stat-label">Borrower Advance</div>'));
+  assert.ok(finance.includes('class="stat-label">Lender Debit</div>'));
+  assert.ok(finance.includes('class="stat-label">Borrower Credit</div>'));
   const personLedger = fs.readFileSync('financePersonLedger.html','utf8');
-  assert.ok(personLedger.includes("negative?'Lender Advance'"));
-  assert.ok(personLedger.includes("negative?'Borrower Advance'"));
+  assert.ok(personLedger.includes("negative?'Lender Debit'"));
+  assert.ok(personLedger.includes("negative?'Borrower Credit'"));
 });
 
-test('Customer and Supplier due-ledger columns do not falsely describe entries as cash flow', () => {
+test('customer retains due-change hints while supplier uses khoros joma', () => {
   for (const file of ['customers.html','suppliers.html']) {
     const html = fs.readFileSync(file,'utf8');
-    assert.ok(html.includes('Debit<br><span class="bn-hint" style="display:inline;">বাকি বাড়ে</span>'), file);
-    assert.ok(html.includes('Credit<br><span class="bn-hint" style="display:inline;">বাকি কমে</span>'), file);
+    assert.ok(html.includes('Debit<br><span class="bn-hint" style="display:inline;">' + (file === 'customers.html' ? 'বাকি বাড়ে' : 'খরচ') + '</span>'), file);
+    assert.ok(html.includes('Credit<br><span class="bn-hint" style="display:inline;">' + (file === 'customers.html' ? 'বাকি কমে' : 'জমা') + '</span>'), file);
   }
 });
 
