@@ -32,11 +32,38 @@ test('Supplier screens invert displayed amounts without changing raw ledger fiel
   assert.ok(sup.includes("ledger-txn--increase\">' + (l['Debit'] ? formatMoney(l['Debit']) : '')"));
 });
 
-test('Customer ledger remains unchanged',()=>{
+test('Customer ledger keeps existing due semantics, with Credit first',()=>{
   assert.match(cust,/Debit<br><span class="bn-hint"[^>]*>বাকি বাড়ে<\/span>/);
   assert.match(cust,/Credit<br><span class="bn-hint"[^>]*>বাকি কমে<\/span>/);
   assert.ok(cl.includes("data-label=\"Debit\">' + customerLedgerAmountCell_(row, 'Debit')"));
   assert.ok(cl.includes("data-label=\"Credit\">' + credit + '</td>'"));
+});
+
+test('Credit appears left of Debit throughout Customer, Supplier and Finance ledgers',()=>{
+  for(const src of [fp,fl,sl,sup,cl,cust]){
+    const tableHeader=src.match(/<thead>[\s\S]*?<\/thead>/);
+    assert.ok(tableHeader,'table header exists');
+    const header=tableHeader[0];
+    assert.ok(header.indexOf('Credit')<header.indexOf('Debit'),'Credit must precede Debit in header');
+  }
+  assert.ok(cl.indexOf('data-label="Credit"')<cl.indexOf('data-label="Debit"'),'Customer row order');
+  assert.ok(sl.indexOf('data-label="Credit"')<sl.indexOf('data-label="Debit"'),'Supplier row order');
+  assert.ok(fp.indexOf('data-label="Credit"')<fp.indexOf('data-label="Debit"'),'Finance person row order');
+  assert.ok(fl.indexOf("finLedMoneyCell_(r, 'credit')")<fl.indexOf("finLedMoneyCell_(r, 'debit')"),'Finance row order');
+  assert.ok(fl.indexOf("key:'credit', label:'Credit'")<fl.indexOf("key:'debit', label:'Debit'"),'Finance export order');
+  assert.ok(fp.indexOf("key:'credit',label:'Credit'")<fp.indexOf("key:'debit',label:'Debit'"),'Finance person export order');
+});
+
+test('Money-held/away card colors use the approved role-specific sign convention',()=>{
+  assert.ok(fp.includes("account==='loanPayable'?(positive?'positive':'negative')"));
+  assert.ok(fp.includes("account==='borrowerReceivable'?(positive?'negative':'positive')"));
+  const styles=read('style.html');
+  assert.match(styles,/#page-supplierLedger \.party-ledger-balance-box\.ledger-tone--advance/);
+  assert.match(styles,/#page-suppliers \.ledger-tone--advance/);
+  assert.match(styles,/#page-financePersonLedger \.fpl-balance\.positive/);
+  assert.match(styles,/#page-financePersonLedger \.fpl-balance\.negative/);
+  assert.match(fl,/outstandingLoan: \{ kind:'positive', label:'Credit Balance' \}/);
+  assert.match(fl,/borrowerReceivable: \{ kind:'negative', label:'Debit Balance' \}/);
 });
 
 function printStatement(kind){
@@ -57,13 +84,13 @@ function printStatement(kind){
 
 test('Supplier printed statement inverts displayed debit/credit, customer does not',()=>{
   const s=printStatement('supplier');
-  assert.ok(s.includes('<th>Debit<br>খরচ</th><th>Credit<br>জমা</th>'));
+  assert.ok(s.includes('<th>Credit<br>জমা</th><th>Debit<br>খরচ</th>'));
   assert.ok(s.includes('Period Debit: <strong>400</strong>'));
   assert.ok(s.includes('Period Credit: <strong>1000</strong>'));
-  assert.ok(s.includes('<td style="text-align:right">400</td><td style="text-align:right">1000</td>'));
+  assert.ok(s.includes('<td style="text-align:right">1000</td><td style="text-align:right">400</td>'));
   const c=printStatement('customer');
-  assert.ok(c.includes('<th>Debit</th><th>Credit</th>'));
+  assert.ok(c.includes('<th>Credit</th><th>Debit</th>'));
   assert.ok(c.includes('Period Debit: <strong>1000</strong>'));
   assert.ok(c.includes('Period Credit: <strong>400</strong>'));
-  assert.ok(c.includes('<td style="text-align:right">1000</td><td style="text-align:right">400</td>'));
+  assert.ok(c.includes('<td style="text-align:right">400</td><td style="text-align:right">1000</td>'));
 });
