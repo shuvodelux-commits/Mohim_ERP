@@ -51,18 +51,18 @@ test('Finance Ledger renders a selected-person balance card from complete-histor
 test('transaction selectors retain original names while advance balances are unambiguous', () => {
   assert.match(server, /key:'Loan Received', label:'Lender Credit'/);
   assert.match(server, /key:'Borrower Repayment', label:'Borrower Credit'/);
-  assert.match(finance, /class="stat-label">Lender Advance<\\/div>/);
-  assert.match(finance, /class="stat-label">Borrower Advance<\\/div>/);
+  assert.ok(finance.includes('class="stat-label">Lender Advance</div>'));
+  assert.ok(finance.includes('class="stat-label">Borrower Advance</div>'));
   const personLedger = fs.readFileSync('financePersonLedger.html','utf8');
-  assert.match(personLedger, /negative\\?'Lender Advance'/);
-  assert.match(personLedger, /negative\\?'Borrower Advance'/);
+  assert.ok(personLedger.includes("negative?'Lender Advance'"));
+  assert.ok(personLedger.includes("negative?'Borrower Advance'"));
 });
 
 test('Customer and Supplier due-ledger columns do not falsely describe entries as cash flow', () => {
   for (const file of ['customers.html','suppliers.html']) {
     const html = fs.readFileSync(file,'utf8');
-    assert.match(html, /Debit<br><span class="bn-hint" style="display:inline;">বাকি বাড়ে<\\/span>/, file);
-    assert.match(html, /Credit<br><span class="bn-hint" style="display:inline;">বাকি কমে<\\/span>/, file);
+    assert.ok(html.includes('Debit<br><span class="bn-hint" style="display:inline;">বাকি বাড়ে</span>'), file);
+    assert.ok(html.includes('Credit<br><span class="bn-hint" style="display:inline;">বাকি কমে</span>'), file);
   }
 });
 
