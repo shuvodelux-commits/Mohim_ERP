@@ -41,9 +41,9 @@ test('Customer ledger keeps existing due semantics, with Credit first',()=>{
 
 test('Credit appears left of Debit throughout Customer, Supplier and Finance ledgers',()=>{
   for(const src of [fp,fl,sl,sup,cl,cust]){
-    const tableHeader=src.match(/<thead>[\s\S]*?<\/thead>/);
-    assert.ok(tableHeader,'table header exists');
-    const header=tableHeader[0];
+    const tableHeaders=[...src.matchAll(/<thead>[\s\S]*?<\/thead>/g)].map(match=>match[0]);
+    const header=tableHeaders.find(h=>h.includes('Credit') && h.includes('Debit'));
+    assert.ok(header,'ledger table header exists');
     assert.ok(header.indexOf('Credit')<header.indexOf('Debit'),'Credit must precede Debit in header');
   }
   assert.ok(cl.indexOf('data-label="Credit"')<cl.indexOf('data-label="Debit"'),'Customer row order');
