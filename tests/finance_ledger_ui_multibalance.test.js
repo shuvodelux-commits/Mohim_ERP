@@ -23,14 +23,14 @@ test('Finance Ledger shows all six current relationship balances', () => {
   assert.match(src, /d\.summary/);
 });
 
-test('Finance Ledger captions use accounting balance sides without changing business warning colors', () => {
+test('Finance Ledger captions use accounting balance sides with money-received versus money-away card colors', () => {
   const rules = [
     ['ownerCapital','positive','Credit Balance'],
     ['ownerAdvance','negative','Debit Balance'],
-    ['outstandingLoan','negative','Credit Balance'],
-    ['lenderCredit','positive','Debit Balance'],
-    ['borrowerReceivable','positive','Debit Balance'],
-    ['borrowerCredit','negative','Credit Balance']
+    ['outstandingLoan','positive','Credit Balance'],
+    ['lenderCredit','negative','Debit Balance'],
+    ['borrowerReceivable','negative','Debit Balance'],
+    ['borrowerCredit','positive','Credit Balance']
   ];
   for (const [key, kind, label] of rules) {
     assert.match(src, new RegExp(key + ":\\s*\\{ kind:'" + kind + "', label:'" + label + "' \\}"), key);
