@@ -93,8 +93,8 @@
   }
   function finPersonLedgerSign_(balance,account) {
     var signed=Number(balance)||0,positive=signed>0,negative=signed<0;
-    var label=account==='loanPayable'?(positive?'Payable':negative?'Lender Credit':'Settled'):
-      account==='borrowerReceivable'?(positive?'Receivable':negative?'Borrower Credit':'Settled'):
+    var label=account==='loanPayable'?(positive?'Payable':negative?'Lender Advance':'Settled'):
+      account==='borrowerReceivable'?(positive?'Receivable':negative?'Borrower Advance':'Settled'):
       (positive?'Owner Capital':negative?'Owner Advance':'Settled');
     var css=!signed?'neutral':account==='loanPayable'?(positive?'negative':'positive'):
       account==='borrowerReceivable'?(positive?'positive':'negative'):(positive?'positive':'negative');
