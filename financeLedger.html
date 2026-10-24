@@ -37,7 +37,7 @@
   .fin-led-money-amount.is-out, .fin-led-money-caption.is-out { color:var(--color-danger); }
   .fin-led-money-caption.is-opening { color:var(--color-text-muted); }
 
-  /* Business color: green for recoverable/available, red for obligations. Accounting Debit/Credit captions are separate. */
+  /* Green: received/held in business. Red: money given to another person. Accounting Debit/Credit captions stay separate. */
   .fin-led-balance-card {
     border:1px solid var(--color-border);
     transition:background .15s ease, border-color .15s ease, color .15s ease;
@@ -119,8 +119,8 @@
       <thead>
         <tr>
           <th>Date</th><th>Finance ID</th><th>Type</th><th>Account</th><th>Party</th><th>Method</th>
-          <th class="num">Debit<br><span class="bn-hint" style="display:inline;">খরচ</span></th>
           <th class="num">Credit<br><span class="bn-hint" style="display:inline;">জমা</span></th>
+          <th class="num">Debit<br><span class="bn-hint" style="display:inline;">খরচ</span></th>
           <th class="num">Balance</th><th>By</th><th></th>
         </tr>
       </thead>
@@ -192,10 +192,10 @@
   var FIN_LED_BALANCE_META = {
     ownerCapital: { kind:'positive', label:'Credit Balance' },
     ownerAdvance: { kind:'negative', label:'Debit Balance' },
-    outstandingLoan: { kind:'negative', label:'Credit Balance' },
-    lenderCredit: { kind:'positive', label:'Debit Balance' },
-    borrowerReceivable: { kind:'positive', label:'Debit Balance' },
-    borrowerCredit: { kind:'negative', label:'Credit Balance' }
+    outstandingLoan: { kind:'positive', label:'Credit Balance' },
+    lenderCredit: { kind:'negative', label:'Debit Balance' },
+    borrowerReceivable: { kind:'negative', label:'Debit Balance' },
+    borrowerCredit: { kind:'positive', label:'Credit Balance' }
   };
 
   function finLedMoney_(v) {
@@ -412,8 +412,8 @@
         '<td>' + escapeHtml(r.financeId) + '</td><td>' + escapeHtml(r.transactionTypeLabel) + '</td>' +
         '<td>' + escapeHtml(r.accountLabel || '') + '</td><td>' + escapeHtml(r.person) + '</td>' +
         '<td>' + escapeHtml(r.paymentMethod || (finLedType_(r.transactionType) && finLedType_(r.transactionType).cashDirection === 'none' ? 'Opening' : '')) + '</td>' +
-        '<td class="num">' + finLedMoneyCell_(r, 'debit') + '</td>' +
         '<td class="num">' + finLedMoneyCell_(r, 'credit') + '</td>' +
+        '<td class="num">' + finLedMoneyCell_(r, 'debit') + '</td>' +
         '<td class="num">' + finLedMoney_(r.balance) + '</td><td>' + escapeHtml(r.createdBy) + '</td>' +
         '<td style="white-space:nowrap;"><button class="btn" data-act="menuTxn" data-idx="' + idx + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button></td>';
       body.appendChild(tr);
@@ -567,8 +567,8 @@
   var FIN_LED_COLUMNS = [
     { key:'date', label:'Date' }, { key:'financeId', label:'Finance ID' }, { key:'transactionTypeLabel', label:'Type' },
     { key:'accountLabel', label:'Account' }, { key:'person', label:'Party' }, { key:'paymentMethod', label:'Method' },
-    { key:'debit', label:'Debit', align:'right', value:function (r) { return r.debit ? finLedMoney_(r.debit) : ''; } },
     { key:'credit', label:'Credit', align:'right', value:function (r) { return r.credit ? finLedMoney_(r.credit) : ''; } },
+    { key:'debit', label:'Debit', align:'right', value:function (r) { return r.debit ? finLedMoney_(r.debit) : ''; } },
     { key:'balance', label:'Balance', align:'right', value:function (r) { return r._summaryLabel ? finLedMoney_(r.balance) : finLedMoney_(r.balance); } }
   ];
 
