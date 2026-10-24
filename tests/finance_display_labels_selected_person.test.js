@@ -41,11 +41,29 @@ test('Finance Ledger renders a selected-person balance card from complete-histor
   assert.match(ledger, /finLedState\.selectedPerson/);
   assert.match(ledger, /finLedState\.summary/);
   assert.match(ledger, /Outstanding Loan/);
-  assert.match(ledger, /Lender Credit/);
+  assert.match(ledger, /Lender Advance/);
   assert.match(ledger, /Borrower Receivable/);
-  assert.match(ledger, /Borrower Credit/);
+  assert.match(ledger, /Borrower Advance/);
   assert.match(ledger, /Owner Capital/);
   assert.match(ledger, /Owner Advance/);
+});
+
+test('transaction selectors retain original names while advance balances are unambiguous', () => {
+  assert.match(server, /key:'Loan Received', label:'Lender Credit'/);
+  assert.match(server, /key:'Borrower Repayment', label:'Borrower Credit'/);
+  assert.ok(finance.includes('class="stat-label">Lender Advance</div>'));
+  assert.ok(finance.includes('class="stat-label">Borrower Advance</div>'));
+  const personLedger = fs.readFileSync('financePersonLedger.html','utf8');
+  assert.ok(personLedger.includes("negative?'Lender Advance'"));
+  assert.ok(personLedger.includes("negative?'Borrower Advance'"));
+});
+
+test('Customer and Supplier due-ledger columns do not falsely describe entries as cash flow', () => {
+  for (const file of ['customers.html','suppliers.html']) {
+    const html = fs.readFileSync(file,'utf8');
+    assert.ok(html.includes('Debit<br><span class="bn-hint" style="display:inline;">বাকি বাড়ে</span>'), file);
+    assert.ok(html.includes('Credit<br><span class="bn-hint" style="display:inline;">বাকি কমে</span>'), file);
+  }
 });
 
 test('Finance Ledger uses Party and friendly relationship account labels', () => {
