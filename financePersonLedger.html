@@ -164,12 +164,16 @@
       return '<button class="btn" type="button" data-account-role="'+role+'" aria-pressed="'+
         (role===finPersonLedgerState.account)+'">'+role+'</button>';
     }).join('');
-    var account=FPL_ACCOUNTS_[finPersonLedgerState.account],meta=finPersonLedgerSign_(finPersonLedgerBalance_(p.id,account),account);
+    var account=FPL_ACCOUNTS_[finPersonLedgerState.account];
+    var signedBalance=finPersonLedgerBalance_(p.id,account);
+    var meta=finPersonLedgerSign_(signedBalance,account);
     document.getElementById('fplBalanceLabel').textContent=meta.label;
     document.getElementById('fplCurrentBalance').textContent=meta.text;
-    document.getElementById('fplBalanceHint').textContent=!finPersonLedgerBalance_(p.id,account)?'Settled':
-      account==='borrowerReceivable'?(meta.css==='positive'?'আপনি পাবেন':'ফেরত দিতে হবে'):
-      account==='loanPayable'?(meta.css==='negative'?'আপনাকে দিতে হবে':'আপনি পাবেন'):(meta.css==='negative'?'মালিকের কাছে পাওনা':'মালিকের মূলধন');
+    // Balance meaning is based on signed relationship amounts, never the display color.
+    document.getElementById('fplBalanceHint').textContent=!signedBalance?'Settled':
+      account==='borrowerReceivable'?(signedBalance>0?'আপনি পাবেন':'ফেরত দিতে হবে'):
+      account==='loanPayable'?(signedBalance>0?'আপনাকে দিতে হবে':'আপনি পাবেন'):
+      (signedBalance<0?'মালিকের কাছে পাওনা':'মালিকের মূলধন');
     document.querySelector('.fpl-balance').className='fpl-balance '+meta.css;
     document.getElementById('fplRecordBtn').disabled=p.status==='Inactive';
     var types=finPersonLedgerState.transactionTypes.filter(function(t){return t.role===finPersonLedgerState.account;});
