@@ -94,6 +94,24 @@ test('customer due red, supplier payable red, signed cash and profit follow thei
   assert.equal(c.erpSemanticLabel_(c.ERP_SEMANTIC_CARDS_.dashPayable, 'negative'), 'To Pay');
 });
 
+test('finance card captions reflect accounting debit/credit side, not the red/green business tone', () => {
+  const {context:c} = harness({});
+  const cases = [
+    ['finCapitalStat', 'positive', 'Credit Balance'],
+    ['finOwnerAdvanceStat', 'negative', 'Debit Balance'],
+    ['finLoanStat', 'negative', 'Credit Balance'],
+    ['finLenderCreditStat', 'positive', 'Debit Balance'],
+    ['finBorrowerReceivableStat', 'positive', 'Debit Balance'],
+    ['finBorrowerCreditStat', 'negative', 'Credit Balance']
+  ];
+  for (const [id, tone, label] of cases) {
+    const rule = c.ERP_SEMANTIC_CARDS_[id];
+    assert.equal(c.erpSemanticTone_(rule, '৳10,000'), tone, id + ' business color');
+    assert.equal(c.erpSemanticLabel_(rule, tone), label, id + ' accounting caption');
+    assert.equal(c.erpSemanticLabel_(rule, 'neutral'), '', id + ' zero caption');
+  }
+});
+
 test('money flow types are accurate; purchase totals are not falsely called money out', () => {
   const {context:c} = harness({});
   assert.equal(c.erpSemanticLabel_(c.ERP_SEMANTIC_CARDS_.rcIn, 'positive'), 'Money In');
