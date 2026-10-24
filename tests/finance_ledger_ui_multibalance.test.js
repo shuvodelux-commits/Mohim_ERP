@@ -53,7 +53,7 @@ test('ledger table and view expose relationship account semantics', () => {
 });
 
 test('print and CSV include selected person identity and all six summary values', () => {
-  ['Owner Capital','Owner Advance','Outstanding Loan','Lender Advance','Borrower Receivable','Borrower Advance'].forEach(label => {
+  ['Owner Credit','Owner Debit','Lender Credit','Lender Debit','Borrower Debit','Borrower Credit'].forEach(label => {
     assert.match(src, new RegExp(label.replace(' ','\\s+')));
   });
   assert.match(src, /selectedPerson/);
