@@ -49,12 +49,12 @@
         </div>
         <div class="fpl-period">
           <span>Opening balance <strong id="fplOpening">0</strong></span>
-          <span>Period Debit · <span class="bn-hint">খরচ</span> <strong id="fplPeriodDebit">0</strong></span>
           <span>Period Credit · <span class="bn-hint">জমা</span> <strong id="fplPeriodCredit">0</strong></span>
+          <span>Period Debit · <span class="bn-hint">খরচ</span> <strong id="fplPeriodDebit">0</strong></span>
           <span>Closing balance <strong id="fplClosing">0</strong></span>
         </div>
         <div class="table-scroll"><table class="mobile-card-table fpl-table">
-          <thead><tr><th>Date</th><th>Particulars</th><th class="num">Debit<br><span class="bn-hint">খরচ</span></th><th class="num">Credit<br><span class="bn-hint">জমা</span></th><th class="num">Running</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Date</th><th>Particulars</th><th class="num">Credit<br><span class="bn-hint">জমা</span></th><th class="num">Debit<br><span class="bn-hint">খরচ</span></th><th class="num">Running</th><th>Actions</th></tr></thead>
           <tbody id="fplTransactionBody"></tbody>
         </table></div>
         <div class="empty-state" id="fplLedgerEmpty" hidden>No transactions match these filters.</div>
@@ -96,8 +96,8 @@
     var label=account==='loanPayable'?(positive?'Lender Credit':negative?'Lender Debit':'Settled'):
       account==='borrowerReceivable'?(positive?'Borrower Debit':negative?'Borrower Credit':'Settled'):
       (positive?'Owner Credit':negative?'Owner Debit':'Settled');
-    var css=!signed?'neutral':account==='loanPayable'?(positive?'negative':'positive'):
-      account==='borrowerReceivable'?(positive?'positive':'negative'):(positive?'positive':'negative');
+    var css=!signed?'neutral':account==='loanPayable'?(positive?'positive':'negative'):
+      account==='borrowerReceivable'?(positive?'negative':'positive'):(positive?'positive':'negative');
     return {label:label,css:css,text:finPersonLedgerMoney_(Math.abs(signed))};
   }
   function finPersonLedgerBalance_(personId,account) {
@@ -203,8 +203,8 @@
         escapeHtml(row.transactionTypeLabel||row.transactionType)+'</button><small>'+
         escapeHtml([row.referenceNo||row.financeId,row.notes||''].filter(Boolean).join(' · '))+
         (t&&t.isOpening?' · Historical opening':'')+'</small></td>'+
-        '<td class="num" data-label="Debit">'+(row.debit?escapeHtml(finPersonLedgerMoney_(row.debit)):'—')+'</td>'+
         '<td class="num" data-label="Credit">'+(row.credit?escapeHtml(finPersonLedgerMoney_(row.credit)):'—')+'</td>'+
+        '<td class="num" data-label="Debit">'+(row.debit?escapeHtml(finPersonLedgerMoney_(row.debit)):'—')+'</td>'+
         '<td class="num" data-label="Running">'+escapeHtml(finPersonLedgerMoney_(row.balance))+'</td>'+
         '<td data-label="Actions"><button type="button" class="btn" data-fpl-menu="'+escapeHtml(row.financeId)+'" aria-label="Actions for '+escapeHtml(row.financeId)+'">Actions ▾</button></td></tr>';
     }).join('');
@@ -329,8 +329,8 @@
   var FPL_EXPORT_COLUMNS_=[
     {key:'date',label:'Date'}, {key:'transactionTypeLabel',label:'Particulars'},
     {key:'financeId',label:'Reference',value:function(r){return r.referenceNo||r.financeId||'';}},
-    {key:'debit',label:'Debit',value:function(r){return r.debit||'';}},
     {key:'credit',label:'Credit',value:function(r){return r.credit||'';}},
+    {key:'debit',label:'Debit',value:function(r){return r.debit||'';}},
     {key:'balance',label:'Running Balance'}
   ];
   function finPersonLedgerPrint_(exportCsv) {
