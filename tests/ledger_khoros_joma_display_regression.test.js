@@ -54,6 +54,22 @@ test('Credit appears left of Debit throughout Customer, Supplier and Finance led
   assert.ok(fp.indexOf("key:'credit',label:'Credit'")<fp.indexOf("key:'debit',label:'Debit'"),'Finance person export order');
 });
 
+test('Finance person ledger signs and Bangla hints remain independent of card color',()=>{
+  const start=fp.indexOf('function finPersonLedgerSign_(balance,account) {');
+  const end=fp.indexOf('function finPersonLedgerBalance_(',start);
+  assert.ok(start>=0&&end>start);
+  const fn=new Function('finPersonLedgerMoney_',fp.slice(start,end)+';return finPersonLedgerSign_;')(n=>'৳'+n);
+  assert.deepEqual(fn(100,'loanPayable'),{label:'Lender Credit',css:'positive',text:'৳100'});
+  assert.deepEqual(fn(-100,'loanPayable'),{label:'Lender Debit',css:'negative',text:'৳100'});
+  assert.deepEqual(fn(100,'borrowerReceivable'),{label:'Borrower Debit',css:'negative',text:'৳100'});
+  assert.deepEqual(fn(-100,'borrowerReceivable'),{label:'Borrower Credit',css:'positive',text:'৳100'});
+  assert.deepEqual(fn(100,'owner'),{label:'Owner Credit',css:'positive',text:'৳100'});
+  assert.deepEqual(fn(-100,'owner'),{label:'Owner Debit',css:'negative',text:'৳100'});
+  assert.ok(fp.includes("account==='borrowerReceivable'?(signedBalance>0?'আপনি পাবেন':'ফেরত দিতে হবে')"));
+  assert.ok(fp.includes("account==='loanPayable'?(signedBalance>0?'আপনাকে দিতে হবে':'আপনি পাবেন')"));
+  assert.ok(!fp.includes("meta.css==='negative'?'আপনাকে দিতে হবে'"));
+});
+
 test('Money-held/away card colors use the approved role-specific sign convention',()=>{
   assert.ok(fp.includes("account==='loanPayable'?(positive?'positive':'negative')"));
   assert.ok(fp.includes("account==='borrowerReceivable'?(positive?'negative':'positive')"));
