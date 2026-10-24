@@ -23,14 +23,14 @@ test('Finance Ledger shows all six current relationship balances', () => {
   assert.match(src, /d\.summary/);
 });
 
-test('Finance Ledger captions use accounting balance sides without changing business warning colors', () => {
+test('Finance Ledger captions use accounting balance sides with money-received versus money-away card colors', () => {
   const rules = [
     ['ownerCapital','positive','Credit Balance'],
     ['ownerAdvance','negative','Debit Balance'],
-    ['outstandingLoan','negative','Credit Balance'],
-    ['lenderCredit','positive','Debit Balance'],
-    ['borrowerReceivable','positive','Debit Balance'],
-    ['borrowerCredit','negative','Credit Balance']
+    ['outstandingLoan','positive','Credit Balance'],
+    ['lenderCredit','negative','Debit Balance'],
+    ['borrowerReceivable','negative','Debit Balance'],
+    ['borrowerCredit','positive','Credit Balance']
   ];
   for (const [key, kind, label] of rules) {
     assert.match(src, new RegExp(key + ":\\s*\\{ kind:'" + kind + "', label:'" + label + "' \\}"), key);
@@ -53,7 +53,7 @@ test('ledger table and view expose relationship account semantics', () => {
 });
 
 test('print and CSV include selected person identity and all six summary values', () => {
-  ['Owner Capital','Owner Advance','Outstanding Loan','Lender Advance','Borrower Receivable','Borrower Advance'].forEach(label => {
+  ['Owner Credit','Owner Debit','Lender Credit','Lender Debit','Borrower Debit','Borrower Credit'].forEach(label => {
     assert.match(src, new RegExp(label.replace(' ','\\s+')));
   });
   assert.match(src, /selectedPerson/);

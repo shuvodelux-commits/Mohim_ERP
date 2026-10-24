@@ -65,7 +65,7 @@
       <div class="field-error" id="custPayError"></div>
       <h3 style="font-size:14px; margin:16px 0 8px;">Ledger <span class="bn-hint" style="display:inline;">— কাস্টমারের বাকি হিসাব</span></h3>
       <table class="mobile-card-table mobile-ledger-table">
-        <thead><tr><th>Date</th><th>Type</th><th>Reference</th><th class="num">Debit<br><span class="bn-hint" style="display:inline;">বাকি বাড়ে</span></th><th class="num">Credit<br><span class="bn-hint" style="display:inline;">বাকি কমে</span></th><th class="num">Balance</th><th></th></tr></thead>
+        <thead><tr><th>Date</th><th>Type</th><th>Reference</th><th class="num">Credit<br><span class="bn-hint" style="display:inline;">বাকি কমে</span></th><th class="num">Debit<br><span class="bn-hint" style="display:inline;">বাকি বাড়ে</span></th><th class="num">Balance</th><th></th></tr></thead>
         <tbody id="custLedgerBody"></tbody>
       </table>
       <div class="empty-state" id="custLedgerEmpty" hidden>No transactions yet.</div>
@@ -334,8 +334,8 @@
           '<td>' + escapeHtml(formatDateShort_(l['Date'])) + '</td>' +
           '<td>' + escapeHtml(l['Type']) + '</td>' +
           '<td>' + escapeHtml(l['Reference'] || '') + '</td>' +
-          '<td class="num ledger-txn--increase">' + (l['Debit'] ? formatMoney(l['Debit']) : '') + '</td>' +
           '<td class="num ledger-txn--decrease">' + creditHtml + '</td>' +
+          '<td class="num ledger-txn--increase">' + (l['Debit'] ? formatMoney(l['Debit']) : '') + '</td>' +
           '<td class="num ' + partyLedgerBalanceTone_(l['Balance']) + '">' + formatMoney(l['Balance']) + '</td>' +
           '<td style="white-space:nowrap;">' +
           (isPayment

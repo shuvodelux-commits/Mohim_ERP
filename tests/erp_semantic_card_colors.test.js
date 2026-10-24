@@ -99,10 +99,10 @@ test('finance card captions reflect accounting debit/credit side, not the red/gr
   const cases = [
     ['finCapitalStat', 'positive', 'Credit Balance'],
     ['finOwnerAdvanceStat', 'negative', 'Debit Balance'],
-    ['finLoanStat', 'negative', 'Credit Balance'],
-    ['finLenderCreditStat', 'positive', 'Debit Balance'],
-    ['finBorrowerReceivableStat', 'positive', 'Debit Balance'],
-    ['finBorrowerCreditStat', 'negative', 'Credit Balance']
+    ['finLoanStat', 'positive', 'Credit Balance'],
+    ['finLenderCreditStat', 'negative', 'Debit Balance'],
+    ['finBorrowerReceivableStat', 'negative', 'Debit Balance'],
+    ['finBorrowerCreditStat', 'positive', 'Credit Balance']
   ];
   for (const [id, tone, label] of cases) {
     const rule = c.ERP_SEMANTIC_CARDS_[id];

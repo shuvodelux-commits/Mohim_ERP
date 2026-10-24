@@ -50,7 +50,7 @@
       </div>
       <div class="table-scroll party-ledger-table-scroll">
         <table class="mobile-card-table party-ledger-table">
-          <thead><tr><th>Date</th><th>Type</th><th>Reference</th><th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th><th></th></tr></thead>
+          <thead><tr><th>Date</th><th>Type</th><th>Reference</th><th class="num">Credit<br><span class="bn-hint">জমা</span></th><th class="num">Debit<br><span class="bn-hint">খরচ</span></th><th class="num">Balance</th><th></th></tr></thead>
           <tbody id="supplierLedgerBody"></tbody>
         </table>
       </div>
@@ -294,7 +294,7 @@
   }
 
 
-  // Cash labels are separate from supplier ledger Debit/Credit accounting direction.
+  // Supplier view: Debit displays settlements (খরচ), Credit displays payable increases (জমা); raw ledger and balance logic stay unchanged.
   function supplierLedgerAmountCell_(row, column) {
     var amount = Number(row[column]) || 0;
     if (!amount) return '';
@@ -358,11 +358,11 @@
     var body = document.getElementById('supplierLedgerBody');
     body.innerHTML = '';
     supplierLedgerState.rows.forEach(function (row, index) {
-      var credit = supplierLedgerAmountCell_(row, 'Credit');
+      var debit = supplierLedgerAmountCell_(row, 'Credit');
       var discount = Number(row['Discount Amount']) || 0;
       var payment = (row['Payment Amount'] === '' || row['Payment Amount'] == null) ? (Number(row['Credit']) || 0) : (Number(row['Payment Amount']) || 0);
       if (row.sourceModule === 'supplierPayment' && discount > 0) {
-        credit += '<div class="party-ledger-row-note">Payment ' + escapeHtml(formatMoney(payment)) + ' + Discount ' + escapeHtml(formatMoney(discount)) + '</div>';
+        debit += '<div class="party-ledger-row-note">Payment ' + escapeHtml(formatMoney(payment)) + ' + Discount ' + escapeHtml(formatMoney(discount)) + '</div>';
       }
       var actions = (row.availableActions || []).filter(function (action) { return supplierLedgerActionAllowed_(row, action); });
       var tr = document.createElement('tr');
@@ -370,8 +370,8 @@
         '<td data-label="Date">' + escapeHtml(String(row['Date'] || '').slice(0,10)) + '</td>' +
         '<td data-label="Type">' + escapeHtml(row['Type'] || '') + '</td>' +
         '<td data-label="Reference">' + escapeHtml(row['Reference'] || '') + '</td>' +
-        '<td class="num ledger-txn--increase" data-label="Debit">' + supplierLedgerAmountCell_(row, 'Debit') + '</td>' +
-        '<td class="num ledger-txn--decrease" data-label="Credit">' + credit + '</td>' +
+        '<td class="num ledger-txn--increase" data-label="Credit">' + supplierLedgerAmountCell_(row, 'Debit') + '</td>' +
+        '<td class="num ledger-txn--decrease" data-label="Debit">' + debit + '</td>' +
         '<td class="num ' + partyLedgerBalanceTone_(row['Balance']) + '" data-label="Balance">' + escapeHtml(formatMoney(Number(row['Balance']) || 0)) + '</td>' +
         '<td>' + (actions.length ? '<button class="btn" type="button" data-supplier-ledger-action-index="' + index + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button>' : '') + '</td>';
       body.appendChild(tr);

@@ -3262,6 +3262,9 @@
     var business = s.business || {};
     var party = s.party || {};
     var isCustomer = s.kind === 'customer';
+    // The supplier print column orientation is display-only; the customer's is unchanged.
+    var debitKey = isCustomer ? 'Debit' : 'Credit';
+    var creditKey = isCustomer ? 'Credit' : 'Debit';
     var title = isCustomer ? 'Customer Ledger Statement' : 'Supplier Ledger Statement';
     var phoneLine = [business.phone1, business.phone2].filter(Boolean).join(' / ');
     var partyMeta = [party.phone, party.address].filter(Boolean).join(' · ');
@@ -3270,8 +3273,8 @@
         '<td>' + escapeHtml(String(r['Date'] || '').slice(0, 10)) + '</td>' +
         '<td>' + escapeHtml(r['Type'] || '') + '</td>' +
         '<td>' + escapeHtml(r['Reference'] || '') + '</td>' +
-        '<td style="text-align:right">' + escapeHtml(formatMoney(Number(r['Debit']) || 0)) + '</td>' +
-        '<td style="text-align:right">' + escapeHtml(formatMoney(Number(r['Credit']) || 0)) + '</td>' +
+        '<td style="text-align:right">' + escapeHtml(formatMoney(Number(r[creditKey]) || 0)) + '</td>' +
+        '<td style="text-align:right">' + escapeHtml(formatMoney(Number(r[debitKey]) || 0)) + '</td>' +
         '<td style="text-align:right">' + escapeHtml(formatMoney(Number(r['Balance']) || 0)) + '</td>' +
       '</tr>';
     }).join('');
@@ -3290,11 +3293,11 @@
           '<br>Period: ' + escapeHtml((s.period || {}).from || '') + ' to ' + escapeHtml((s.period || {}).to || '') + '</div>' +
         '<div class="party-ledger-print-summary">' +
           '<span>Opening Balance: <strong>' + escapeHtml(formatMoney(Number(s.openingBalance) || 0)) + '</strong></span>' +
-          '<span>Period Debit: <strong>' + escapeHtml(formatMoney(Number(s.periodDebit) || 0)) + '</strong></span>' +
-          '<span>Period Credit: <strong>' + escapeHtml(formatMoney(Number(s.periodCredit) || 0)) + '</strong></span>' +
+          '<span>Period Credit: <strong>' + escapeHtml(formatMoney(Number(isCustomer ? s.periodCredit : s.periodDebit) || 0)) + '</strong></span>' +
+          '<span>Period Debit: <strong>' + escapeHtml(formatMoney(Number(isCustomer ? s.periodDebit : s.periodCredit) || 0)) + '</strong></span>' +
           '<span>Closing Balance: <strong>' + escapeHtml(formatMoney(Number(s.closingBalance) || 0)) + '</strong></span>' +
         '</div>' +
-        '<table class="ledger-print-table"><thead><tr><th>Date</th><th>Type</th><th>Reference</th><th>Debit</th><th>Credit</th><th>Balance</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+        '<table class="ledger-print-table"><thead><tr><th>Date</th><th>Type</th><th>Reference</th><th>Credit' + (isCustomer?'':'<br>জমা') + '</th><th>Debit' + (isCustomer?'':'<br>খরচ') + '</th><th>Balance</th></tr></thead><tbody>' + rows + '</tbody></table>' +
         '<div class="ledger-print-meta" style="margin-top:10px">Printed: ' + escapeHtml(s.printedAt || '') + '</div>' +
       '</div>';
 
@@ -4247,8 +4250,8 @@
     dashLowStockCount:['alert','Low Stock'],
     // Finance transaction page: same semantics as Finance Ledger.
     finCapitalStat:['gain','Credit Balance'], finOwnerAdvanceStat:['cost','Debit Balance'],
-    finLoanStat:['cost','Credit Balance'], finLenderCreditStat:['gain','Debit Balance'],
-    finBorrowerReceivableStat:['gain','Debit Balance'], finBorrowerCreditStat:['cost','Credit Balance'],
+    finLoanStat:['gain','Credit Balance'], finLenderCreditStat:['cost','Debit Balance'],
+    finBorrowerReceivableStat:['cost','Debit Balance'], finBorrowerCreditStat:['gain','Credit Balance'],
     // Bank & Day Book: only actual cash movements are Money In / Money Out.
     bnkLedIn:['gain','Money In'], bnkLedOut:['cost','Money Out'],
     bnkLedClosing:['signed','Available','Negative Balance'],

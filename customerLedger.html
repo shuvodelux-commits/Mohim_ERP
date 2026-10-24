@@ -58,7 +58,7 @@
       </div>
       <div class="table-scroll party-ledger-table-scroll">
         <table class="mobile-card-table party-ledger-table">
-          <thead><tr><th>Date</th><th>Type</th><th>Reference</th><th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th><th></th></tr></thead>
+          <thead><tr><th>Date</th><th>Type</th><th>Reference</th><th class="num">Credit</th><th class="num">Debit</th><th class="num">Balance</th><th></th></tr></thead>
           <tbody id="customerLedgerBody"></tbody>
         </table>
       </div>
@@ -425,8 +425,8 @@
         '<td data-label="Date">' + escapeHtml(String(row['Date'] || '').slice(0,10)) + '</td>' +
         '<td data-label="Type">' + escapeHtml(displayType) + '</td>' +
         '<td data-label="Reference">' + escapeHtml(displayReference) + '</td>' +
-        '<td class="num ledger-txn--increase" data-label="Debit">' + customerLedgerAmountCell_(row, 'Debit') + '</td>' +
         '<td class="num ledger-txn--decrease" data-label="Credit">' + credit + '</td>' +
+        '<td class="num ledger-txn--increase" data-label="Debit">' + customerLedgerAmountCell_(row, 'Debit') + '</td>' +
         '<td class="num ' + partyLedgerBalanceTone_(row['Balance']) + '" data-label="Balance">' + escapeHtml(formatMoney(Number(row['Balance']) || 0)) + '</td>' +
         '<td>' + (actions.length ? '<button class="btn" type="button" data-customer-ledger-action-index="' + index + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button>' : '') + '</td>';
       body.appendChild(tr);

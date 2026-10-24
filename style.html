@@ -3163,6 +3163,36 @@
 #page-supplierLedger .party-ledger-inline-money.is-adjustment .party-ledger-money-caption { color:var(--color-text-muted); }
 @media print { #page-customerLedger .party-ledger-balance-item { background:transparent!important; } }
 
+/* Ledger color policy: received/held money green; money with another
+   party red. Signed balances and stored records remain unchanged. */
+#page-supplierLedger .ledger-tone--advance,
+#page-suppliers .ledger-tone--advance { color:var(--color-danger) !important; }
+#page-supplierLedger .party-ledger-balance-box.ledger-tone--advance {
+  background:var(--color-danger-light); border-color:var(--color-danger);
+}
+#page-supplierLedger .party-ledger-balance-box.ledger-tone--advance .party-ledger-balance-note {
+  color:var(--color-danger);
+}
+#page-suppliers .erp-semantic-detail.erp-semantic--positive {
+  background:color-mix(in srgb, var(--color-danger) 8%, var(--color-surface));
+  border-color:color-mix(in srgb, var(--color-danger) 32%, var(--color-border));
+}
+#page-suppliers .erp-semantic-detail.erp-semantic--positive .stat-value,
+#page-suppliers .erp-semantic-detail.erp-semantic--positive .stat-label,
+#page-suppliers .erp-semantic-detail.erp-semantic--positive > .erp-semantic-caption {
+  color:var(--color-danger)!important;
+}
+#page-financePersonLedger .fpl-balance.positive {
+  background:color-mix(in srgb, var(--color-success) 8%, var(--color-surface));
+  border:1px solid color-mix(in srgb, var(--color-success) 30%, var(--color-border));
+  border-radius:10px; padding:9px 12px;
+}
+#page-financePersonLedger .fpl-balance.negative {
+  background:color-mix(in srgb, var(--color-danger) 8%, var(--color-surface));
+  border:1px solid color-mix(in srgb, var(--color-danger) 30%, var(--color-border));
+  border-radius:10px; padding:9px 12px;
+}
+
 /* ERP semantic cards — visual presentation only; scoped away from ledger tables. */
 .erp-semantic-card, .erp-semantic-detail {
   transition:background-color .15s ease, border-color .15s ease, color .15s ease;
