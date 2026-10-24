@@ -66,7 +66,7 @@
       </div>
       <h3 style="font-size:14px; margin:16px 0 8px;">Ledger <span class="bn-hint" style="display:inline;">— সাপ্লায়ারের বাকি হিসাব</span></h3>
       <table class="mobile-card-table">
-        <thead><tr><th>Date</th><th>Type</th><th>Reference</th><th class="num">Debit<br><span class="bn-hint" style="display:inline;">খরচ</span></th><th class="num">Credit<br><span class="bn-hint" style="display:inline;">জমা</span></th><th class="num">Balance</th><th></th></tr></thead>
+        <thead><tr><th>Date</th><th>Type</th><th>Reference</th><th class="num">Credit<br><span class="bn-hint" style="display:inline;">জমা</span></th><th class="num">Debit<br><span class="bn-hint" style="display:inline;">খরচ</span></th><th class="num">Balance</th><th></th></tr></thead>
         <tbody id="supLedgerBody"></tbody>
       </table>
       <div class="empty-state" id="supLedgerEmpty" hidden>No transactions yet.</div>
@@ -371,8 +371,8 @@
           '<td>' + escapeHtml(formatDateShort_(l['Date'])) + '</td>' +
           '<td>' + escapeHtml(l['Type']) + '</td>' +
           '<td>' + escapeHtml(l['Reference'] || '') + '</td>' +
-          '<td class="num ledger-txn--decrease">' + debitHtml + '</td>' +
           '<td class="num ledger-txn--increase">' + (l['Debit'] ? formatMoney(l['Debit']) : '') + '</td>' +
+          '<td class="num ledger-txn--decrease">' + debitHtml + '</td>' +
           '<td class="num ' + partyLedgerBalanceTone_(l['Balance']) + '">' + formatMoney(l['Balance']) + '</td>' +
           '<td style="white-space:nowrap;">' +
           (isPayment
