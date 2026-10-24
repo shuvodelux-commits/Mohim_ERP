@@ -49,12 +49,12 @@
         </div>
         <div class="fpl-period">
           <span>Opening balance <strong id="fplOpening">0</strong></span>
-          <span>Period debit <strong id="fplPeriodDebit">0</strong></span>
-          <span>Period credit <strong id="fplPeriodCredit">0</strong></span>
+          <span>Period Debit · <span class="bn-hint">খরচ</span> <strong id="fplPeriodDebit">0</strong></span>
+          <span>Period Credit · <span class="bn-hint">জমা</span> <strong id="fplPeriodCredit">0</strong></span>
           <span>Closing balance <strong id="fplClosing">0</strong></span>
         </div>
         <div class="table-scroll"><table class="mobile-card-table fpl-table">
-          <thead><tr><th>Date</th><th>Particulars</th><th class="num">Debit</th><th class="num">Credit</th><th class="num">Running</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Date</th><th>Particulars</th><th class="num">Debit<br><span class="bn-hint">খরচ</span></th><th class="num">Credit<br><span class="bn-hint">জমা</span></th><th class="num">Running</th><th>Actions</th></tr></thead>
           <tbody id="fplTransactionBody"></tbody>
         </table></div>
         <div class="empty-state" id="fplLedgerEmpty" hidden>No transactions match these filters.</div>
@@ -93,9 +93,9 @@
   }
   function finPersonLedgerSign_(balance,account) {
     var signed=Number(balance)||0,positive=signed>0,negative=signed<0;
-    var label=account==='loanPayable'?(positive?'Payable':negative?'Lender Advance':'Settled'):
-      account==='borrowerReceivable'?(positive?'Receivable':negative?'Borrower Advance':'Settled'):
-      (positive?'Owner Capital':negative?'Owner Advance':'Settled');
+    var label=account==='loanPayable'?(positive?'Lender Credit':negative?'Lender Debit':'Settled'):
+      account==='borrowerReceivable'?(positive?'Borrower Debit':negative?'Borrower Credit':'Settled'):
+      (positive?'Owner Credit':negative?'Owner Debit':'Settled');
     var css=!signed?'neutral':account==='loanPayable'?(positive?'negative':'positive'):
       account==='borrowerReceivable'?(positive?'positive':'negative'):(positive?'positive':'negative');
     return {label:label,css:css,text:finPersonLedgerMoney_(Math.abs(signed))};
@@ -165,7 +165,7 @@
         (role===finPersonLedgerState.account)+'">'+role+'</button>';
     }).join('');
     var account=FPL_ACCOUNTS_[finPersonLedgerState.account],meta=finPersonLedgerSign_(finPersonLedgerBalance_(p.id,account),account);
-    document.getElementById('fplBalanceLabel').textContent=meta.label+' · '+finPersonLedgerState.account;
+    document.getElementById('fplBalanceLabel').textContent=meta.label;
     document.getElementById('fplCurrentBalance').textContent=meta.text;
     document.getElementById('fplBalanceHint').textContent=!finPersonLedgerBalance_(p.id,account)?'Settled':
       account==='borrowerReceivable'?(meta.css==='positive'?'আপনি পাবেন':'ফেরত দিতে হবে'):
