@@ -107,9 +107,9 @@
   <div class="stat-card fin-led-balance-card" id="finLedCapitalCard"><div class="stat-label">Owner Capital</div><div class="stat-value" id="finLedCapital">--</div><div class="fin-led-balance-note" id="finLedCapitalNote"></div></div>
   <div class="stat-card fin-led-balance-card" id="finLedOwnerAdvanceCard"><div class="stat-label">Owner Advance</div><div class="stat-value" id="finLedOwnerAdvance">--</div><div class="fin-led-balance-note" id="finLedOwnerAdvanceNote"></div></div>
   <div class="stat-card fin-led-balance-card" id="finLedLoanCard"><div class="stat-label">Outstanding Loan</div><div class="stat-value" id="finLedLoan">--</div><div class="fin-led-balance-note" id="finLedLoanNote"></div></div>
-  <div class="stat-card fin-led-balance-card" id="finLedLenderCreditCard"><div class="stat-label">Lender Credit</div><div class="stat-value" id="finLedLenderCredit">--</div><div class="fin-led-balance-note" id="finLedLenderCreditNote"></div></div>
+  <div class="stat-card fin-led-balance-card" id="finLedLenderCreditCard"><div class="stat-label">Lender Advance</div><div class="stat-value" id="finLedLenderCredit">--</div><div class="fin-led-balance-note" id="finLedLenderCreditNote"></div></div>
   <div class="stat-card fin-led-balance-card" id="finLedBorrowerReceivableCard"><div class="stat-label">Borrower Receivable</div><div class="stat-value" id="finLedBorrowerReceivable">--</div><div class="fin-led-balance-note" id="finLedBorrowerReceivableNote"></div></div>
-  <div class="stat-card fin-led-balance-card" id="finLedBorrowerCreditCard"><div class="stat-label">Borrower Credit</div><div class="stat-value" id="finLedBorrowerCredit">--</div><div class="fin-led-balance-note" id="finLedBorrowerCreditNote"></div></div>
+  <div class="stat-card fin-led-balance-card" id="finLedBorrowerCreditCard"><div class="stat-label">Borrower Advance</div><div class="stat-value" id="finLedBorrowerCredit">--</div><div class="fin-led-balance-note" id="finLedBorrowerCreditNote"></div></div>
   <div class="stat-card"><div class="stat-label">Entries Shown</div><div class="stat-value" id="finLedCount">--</div></div>
 </div>
 
@@ -192,10 +192,10 @@
   var FIN_LED_BALANCE_META = {
     ownerCapital: { kind:'positive', label:'Credit Balance' },
     ownerAdvance: { kind:'negative', label:'Debit Balance' },
-    outstandingLoan: { kind:'negative', label:'Debit Balance' },
-    lenderCredit: { kind:'positive', label:'Credit Balance' },
-    borrowerReceivable: { kind:'positive', label:'Credit Balance' },
-    borrowerCredit: { kind:'negative', label:'Debit Balance' }
+    outstandingLoan: { kind:'negative', label:'Credit Balance' },
+    lenderCredit: { kind:'positive', label:'Debit Balance' },
+    borrowerReceivable: { kind:'positive', label:'Debit Balance' },
+    borrowerCredit: { kind:'negative', label:'Credit Balance' }
   };
 
   function finLedMoney_(v) {
@@ -323,12 +323,12 @@
     var balances = [];
     if (roles.indexOf('Lender') !== -1) {
       balances.push(summary.lenderCredit > 0
-        ? { label:'Lender Credit', value:summary.lenderCredit }
+        ? { label:'Lender Advance', value:summary.lenderCredit }
         : { label:'Outstanding Loan', value:summary.outstandingLoan });
     }
     if (roles.indexOf('Borrower') !== -1) {
       balances.push(summary.borrowerCredit > 0
-        ? { label:'Borrower Credit', value:summary.borrowerCredit }
+        ? { label:'Borrower Advance', value:summary.borrowerCredit }
         : { label:'Borrower Receivable', value:summary.borrowerReceivable });
     }
     if (roles.indexOf('Owner') !== -1) {
@@ -342,8 +342,8 @@
     document.getElementById('finLedSelectedPersonBalances').innerHTML = balances.map(function (item) {
       var metaKey = {
         'Owner Capital':'ownerCapital', 'Owner Advance':'ownerAdvance',
-        'Outstanding Loan':'outstandingLoan', 'Lender Credit':'lenderCredit',
-        'Borrower Receivable':'borrowerReceivable', 'Borrower Credit':'borrowerCredit'
+        'Outstanding Loan':'outstandingLoan', 'Lender Advance':'lenderCredit',
+        'Borrower Receivable':'borrowerReceivable', 'Borrower Advance':'borrowerCredit'
       }[item.label] || '';
       var kind = finLedBalanceKind_(item.value, metaKey);
       return '<div class="finance-selected-person-balance-item fin-led-balance-card is-' + kind + '">'
@@ -575,8 +575,8 @@
   function finLedSummaryFooter_() {
     var s = finLedState.summary || {};
     return 'Owner Capital: ' + finLedMoney_(s.ownerCapital) + ' | Owner Advance: ' + finLedMoney_(s.ownerAdvance) +
-      ' | Outstanding Loan: ' + finLedMoney_(s.outstandingLoan) + ' | Lender Credit: ' + finLedMoney_(s.lenderCredit) +
-      ' | Borrower Receivable: ' + finLedMoney_(s.borrowerReceivable) + ' | Borrower Credit: ' + finLedMoney_(s.borrowerCredit);
+      ' | Outstanding Loan: ' + finLedMoney_(s.outstandingLoan) + ' | Lender Advance: ' + finLedMoney_(s.lenderCredit) +
+      ' | Borrower Receivable: ' + finLedMoney_(s.borrowerReceivable) + ' | Borrower Advance: ' + finLedMoney_(s.borrowerCredit);
   }
 
   function finLedCsvRows_() {
@@ -586,7 +586,7 @@
     var s = finLedState.summary || {};
     [
       ['Owner Capital',s.ownerCapital], ['Owner Advance',s.ownerAdvance], ['Outstanding Loan',s.outstandingLoan],
-      ['Lender Credit',s.lenderCredit], ['Borrower Receivable',s.borrowerReceivable], ['Borrower Credit',s.borrowerCredit]
+      ['Lender Advance',s.lenderCredit], ['Borrower Receivable',s.borrowerReceivable], ['Borrower Advance',s.borrowerCredit]
     ].forEach(function (item) { rows.push({ date:'Summary', financeId:item[0], _summaryLabel:true, balance:Number(item[1]) || 0 }); });
     return rows;
   }
