@@ -36,6 +36,8 @@
           <button type="button" class="btn btn-primary" id="fplRecordBtn">+ Record Transaction</button>
           <button type="button" class="btn" id="fplPrintBtn">Print Statement</button>
           <button type="button" class="btn" id="fplExportBtn">Export</button>
+          <button type="button" class="btn wa-party-action" id="fplShareBalanceBtn" hidden disabled>WhatsApp Balance</button>
+          <button type="button" class="btn wa-party-action" id="fplSharePeriodBtn" hidden disabled>WhatsApp Dates</button>
         </div>
       </div>
       <div class="card fpl-ledger">
@@ -45,6 +47,7 @@
           <label>Type<select id="fplTypeFilter"><option value="">All Transactions</option></select></label>
           <label class="fpl-search-ledger">Reference or Notes<input type="search" id="fplLedgerSearch" data-search-clear="on" placeholder="Search reference or note..."></label>
           <button class="btn" type="button" id="fplClearFilters">× Clear Filters</button>
+          <button type="button" class="btn wa-party-action" id="fplShareSelectedBtn" hidden disabled>WhatsApp Selected (0)</button>
           <label class="fpl-pagesize">Show<select id="fplPageSize"><option value="50">50</option><option value="100">100</option><option value="200">200</option></select></label>
         </div>
         <div class="fpl-period">
@@ -79,7 +82,7 @@
   var finPersonLedgerState = {
     persons:[], balances:{}, transactionTypes:[], currencySymbol:'', bankAccounts:[],
     personId:'', account:'', role:'All', rows:[], filtered:[], page:1, requestId:0,
-    statement:null, busy:false
+    statement:null, busy:false, waFinanceSelected:{}, waFinanceScope:''
   };
   var FPL_ACCOUNTS_={Owner:'owner',Lender:'loanPayable',Borrower:'borrowerReceivable'};
   function finPersonLedgerRoles_(person) {
@@ -156,7 +159,10 @@
     document.getElementById('fplDetailReady').hidden=!ready;
     if(!ready)return;
     var roles=finPersonLedgerRoles_(p).filter(function(role){return FPL_ACCOUNTS_[role];});
-    if(roles.indexOf(finPersonLedgerState.account)<0)finPersonLedgerState.account=roles[0]||'Owner';
+    if(roles.indexOf(finPersonLedgerState.account)<0){
+      waFinanceReset_(finPersonLedgerState);
+      finPersonLedgerState.account=roles[0]||'Owner';
+    }
     document.getElementById('fplSelectedName').textContent=p.name||'Finance Person';
     document.getElementById('fplAvatar').textContent=(p.name||'?').trim().slice(0,2).toUpperCase();
     document.getElementById('fplSelectedMeta').textContent=[p.phone,p.status||'Active'].filter(Boolean).join(' · ');
@@ -182,6 +188,7 @@
       return '<option value="'+escapeHtml(t.key)+'">'+escapeHtml(t.label)+'</option>';}).join('');
     if(types.some(function(t){return t.key===keepType;}))typeFilter.value=keepType;
     finPersonLedgerRenderLedger_();
+    waFinanceUpdateUi_(finPersonLedgerState);
   }
   function finPersonLedgerRenderLedger_() {
     if(!finPersonLedgerPerson_())return;
@@ -200,6 +207,7 @@
     document.getElementById('fplPeriodDebit').textContent=finPersonLedgerMoney_(statement.debit);
     document.getElementById('fplPeriodCredit').textContent=finPersonLedgerMoney_(statement.credit);
     document.getElementById('fplClosing').textContent=finPersonLedgerMoney_(statement.closing);
+    var waAllowed=waFinanceCanShare_(finPersonLedgerState);
     document.getElementById('fplTransactionBody').innerHTML=filtered.slice((finPersonLedgerState.page-1)*size,finPersonLedgerState.page*size).map(function(row){
       var t=finPersonLedgerType_(row.transactionType);
       return '<tr data-finance-id="'+escapeHtml(row.financeId)+'"><td data-label="Date">'+escapeHtml(row.date)+'</td>'+
@@ -210,15 +218,25 @@
         '<td class="num" data-label="Credit">'+(row.credit?escapeHtml(finPersonLedgerMoney_(row.credit)):'—')+'</td>'+
         '<td class="num" data-label="Debit">'+(row.debit?escapeHtml(finPersonLedgerMoney_(row.debit)):'—')+'</td>'+
         '<td class="num" data-label="Running">'+escapeHtml(finPersonLedgerMoney_(row.balance))+'</td>'+
-        '<td data-label="Actions"><button type="button" class="btn" data-fpl-menu="'+escapeHtml(row.financeId)+'" aria-label="Actions for '+escapeHtml(row.financeId)+'">Actions ▾</button></td></tr>';
+        '<td data-label="Actions">'+
+          (waAllowed && row.personId===finPersonLedgerState.personId && row.account===account
+           ? '<label class="wa-party-row-choice" title="Select for WhatsApp">'+
+             '<input type="checkbox" data-fpl-wa-check="'+escapeHtml(row.financeId)+'" '+
+             'aria-label="Select Finance transaction for WhatsApp" '+
+             ((finPersonLedgerState.waFinanceSelected||{})[row.financeId] &&
+                finPersonLedgerState.waFinanceScope===waFinanceScope_(finPersonLedgerState)?'checked':'')+
+             '></label>' : '')+
+          '<button type="button" class="btn" data-fpl-menu="'+escapeHtml(row.financeId)+'" aria-label="Actions for '+escapeHtml(row.financeId)+'">Actions ▾</button></td></tr>';
     }).join('');
     document.getElementById('fplLedgerEmpty').hidden=filtered.length>0;
     document.getElementById('fplPageLabel').textContent='Page '+finPersonLedgerState.page+' of '+pages;
     document.getElementById('fplPrev').disabled=finPersonLedgerState.page<=1;
     document.getElementById('fplNext').disabled=finPersonLedgerState.page>=pages;
+    waFinanceUpdateUi_(finPersonLedgerState);
     if(typeof enhanceMobileCardTables_==='function')enhanceMobileCardTables_(document.getElementById('fplDetailPanel'));
   }
   function finPersonLedgerFetch_() {
+    waFinanceReset_(finPersonLedgerState);
     var id=finPersonLedgerState.personId,requestId=++finPersonLedgerState.requestId;
     if(!id)return Promise.resolve();
     return withLoader(serverCall('getFinanceLedger',authToken,{personId:id})).then(function(data){
@@ -230,6 +248,7 @@
   }
   function finPersonLedgerSelect_(id,role) {
     var p=finPersonLedgerState.persons.filter(function(x){return x.id===id;})[0];if(!p)return;
+    waFinanceReset_(finPersonLedgerState);
     finPersonLedgerState.personId=id;
     var roles=finPersonLedgerRoles_(p);
     finPersonLedgerState.account=roles.indexOf(role)>=0?role:roles.filter(function(x){return FPL_ACCOUNTS_[x];})[0]||'Owner';
@@ -296,6 +315,7 @@
   });
   document.getElementById('fplRoleChips').addEventListener('click',function(e){
     var btn=e.target.closest('button[data-account-role]');if(!btn)return;
+    waFinanceReset_(finPersonLedgerState);
     finPersonLedgerState.account=btn.dataset.accountRole;finPersonLedgerState.page=1;
     document.getElementById('fplTypeFilter').value='';
     finPersonLedgerRenderSelected_();
@@ -314,11 +334,24 @@
   });
   document.getElementById('fplPrev').addEventListener('click',function(){finPersonLedgerState.page--;finPersonLedgerRenderLedger_();});
   document.getElementById('fplNext').addEventListener('click',function(){finPersonLedgerState.page++;finPersonLedgerRenderLedger_();});
+  document.getElementById('fplTransactionBody').addEventListener('change',function(e){
+    var box=e.target.closest('input[data-fpl-wa-check]');if(!box)return;
+    var row=finPersonLedgerState.filtered.filter(function(r){return r.financeId===box.dataset.fplWaCheck;})[0];
+    if(!waFinanceToggle_(finPersonLedgerState,row,box.checked))box.checked=false;
+  });
   document.getElementById('fplTransactionBody').addEventListener('click',function(e){
+    if(e.target.closest('input[data-fpl-wa-check]') ||
+       e.target.closest('label.wa-party-row-choice'))return;
     var menu=e.target.closest('button[data-fpl-menu]');
     if(menu){
       var id=menu.dataset.fplMenu;
-      return openRowActionMenu_(menu,[{action:'view',label:'View'},{action:'edit',label:'Edit'},{divider:true},{action:'delete',label:'Delete',danger:true}],function(action){
+      var actions=[{action:'view',label:'View'},{action:'edit',label:'Edit'},{divider:true},{action:'delete',label:'Delete',danger:true}];
+      var financeRow=finPersonLedgerState.filtered.filter(function(r){return r.financeId===id;})[0];
+      if(waFinanceRowInAccount_(finPersonLedgerState,financeRow)){
+        actions.push({divider:true},{action:'whatsapp',label:'WhatsApp'});
+      }
+      return openRowActionMenu_(menu,actions,function(action){
+        if(action==='whatsapp'){waFinanceSend_(finPersonLedgerState,'single',financeRow,null,menu);return;}
         if(action==='view')finPersonLedgerView_(id);
         if(action==='edit')finPersonLedgerEdit_(id);
         if(action==='delete')finLedDelete_(id);
@@ -327,6 +360,18 @@
     var btn=e.target.closest('button[data-finance-id]');if(btn){finPersonLedgerView_(btn.dataset.financeId);return;}
     var row=e.target.closest('tr[data-finance-id]');
     if(row)finPersonLedgerView_(row.dataset.financeId);
+  });
+  document.getElementById('fplShareBalanceBtn').addEventListener('click',function(){
+    waFinanceSend_(finPersonLedgerState,'due',null,null,this);
+  });
+  document.getElementById('fplShareSelectedBtn').addEventListener('click',function(){
+    waFinanceSend_(finPersonLedgerState,'selected',null,null,this);
+  });
+  document.getElementById('fplSharePeriodBtn').addEventListener('click',function(){
+    waFinanceSend_(finPersonLedgerState,'period',null,{
+      from:document.getElementById('fplDateFrom').value,
+      to:document.getElementById('fplDateTo').value
+    },this);
   });
   function finPersonLedgerView_(id) { finLedOpenView_(id); }
   function finPersonLedgerRefreshAfterMutation_(){return financePersonLedgerLoad();}
