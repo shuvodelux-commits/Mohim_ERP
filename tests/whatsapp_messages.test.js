@@ -109,7 +109,8 @@ test('clean untrusted names and references as plain single-line text without HTM
   mode:'single',rows:[{...item(2),Reference:'INV-2\nPAY NOW'}]
  }),'en');
  assert.match(t,/<Shop>/);
- assert.doesNotMatch(t,/&lt;|URGENT\n|Rahim\nPAY NOW|INV-2\nPAY NOW/);
+ assert.equal(t.split('\n')[0],'<Shop> URGENT');
+ assert.doesNotMatch(t,/&lt;|Rahim\nPAY NOW|INV-2\nPAY NOW/);
 });
 test('authenticated preview ignores client-provided amounts and returns normalized recipient',()=>{
  const h=harness();
