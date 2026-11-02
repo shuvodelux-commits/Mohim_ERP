@@ -250,6 +250,17 @@ async function main() {
       assert.deepEqual(calls.at(-1).rowIds,['CLEAN|'+kind+'|INV-1','SOURCE|'+kind+'|INV-2']);
       assert.equal(Object.keys(calls.at(-1).rowVersions).length,2);
     });
+    await check(kind+' clears cross-page WhatsApp selections without changing ledger rows',async()=>{
+      await page.click('#'+prefix+'ClearSelectedBtn');
+      assert.equal(await page.locator('#'+prefix+'ShareSelectedBtn').isDisabled(),true);
+      assert.equal(await page.locator('#'+prefix+'ClearSelectedBtn').isHidden(),true);
+      assert.equal(await page.locator('#'+prefix+'Body input[data-'+kind+'-ledger-share-index="0"]').isChecked(),false);
+      const state=await page.evaluate(kind=>{
+        const s=kind==='customer'?customerLedgerState:supplierLedgerState;
+        return {count:Object.keys(s.waSelected||{}).length,rows:s.rows.length};
+      },kind);
+      assert.deepEqual(state,{count:0,rows:1});
+    });
     await check(kind+' ledger per-row Actions menu shares only one entry',async()=>{
       await page.click('#'+prefix+'Body button[data-'+kind+'-ledger-action-index="0"]');
       await page.getByRole('menuitem',{name:'WhatsApp'}).click();
@@ -341,6 +352,13 @@ async function main() {
     requests=await page.evaluate(()=>window.__waFinanceRequests);
     assert.deepEqual(requests.at(-1).rowIds,['F2','F1']);
     assert.ok(requests.at(-1).rowVersions.F1.includes('"loanPayable"'));
+  });
+  await check('Finance clears WhatsApp selection and unchecks visible rows',async()=>{
+    await page.click('#fplClearSelectedBtn');
+    assert.equal(await page.locator('#fplShareSelectedBtn').isDisabled(),true);
+    assert.equal(await page.locator('#fplClearSelectedBtn').isHidden(),true);
+    assert.equal(await page.locator('#fplTransactionBody input[data-fpl-wa-check="F1"]').isChecked(),false);
+    assert.equal(await page.evaluate(()=>Object.keys(finPersonLedgerState.waFinanceSelected||{}).length),0);
   });
   await check('Finance row Actions include WhatsApp with only selected role transaction',async()=>{
     await page.click('#fplTransactionBody button[data-fpl-menu="F2"]');
