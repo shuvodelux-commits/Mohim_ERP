@@ -78,7 +78,8 @@
   var waShareState_ = {
     open: false, sequence: 0, request: null, response: null,
     originalPhone: '', verifiedPhone: '', pending: false,
-    previousFocus: null, wired: false
+    previousFocus: null, wired: false,
+    auditLastAt: 0, auditLastUrl: '', auditRecipientOverride: ''
   };
 
   function waShareElement_(id) { return document.getElementById(id); }
@@ -128,6 +129,9 @@
     state.response = null;
     state.originalPhone = '';
     state.verifiedPhone = '';
+    state.auditRecipientOverride = '';
+    state.auditLastAt = 0;
+    state.auditLastUrl = '';
     waShareDisableLink_();
     waShareElement_('waShareModal').hidden = true;
     document.body.classList.remove('wa-share-modal-open');
@@ -199,6 +203,7 @@
       var normalized = preview.recipient ? String(preview.recipient.display || '') : '';
       if (!alternate) state.originalPhone = normalized;
       state.verifiedPhone = normalized;
+      state.auditRecipientOverride = alternate && preview.recipient && preview.recipient.overridden ? alternate : '';
       waShareElement_('waSharePhone').value = normalized;
       waShareElement_('waShareConfirmRow').hidden = !alternate;
       if (!preserveDraft) waShareElement_('waShareText').value = preview.text;
@@ -259,6 +264,53 @@
     });
   }
 
+
+  /** A click attempt is not a send/delivery acknowledgement. */
+  function waShareAuditKey_() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return 'wa_' + crypto.randomUUID();
+    }
+    return 'wa_' + Date.now().toString(36) + '_' +
+      Math.random().toString(36).slice(2) + '_' + Math.random().toString(36).slice(2);
+  }
+
+  function waShareAuditOpen_(href) {
+    var state = waShareState_;
+    if (!state.open || !state.response || !state.response.recipient ||
+        !href || state.pending) return;
+    // Fast repeated clicks on the exact same link are one attempt.
+    var now = Date.now();
+    if (state.auditLastUrl === href && now - state.auditLastAt < 1000) return;
+    state.auditLastAt = now;
+    state.auditLastUrl = href;
+
+    var req = Object.assign({}, state.request, { eventKey: waShareAuditKey_() });
+    if (state.response.recipient.overridden) {
+      req.recipientOverride = state.auditRecipientOverride || state.verifiedPhone;
+      req.confirmOverride = true;
+    }
+    // Never await the audit before opening the anchor: browser pop-up guards
+    // require the navigation to remain part of the direct user click.
+    // Neither recipient numbers nor message text are persisted in the audit.
+    try {
+      Promise.resolve(serverCall('recordWhatsAppShare', authToken, req)).then(function (result) {
+        if (!result || result.status !== 'OPEN_ATTEMPTED') {
+          throw new Error('Audit recording did not return an open-attempt receipt.');
+        }
+      }).catch(function (err) {
+        if (!state.open) return;
+        var msg = (err && err.message) || 'Audit log unavailable';
+        var warnings = waShareElement_('waShareWarnings');
+        warnings.textContent += (warnings.textContent ? '\n' : '') +
+          msg + '. Opening WhatsApp does not confirm delivery.';
+      });
+    } catch (err) {
+      var warning = waShareElement_('waShareWarnings');
+      warning.textContent += (warning.textContent ? '\n' : '') +
+        'Audit log unavailable. Opening WhatsApp does not confirm delivery.';
+    }
+  }
+
   function waShareWire_() {
     if (waShareState_.wired || !waShareElement_('waShareModal')) return;
     waShareState_.wired = true;
@@ -281,9 +333,10 @@
     waShareElement_('waShareCopy').addEventListener('click', waShareCopy_);
     waShareElement_('waShareOpen').addEventListener('click', function (event) {
       waShareSyncLink_();
-      if (!this.getAttribute('href')) event.preventDefault();
-      // Navigation is ONLY a direct user click on this anchor. This does
-      // not send a message; delivery audit belongs to a later task.
+      var href = this.getAttribute('href');
+      if (!href) { event.preventDefault(); return; }
+      waShareAuditOpen_(href);
+      // Navigation remains synchronous on the real anchor; no message is sent.
     });
     document.addEventListener('keydown', waShareKeydown_, true);
   }
@@ -313,6 +366,9 @@
     state.pending = false;
     state.originalPhone = '';
     state.verifiedPhone = '';
+    state.auditRecipientOverride = '';
+    state.auditLastAt = 0;
+    state.auditLastUrl = '';
     waShareElement_('waShareLanguage').value = request.language === 'en' ? 'en' : 'bn';
     waShareElement_('waSharePhone').value = '';
     waShareElement_('waShareText').value = '';
