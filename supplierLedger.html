@@ -10,8 +10,8 @@
     <div class="party-ledger-toolbar-actions">
       <button class="btn btn-primary" id="supplierLedgerMakePaymentBtn" type="button" disabled>Make Payment</button>
       <button class="btn" id="supplierLedgerPrintBtn" type="button" disabled>Print Ledger</button>
-      <button class="btn" id="supplierLedgerShareDueBtn" type="button" disabled hidden>WhatsApp Due</button>
-      <button class="btn" id="supplierLedgerSharePeriodBtn" type="button" disabled hidden>WhatsApp Dates</button>
+      <button class="btn wa-party-action" id="supplierLedgerShareDueBtn" type="button" disabled hidden>WhatsApp Due</button>
+      <button class="btn wa-party-action" id="supplierLedgerSharePeriodBtn" type="button" disabled hidden>WhatsApp Dates</button>
     </div>
   </div>
 
@@ -41,7 +41,7 @@
           <label class="party-ledger-corrections-toggle" id="supplierLedgerCorrectionsWrap" hidden>
             <input id="supplierLedgerCorrectionsToggle" type="checkbox"> Show corrections
           </label>
-          <button class="btn btn-sm" id="supplierLedgerShareSelectedBtn" type="button" disabled hidden>WhatsApp Selected (0)</button>
+          <button class="btn btn-sm wa-party-action" id="supplierLedgerShareSelectedBtn" type="button" disabled hidden>WhatsApp Selected (0)</button>
           <label class="party-ledger-page-size">Show
             <select id="supplierLedgerPageSize">
               <option value="50" selected>50</option>
@@ -126,7 +126,7 @@
       </div>
       <div class="field-error" id="supplierLedgerPrintError"></div>
     </div>
-    <div class="modal-footer"><button class="btn" type="button" onclick="closeModal('supplierLedgerPrintModal')">Cancel</button><button class="btn" id="supplierLedgerPrintShareBtn" type="button" disabled hidden>WhatsApp</button><button class="btn btn-primary" id="supplierLedgerPrintConfirmBtn" type="button">Preview / Print</button></div>
+    <div class="modal-footer"><button class="btn" type="button" onclick="closeModal('supplierLedgerPrintModal')">Cancel</button><button class="btn wa-party-action" id="supplierLedgerPrintShareBtn" type="button" disabled hidden>WhatsApp</button><button class="btn btn-primary" id="supplierLedgerPrintConfirmBtn" type="button">Preview / Print</button></div>
   </div>
 </div>
 
