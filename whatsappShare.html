@@ -445,6 +445,7 @@
       ? Object.keys(state.waFinanceSelected || {}).length : 0;
     var balance = waShareElement_('fplShareBalanceBtn');
     var selected = waShareElement_('fplShareSelectedBtn');
+    var clear = waShareElement_('fplClearSelectedBtn');
     var period = waShareElement_('fplSharePeriodBtn');
     [balance, selected, period].forEach(function (el) { if (el) el.hidden = !allowed; });
     if (balance) balance.disabled = !allowed;
@@ -452,6 +453,10 @@
     if (selected) {
       selected.disabled = !allowed || !count;
       selected.textContent = 'WhatsApp Selected (' + count + ')';
+    }
+    if (clear) {
+      clear.hidden = !allowed || !count;
+      clear.disabled = !allowed || !count;
     }
   }
 
@@ -550,6 +555,7 @@
     var active = !!(state && state.partyId && state.party && !state.showCorrections);
     var due = waShareElement_(prefix + 'ShareDueBtn');
     var selected = waShareElement_(prefix + 'ShareSelectedBtn');
+    var clear = waShareElement_(prefix + 'ClearSelectedBtn');
     var period = waShareElement_(prefix + 'SharePeriodBtn');
     var printShare = waShareElement_(prefix + 'PrintShareBtn');
     var count = Object.keys((state && state.waSelected) || {}).length;
@@ -562,6 +568,10 @@
     if (selected) {
       selected.disabled = !allowed || !active || !count;
       selected.textContent = 'WhatsApp Selected (' + count + ')';
+    }
+    if (clear) {
+      clear.hidden = !allowed || !active || !count;
+      clear.disabled = !allowed || !active || !count;
     }
   }
 
