@@ -630,6 +630,13 @@ function recordWhatsAppShare(token, request) {
       ? whatsAppBuildFinanceSource_(token, request)
       : whatsAppBuildPartySource_(token, request);
     if (!snapshot || !snapshot.party) throw new Error('Unable to verify WhatsApp source.');
+    if (String(snapshot.source || '') !== source ||
+      String(snapshot.entityId || '') !== String(request.entityId || '') ||
+      (source === 'financePerson'
+        ? String(snapshot.accountRole || '') !== String(request.accountRole || '')
+        : !!String(request.accountRole || '').trim())) {
+      throw new Error('WhatsApp source and account role mismatch.');
+    }
     const recipient = whatsAppResolveRecipient_(snapshot.party.phone,
       request.recipientOverride, request.confirmOverride);
     const last4 = recipient.digits.slice(-4);
