@@ -426,6 +426,12 @@ function whatsAppMoneyText_(amount, currencySymbol) {
   return symbol + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function whatsAppSignedMoneyText_(amount, currencySymbol) {
+  const n = Number(amount);
+  if (!Number.isFinite(n)) throw new Error('Invalid WhatsApp financial balance.');
+  return (n < -0.004 ? '-' : '') + whatsAppMoneyText_(n, currencySymbol);
+}
+
 function whatsAppBalanceCopy_(kind, language) {
   const en = {
     customer_due: 'Outstanding due', customer_credit: 'Customer credit',
@@ -492,7 +498,7 @@ function whatsAppComposeText_(view, language) {
       if (!view.period || !view.period.from || !view.period.to) throw new Error('Statement dates are missing.');
       lines.push((bn ? 'সময়কাল: ' : 'Period: ') + whatsAppPlainText_(view.period.from) +
         (bn ? ' থেকে ' : ' to ') + whatsAppPlainText_(view.period.to));
-      lines.push((bn ? 'শুরুর জের: ' : 'Opening balance: ') + whatsAppMoneyText_(view.openingBalance, currency));
+      lines.push((bn ? 'শুরুর জের: ' : 'Opening balance: ') + whatsAppSignedMoneyText_(view.openingBalance, currency));
     }
     if (!rows.length) {
       lines.push(bn ? 'এই সময়ে কোনো লেনদেন নেই' : 'No transactions in this period');
@@ -514,9 +520,9 @@ function whatsAppComposeText_(view, language) {
     lines.push((bn ? 'মোট ডেবিট' : 'Total debit') + totalSuffix + ': ' + whatsAppMoneyText_(view.totalDebit, currency));
     lines.push((bn ? 'মোট ক্রেডিট' : 'Total credit') + totalSuffix + ': ' + whatsAppMoneyText_(view.totalCredit, currency));
     if (view.mode === 'period') {
-      lines.push((bn ? 'শেষ জের: ' : 'Closing balance: ') + whatsAppMoneyText_(view.closingBalance, currency));
+      lines.push((bn ? 'শেষ জের: ' : 'Closing balance: ') + whatsAppSignedMoneyText_(view.closingBalance, currency));
     }
-    lines.push((bn ? 'বর্তমান হিসাবের জের: ' : 'Current account balance: ') + current);
+    lines.push((bn ? 'বর্তমান হিসাবের জের: ' : 'Current account balance: ') + whatsAppSignedMoneyText_(view.currentBalance, currency));
   }
   lines.push(bn ? 'অনুগ্রহ করে হিসাবটি যাচাই করুন। ধন্যবাদ।' :
     'Please review your balance. Thank you.');
@@ -529,6 +535,9 @@ function whatsAppComposeText_(view, language) {
  */
 function prepareWhatsAppMessage(token, request) {
   try {
+    // Public RPC: refuse invalid sessions before disclosing validation details.
+    // The selected source builder still enforces its own per-module view rights.
+    requirePermission_(token, 'whatsappShare', 'edit');
     request = request || {};
     const language = request.language == null ? 'bn' : String(request.language);
     if (language !== 'bn' && language !== 'en') throw new Error('Language must be bn or en.');
