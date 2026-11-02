@@ -11,6 +11,8 @@
       <button class="btn btn-primary" id="customerLedgerReceiveBtn" type="button" disabled>Receive Payment</button>
       <button class="btn" id="customerLedgerAdvanceRefundBtn" type="button" disabled>Refund Credit</button>
       <button class="btn" id="customerLedgerPrintBtn" type="button" disabled>Print Ledger</button>
+      <button class="btn wa-party-action" id="customerLedgerShareDueBtn" type="button" disabled hidden>WhatsApp Due</button>
+      <button class="btn wa-party-action" id="customerLedgerSharePeriodBtn" type="button" disabled hidden>WhatsApp Dates</button>
     </div>
   </div>
 
@@ -47,6 +49,8 @@
           <label class="party-ledger-corrections-toggle" id="customerLedgerCorrectionsWrap" hidden>
             <input id="customerLedgerCorrectionsToggle" type="checkbox"> Show corrections
           </label>
+          <button class="btn btn-sm wa-party-action" id="customerLedgerShareSelectedBtn" type="button" disabled hidden>WhatsApp Selected (0)</button>
+          <button class="btn btn-sm wa-party-action" id="customerLedgerClearSelectedBtn" type="button" hidden title="Clear selected transactions on all pages">Clear selection</button>
           <label class="party-ledger-page-size">Show
             <select id="customerLedgerPageSize">
               <option value="50" selected>50</option>
@@ -143,7 +147,7 @@
 <!-- Print Ledger -->
 <div class="modal-overlay" id="customerLedgerPrintModal" hidden>
   <div class="modal party-ledger-print-modal">
-    <div class="modal-header"><h3>Print Customer Ledger</h3><button class="modal-close" type="button" onclick="closeModal('customerLedgerPrintModal')">&#10005;</button></div>
+    <div class="modal-header"><h3 id="customerLedgerPrintTitle">Print Customer Ledger</h3><button class="modal-close" type="button" onclick="closeModal('customerLedgerPrintModal')">&#10005;</button></div>
     <div class="modal-body">
       <div class="party-ledger-print-party" id="customerLedgerPrintParty"></div>
       <div class="form-grid">
@@ -152,7 +156,7 @@
       </div>
       <div class="field-error" id="customerLedgerPrintError"></div>
     </div>
-    <div class="modal-footer"><button class="btn" type="button" onclick="closeModal('customerLedgerPrintModal')">Cancel</button><button class="btn btn-primary" id="customerLedgerPrintConfirmBtn" type="button">Preview / Print</button></div>
+    <div class="modal-footer"><button class="btn" type="button" onclick="closeModal('customerLedgerPrintModal')">Cancel</button><button class="btn wa-party-action" id="customerLedgerPrintShareBtn" type="button" disabled hidden>WhatsApp</button><button class="btn btn-primary" id="customerLedgerPrintConfirmBtn" type="button">Preview / Print</button></div>
   </div>
 </div>
 
@@ -161,7 +165,7 @@
     partyId: '', pageSize: 50, pageNumber: 1, cursor: '', cursorStack: [],
     parties: [], bankAccounts: [], party: null, rows: [], page: null,
     currencySymbol: '', editingLedgerId: '', paymentContext: null, partyCombo: null, _loaded: false,
-    showCorrections: false, canViewCorrections: false
+    showCorrections: false, canViewCorrections: false, waSelected: {}
   };
 
   function customerLedgerCan_(moduleKey, action) {
@@ -203,6 +207,7 @@
   function customerLedgerSelectParty_(customerId) {
     closeRowActionMenu_();
     customerLedgerState.partyId = String(customerId || '');
+    waPartyLedgerReset_(customerLedgerState);
     customerLedgerState.showCorrections = false;
     var correctionsToggle = document.getElementById('customerLedgerCorrectionsToggle'); if (correctionsToggle) correctionsToggle.checked = false;
     customerLedgerResetPaging_();
@@ -229,6 +234,7 @@
   function customerLedgerOnPageEnter_(pendingCustomerId) {
     customerLedgerEnsurePartyCombo_();
     customerLedgerState.partyId = String(pendingCustomerId || '');
+    waPartyLedgerReset_(customerLedgerState);
     customerLedgerState.showCorrections = false;
     var correctionsToggle = document.getElementById('customerLedgerCorrectionsToggle'); if (correctionsToggle) correctionsToggle.checked = false;
     customerLedgerResetPaging_();
@@ -318,6 +324,7 @@
       customerLedgerPaintBalanceCard_('customerLedgerCreditCard', 'customerLedgerCreditNote', 0, 'is-credit');
       customerLedgerPaintBalanceCard_('customerLedgerDueCard', 'customerLedgerDueNote', 0, 'is-due');
       document.getElementById('customerLedgerPrintBtn').disabled = true;
+      waPartyLedgerUpdateUi_('customer', customerLedgerState);
       return;
     }
     if (customerLedgerState.partyCombo) customerLedgerState.partyCombo.setSelected(party);
@@ -331,6 +338,7 @@
     customerLedgerPaintBalanceCard_('customerLedgerDueCard', 'customerLedgerDueNote', Math.max(0, balance), 'is-due');
     document.getElementById('customerLedgerReceiveBtn').disabled = !party.canPay || !customerLedgerCan_('customers', 'edit');
     document.getElementById('customerLedgerPrintBtn').disabled = customerLedgerState.rows.length === 0 && !(customerLedgerState.page && customerLedgerState.page.hasOlder);
+    waPartyLedgerUpdateUi_('customer', customerLedgerState);
     document.getElementById('customerLedgerPageSize').value = String(customerLedgerState.pageSize);
     var correctionWrap = document.getElementById('customerLedgerCorrectionsWrap');
     var correctionToggle = document.getElementById('customerLedgerCorrectionsToggle');
@@ -409,6 +417,7 @@
 
   function customerLedgerRenderRows_() {
     var body = document.getElementById('customerLedgerBody');
+    var canWa = waPartyLedgerCanShare_('customer') && !!customerLedgerState.party && !customerLedgerState.showCorrections;
     body.innerHTML = '';
     customerLedgerState.rows.forEach(function (row, index) {
       var credit = customerLedgerAmountCell_(row, 'Credit');
@@ -420,6 +429,8 @@
         credit += '<div class="party-ledger-row-note">Payment ' + escapeHtml(formatMoney(payment)) + ' + Discount ' + escapeHtml(formatMoney(discount)) + '</div>';
       }
       var actions = (row.availableActions || []).filter(function (action) { return customerLedgerActionAllowed_(row, action); });
+      var waRow = canWa && !!String(row['Ledger ID'] || '');
+      var waChecked = waRow && !!(customerLedgerState.waSelected && customerLedgerState.waSelected[String(row['Ledger ID'])]);
       var tr = document.createElement('tr');
       tr.innerHTML =
         '<td data-label="Date">' + escapeHtml(String(row['Date'] || '').slice(0,10)) + '</td>' +
@@ -428,7 +439,9 @@
         '<td class="num ledger-txn--decrease" data-label="Credit">' + credit + '</td>' +
         '<td class="num ledger-txn--increase" data-label="Debit">' + customerLedgerAmountCell_(row, 'Debit') + '</td>' +
         '<td class="num ' + partyLedgerBalanceTone_(row['Balance']) + '" data-label="Balance">' + escapeHtml(formatMoney(Number(row['Balance']) || 0)) + '</td>' +
-        '<td>' + (actions.length ? '<button class="btn" type="button" data-customer-ledger-action-index="' + index + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button>' : '') + '</td>';
+        '<td>' +
+          (waRow ? '<label class="wa-party-row-choice" title="Select for WhatsApp"><input type="checkbox" data-customer-ledger-share-index="' + index + '" aria-label="Select transaction for WhatsApp" ' + (waChecked ? 'checked' : '') + '></label>' : '') +
+          ((actions.length || waRow) ? '<button class="btn" type="button" data-customer-ledger-action-index="' + index + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button>' : '') + '</td>';
       body.appendChild(tr);
     });
     document.getElementById('customerLedgerEmpty').hidden = customerLedgerState.rows.length > 0;
@@ -446,6 +459,8 @@
   document.getElementById('customerLedgerCorrectionsToggle').addEventListener('change', function () {
     if (!customerLedgerState.canViewCorrections) { this.checked = false; return; }
     customerLedgerState.showCorrections = !!this.checked;
+    waPartyLedgerReset_(customerLedgerState);
+    waPartyLedgerUpdateUi_('customer', customerLedgerState);
     customerLedgerResetPaging_();
     customerLedgerLoadPage_('');
   });
@@ -472,6 +487,13 @@
     customerLedgerLoadPage_(customerLedgerState.cursor);
   });
 
+  document.getElementById('customerLedgerBody').addEventListener('change', function (event) {
+    var box = event.target.closest('input[data-customer-ledger-share-index]');
+    if (!box) return;
+    var row = customerLedgerState.rows[Number(box.dataset.customerLedgerShareIndex)];
+    if (!waPartyLedgerToggle_('customer', customerLedgerState, row, box.checked)) box.checked = false;
+  });
+
   document.getElementById('customerLedgerBody').addEventListener('click', function (e) {
     var btn = e.target.closest('button[data-customer-ledger-action-index]');
     if (!btn) return;
@@ -479,7 +501,14 @@
     if (!row) return;
     var actions = (row.availableActions || []).filter(function (action) { return customerLedgerActionAllowed_(row, action); });
     var items = actions.map(function (action) { return {action:action, label:customerLedgerActionLabel_(action), danger:action === 'delete'}; });
+    if (waPartyLedgerCanShare_('customer') && customerLedgerState.party && !customerLedgerState.showCorrections && row['Ledger ID']) {
+      items.push({action:'whatsapp', label:'WhatsApp', danger:false});
+    }
     openRowActionMenu_(btn, items, function (action) {
+      if (action === 'whatsapp') {
+        waPartyLedgerSend_('customer', customerLedgerState, 'single', row, null, btn);
+        return;
+      }
       if (row.sourceModule === 'customerPayment') {
         if (action === 'edit') customerLedgerOpenPaymentEdit_(row.sourceId);
         if (action === 'delete') customerLedgerDeletePayment_(row.sourceId);
@@ -694,18 +723,47 @@
   }
 
   function customerLedgerRefreshNewest_() {
+    waPartyLedgerReset_(customerLedgerState);
     customerLedgerResetPaging_();
     return customerLedgerLoad();
   }
 
-  document.getElementById('customerLedgerPrintBtn').addEventListener('click', function () {
+  document.getElementById('customerLedgerShareDueBtn').addEventListener('click', function () {
+    waPartyLedgerSend_('customer', customerLedgerState, 'due', null, null, this);
+  });
+  document.getElementById('customerLedgerShareSelectedBtn').addEventListener('click', function () {
+    waPartyLedgerSend_('customer', customerLedgerState, 'selected', null, null, this);
+  });
+  document.getElementById('customerLedgerClearSelectedBtn').addEventListener('click', function () {
+    waPartyLedgerReset_(customerLedgerState);
+    customerLedgerRenderRows_();
+    waPartyLedgerUpdateUi_('customer', customerLedgerState);
+  });
+  document.getElementById('customerLedgerSharePeriodBtn').addEventListener('click', function () {
+    customerLedgerOpenDateModal_('Customer Ledger — Date Range');
+  });
+  document.getElementById('customerLedgerPrintShareBtn').addEventListener('click', function () {
+    var request = waPartyLedgerSend_('customer', customerLedgerState, 'period', null, {
+      from: document.getElementById('customerLedgerPrintFrom').value,
+      to: document.getElementById('customerLedgerPrintTo').value
+    }, this);
+    if (request) closeModal('customerLedgerPrintModal');
+  });
+
+  // Open shared date picker even if no transaction rows are printable.
+  function customerLedgerOpenDateModal_(title) {
     if (!customerLedgerState.party) return;
+    document.getElementById('customerLedgerPrintTitle').textContent = title;
     var today=customerLedgerToday_();
     document.getElementById('customerLedgerPrintParty').textContent=customerLedgerState.party.name || '';
     document.getElementById('customerLedgerPrintFrom').value=today.slice(0,8)+'01';
     document.getElementById('customerLedgerPrintTo').value=today;
     document.getElementById('customerLedgerPrintError').style.display='none';
     openModal('customerLedgerPrintModal');
+  }
+
+  document.getElementById('customerLedgerPrintBtn').addEventListener('click', function () {
+    customerLedgerOpenDateModal_('Print Customer Ledger');
   });
 
   document.getElementById('customerLedgerPrintConfirmBtn').addEventListener('click', function () {

@@ -36,8 +36,15 @@ test('ledger tones use existing semantic theme colors, not monetary mutations', 
 test('customer and supplier main ledger rows color debit credit and signed running balances', () => {
   for (const p of ['customerLedger.html', 'supplierLedger.html']) {
     const s = read(p);
-    assert.match(s, /class="num ledger-txn--increase" data-label="Debit"/);
-    assert.match(s, /class="num ledger-txn--decrease" data-label="Credit"/);
+    // Customer sheet debit increases due, supplier UI labels its payable
+    // increase as Credit. Preserve the existing two ledger conventions.
+    if (p === 'customerLedger.html') {
+      assert.match(s, /class="num ledger-txn--increase" data-label="Debit"/);
+      assert.match(s, /class="num ledger-txn--decrease" data-label="Credit"/);
+    } else {
+      assert.match(s, /class="num ledger-txn--increase" data-label="Credit"/);
+      assert.match(s, /class="num ledger-txn--decrease" data-label="Debit"/);
+    }
     assert.match(s, /partyLedgerBalanceTone_\(row\['Balance'\]\)/);
     if (p === 'customerLedger.html') {
       // Customer ledger has separate Due and Credit cards, not a single
