@@ -734,8 +734,7 @@
     waPartyLedgerSend_('customer', customerLedgerState, 'selected', null, null, this);
   });
   document.getElementById('customerLedgerSharePeriodBtn').addEventListener('click', function () {
-    document.getElementById('customerLedgerPrintBtn').click();
-    document.getElementById('customerLedgerPrintTitle').textContent = 'Customer Ledger — Date Range';
+    customerLedgerOpenDateModal_('Customer Ledger — Date Range');
   });
   document.getElementById('customerLedgerPrintShareBtn').addEventListener('click', function () {
     var request = waPartyLedgerSend_('customer', customerLedgerState, 'period', null, {
@@ -745,15 +744,20 @@
     if (request) closeModal('customerLedgerPrintModal');
   });
 
-  document.getElementById('customerLedgerPrintBtn').addEventListener('click', function () {
-    document.getElementById('customerLedgerPrintTitle').textContent = 'Print Customer Ledger';
+  // Open shared date picker even if no transaction rows are printable.
+  function customerLedgerOpenDateModal_(title) {
     if (!customerLedgerState.party) return;
+    document.getElementById('customerLedgerPrintTitle').textContent = title;
     var today=customerLedgerToday_();
     document.getElementById('customerLedgerPrintParty').textContent=customerLedgerState.party.name || '';
     document.getElementById('customerLedgerPrintFrom').value=today.slice(0,8)+'01';
     document.getElementById('customerLedgerPrintTo').value=today;
     document.getElementById('customerLedgerPrintError').style.display='none';
     openModal('customerLedgerPrintModal');
+  }
+
+  document.getElementById('customerLedgerPrintBtn').addEventListener('click', function () {
+    customerLedgerOpenDateModal_('Print Customer Ledger');
   });
 
   document.getElementById('customerLedgerPrintConfirmBtn').addEventListener('click', function () {
