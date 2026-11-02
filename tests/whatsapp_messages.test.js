@@ -184,3 +184,16 @@ test('negative balances in dated statements show advance, not a negative due',()
  assert.doesNotMatch(result,/Tk -25|Your current total due|Opening balance|Closing balance/);
 });
 
+
+
+test('compact dated preview does not falsely say it displays 12 of 13 rows',()=>{
+ const rows=Array.from({length:13},(_,i)=>item(i+1,100));
+ const h=harness({view:view({mode:'period',period:{from:'2026-10-01',to:'2026-10-31'},
+  rows,rowCount:13,currentBalance:1400,balanceKind:'customer_due'})});
+ const res=plain(h.prepare('valid',{source:'customer',entityId:'C-1',mode:'period',
+  language:'en',from:'2026-10-01',to:'2026-10-31'}));
+ assert.equal(res.success,true);
+ assert.equal(res.data.lineCount,13);
+ assert.doesNotMatch(res.data.text,/INV-|showing|12 of 13|Total debit/i);
+ assert.ok(!res.data.warnings.some(w=>/12|Showing|দেখানো/.test(w)));
+});
