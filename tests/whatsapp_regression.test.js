@@ -73,21 +73,21 @@ const request=(source,entityId,mode,patch={})=>({source,entityId,mode,language:'
 test('customer due preview produces authorized recipient and safely encoded wa.me text',()=>{
  const h=harness(),res=h.call('prepareWhatsAppMessage','valid',request('customer','C1','due'));
  assert.equal(res.success,true);assert.equal(res.data.recipient.digits,'8801712345678');
- assert.match(res.data.text,/Outstanding due: ৳200/);
+ assert.match(res.data.text,/Your total due: Tk 200/);
  assert.equal(decodeURIComponent(encodeURIComponent(res.data.text)),res.data.text);
  assert.match('https://wa.me/'+res.data.recipient.digits+'?text='+encodeURIComponent(res.data.text),/^https:\/\/wa\.me\/8801712345678/);
 });
 test('supplier period includes supplier payment and reconciled opening/closing',()=>{
  const h=harness(),r=h.call('prepareWhatsAppMessage','valid',request('supplier','S1','period',{from:'2026-10-01',to:'2026-10-02'}));
- assert.equal(r.success,true);assert.match(r.data.text,/Opening balance: ৳0/);assert.match(r.data.text,/Closing balance: ৳125/);assert.match(r.data.text,/PAY-S/);
+ assert.equal(r.success,true);assert.match(r.data.text,/Statement: 1–2 October 2026/);assert.match(r.data.text,/Current amount we owe you: Tk 125/);assert.doesNotMatch(r.data.text,/PAY-S|Opening balance|Closing balance/);
 });
 test('Lender statement follows finance relationship credit/debit, never other-person entries',()=>{
  const h=harness(),r=h.call('prepareWhatsAppMessage','valid',request('financePerson','P1','period',{accountRole:'Lender',from:'2026-10-01',to:'2026-10-02'}));
- assert.equal(r.success,true);assert.match(r.data.text,/Credit ৳500/);assert.match(r.data.text,/Debit ৳200/);assert.doesNotMatch(r.data.text,/OTHER|৳900/);
+ assert.equal(r.success,true);assert.match(r.data.text,/Current loan amount we owe you: Tk 300/);assert.doesNotMatch(r.data.text,/OTHER|Tk 900|Credit|Debit/);
 });
 test('Borrower balance cannot silently include lender transactions',()=>{
  const h=harness(),r=h.call('prepareWhatsAppMessage','valid',request('financePerson','P1','due',{accountRole:'Borrower'}));
- assert.equal(r.success,true);assert.match(r.data.text,/Borrower/);assert.doesNotMatch(r.data.text,/OTHER|Lender|৳900/);
+ assert.equal(r.success,true);assert.match(r.data.text,/Your remaining loan: Tk 150/);assert.doesNotMatch(r.data.text,/OTHER|Lender|Tk 900/);
 });
 test('future period and authorization fail; missing phone remains Copy only',()=>{
  const h=harness();assert.equal(h.call('prepareWhatsAppMessage','invalid',request('customer','C1','due')).success,false);
@@ -101,7 +101,7 @@ test('25 selected supported, 26 rejected; no fabricated reconciled closing for d
  for(const row of many)versions[row['Ledger ID']]=h.call('whatsAppPartyRowVersion_',row);
  const r=request('customer','C1','selected',{rowIds:many.slice(0,25).map(r=>r['Ledger ID']),rowVersions:versions});
  const ok=h.call('prepareWhatsAppMessage','valid',r);
- assert.equal(ok.success,true);assert.match(ok.data.text,/Selected entries/);assert.doesNotMatch(ok.data.text,/Closing balance:/);
+ assert.equal(ok.success,true);assert.match(ok.data.text,/Selected transactions: 25/);assert.doesNotMatch(ok.data.text,/Closing balance:/);
  assert.equal(h.call('prepareWhatsAppMessage','valid',{...r,rowIds:many.map(r=>r['Ledger ID'])}).success,false);
 });
 test('changed CLEAN synthetic row is blocked before any audit write',()=>{
