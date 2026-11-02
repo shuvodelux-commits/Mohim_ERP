@@ -334,6 +334,123 @@
    * One common Customer/Supplier ledger sharing adapter.
    * Version tuples must match whatsAppPartyRowVersion_ in WhatsAppService.gs.
    */
+
+  // Finance Person role-scoped WhatsApp adapter. The source of truth for
+  // relationship debit/credit remains FinanceModule.gs (not cash direction).
+  function waFinancePerson_(state) {
+    return state && Array.isArray(state.persons)
+      ? state.persons.filter(function (p) { return String(p.id) === String(state.personId); })[0] || null
+      : null;
+  }
+
+  function waFinanceCanShare_(state) {
+    var role = state && state.account;
+    if (!state || !state.personId || !Object.prototype.hasOwnProperty.call(
+        {Owner:1,Lender:1,Borrower:1}, role)) return false;
+    var person = waFinancePerson_(state);
+    if (!person) return false;
+    var roles = Array.isArray(person.roles) && person.roles.length ? person.roles : [person.type || 'Owner'];
+    if (roles.indexOf(role) < 0) return false;
+    return userPermissions === null || !!(userPermissions && userPermissions.whatsappShare &&
+      userPermissions.whatsappShare.edit && userPermissions.finance && userPermissions.finance.view);
+  }
+
+  function waFinanceRowVersion_(row) {
+    return JSON.stringify([
+      String(row.financeId || ''), String(row.date || ''),
+      String(row.transactionType || ''), Number(row.amount) || 0,
+      Number(row.balance) || 0, String(row.referenceNo || ''),
+      String(row.notes || ''), String(row.account || ''),
+      String(row.personId || '')
+    ]);
+  }
+
+  function waFinanceReset_(state) {
+    if (!state) return;
+    state.waFinanceSelected = {};
+    state.waFinanceScope = '';
+  }
+
+  function waFinanceScope_(state) {
+    return String(state.personId || '') + '|' + String(state.account || '');
+  }
+
+  function waFinanceRowInAccount_(state, row) {
+    var accounts = {Owner:'owner',Lender:'loanPayable',Borrower:'borrowerReceivable'};
+    return !!(waFinanceCanShare_(state) && row && String(row.financeId || '') &&
+      String(row.personId || '') === String(state.personId) &&
+      String(row.account || '') === accounts[state.account]);
+  }
+
+  function waFinanceUpdateUi_(state) {
+    var allowed = waFinanceCanShare_(state);
+    var scope = state ? waFinanceScope_(state) : '';
+    var count = state && state.waFinanceScope === scope
+      ? Object.keys(state.waFinanceSelected || {}).length : 0;
+    var balance = waShareElement_('fplShareBalanceBtn');
+    var selected = waShareElement_('fplShareSelectedBtn');
+    var period = waShareElement_('fplSharePeriodBtn');
+    [balance, selected, period].forEach(function (el) { if (el) el.hidden = !allowed; });
+    if (balance) balance.disabled = !allowed;
+    if (period) period.disabled = !allowed;
+    if (selected) {
+      selected.disabled = !allowed || !count;
+      selected.textContent = 'WhatsApp Selected (' + count + ')';
+    }
+  }
+
+  function waFinanceToggle_(state, row, checked) {
+    if (!waFinanceRowInAccount_(state, row)) return false;
+    var scope = waFinanceScope_(state);
+    if (state.waFinanceScope && state.waFinanceScope !== scope) waFinanceReset_(state);
+    state.waFinanceScope = scope;
+    if (!state.waFinanceSelected) state.waFinanceSelected = {};
+    var id = String(row.financeId);
+    if (checked && !Object.prototype.hasOwnProperty.call(state.waFinanceSelected,id) &&
+        Object.keys(state.waFinanceSelected).length >= 25) {
+      showToast('Select up to 25 Finance entries for WhatsApp.', 'error');
+      return false;
+    }
+    if (checked) state.waFinanceSelected[id] = waFinanceRowVersion_(row);
+    else delete state.waFinanceSelected[id];
+    waFinanceUpdateUi_(state);
+    return true;
+  }
+
+  function waFinanceSend_(state, mode, row, dates, trigger) {
+    if (!waFinanceCanShare_(state)) return false;
+    if (['due','single','selected','period'].indexOf(mode) < 0) return false;
+    var request = {
+      source:'financePerson', entityId:String(state.personId),
+      accountRole:state.account, mode:mode, rowIds:[], rowVersions:{}
+    };
+    if (mode === 'single') {
+      if (!waFinanceRowInAccount_(state,row)) return false;
+      request.rowIds = [String(row.financeId)];
+      request.rowVersions[String(row.financeId)] = waFinanceRowVersion_(row);
+    } else if (mode === 'selected') {
+      if (state.waFinanceScope !== waFinanceScope_(state)) return false;
+      var selected = state.waFinanceSelected || {};
+      request.rowIds = Object.keys(selected);
+      if (!request.rowIds.length || request.rowIds.length > 25) return false;
+      request.rowVersions = Object.assign({},selected);
+    } else if (mode === 'period') {
+      var from = dates && dates.from || '', to = dates && dates.to || '';
+      var d = new Date();
+      var today = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+
+        '-'+String(d.getDate()).padStart(2,'0');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) ||
+        from > to || to > today) {
+        showToast('Select valid From and To dates for Finance WhatsApp sharing.', 'error');
+        return false;
+      }
+      request.from = from;
+      request.to = to;
+    }
+    openWhatsAppShare_(request,trigger);
+    return request;
+  }
+
   function waPartyLedgerCanShare_(kind) {
     if (kind !== 'customer' && kind !== 'supplier') return false;
     if (userPermissions === null) return true;
