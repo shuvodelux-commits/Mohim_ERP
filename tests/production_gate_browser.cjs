@@ -423,7 +423,9 @@ async function main() {
     });
     await check('Finance Ledger '+size.width+' guarded single-person row action',async()=>{
       await page.locator('#finLedTableBody button[data-act="menuTxn"]').click();
-      await page.getByRole('menuitem',{name:'WhatsApp'}).click();
+      // Mobile Actions is a fixed-bottom menu closed by scroll events.
+      // Dispatch the actual menu item click without Playwright auto-scrolling it.
+      await page.getByRole('menuitem',{name:'WhatsApp'}).dispatchEvent('click');
       const requests=await page.evaluate(()=>window.__finLedgerShares);
       assert.equal(requests.length,1);
       assert.deepEqual([requests[0].source,requests[0].entityId,requests[0].accountRole,requests[0].mode],
