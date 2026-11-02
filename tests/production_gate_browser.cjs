@@ -402,6 +402,60 @@ async function main() {
   await check('Finance WhatsApp browser errors',()=>assert.deepEqual(errors,[]));
   await page.close();
 
+
+  // Finance Ledger all-person view: read one bound row only (no bulk share).
+  for (const size of [{width:1440,height:900},{width:375,height:812}]) {
+    ({page,errors}=await boot(browser,size));
+    await route(page,'financeLedger');
+    await page.evaluate(()=>{
+      finLedState.persons=[{id:'P1',name:'Finance A',roles:['Lender','Borrower']},{id:'P2',name:'Finance B',roles:['Lender']}];
+      finLedState.transactionTypes=[{key:'Loan Received',account:'loanPayable',role:'Lender',cashDirection:'in',label:'Lender Credit'}];
+      finLedState.currencySymbol='৳';
+      finLedState.rows=[{
+        financeId:'F-1',date:'2026-10-01',personId:'P1',personKey:'id:P1',
+        person:'Finance A',transactionType:'Loan Received',transactionTypeLabel:'Lender Credit',
+        account:'loanPayable',accountLabel:'Lender Balance',amount:500,balance:500,
+        debit:0,credit:500,referenceNo:'L-1',notes:'',paymentMethod:'Cash',createdBy:'Admin'
+      }];
+      window.__finLedgerShares=[];
+      window.openWhatsAppShare_=(req)=>{window.__finLedgerShares.push(JSON.parse(JSON.stringify(req)));return req;};
+      finLedRender_();
+    });
+    await check('Finance Ledger '+size.width+' guarded single-person row action',async()=>{
+      await page.locator('#finLedTableBody button[data-act="menuTxn"]').click();
+      await page.getByRole('menuitem',{name:'WhatsApp'}).click();
+      const requests=await page.evaluate(()=>window.__finLedgerShares);
+      assert.equal(requests.length,1);
+      assert.deepEqual([requests[0].source,requests[0].entityId,requests[0].accountRole,requests[0].mode],
+        ['financePerson','P1','Lender','single']);
+      assert.deepEqual(requests[0].rowIds,['F-1']);
+      assert.ok(requests[0].rowVersions['F-1'].includes('"loanPayable"'));
+    });
+    await check('Finance Ledger '+size.width+' unresolved legacy person never offered WhatsApp',async()=>{
+      await page.evaluate(()=>{
+        finLedState.rows[0].personId='';
+        finLedState.rows[0].personKey='name:Finance A';
+        finLedRender_();
+      });
+      await page.locator('#finLedTableBody button[data-act="menuTxn"]').click();
+      assert.equal(await page.getByRole('menuitem',{name:'WhatsApp'}).count(),0);
+      assert.equal((await page.evaluate(()=>window.__finLedgerShares)).length,1);
+    });
+    await check('Finance Ledger '+size.width+' role mismatch never offered WhatsApp',async()=>{
+      await page.keyboard.press('Escape');
+      await page.evaluate(()=>{
+        finLedState.rows[0].personId='P1';
+        finLedState.rows[0].personKey='id:P1';
+        finLedState.rows[0].account='owner';
+        finLedRender_();
+      });
+      await page.locator('#finLedTableBody button[data-act="menuTxn"]').click();
+      assert.equal(await page.getByRole('menuitem',{name:'WhatsApp'}).count(),0);
+      assert.deepEqual(errors,[]);
+    });
+    await page.close();
+  }
+
  } finally {await browser.close();}
  console.log(`production_gate_browser: ${pass}/${pass+fail} PASS; ${pages.length} routes; MOCKED Apps Script bridge`);
  if(fail)process.exitCode=1;
