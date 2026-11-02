@@ -1,0 +1,333 @@
+<!-- Shared read-only WhatsApp preview; ledger actions are wired in later phases. -->
+<div class="modal-overlay wa-share-overlay" id="waShareModal" hidden>
+  <section class="modal wa-share-dialog" role="dialog" aria-modal="true" aria-labelledby="waShareTitle" aria-describedby="waShareNotice">
+    <div class="modal-header">
+      <h3 id="waShareTitle">WhatsApp Preview</h3>
+      <button type="button" class="modal-close" id="waShareClose" aria-label="Close WhatsApp preview">&#10005;</button>
+    </div>
+    <div class="modal-body wa-share-body">
+      <div class="wa-share-recipient">
+        <label for="waSharePhone">WhatsApp number <span class="bn-hint">— মোবাইল নম্বর</span></label>
+        <input type="tel" id="waSharePhone" autocomplete="off" inputmode="tel" placeholder="01XXXXXXXXX" aria-describedby="waSharePhoneHelp">
+        <p class="wa-share-hint" id="waSharePhoneHelp">A different number must be confirmed; contact records are not changed.</p>
+        <label id="waShareConfirmRow" class="wa-share-confirm-row" hidden>
+          <input type="checkbox" id="waShareConfirmPhone">
+          <span>I confirm this is the correct recipient / নম্বরটি সঠিক</span>
+        </label>
+      </div>
+      <div class="wa-share-compose-head">
+        <label for="waShareText">Message <span class="bn-hint">— মেসেজ</span></label>
+        <label class="wa-share-language-label" for="waShareLanguage">
+          <span>Language</span>
+          <select id="waShareLanguage" aria-label="Message language">
+            <option value="bn">বাংলা</option>
+            <option value="en">English</option>
+          </select>
+        </label>
+      </div>
+      <textarea id="waShareText" rows="9" dir="auto" spellcheck="true" aria-label="Editable WhatsApp message"></textarea>
+      <div id="waShareWarnings" class="wa-share-warnings" role="status" aria-live="polite"></div>
+      <div id="waShareError" class="field-error wa-share-error" role="alert" hidden></div>
+      <p id="waShareNotice" class="wa-share-notice">WhatsApp opens with a draft. You must press Send in WhatsApp. Opening a draft does not confirm delivery.</p>
+    </div>
+    <div class="modal-footer wa-share-footer">
+      <button type="button" class="btn" id="waShareCancel">Cancel</button>
+      <button type="button" class="btn" id="waShareCopy" disabled>Copy</button>
+      <a class="btn btn-primary wa-share-open" id="waShareOpen" target="_blank" rel="noopener noreferrer"
+         aria-disabled="true" tabindex="-1">Open WhatsApp</a>
+    </div>
+  </section>
+</div>
+<style>
+  /* Inherit the ERP's .modal, .btn, input, textarea and theme tokens. */
+  .wa-share-overlay { z-index: 1400; align-items: center; padding: 16px; }
+  .wa-share-dialog { max-width: 540px; max-height: min(710px, calc(100dvh - 32px)); }
+  .wa-share-body { display: grid; gap: 10px; padding: 16px 18px; }
+  .wa-share-body label { margin-bottom: 0; }
+  .wa-share-body .wa-share-hint, .wa-share-notice { font-size: 12px; line-height: 1.45; color: var(--color-text-muted); margin: 5px 0 0; }
+  .wa-share-compose-head { display: flex; justify-content: space-between; align-items: end; gap: 12px; }
+  .wa-share-language-label { display: flex; align-items: center; gap: 8px; }
+  .wa-share-language-label select { width: auto; min-width: 108px; padding: 6px 8px; }
+  #waShareText { min-height: 144px; max-height: 38dvh; resize: vertical; white-space: pre-wrap; font-family: var(--font); line-height: 1.5; }
+  .wa-share-confirm-row { display: flex; gap: 8px; align-items: flex-start; font-weight: 500; margin-top: 8px; cursor: pointer; }
+  .wa-share-confirm-row[hidden] { display: none; }
+  .wa-share-confirm-row input { width: 18px; height: 18px; flex: 0 0 18px; margin: 0; }
+  .wa-share-confirm-row span { flex: 1; line-height: 1.4; }
+  .wa-share-warnings { font-size: 12px; color: var(--color-text-muted); white-space: pre-wrap; }
+  .wa-share-warnings:empty { display: none; }
+  .wa-share-error { font-size: 12px; color: var(--color-danger); }
+  .wa-share-error[hidden] { display: none; }
+  .wa-share-open { text-decoration: none; display: inline-flex; justify-content: center; align-items: center; }
+  .wa-share-open[aria-disabled="true"] { opacity: .45; cursor: not-allowed; pointer-events: none; }
+  .wa-share-dialog :is(button, input, select, textarea, a):focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  body.wa-share-modal-open { overflow: hidden; }
+  @media (max-width: 540px) {
+    .wa-share-overlay { align-items: flex-end; padding: 0; }
+    .wa-share-dialog { max-height: 92dvh; border-radius: var(--radius) var(--radius) 0 0; }
+    .wa-share-body { padding: 12px 14px; gap: 9px; }
+    #waShareText { min-height: 115px; max-height: 30dvh; }
+    .wa-share-footer { padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); }
+    .wa-share-footer .btn { flex: 1 1 0; min-height: 44px; padding: 9px 5px; font-size: 12px; white-space: nowrap; }
+  }
+</style>
+<script>
+  var waShareState_ = {
+    open: false, sequence: 0, request: null, response: null,
+    originalPhone: '', verifiedPhone: '', pending: false,
+    previousFocus: null, wired: false
+  };
+
+  function waShareElement_(id) { return document.getElementById(id); }
+
+  function waShareDisableLink_() {
+    var link = waShareElement_('waShareOpen');
+    if (!link) return;
+    link.removeAttribute('href');
+    link.setAttribute('aria-disabled', 'true');
+    link.setAttribute('tabindex', '-1');
+  }
+
+  function waShareError_(message) {
+    var el = waShareElement_('waShareError');
+    el.textContent = String(message || '');
+    el.hidden = !message;
+  }
+
+  function waShareSyncLink_() {
+    var state = waShareState_;
+    waShareDisableLink_();
+    if (!state.open || state.pending || !state.response ||
+        !state.response.canOpenLink || !state.response.recipient) return;
+    if (waShareElement_('waSharePhone').value.trim() !== state.verifiedPhone) return;
+    var text = waShareElement_('waShareText').value;
+    var digits = String(state.response.recipient.digits || '');
+    if (!text.trim() || !/^8801[3-9][0-9]{8}$/.test(digits)) return;
+    var url = 'https://wa.me/' + digits + '?text=' + encodeURIComponent(text);
+    if (url.length > 8000) {
+      waShareElement_('waShareWarnings').textContent =
+        'The edited message is too long for a direct link. Copy it instead. / মেসেজটি কপি করুন।';
+      return;
+    }
+    var link = waShareElement_('waShareOpen');
+    link.setAttribute('href', url);
+    link.setAttribute('aria-disabled', 'false');
+    link.removeAttribute('tabindex');
+  }
+
+  function waShareClose_() {
+    var state = waShareState_;
+    if (!state.open) return;
+    state.sequence++;
+    state.open = false;
+    state.pending = false;
+    state.request = null;
+    state.response = null;
+    state.originalPhone = '';
+    state.verifiedPhone = '';
+    waShareDisableLink_();
+    waShareElement_('waShareModal').hidden = true;
+    document.body.classList.remove('wa-share-modal-open');
+    var focus = state.previousFocus;
+    state.previousFocus = null;
+    if (focus && typeof focus.focus === 'function' && focus.isConnected) focus.focus();
+  }
+
+  function waShareFocusable_() {
+    var modal = waShareElement_('waShareModal');
+    if (!modal || modal.hidden) return [];
+    return Array.prototype.slice.call(modal.querySelectorAll(
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href]'))
+      .filter(function (el) { return !el.hidden && el.getClientRects().length; });
+  }
+
+  function waShareKeydown_(event) {
+    if (!waShareState_.open) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      waShareClose_();
+    } else if (event.key === 'Tab') {
+      var items = waShareFocusable_();
+      if (!items.length) return;
+      if (event.shiftKey && document.activeElement === items[0]) {
+        event.preventDefault(); items[items.length - 1].focus();
+      } else if (!event.shiftKey && document.activeElement === items[items.length - 1]) {
+        event.preventDefault(); items[0].focus();
+      }
+    }
+  }
+
+  function waShareRequestPreview_(preserveDraft) {
+    var state = waShareState_;
+    if (!state.open || !state.request) return Promise.resolve(false);
+    var phone = waShareElement_('waSharePhone').value.trim();
+    var alternate = phone && phone !== state.originalPhone ? phone : '';
+    var confirmed = !!waShareElement_('waShareConfirmPhone').checked;
+    if (state.response && !phone && state.originalPhone) {
+      waShareDisableLink_();
+      waShareError_('Enter a recipient number or use Copy.');
+      return Promise.resolve(false);
+    }
+    if (alternate && !confirmed && state.response) {
+      waShareDisableLink_();
+      waShareError_('Confirm the changed recipient before opening WhatsApp.');
+      return Promise.resolve(false);
+    }
+    var seq = ++state.sequence;
+    var request = Object.assign({}, state.request, { language: waShareElement_('waShareLanguage').value });
+    // A new override must pass server validation; never trust typed phone text.
+    if (alternate && confirmed) {
+      request.recipientOverride = alternate;
+      request.confirmOverride = true;
+    }
+    state.pending = true;
+    state.response = null;
+    waShareDisableLink_();
+    waShareElement_('waShareCopy').disabled = true;
+    waShareError_('');
+    if (!preserveDraft) waShareElement_('waShareText').value = '';
+    waShareElement_('waShareWarnings').textContent = 'Preparing preview…';
+    return serverCall('prepareWhatsAppMessage', authToken, request).then(function (preview) {
+      if (!state.open || seq !== state.sequence) return false;
+      if (!preview || typeof preview.text !== 'string') throw new Error('Preview response is invalid.');
+      state.response = preview;
+      state.pending = false;
+      var normalized = preview.recipient ? String(preview.recipient.display || '') : '';
+      if (!alternate) state.originalPhone = normalized;
+      state.verifiedPhone = normalized;
+      waShareElement_('waSharePhone').value = normalized;
+      waShareElement_('waShareConfirmRow').hidden = !alternate;
+      if (!preserveDraft) waShareElement_('waShareText').value = preview.text;
+      waShareElement_('waShareTitle').textContent = preview.title || 'WhatsApp Preview';
+      waShareElement_('waShareWarnings').textContent = (preview.warnings || []).join('\n');
+      waShareElement_('waShareCopy').disabled = !waShareElement_('waShareText').value;
+      waShareSyncLink_();
+      return true;
+    }).catch(function (err) {
+      if (!state.open || seq !== state.sequence) return false;
+      state.pending = false;
+      state.response = null;
+      waShareDisableLink_();
+      waShareElement_('waShareCopy').disabled = !waShareElement_('waShareText').value;
+      waShareError_(err && err.message ? err.message : String(err));
+      return false;
+    });
+  }
+
+  function waSharePhoneInput_() {
+    var state = waShareState_;
+    if (!state.open) return;
+    var value = waShareElement_('waSharePhone').value.trim();
+    waShareDisableLink_();
+    waShareError_('');
+    var changed = value && value !== state.originalPhone;
+    waShareElement_('waShareConfirmRow').hidden = !changed;
+    if (value === state.verifiedPhone && state.response) {
+      waShareElement_('waShareConfirmPhone').checked = false;
+      waShareSyncLink_();
+      return;
+    }
+    waShareElement_('waShareConfirmPhone').checked = false;
+    if (!value) {
+      waShareError_('Enter a recipient number or use Copy.');
+    } else if (!changed) {
+      waShareRequestPreview_(true);
+    } else {
+      waShareError_('Confirm the changed recipient number to continue.');
+    }
+  }
+
+  function waShareCopy_() {
+    var text = waShareElement_('waShareText').value;
+    if (!text || waShareElement_('waShareCopy').disabled) return;
+    var task;
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      task = navigator.clipboard.writeText(text);
+    } else {
+      var input = waShareElement_('waShareText');
+      input.focus(); input.select();
+      task = document.execCommand('copy') ? Promise.resolve() : Promise.reject(new Error('Copy unavailable'));
+    }
+    Promise.resolve(task).then(function () {
+      if (waShareState_.open) waShareError_('Message copied. Not sent.');
+    }).catch(function (err) {
+      if (waShareState_.open) waShareError_('Copy failed. Select the message and copy it manually.');
+    });
+  }
+
+  function waShareWire_() {
+    if (waShareState_.wired || !waShareElement_('waShareModal')) return;
+    waShareState_.wired = true;
+    waShareElement_('waShareClose').addEventListener('click', waShareClose_);
+    waShareElement_('waShareCancel').addEventListener('click', waShareClose_);
+    waShareElement_('waShareModal').addEventListener('click', function (event) {
+      if (event.target === waShareElement_('waShareModal')) waShareClose_();
+    });
+    waShareElement_('waShareLanguage').addEventListener('change', function () {
+      waShareRequestPreview_(false); // Deliberate recomposition of edited text.
+    });
+    waShareElement_('waShareText').addEventListener('input', function () {
+      waShareSyncLink_(); // Re-encode edited text in the click-ready anchor.
+    });
+    waShareElement_('waSharePhone').addEventListener('input', waSharePhoneInput_);
+    waShareElement_('waShareConfirmPhone').addEventListener('change', function () {
+      if (this.checked) waShareRequestPreview_(true);
+      else waShareDisableLink_();
+    });
+    waShareElement_('waShareCopy').addEventListener('click', waShareCopy_);
+    waShareElement_('waShareOpen').addEventListener('click', function (event) {
+      waShareSyncLink_();
+      if (!this.getAttribute('href')) event.preventDefault();
+      // Navigation is ONLY a direct user click on this anchor. This does
+      // not send a message; delivery audit belongs to a later task.
+    });
+    document.addEventListener('keydown', waShareKeydown_, true);
+  }
+
+  /**
+   * Shared entry point for Task 6 (party) and Task 7 (finance) toolbar actions.
+   * Passing untrusted IDs or amounts cannot bypass the server permission gate.
+   */
+  function openWhatsAppShare_(request, trigger) {
+    if (!request || !request.source || !request.entityId || !request.mode) {
+      throw new Error('Choose a ledger account and WhatsApp sharing mode.');
+    }
+    waShareWire_();
+    if (waShareState_.open) waShareClose_();
+    var state = waShareState_;
+    state.open = true;
+    state.sequence++;
+    state.request = {
+      source: request.source, entityId: request.entityId, mode: request.mode,
+      accountRole: request.accountRole || '',
+      from: request.from || '', to: request.to || '',
+      rowIds: request.rowIds || [],
+      rowVersions: request.rowVersions || {}
+    };
+    state.previousFocus = trigger || document.activeElement;
+    state.response = null;
+    state.pending = false;
+    state.originalPhone = '';
+    state.verifiedPhone = '';
+    waShareElement_('waShareLanguage').value = request.language === 'en' ? 'en' : 'bn';
+    waShareElement_('waSharePhone').value = '';
+    waShareElement_('waShareText').value = '';
+    waShareElement_('waShareTitle').textContent = 'WhatsApp Preview';
+    waShareElement_('waShareConfirmPhone').checked = false;
+    waShareElement_('waShareConfirmRow').hidden = true;
+    waShareElement_('waShareWarnings').textContent = '';
+    waShareError_('');
+    waShareElement_('waShareCopy').disabled = true;
+    waShareDisableLink_();
+    waShareElement_('waShareModal').hidden = false;
+    document.body.classList.add('wa-share-modal-open');
+    waShareElement_('waShareClose').focus();
+    return waShareRequestPreview_(false);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', waShareWire_);
+  } else {
+    waShareWire_();
+  }
+</script>
