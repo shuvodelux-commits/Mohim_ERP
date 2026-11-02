@@ -113,7 +113,8 @@ async function main() {
     assert.equal((await page.evaluate(()=>window.__waCalls)).length,1);
   });
   await check('WhatsApp Bangla and English recompose using authenticated RPC',async()=>{
-    await page.selectOption('#waShareLanguage','en');
+    await page.click('#waShareLanguage + .touch-select-trigger');
+    await page.click('#touchSelectMenuGlobal button[data-touch-option-index="1"]');
     await page.waitForFunction(()=>document.getElementById('waShareText').value==='Due balance: ৳1,000');
     assert.equal((await page.evaluate(()=>window.__waCalls)).length,2);
     assert.equal((await page.evaluate(()=>window.__waCalls[1].req.language)),'en');
