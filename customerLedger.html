@@ -50,6 +50,7 @@
             <input id="customerLedgerCorrectionsToggle" type="checkbox"> Show corrections
           </label>
           <button class="btn btn-sm wa-party-action" id="customerLedgerShareSelectedBtn" type="button" disabled hidden>WhatsApp Selected (0)</button>
+          <button class="btn btn-sm wa-party-action" id="customerLedgerClearSelectedBtn" type="button" hidden title="Clear selected transactions on all pages">Clear selection</button>
           <label class="party-ledger-page-size">Show
             <select id="customerLedgerPageSize">
               <option value="50" selected>50</option>
@@ -732,6 +733,11 @@
   });
   document.getElementById('customerLedgerShareSelectedBtn').addEventListener('click', function () {
     waPartyLedgerSend_('customer', customerLedgerState, 'selected', null, null, this);
+  });
+  document.getElementById('customerLedgerClearSelectedBtn').addEventListener('click', function () {
+    waPartyLedgerReset_(customerLedgerState);
+    customerLedgerRenderRows_();
+    waPartyLedgerUpdateUi_('customer', customerLedgerState);
   });
   document.getElementById('customerLedgerSharePeriodBtn').addEventListener('click', function () {
     customerLedgerOpenDateModal_('Customer Ledger — Date Range');
