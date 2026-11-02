@@ -40,6 +40,10 @@
 </div>
 <style>
   /* Inherit the ERP's .modal, .btn, input, textarea and theme tokens. */
+  .wa-party-action[hidden] { display: none !important; }
+  .wa-party-row-choice { display: inline-flex; vertical-align: middle; align-items: center; margin: 0 6px 0 0; cursor: pointer; }
+  .wa-party-row-choice input { width: 17px; height: 17px; margin: 0; padding: 0; }
+  .wa-party-row-choice input:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .wa-share-overlay { z-index: 1400; align-items: center; padding: 16px; }
   .wa-share-dialog { max-width: 540px; max-height: min(710px, calc(100dvh - 32px)); }
   .wa-share-body { display: grid; gap: 10px; padding: 16px 18px; }
