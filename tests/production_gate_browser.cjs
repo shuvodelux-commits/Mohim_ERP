@@ -143,6 +143,66 @@ async function main() {
     assert.match(await page.locator('#waShareWarnings').textContent(),/phone number missing/i);
     await page.click('#waShareClose');
   });
+
+  // Manual open audit must happen on a user click, never on preview/copy.
+  await page.evaluate(()=>{
+    window.__waAudits=[];
+    window.__waAuditReject=false;
+    const original=window.serverCall;
+    window.serverCall=(fn,token,req)=>{
+      if(fn==='recordWhatsAppShare'){
+        window.__waAudits.push({fn,token,req:JSON.parse(JSON.stringify(req))});
+        return window.__waAuditReject
+          ? Promise.reject(Error('Audit log unavailable'))
+          : Promise.resolve({eventId:'WSA-000001',status:'OPEN_ATTEMPTED',duplicate:false});
+      }
+      return original(fn,token,req);
+    };
+    window.__waSyntheticClick=()=>{
+      const anchor=document.getElementById('waShareOpen');
+      // Prevent external navigation in a mocked test; preserve click handling.
+      anchor.addEventListener('click',e=>e.preventDefault(),{once:true,capture:true});
+      anchor.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+    };
+  });
+  await check('WhatsApp audit fires only on actual enabled Open link and captures confirmed override',async()=>{
+    await page.evaluate(()=>openWhatsAppShare_({source:'customer',entityId:'C-1',mode:'due'}));
+    await page.waitForFunction(()=>!!document.getElementById('waShareOpen').getAttribute('href'));
+    assert.equal((await page.evaluate(()=>window.__waAudits)).length,0);
+    await page.fill('#waSharePhone','01912345678');
+    await page.evaluate(()=>window.__waSyntheticClick());
+    assert.equal((await page.evaluate(()=>window.__waAudits)).length,0);
+    await page.check('#waShareConfirmPhone');
+    await page.waitForFunction(()=>!!document.getElementById('waShareOpen').getAttribute('href'));
+    await page.evaluate(()=>window.__waSyntheticClick());
+    const calls=await page.evaluate(()=>window.__waAudits);
+    assert.equal(calls.length,1);
+    assert.equal(calls[0].fn,'recordWhatsAppShare');
+    assert.equal(calls[0].req.source,'customer');
+    assert.equal(calls[0].req.entityId,'C-1');
+    assert.equal(calls[0].req.recipientOverride,'01912345678');
+    assert.equal(calls[0].req.confirmOverride,true);
+    assert.match(calls[0].req.eventKey,/^[A-Za-z0-9_-]{16,90}$/);
+    assert.equal(JSON.stringify(calls[0].req).includes('message'),false);
+    await page.evaluate(()=>window.__waSyntheticClick());
+    assert.equal((await page.evaluate(()=>window.__waAudits)).length,1,'double click should not re-record attempt');
+  });
+  await check('WhatsApp audit failure remains nonblocking and never claims sent',async()=>{
+    await page.evaluate(()=>{window.__waAuditReject=true;waShareState_.auditLastAt=0;window.__waSyntheticClick()});
+    await page.waitForFunction(()=>document.getElementById('waShareWarnings').textContent.includes('Audit log unavailable'));
+    assert.equal((await page.evaluate(()=>window.__waAudits)).length,2);
+    assert.ok((await page.locator('#waShareOpen').getAttribute('href')).startsWith('https://wa.me/'));
+    assert.doesNotMatch(await page.locator('#waShareWarnings').textContent(),/\b(sent|delivered)\b/i);
+    await page.click('#waShareClose');
+  });
+  await check('WhatsApp Copy never records an open attempt',async()=>{
+    await page.evaluate(()=>{window.__waAuditReject=false;openWhatsAppShare_({source:'customer',entityId:'C-1',mode:'due'})});
+    await page.waitForFunction(()=>!!document.getElementById('waShareOpen').getAttribute('href'));
+    await page.click('#waShareCopy');
+    assert.equal((await page.evaluate(()=>window.__waAudits)).length,2);
+    await page.click('#waShareClose');
+  });
+
   await check('WhatsApp preview browser errors',()=>assert.deepEqual(errors,[]));
   await page.close();
 
