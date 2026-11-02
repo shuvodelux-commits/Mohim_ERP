@@ -70,6 +70,81 @@ async function main() {
   await check('tablet no document overflow',async()=>assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth)<=1));
   await check('tablet sidebar rail',async()=>assert.ok(await page.$eval('#app',e=>e.classList.contains('sidebar-collapsed'))));
   await check('tablet browser errors',()=>assert.deepEqual(errors,[]));await page.close();
+
+  // Shared WhatsApp dialog: use the same mocked Apps Script bridge as other
+  // browser checks. No real WhatsApp navigation or financial writes occur.
+  ({page,errors}=await boot(browser));
+  await page.evaluate(()=>{
+    window.__waCalls=[];
+    window.__waCopied='';
+    Object.defineProperty(navigator,'clipboard',{configurable:true,value:{
+      writeText:async text=>{window.__waCopied=text;}
+    }});
+    window.serverCall=(fn,token,req)=>{
+      if(fn!=='prepareWhatsAppMessage') return Promise.reject(Error('Unexpected RPC '+fn));
+      window.__waCalls.push({fn,token,req:JSON.parse(JSON.stringify(req))});
+      if(req.recipientOverride && !req.confirmOverride)
+        return Promise.reject(Error('Confirm changed WhatsApp recipient'));
+      const bn=req.language==='bn';
+      const phone=req.recipientOverride?'8801912345678':'8801712345678';
+      return Promise.resolve({
+        title:bn?'হিসাব':'Account balance',partyName:'Rahim',mode:req.mode,source:req.source,
+        recipient:req.entityId==='MISSING'?null:{digits:phone,display:'+'+phone,overridden:!!req.recipientOverride},
+        text:bn?'মোট বকেয়া: ৳1,000':'Due balance: ৳1,000',
+        canOpenLink:req.entityId!=='MISSING',warnings:req.entityId==='MISSING'?['WhatsApp phone number missing']:[]
+      });
+    };
+  });
+  await check('WhatsApp preview uses shared modal, verified phone and user click only',async()=>{
+    await page.evaluate(()=>openWhatsAppShare_({source:'customer',entityId:'C-1',mode:'due'}));
+    await page.locator('#waShareModal').waitFor({state:'visible'});
+    assert.equal(await page.inputValue('#waShareText'),'মোট বকেয়া: ৳1,000');
+    assert.equal(await page.inputValue('#waSharePhone'),'+8801712345678');
+    const url=await page.locator('#waShareOpen').getAttribute('href');
+    assert.ok(url.startsWith('https://wa.me/8801712345678?text='));
+    assert.ok(decodeURIComponent(url.split('?text=')[1]).includes('৳1,000'));
+    assert.equal((await page.evaluate(()=>window.__waCalls)).length,1);
+    assert.equal(await page.locator('#waShareNotice').textContent()!=='',true);
+  });
+  await check('WhatsApp edited message is used in direct link without a new RPC',async()=>{
+    await page.fill('#waShareText','Edited: ৳2,000\nSecond line');
+    const url=await page.locator('#waShareOpen').getAttribute('href');
+    assert.equal(decodeURIComponent(url.split('?text=')[1]),'Edited: ৳2,000\nSecond line');
+    assert.equal((await page.evaluate(()=>window.__waCalls)).length,1);
+  });
+  await check('WhatsApp Bangla and English recompose using authenticated RPC',async()=>{
+    await page.selectOption('#waShareLanguage','en');
+    await page.waitForFunction(()=>document.getElementById('waShareText').value==='Due balance: ৳1,000');
+    assert.equal((await page.evaluate(()=>window.__waCalls)).length,2);
+    assert.equal((await page.evaluate(()=>window.__waCalls[1].req.language)),'en');
+  });
+  await check('WhatsApp changed phone is blocked until explicitly confirmed',async()=>{
+    await page.fill('#waSharePhone','01912345678');
+    assert.equal(await page.locator('#waShareOpen').getAttribute('href'),null);
+    assert.equal(await page.locator('#waShareOpen').getAttribute('aria-disabled'),'true');
+    await page.check('#waShareConfirmPhone');
+    await page.waitForFunction(()=>!!document.getElementById('waShareOpen').getAttribute('href'));
+    assert.match(await page.locator('#waShareOpen').getAttribute('href'),/^https:\/\/wa\.me\/8801912345678\?/);
+  });
+  await check('WhatsApp copy uses edited draft and Escape restores focus',async()=>{
+    await page.fill('#waShareText','Copy this customer message');
+    await page.click('#waShareCopy');
+    assert.equal(await page.evaluate(()=>window.__waCopied),'Copy this customer message');
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('#waShareModal').isHidden(),true);
+  });
+  await check('WhatsApp missing recipient offers copy only, never link',async()=>{
+    await page.evaluate(()=>openWhatsAppShare_({source:'customer',entityId:'MISSING',mode:'due'}));
+    await page.locator('#waShareModal').waitFor({state:'visible'});
+    await page.waitForFunction(()=>document.getElementById('waShareText').value.indexOf('৳1,000')>=0);
+    assert.equal(await page.locator('#waShareOpen').getAttribute('href'),null);
+    assert.equal(await page.locator('#waShareOpen').getAttribute('aria-disabled'),'true');
+    assert.match(await page.locator('#waShareWarnings').textContent(),/phone number missing/i);
+    await page.click('#waShareClose');
+  });
+  await check('WhatsApp preview browser errors',()=>assert.deepEqual(errors,[]));
+  await page.close();
+
  } finally {await browser.close();}
  console.log(`production_gate_browser: ${pass}/${pass+fail} PASS; ${pages.length} routes; MOCKED Apps Script bridge`);
  if(fail)process.exitCode=1;
