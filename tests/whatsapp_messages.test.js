@@ -13,6 +13,7 @@ const base={
 function harness({view=base,settings={'Currency Symbol':'৳'}}={}){
  const calls=[],log=[];
  const ctx={console,Date, getSettingsMap_:()=>settings,
+  requirePermission_:(token,module,action)=>{if(token!=='valid')throw Error('Permission denied');return {Role:'Administrator'};},
   ok_:data=>({success:true,data}),fail_:message=>({success:false,message}),
   logError_:(name,err)=>log.push([name,err.message])};
  vm.createContext(ctx);vm.runInContext(source,ctx,{filename:'WhatsAppService.gs'});
@@ -59,7 +60,7 @@ test('finance lender, borrower and owner respect relationship balance labels',()
 test('settled zero balance is neutral for every source',()=>{
  const h=harness();
  for(const sourceKind of ['customer','supplier','financePerson']){
-  const t=h.compose(view({source:sourceKind,currentBalance:0,balanceKind:'settled'}),'en');
+  const t=h.compose(view({source:sourceKind,accountRole:sourceKind==='financePerson'?'Lender':undefined,currentBalance:0,balanceKind:'settled'}),'en');
   assert.match(t,/No outstanding balance: ৳0\.00/);
   assert.doesNotMatch(t,/Outstanding due|Supplier payable|Lender credit/);
  }
@@ -103,7 +104,7 @@ test('selected rows never imply reconciled date-range opening or closing',()=>{
 });
 test('clean untrusted names and references as plain single-line text without HTML encoding',()=>{
  const t=harness().compose(view({
-  business:{name:'<Shop>\\nURGENT',nameBangla:''},
+  business:{name:'<Shop>\nURGENT',nameBangla:''},
   party:{...base.party,name:'Rahim\nPAY NOW'},
   mode:'single',rows:[{...item(2),Reference:'INV-2\nPAY NOW'}]
  }),'en');
@@ -155,4 +156,20 @@ test('long message exceeds conservative 8000 encoded character guard without sil
  assert.equal(result.data.canOpenLink,false);
  assert.ok(result.data.warnings.some(x=>/copy|long|দীর্ঘ/i.test(x)));
  assert.ok(result.data.text.includes('X'.repeat(650)));
+});
+
+test('authenticated preview checks session before validating malicious or missing request source',()=>{
+ const h=harness();
+ const result=plain(h.prepare('invalid',{source:'not-a-source',mode:'due',language:'en'}));
+ assert.equal(result.success,false);
+ assert.match(result.message,/permission|session/i);
+ assert.deepEqual(h.calls,[]);
+});
+test('negative account balances in dated statements retain their sign',()=>{
+ const h=harness();
+ const result=h.compose(view({mode:'period',period:{from:'2026-10-01',to:'2026-10-10'},
+   rows:[],rowCount:0,openingBalance:-25,closingBalance:-25,currentBalance:-25}),'en');
+ assert.match(result,/Opening balance: -৳25\.00/);
+ assert.match(result,/Closing balance: -৳25\.00/);
+ assert.match(result,/Current account balance: -৳25\.00/);
 });
