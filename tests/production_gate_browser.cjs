@@ -146,6 +146,89 @@ async function main() {
   await check('WhatsApp preview browser errors',()=>assert.deepEqual(errors,[]));
   await page.close();
 
+  // Party ledger integrations: real page render/menu controls with simulated
+  // data, while intercepting the shared preview entry point (no live GAS).
+  for (const kind of ['customer','supplier']) {
+    ({page,errors}=await boot(browser));
+    await route(page,kind+'Ledger');
+    const prefix=kind+'Ledger';
+    await page.evaluate(kind=>{
+      const st=kind==='customer'?customerLedgerState:supplierLedgerState;
+      st.partyId=kind==='customer'?'C1':'S1';
+      st.party={id:st.partyId,name:'Test Party',phone:'01712345678',balance:175,canPay:true,status:'Active'};
+      st.parties=[st.party];st.page={pageSize:50,hasOlder:false,olderCursor:'',hasNewer:false};
+      st.pageSize=50;st.showCorrections=false;st.canViewCorrections=false;
+      st.waSelected={};st.partyCombo=null;
+      st.rows=[{'Ledger ID':'CLEAN|'+kind+'|INV-1',Date:'2026-10-01',Type:kind==='customer'?'Sale':'Purchase',
+        Reference:'INV-1',Debit:200,Credit:0,Balance:200,sourceModule:kind==='customer'?'sales':'purchase',availableActions:['view']}];
+      window.__waPartyRequests=[];
+      window.openWhatsAppShare_=function(req,trigger){
+        window.__waPartyRequests.push(JSON.parse(JSON.stringify(req)));
+        return req;
+      };
+      (kind==='customer'?customerLedgerRender_:supplierLedgerRender_)();
+    },kind);
+    await check(kind+' ledger due shortcut uses selected account',async()=>{
+      await page.click('#'+prefix+'ShareDueBtn');
+      const requests=await page.evaluate(()=>window.__waPartyRequests);
+      assert.equal(requests[0].source,kind);assert.equal(requests[0].mode,'due');
+      assert.deepEqual(requests[0].rowIds,[]);
+    });
+    await check(kind+' ledger row selection carries across pagination',async()=>{
+      await page.locator('#'+prefix+'Body input[data-'+kind+'-ledger-share-index="0"]').check();
+      await page.evaluate(kind=>{
+        const st=kind==='customer'?customerLedgerState:supplierLedgerState;
+        st.pageNumber=2;
+        st.rows=[{'Ledger ID':'SOURCE|'+kind+'|INV-2',Date:'2026-10-02',Type:'Payment',
+          Reference:'INV-2',Debit:0,Credit:25,Balance:175,sourceModule:kind==='customer'?'customerPayment':'supplierPayment',availableActions:[]}];
+        (kind==='customer'?customerLedgerRenderRows_:supplierLedgerRenderRows_)();
+      },kind);
+      await page.locator('#'+prefix+'Body input[data-'+kind+'-ledger-share-index="0"]').check();
+      await page.click('#'+prefix+'ShareSelectedBtn');
+      const calls=await page.evaluate(()=>window.__waPartyRequests);
+      assert.equal(calls.at(-1).mode,'selected');
+      assert.deepEqual(calls.at(-1).rowIds,['CLEAN|'+kind+'|INV-1','SOURCE|'+kind+'|INV-2']);
+      assert.equal(Object.keys(calls.at(-1).rowVersions).length,2);
+    });
+    await check(kind+' ledger per-row Actions menu shares only one entry',async()=>{
+      await page.click('#'+prefix+'Body button[data-'+kind+'-ledger-action-index="0"]');
+      await page.getByRole('menuitem',{name:'WhatsApp'}).click();
+      const calls=await page.evaluate(()=>window.__waPartyRequests);
+      assert.equal(calls.at(-1).mode,'single');
+      assert.deepEqual(calls.at(-1).rowIds,['SOURCE|'+kind+'|INV-2']);
+    });
+    await check(kind+' ledger date-range shares independent from visible page',async()=>{
+      await page.click('#'+prefix+'SharePeriodBtn');
+      await page.fill('#'+prefix+'PrintFrom','2026-10-01');
+      await page.fill('#'+prefix+'PrintTo','2026-10-31');
+      await page.click('#'+prefix+'PrintShareBtn');
+      const calls=await page.evaluate(()=>window.__waPartyRequests);
+      assert.equal(calls.at(-1).mode,'period');
+      assert.equal(calls.at(-1).from,'2026-10-01');
+      assert.equal(calls.at(-1).to,'2026-10-31');
+      assert.deepEqual(calls.at(-1).rowIds,[]);
+    });
+    await check(kind+' ledger permission and correction visibility fail closed',async()=>{
+      await page.evaluate(kind=>{
+        const st=kind==='customer'?customerLedgerState:supplierLedgerState;
+        st.showCorrections=true;
+        waPartyLedgerUpdateUi_(kind,st);
+      },kind);
+      assert.equal(await page.locator('#'+prefix+'ShareDueBtn').isDisabled(),true);
+      await page.evaluate(kind=>{
+        const st=kind==='customer'?customerLedgerState:supplierLedgerState;
+        st.showCorrections=false;
+        userPermissions={whatsappShare:{edit:false},[kind==='customer'?'customers':'suppliers']:{view:true}};
+        waPartyLedgerUpdateUi_(kind,st);
+      },kind);
+      assert.equal(await page.locator('#'+prefix+'ShareDueBtn').isHidden(),true);
+      assert.equal(await page.locator('#'+prefix+'ShareSelectedBtn').isHidden(),true);
+    });
+    await check(kind+' ledger WhatsApp browser errors',()=>assert.deepEqual(errors,[]));
+    await page.close();
+  }
+
+
  } finally {await browser.close();}
  console.log(`production_gate_browser: ${pass}/${pass+fail} PASS; ${pages.length} routes; MOCKED Apps Script bridge`);
  if(fail)process.exitCode=1;
