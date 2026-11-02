@@ -407,3 +407,186 @@ function whatsAppBuildFinanceSource_(token, request) {
     currentBalance: currentBalance, balanceKind: whatsAppFinanceBalanceKind_(accountRole, currentBalance)
   };
 }
+
+
+/**
+ * Pure text helpers: never read accounting data or output HTML markup.
+ * Escape only when inserting into the browser DOM, not in WhatsApp text.
+ */
+function whatsAppPlainText_(value) {
+  return String(value == null ? '' : value)
+    .replace(/[\u0000-\u001F\u007F-\u009F]+/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+}
+
+function whatsAppMoneyText_(amount, currencySymbol) {
+  const n = Number(amount);
+  if (!Number.isFinite(n)) throw new Error('Invalid WhatsApp financial amount.');
+  const symbol = whatsAppPlainText_(currencySymbol == null ? '৳' : currencySymbol);
+  return symbol + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function whatsAppBalanceCopy_(kind, language) {
+  const en = {
+    customer_due: 'Outstanding due', customer_credit: 'Customer credit',
+    supplier_payable: 'Supplier payable', supplier_advance: 'Supplier advance',
+    lender_credit: 'Lender credit', lender_debit: 'Lender debit / advance',
+    borrower_debit: 'Borrower receivable', borrower_credit: 'Borrower credit',
+    owner_credit: 'Owner capital', owner_debit: 'Owner debit',
+    settled: 'No outstanding balance'
+  };
+  const bn = {
+    customer_due: 'বকেয়া পাওনা', customer_credit: 'গ্রাহকের জমা/অগ্রিম',
+    supplier_payable: 'সরবরাহকারীর পাওনা', supplier_advance: 'সরবরাহকারীকে অগ্রিম',
+    lender_credit: 'ঋণদাতার পাওনা', lender_debit: 'ঋণদাতার কাছে অগ্রিম',
+    borrower_debit: 'ঋণগ্রহীতার কাছে পাওনা', borrower_credit: 'ঋণগ্রহীতার জমা',
+    owner_credit: 'মালিকের মূলধন', owner_debit: 'মালিকের ডেবিট',
+    settled: 'কোনো বকেয়া নেই'
+  };
+  const map = language === 'bn' ? bn : en;
+  if (!Object.prototype.hasOwnProperty.call(map, kind)) {
+    throw new Error('Unrecognized WhatsApp balance type.');
+  }
+  return map[kind];
+}
+
+function whatsAppEntryLine_(row, language, symbol) {
+  const isFinance = Object.prototype.hasOwnProperty.call(row, 'financeId');
+  const date = whatsAppPlainText_(isFinance ? row.date : row['Date']);
+  const kind = whatsAppPlainText_(isFinance ? (row.transactionTypeLabel || row.transactionType) : row['Type']);
+  const reference = whatsAppPlainText_(isFinance ? (row.referenceNo || row.financeId) : (row['Reference'] || row['Ledger ID']));
+  const debit = Number(isFinance ? row.debit : row['Debit']) || 0;
+  const credit = Number(isFinance ? row.credit : row['Credit']) || 0;
+  const debitName = language === 'bn' ? 'ডেবিট' : 'Debit';
+  const creditName = language === 'bn' ? 'ক্রেডিট' : 'Credit';
+  return [date, kind, reference, debitName + ' ' + whatsAppMoneyText_(debit, symbol),
+    creditName + ' ' + whatsAppMoneyText_(credit, symbol)].join(' | ');
+}
+
+/** Produce only Unicode text from a previously authorized server view. */
+function whatsAppComposeText_(view, language) {
+  if (language !== 'bn' && language !== 'en') throw new Error('Choose Bangla or English.');
+  if (!view || !view.party || !view.business) throw new Error('WhatsApp source is unavailable.');
+  const bn = language === 'bn';
+  const currency = view.currencySymbol == null ? '৳' : view.currencySymbol;
+  const name = whatsAppPlainText_(bn && view.business.nameBangla ? view.business.nameBangla : view.business.name) || 'Mohim ERP';
+  const person = whatsAppPlainText_(view.party.name) || (bn ? 'নাম নেই' : 'Unnamed account');
+  const roleLabel = view.source === 'financePerson' ? view.accountRole :
+    view.source === 'supplier' ? (bn ? 'সরবরাহকারী' : 'Supplier') : (bn ? 'গ্রাহক' : 'Customer');
+  if (!roleLabel) throw new Error('WhatsApp finance role is required.');
+  const current = whatsAppMoneyText_(view.currentBalance, currency);
+  const lines = [name];
+
+  if (view.mode === 'due') {
+    lines.push(whatsAppPlainText_(roleLabel) + ': ' + person);
+    lines.push(whatsAppBalanceCopy_(view.balanceKind, language) + ': ' + current);
+  } else {
+    let heading = bn ? 'হিসাবের বিবরণ' : 'Ledger entries';
+    if (view.mode === 'period') heading = bn ? 'হিসাব বিবরণী' : 'Ledger statement';
+    else if (view.mode === 'single') heading = bn ? 'লেনদেনের বিবরণ' : 'Ledger entry';
+    else if (view.mode === 'selected') heading = bn ? 'নির্বাচিত লেনদেন' : 'Selected entries';
+    else throw new Error('Unknown WhatsApp sharing mode.');
+    lines.push(heading + ' — ' + whatsAppPlainText_(roleLabel) + ': ' + person);
+    const rows = Array.isArray(view.rows) ? view.rows : [];
+    if (view.mode === 'period') {
+      if (!view.period || !view.period.from || !view.period.to) throw new Error('Statement dates are missing.');
+      lines.push((bn ? 'সময়কাল: ' : 'Period: ') + whatsAppPlainText_(view.period.from) +
+        (bn ? ' থেকে ' : ' to ') + whatsAppPlainText_(view.period.to));
+      lines.push((bn ? 'শুরুর জের: ' : 'Opening balance: ') + whatsAppMoneyText_(view.openingBalance, currency));
+    }
+    if (!rows.length) {
+      lines.push(bn ? 'এই সময়ে কোনো লেনদেন নেই' : 'No transactions in this period');
+    } else {
+      lines.push(bn ? 'লেনদেন:' : 'Transactions:');
+      const limit = view.mode === 'period' ? 12 : rows.length;
+      rows.slice(0, limit).forEach(function (row) {
+        lines.push(whatsAppEntryLine_(row, language, currency));
+      });
+      if (view.mode === 'period' && rows.length > limit) {
+        lines.push(bn ? 'দেখানো হয়েছে ' + rows.length + 'টির মধ্যে ' + limit + 'টি লেনদেন' :
+          'Showing ' + limit + ' of ' + rows.length + ' entries');
+      }
+    }
+
+    const allCount = rows.length;
+    const totalSuffix = view.mode === 'period' && allCount > 12
+      ? (bn ? ' (সব ' + allCount + 'টি)' : ' (all ' + allCount + ')') : '';
+    lines.push((bn ? 'মোট ডেবিট' : 'Total debit') + totalSuffix + ': ' + whatsAppMoneyText_(view.totalDebit, currency));
+    lines.push((bn ? 'মোট ক্রেডিট' : 'Total credit') + totalSuffix + ': ' + whatsAppMoneyText_(view.totalCredit, currency));
+    if (view.mode === 'period') {
+      lines.push((bn ? 'শেষ জের: ' : 'Closing balance: ') + whatsAppMoneyText_(view.closingBalance, currency));
+    }
+    lines.push((bn ? 'বর্তমান হিসাবের জের: ' : 'Current account balance: ') + current);
+  }
+  lines.push(bn ? 'অনুগ্রহ করে হিসাবটি যাচাই করুন। ধন্যবাদ।' :
+    'Please review your balance. Thank you.');
+  return lines.join('\n');
+}
+
+/**
+ * Authenticated RPC: compose from authoritative server state, never request
+ * amounts/party names. No sending, contact updates, ledger writes or log here.
+ */
+function prepareWhatsAppMessage(token, request) {
+  try {
+    request = request || {};
+    const language = request.language == null ? 'bn' : String(request.language);
+    if (language !== 'bn' && language !== 'en') throw new Error('Language must be bn or en.');
+    const source = request.source;
+    if (source !== 'customer' && source !== 'supplier' && source !== 'financePerson') {
+      throw new Error('Invalid WhatsApp sharing source.');
+    }
+    const snapshot = source === 'financePerson'
+      ? whatsAppBuildFinanceSource_(token, request)
+      : whatsAppBuildPartySource_(token, request);
+    const settings = getSettingsMap_();
+    const view = Object.assign({}, snapshot, { currencySymbol: settings['Currency Symbol'] || '৳' });
+    const text = whatsAppComposeText_(view, language);
+
+    // If the stored contact number is absent, allow a Copy-only preview.
+    // An explicitly supplied alternate number must be valid and confirmed.
+    const override = String(request.recipientOverride == null ? '' : request.recipientOverride).trim();
+    const warnings = [];
+    let recipient = null;
+    if (override) {
+      recipient = whatsAppResolveRecipient_(view.party.phone, override, request.confirmOverride);
+    } else {
+      try {
+        recipient = whatsAppResolveRecipient_(view.party.phone, null, false);
+      } catch (err) {
+        warnings.push(language === 'bn'
+          ? 'হোয়াটসঅ্যাপ নম্বর অনুপস্থিত বা ভুল। নম্বর যোগ করুন, অথবা মেসেজ কপি করুন।'
+          : 'WhatsApp phone number is missing or invalid. Add a number or copy the message.');
+      }
+    }
+    const rows = Array.isArray(view.rows) ? view.rows : [];
+    const shown = view.mode === 'period' ? Math.min(rows.length, 12) : rows.length;
+    if (view.mode === 'period' && rows.length > 12) {
+      warnings.push(language === 'bn'
+        ? 'প্রথম ১২টি লেনদেন দেখানো হয়েছে; সব লেনদেনের মোট হিসাব অন্তর্ভুক্ত।'
+        : 'Showing 12 entries; totals include all period transactions.');
+    }
+    // 8,000 encoded characters is a conservative compatibility guard,
+    // not a documented WhatsApp provider limit. Client builds URL on click.
+    const fitsLink = encodeURIComponent(text).length + 30 + (recipient ? recipient.digits.length : 0) <= 8000;
+    if (!fitsLink) {
+      warnings.push(language === 'bn'
+        ? 'মেসেজটি অনেক দীর্ঘ। কপি করে হোয়াটসঅ্যাপে পেস্ট করুন।'
+        : 'Message is too long for the direct link. Copy and paste it into WhatsApp.');
+    }
+    const title = view.mode === 'due'
+      ? (language === 'bn' ? 'বকেয়া ও জের' : 'Account balance')
+      : view.mode === 'period' ? (language === 'bn' ? 'হিসাব বিবরণী' : 'Ledger statement')
+      : view.mode === 'single' ? (language === 'bn' ? 'লেনদেন' : 'Ledger entry')
+      : (language === 'bn' ? 'নির্বাচিত লেনদেন' : 'Selected entries');
+    return ok_({
+      recipient: recipient, partyName: whatsAppPlainText_(view.party.name),
+      title: title, text: text, warnings: warnings, lineCount: shown,
+      mode: view.mode, source: view.source, entityId: view.entityId,
+      currentBalance: view.currentBalance,
+      canOpenLink: !!recipient && fitsLink
+    });
+  } catch (err) {
+    return fail_(err && err.message ? err.message : String(err));
+  }
+}
