@@ -19,7 +19,7 @@ Administrators use the existing administrator permission model. A hidden button 
 
 ## How to share
 
-**Customer or Supplier Ledger:** Select a party. Use **WhatsApp Due** for the current balance; use a transaction's **Actions → WhatsApp** for one entry. To share a selection, tick the checkboxes beside transactions (up to **25**, including across pages), then choose **WhatsApp Selected (N)**. To share a date range, choose **WhatsApp Dates**, set **From** and **To** (inclusive), then select **WhatsApp** in the existing date dialog.
+**Customer or Supplier Ledger:** Select a party. Use **WhatsApp Due** for the current balance; use a transaction's **Actions → WhatsApp** for one entry. To share a selection, tick the checkboxes beside transactions (up to **25**, including across pages), then choose **WhatsApp Selected (N)**. **Clear selection** deselects every checked entry, including entries on other ledger pages, without changing transactions. To share a date range, choose **WhatsApp Dates**, set **From** and **To** (inclusive), then select **WhatsApp** in the existing date dialog.
 
 **Finance Person Ledger:** Select the person and exact **Owner**, **Lender**, or **Borrower** account role. Use **WhatsApp Balance**, **WhatsApp Selected (N)**, **WhatsApp Dates**, or **Actions → WhatsApp** for one row. Switching person or role clears the selection. Lender Credits/Debits and Borrower Debits/Credits follow relationship-ledger meaning, **not** the Cash Book's direction.
 
