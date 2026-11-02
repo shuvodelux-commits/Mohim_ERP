@@ -36,7 +36,8 @@ test('Finance UI row fingerprint equals authoritative finance source signature, 
  const h=rig(),client=h.call('waFinanceRowVersion_',lender,'Lender','P1');
  assert.equal(client,h.server.whatsAppFinanceRowVersion_({...lender,accountRole:'Lender'}));
  assert.notEqual(client,h.call('waFinanceRowVersion_',loanPayment,'Lender','P1'));
- assert.notEqual(client,h.call('waFinanceRowVersion_',lender,'Borrower','P1'));
+ // Fingerprint represents source row values; role isolation is a separate server check.
+ assert.equal(client,h.call('waFinanceRowVersion_',lender,'Borrower','P1'));
  assert.notEqual(client,h.call('waFinanceRowVersion_',{...lender,amount:1501},'Lender','P1'));
  assert.notEqual(client,h.call('waFinanceRowVersion_',{...lender,balance:1501},'Lender','P1'));
 });
