@@ -234,6 +234,114 @@ async function main() {
   }
 
 
+
+  // Finance Person WhatsApp: exercise the real existing ledger workspace
+  // with sample role-scoped ledger rows (mocked GAS, no transactions or sends).
+  ({page,errors}=await boot(browser));
+  await route(page,'financePersonLedger');
+  await page.evaluate(()=>{
+    const st=finPersonLedgerState;
+    const roles=['Owner','Lender','Borrower'];
+    st.persons=[{id:'P1',name:'Finance Party',phone:'01712345678',status:'Active',roles:roles}];
+    st.balances={P1:{owner:7000,loanPayable:2000,borrowerReceivable:400}};
+    st.personId='P1';st.account='Lender';st.role='All';st.page=1;
+    st.transactionTypes=[
+      {key:'Loan Received',role:'Lender',account:'loanPayable',balanceEffect:1,label:'Lender Credit'},
+      {key:'Loan Repayment',role:'Lender',account:'loanPayable',balanceEffect:-1,label:'Lender Debit'},
+      {key:'Borrower Loan',role:'Borrower',account:'borrowerReceivable',balanceEffect:1,label:'Borrower Debit'},
+      {key:'Owner Investment',role:'Owner',account:'owner',balanceEffect:1,label:'Owner Credit'}
+    ];
+    st.rows=[
+      {financeId:'F2',personId:'P1',account:'loanPayable',date:'2026-10-02',transactionType:'Loan Repayment',transactionTypeLabel:'Lender Debit',amount:1000,credit:0,debit:1000,balance:2000,referenceNo:'REF2',notes:''},
+      {financeId:'F1',personId:'P1',account:'loanPayable',date:'2026-10-01',transactionType:'Loan Received',transactionTypeLabel:'Lender Credit',amount:3000,credit:3000,debit:0,balance:3000,referenceNo:'REF1',notes:''},
+      {financeId:'B1',personId:'P1',account:'borrowerReceivable',date:'2026-10-01',transactionType:'Borrower Loan',transactionTypeLabel:'Borrower Debit',amount:400,credit:0,debit:400,balance:400,referenceNo:'BREF',notes:''},
+      {financeId:'O1',personId:'P1',account:'owner',date:'2026-10-01',transactionType:'Owner Investment',transactionTypeLabel:'Owner Credit',amount:7000,credit:7000,debit:0,balance:7000,referenceNo:'OREF',notes:''}
+    ];
+    st.waFinanceSelected={};st.waFinanceScope='';
+    document.getElementById('fplDateFrom').value='';
+    document.getElementById('fplDateTo').value='';
+    document.getElementById('fplLedgerSearch').value='';
+    document.getElementById('fplTypeFilter').value='';
+    document.getElementById('fplPageSize').value='50';
+    window.__waFinanceRequests=[];
+    window.openWhatsAppShare_=function(req){
+      window.__waFinanceRequests.push(JSON.parse(JSON.stringify(req)));
+      return req;
+    };
+    finPersonLedgerRenderSelected_();
+  });
+  await check('Finance Lender balance and selected entries use account role',async()=>{
+    await page.click('#fplShareBalanceBtn');
+    let requests=await page.evaluate(()=>window.__waFinanceRequests);
+    assert.deepEqual([requests.at(-1).source,requests.at(-1).entityId,requests.at(-1).accountRole,requests.at(-1).mode],
+      ['financePerson','P1','Lender','due']);
+    await page.locator('#fplTransactionBody input[data-fpl-wa-check="F2"]').check();
+    await page.locator('#fplTransactionBody input[data-fpl-wa-check="F1"]').check();
+    await page.click('#fplShareSelectedBtn');
+    requests=await page.evaluate(()=>window.__waFinanceRequests);
+    assert.deepEqual(requests.at(-1).rowIds,['F2','F1']);
+    assert.ok(requests.at(-1).rowVersions.F1.includes('"loanPayable"'));
+  });
+  await check('Finance row Actions include WhatsApp with only selected role transaction',async()=>{
+    await page.click('#fplTransactionBody button[data-fpl-menu="F2"]');
+    await page.getByRole('menuitem',{name:'WhatsApp'}).click();
+    const requests=await page.evaluate(()=>window.__waFinanceRequests);
+    assert.equal(requests.at(-1).mode,'single');
+    assert.deepEqual(requests.at(-1).rowIds,['F2']);
+    assert.equal(requests.at(-1).accountRole,'Lender');
+  });
+  await check('Finance date-range uses existing filters, not visible search rows',async()=>{
+    await page.evaluate(()=>{
+      document.getElementById('fplDateFrom').value='2026-10-01';
+      document.getElementById('fplDateTo').value='2026-10-31';
+      document.getElementById('fplLedgerSearch').value='NO MATCH';
+      finPersonLedgerRenderLedger_();
+    });
+    await page.click('#fplSharePeriodBtn');
+    const requests=await page.evaluate(()=>window.__waFinanceRequests);
+    assert.equal(requests.at(-1).mode,'period');
+    assert.equal(requests.at(-1).from,'2026-10-01');
+    assert.equal(requests.at(-1).to,'2026-10-31');
+    assert.deepEqual(requests.at(-1).rowIds,[]);
+  });
+  await check('Finance switching Lender to Borrower drops selected Lender rows',async()=>{
+    await page.evaluate(()=>{
+      document.getElementById('fplDateFrom').value='';
+      document.getElementById('fplDateTo').value='';
+      document.getElementById('fplLedgerSearch').value='';
+      finPersonLedgerRenderSelected_();
+    });
+    await page.click('#fplRoleChips button[data-account-role="Borrower"]');
+    const info=await page.evaluate(()=>({count:Object.keys(finPersonLedgerState.waFinanceSelected).length,
+      role:finPersonLedgerState.account,ids:[...document.querySelectorAll('#fplTransactionBody tr[data-finance-id]')].map(x=>x.dataset.financeId)}));
+    assert.deepEqual([info.role,info.count],['Borrower',0]);
+    assert.deepEqual(info.ids,['B1']);
+    assert.equal(await page.locator('#fplShareSelectedBtn').isDisabled(),true);
+    await page.click('#fplShareBalanceBtn');
+    const requests=await page.evaluate(()=>window.__waFinanceRequests);
+    assert.equal(requests.at(-1).accountRole,'Borrower');
+  });
+  await check('Finance Owner role remains independent and shares only Owner rows',async()=>{
+    await page.click('#fplRoleChips button[data-account-role="Owner"]');
+    await page.locator('#fplTransactionBody input[data-fpl-wa-check="O1"]').check();
+    await page.click('#fplShareSelectedBtn');
+    const requests=await page.evaluate(()=>window.__waFinanceRequests);
+    assert.deepEqual(requests.at(-1).rowIds,['O1']);
+    assert.equal(requests.at(-1).accountRole,'Owner');
+  });
+  await check('Finance sharing controls are hidden without both permissions',async()=>{
+    await page.evaluate(()=>{
+      userPermissions={whatsappShare:{edit:false},finance:{view:true}};
+      waFinanceUpdateUi_(finPersonLedgerState);
+      finPersonLedgerRenderLedger_();
+    });
+    assert.equal(await page.locator('#fplShareBalanceBtn').isHidden(),true);
+    assert.equal(await page.locator('#fplShareSelectedBtn').isHidden(),true);
+    assert.equal(await page.locator('#fplTransactionBody input[data-fpl-wa-check]').count(),0);
+  });
+  await check('Finance WhatsApp browser errors',()=>assert.deepEqual(errors,[]));
+  await page.close();
+
  } finally {await browser.close();}
  console.log(`production_gate_browser: ${pass}/${pass+fail} PASS; ${pages.length} routes; MOCKED Apps Script bridge`);
  if(fail)process.exitCode=1;
