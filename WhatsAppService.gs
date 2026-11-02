@@ -641,12 +641,9 @@ function prepareWhatsAppMessage(token, request) {
       }
     }
     const rows = Array.isArray(view.rows) ? view.rows : [];
-    const shown = view.mode === 'period' ? Math.min(rows.length, 12) : rows.length;
-    if (view.mode === 'period' && rows.length > 12) {
-      warnings.push(language === 'bn'
-        ? 'প্রথম ১২টি লেনদেন দেখানো হয়েছে; সব লেনদেনের মোট হিসাব অন্তর্ভুক্ত।'
-        : 'Showing 12 entries; totals include all period transactions.');
-    }
+    // The approved short copy shows no period transaction lines.
+    // Report the authoritative count without a misleading 12-row truncation warning.
+    const shown = rows.length;
     // 8,000 encoded characters is a conservative compatibility guard,
     // not a documented WhatsApp provider limit. Client builds URL on click.
     const fitsLink = encodeURIComponent(text).length + 30 + (recipient ? recipient.digits.length : 0) <= 8000;
