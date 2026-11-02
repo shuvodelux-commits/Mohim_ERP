@@ -1,6 +1,6 @@
 # WhatsApp Phase 1 — operator guide and release checklist
 
-Status: **Draft PR / deployed to isolated TEST copy only (version 5 of the earlier PR code; latest short-copy changes still pending preview redeploy)**. No production deployment or merge. Scope: **manual WhatsApp Click-to-Chat only**.
+Status: **Draft PR / deployed to isolated TEST copy only (version 7, approved short-copy source fa3ebcb)**. No production deployment or merge. Scope: **manual WhatsApp Click-to-Chat only**.
 
 ## What this feature does
 
