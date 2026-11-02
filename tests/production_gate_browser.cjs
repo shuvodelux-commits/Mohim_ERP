@@ -199,8 +199,12 @@ async function main() {
     });
     await check(kind+' ledger date-range shares independent from visible page',async()=>{
       await page.click('#'+prefix+'SharePeriodBtn');
-      await page.fill('#'+prefix+'PrintFrom','2026-10-01');
-      await page.fill('#'+prefix+'PrintTo','2026-10-31');
+      // The ERP's existing touch-date replacement hides native inputs.
+      // Seed their values; date-picker interaction has separate regression coverage.
+      await page.evaluate(prefix=>{
+        document.getElementById(prefix+'PrintFrom').value='2026-10-01';
+        document.getElementById(prefix+'PrintTo').value='2026-10-31';
+      },prefix);
       await page.click('#'+prefix+'PrintShareBtn');
       const calls=await page.evaluate(()=>window.__waPartyRequests);
       assert.equal(calls.at(-1).mode,'period');
