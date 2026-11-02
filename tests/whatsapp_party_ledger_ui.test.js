@@ -18,6 +18,7 @@ function run(permissions=null){
    openWhatsAppShare_:(request,trigger)=>{calls.push({request:JSON.parse(JSON.stringify(request)),trigger});return request;}
  };
  vm.createContext(ctx);vm.runInContext(script,ctx,{filename:'whatsappShare.html'});
+ ctx.openWhatsAppShare_=(request,trigger)=>{calls.push({request:JSON.parse(JSON.stringify(request)),trigger});return request;};
  const server={};vm.createContext(server);vm.runInContext(service,server,{filename:'WhatsAppService.gs'});
  return {ctx,calls,messages,elements,server,call:(fn,...args)=>{ctx.__args=args;return vm.runInContext(fn+'(...__args)',ctx)}};
 }
