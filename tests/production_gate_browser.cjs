@@ -197,7 +197,8 @@ async function main() {
       assert.equal(calls.at(-1).mode,'single');
       assert.deepEqual(calls.at(-1).rowIds,['SOURCE|'+kind+'|INV-2']);
     });
-    await check(kind+' ledger date-range shares independent from visible page',async()=>{
+    await check(kind+' ledger date-range works even when Print has no rows',async()=>{
+      await page.evaluate(prefix=>{document.getElementById(prefix+'PrintBtn').disabled=true;},prefix);
       await page.click('#'+prefix+'SharePeriodBtn');
       // The ERP's existing touch-date replacement hides native inputs.
       // Seed their values; date-picker interaction has separate regression coverage.
