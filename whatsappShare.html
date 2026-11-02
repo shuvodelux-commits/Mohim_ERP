@@ -325,6 +325,108 @@
     return waShareRequestPreview_(false);
   }
 
+
+  /**
+   * One common Customer/Supplier ledger sharing adapter.
+   * Version tuples must match whatsAppPartyRowVersion_ in WhatsAppService.gs.
+   */
+  function waPartyLedgerCanShare_(kind) {
+    if (kind !== 'customer' && kind !== 'supplier') return false;
+    if (userPermissions === null) return true;
+    var mod = kind === 'customer' ? 'customers' : 'suppliers';
+    return !!(userPermissions && userPermissions.whatsappShare &&
+      userPermissions.whatsappShare.edit && userPermissions[mod] && userPermissions[mod].view);
+  }
+
+  function waPartyLedgerRowVersion_(row) {
+    return JSON.stringify([
+      String(row['Ledger ID'] || ''), String(row['Date'] || '').slice(0, 10),
+      String(row['Type'] || ''), String(row['Reference'] || ''),
+      Number(row['Debit']) || 0, Number(row['Credit']) || 0,
+      Number(row['Balance']) || 0
+    ]);
+  }
+
+  function waPartyLedgerReset_(state) {
+    if (state) state.waSelected = {};
+  }
+
+  function waPartyLedgerToggle_(kind, state, row, checked) {
+    if (!waPartyLedgerCanShare_(kind) || !state || !state.partyId || !state.party ||
+        state.showCorrections || !row || !String(row['Ledger ID'] || '')) return false;
+    if (!state.waSelected) state.waSelected = {};
+    var id = String(row['Ledger ID']);
+    if (checked && !Object.prototype.hasOwnProperty.call(state.waSelected, id) &&
+        Object.keys(state.waSelected).length >= 25) {
+      showToast('Select up to 25 ledger entries for WhatsApp.', 'error');
+      return false;
+    }
+    if (checked) state.waSelected[id] = waPartyLedgerRowVersion_(row);
+    else delete state.waSelected[id];
+    waPartyLedgerUpdateUi_(kind, state);
+    return true;
+  }
+
+  function waPartyLedgerUpdateUi_(kind, state) {
+    var prefix = kind === 'customer' ? 'customerLedger' : 'supplierLedger';
+    var allowed = waPartyLedgerCanShare_(kind);
+    var active = !!(state && state.partyId && state.party && !state.showCorrections);
+    var due = waShareElement_(prefix + 'ShareDueBtn');
+    var selected = waShareElement_(prefix + 'ShareSelectedBtn');
+    var period = waShareElement_(prefix + 'SharePeriodBtn');
+    var printShare = waShareElement_(prefix + 'PrintShareBtn');
+    var count = Object.keys((state && state.waSelected) || {}).length;
+    [due, selected, period, printShare].forEach(function (el) {
+      if (el) el.hidden = !allowed;
+    });
+    if (due) due.disabled = !allowed || !active;
+    if (period) period.disabled = !allowed || !active;
+    if (printShare) printShare.disabled = !allowed || !active;
+    if (selected) {
+      selected.disabled = !allowed || !active || !count;
+      selected.textContent = 'WhatsApp Selected (' + count + ')';
+    }
+  }
+
+  function waPartyLedgerSend_(kind, state, mode, row, dates, trigger) {
+    if (!waPartyLedgerCanShare_(kind) || !state || !state.party || !state.partyId ||
+        state.showCorrections) return false;
+    if (['due','single','selected','period'].indexOf(mode) === -1) return false;
+    var request = {
+      source: kind, entityId: String(state.partyId), mode: mode,
+      rowIds: [], rowVersions: {}
+    };
+    if (mode === 'single') {
+      if (!row || !row['Ledger ID']) return false;
+      var id = String(row['Ledger ID']);
+      request.rowIds = [id];
+      request.rowVersions[id] = waPartyLedgerRowVersion_(row);
+    } else if (mode === 'selected') {
+      var versions = state.waSelected || {};
+      request.rowIds = Object.keys(versions);
+      if (!request.rowIds.length || request.rowIds.length > 25) {
+        showToast('Select between 1 and 25 ledger entries.', 'error');
+        return false;
+      }
+      request.rowVersions = Object.assign({}, versions);
+    } else if (mode === 'period') {
+      var from = dates && dates.from || '';
+      var to = dates && dates.to || '';
+      var now = new Date();
+      var today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2,'0') +
+        '-' + String(now.getDate()).padStart(2,'0');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(from) ||
+          !/^\d{4}-\d{2}-\d{2}$/.test(to) || from > to || to > today) {
+        showToast('Choose a valid From and To date, not after today.', 'error');
+        return false;
+      }
+      request.from = from;
+      request.to = to;
+    }
+    openWhatsAppShare_(request, trigger);
+    return request;
+  }
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', waShareWire_);
   } else {
