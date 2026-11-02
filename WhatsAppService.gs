@@ -224,3 +224,186 @@ function whatsAppBuildPartySource_(token, request) {
     closingBalance: closingBalance, totalDebit: totalDebit, totalCredit: totalCredit
   };
 }
+
+
+/**
+ * A stable, read-only snapshot signature for one Finance Person Ledger line.
+ * Reject a selection when a transaction is edited, backdated, or deleted.
+ */
+function whatsAppFinanceRowVersion_(row) {
+  return JSON.stringify([
+    String(row.financeId || ''), String(row.date || ''),
+    String(row.transactionType || ''), Number(row.amount) || 0,
+    Number(row.balance) || 0, String(row.referenceNo || ''),
+    String(row.notes || ''), String(row.account || ''),
+    String(row.personId || '')
+  ]);
+}
+
+function whatsAppFinanceBalanceKind_(role, balance) {
+  if (Math.abs(balance) < 0.005) return 'settled';
+  if (role === 'Lender') return balance > 0 ? 'lender_credit' : 'lender_debit';
+  if (role === 'Borrower') return balance > 0 ? 'borrower_debit' : 'borrower_credit';
+  return balance > 0 ? 'owner_credit' : 'owner_debit';
+}
+
+/**
+ * Finance source uses existing getFinanceLedger server running balances.
+ * Finance Ledger debit/credit reflect CASH direction, so transaction lines
+ * are independently projected using balanceEffect for their relationship
+ * account (the exact Finance Person Ledger convention).
+ *
+ * Never infer a finance person from an unbound legacy free-text name:
+ * the read must fail closed rather than understate or leak an obligation.
+ */
+function whatsAppBuildFinanceSource_(token, request) {
+  request = request || {};
+  if (request.source !== 'financePerson') throw new Error('Unknown Finance Person sharing source.');
+  const entityId = String(request.entityId == null ? '' : request.entityId).trim();
+  const accountRole = String(request.accountRole == null ? '' : request.accountRole).trim();
+  whatsAppAuthorize_(token, 'financePerson', entityId, accountRole);
+  const accounts = { Owner: 'owner', Lender: 'loanPayable', Borrower: 'borrowerReceivable' };
+  const account = accounts[accountRole];
+  if (!account) throw new Error('Choose a valid Finance Person account role.');
+
+  const mode = String(request.mode || '');
+  if (['due', 'single', 'selected', 'period'].indexOf(mode) === -1) {
+    throw new Error('Unknown Finance Person WhatsApp sharing mode.');
+  }
+  const rowIds = request.rowIds == null ? [] : request.rowIds;
+  if (!Array.isArray(rowIds)) throw new Error('Select valid Finance ID values.');
+  if ((mode === 'due' || mode === 'period') && rowIds.length) {
+    throw new Error('Finance row selection is not allowed for this sharing mode.');
+  }
+  if (mode !== 'period' && (request.from || request.to)) {
+    throw new Error('Date range only applies to a period statement.');
+  }
+
+  const people = getAllRows_('FINANCE_PERSONS').filter(function (person) {
+    return String(person['Person ID'] || '') === entityId && !isDeleted_(person);
+  });
+  if (people.length !== 1) throw new Error('Finance Person not found or unavailable.');
+  const person = people[0];
+
+  // getFinanceLedger returns ok_/fail_; do not use its all-persons mode.
+  const result = getFinanceLedger(token, { personId: entityId });
+  if (!result || result.success !== true || !result.data || !Array.isArray(result.data.rows)) {
+    throw new Error(result && result.message || 'Unable to read Finance Person ledger.');
+  }
+
+  const ledgerRows = result.data.rows;
+  const seenFinanceIds = new Set();
+  const accountRows = [];
+  ledgerRows.forEach(function (row) {
+    if (String(row.personKey || '') !== 'id:' + entityId) {
+      throw new Error('Finance Person account mismatch. Refresh before sharing.');
+    }
+    if (String(row.personId || '') !== entityId) {
+      throw new Error('Legacy finance transaction has unresolved Person ID. Review and link it before WhatsApp sharing.');
+    }
+    const id = String(row.financeId || '');
+    if (!id || seenFinanceIds.has(id)) {
+      throw new Error('Missing or duplicate Finance ID. Review the ledger before sharing.');
+    }
+    seenFinanceIds.add(id);
+
+    const type = financeTransactionType_(row.transactionType);
+    if (!type || !type.account || !type.role) {
+      throw new Error('Unknown Finance transaction type. Review the ledger before sharing.');
+    }
+    if (String(row.account || '') !== type.account) {
+      throw new Error('Finance transaction account mismatch. Review the ledger before sharing.');
+    }
+    if (type.account !== account) return;
+    if (type.role !== accountRole) {
+      throw new Error('Finance Person relationship role mismatch. Review the ledger before sharing.');
+    }
+    const amount = Number(row.amount), balance = Number(row.balance);
+    if (!Number.isFinite(amount) || amount <= 0 || !Number.isFinite(balance)) {
+      throw new Error('Invalid Finance transaction amount or balance. Review the ledger before sharing.');
+    }
+    const increased = type.balanceEffect > 0;
+    const borrower = account === 'borrowerReceivable';
+    accountRows.push({
+      financeId: id, date: String(row.date || ''),
+      personId: entityId, account: account, accountRole: accountRole,
+      transactionType: type.key, transactionTypeLabel: type.label,
+      referenceNo: String(row.referenceNo || ''),
+      notes: String(row.notes || ''), amount: amount,
+      debit: increased === borrower ? amount : 0,
+      credit: increased !== borrower ? amount : 0,
+      balance: balance
+    });
+  });
+
+  // Existing getFinanceLedger returns newest first. Its signed per-account
+  // running balance already includes all historical (including opening)
+  // transaction effects and is not a cash-book movement.
+  const currentBalance = accountRows.length ? Number(accountRows[0].balance) || 0 : 0;
+  const party = {
+    id: entityId, name: String(person['Person Name'] || ''),
+    phone: String(person['Phone'] || ''), balance: currentBalance,
+    accountRole: accountRole
+  };
+  const business = partyLedgerBusinessIdentity_();
+  let rows = [], period = null, openingBalance = null, closingBalance = null;
+  let summaryLabel = 'Current balance';
+
+  if (mode === 'period') {
+    period = partyLedgerValidateStatementDates_(request.from, request.to);
+    const asc = accountRows.slice().reverse();
+    let opening = 0, closing = 0;
+    const selected = [];
+    asc.forEach(function (row) {
+      if (row.date < period.from) opening = row.balance;
+      if (row.date <= period.to) closing = row.balance;
+      if (row.date >= period.from && row.date <= period.to) selected.push(row);
+    });
+    rows = selected.reverse();
+    openingBalance = opening;
+    closingBalance = closing;
+    summaryLabel = 'Period statement';
+  } else if (mode === 'single' || mode === 'selected') {
+    if (mode === 'single' && rowIds.length !== 1) {
+      throw new Error('Choose exactly one Finance entry.');
+    }
+    if (mode === 'selected' && (rowIds.length < 1 || rowIds.length > 25)) {
+      throw new Error('Select between 1 and 25 Finance ledger entries.');
+    }
+    const wanted = new Set();
+    rowIds.forEach(function (id) {
+      if (typeof id !== 'string' || !id.trim()) throw new Error('Invalid Finance ID.');
+      if (wanted.has(id)) throw new Error('Duplicate Finance ID selection is not allowed.');
+      wanted.add(id);
+    });
+    rows = accountRows.filter(function (row) { return wanted.has(row.financeId); });
+    if (rows.length !== rowIds.length) {
+      throw new Error('Selected Finance transaction is missing, changed or belongs to another role/person. Refresh and reselect.');
+    }
+    const versions = request.rowVersions;
+    if (!versions || typeof versions !== 'object' || Array.isArray(versions)) {
+      throw new Error('Selected Finance row versions required. Refresh and reselect.');
+    }
+    rows.forEach(function (row) {
+      if (!Object.prototype.hasOwnProperty.call(versions, row.financeId) ||
+          String(versions[row.financeId]) !== whatsAppFinanceRowVersion_(row)) {
+        throw new Error('Finance transaction changed since display. Refresh and reselect.');
+      }
+    });
+    summaryLabel = mode === 'single' ? 'Finance ledger entry' : 'Selected entries';
+  }
+  const totalDebit = rows.reduce(function (sum, row) {
+    return Math.round((sum + row.debit) * 100) / 100;
+  }, 0);
+  const totalCredit = rows.reduce(function (sum, row) {
+    return Math.round((sum + row.credit) * 100) / 100;
+  }, 0);
+  return {
+    source: 'financePerson', entityId: entityId,
+    accountRole: accountRole, account: account, mode: mode, party: party,
+    business: business, period: period, rows: rows, rowCount: rows.length,
+    summaryLabel: summaryLabel, openingBalance: openingBalance,
+    closingBalance: closingBalance, totalDebit: totalDebit, totalCredit: totalCredit,
+    currentBalance: currentBalance, balanceKind: whatsAppFinanceBalanceKind_(accountRole, currentBalance)
+  };
+}
