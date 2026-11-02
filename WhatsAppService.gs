@@ -599,3 +599,91 @@ function prepareWhatsAppMessage(token, request) {
     return fail_(err && err.message ? err.message : String(err));
   }
 }
+
+
+/**
+ * Record an operator's attempt to open a manual wa.me draft, NOT sending or delivery.
+ * Separate append-only sheet; never stores complete phone numbers or messages.
+ * The current server ledger is reauthorized/revalidated to obtain true row count.
+ */
+function recordWhatsAppShare(token, request) {
+  let lock = null, acquired = false;
+  try {
+    // Auth FIRST: public Google Apps Script RPC must not reveal request
+    // validation, person identity, or audit logs to unauthenticated callers.
+    const actor = requirePermission_(token, 'whatsappShare', 'edit');
+    request = request || {};
+    const eventKey = request.eventKey;
+    if (typeof eventKey !== 'string' || !/^[a-zA-Z0-9_-]{16,90}$/.test(eventKey)) {
+      throw new Error('Invalid WhatsApp open attempt identifier.');
+    }
+    const source = request.source;
+    if (source !== 'customer' && source !== 'supplier' && source !== 'financePerson') {
+      throw new Error('Invalid WhatsApp sharing source.');
+    }
+
+    const actorId = String(actor && actor['User ID'] || '').trim();
+    if (!actorId) throw new Error('Unable to identify current ERP user.');
+    // Validate the selected source and optional version fingerprints AGAIN at
+    // click time. Never trust browser-supplied row totals or recipient digits.
+    const snapshot = source === 'financePerson'
+      ? whatsAppBuildFinanceSource_(token, request)
+      : whatsAppBuildPartySource_(token, request);
+    if (!snapshot || !snapshot.party) throw new Error('Unable to verify WhatsApp source.');
+    const recipient = whatsAppResolveRecipient_(snapshot.party.phone,
+      request.recipientOverride, request.confirmOverride);
+    const last4 = recipient.digits.slice(-4);
+    const role = source === 'financePerson' ? String(snapshot.accountRole || '') : '';
+    const entityId = String(snapshot.entityId || '');
+    const mode = String(snapshot.mode || '');
+    const rowCount = Number(snapshot.rowCount);
+    if (!entityId || !['due','single','selected','period'].includes(mode) ||
+      !Number.isSafeInteger(rowCount) || rowCount < 0 || (source === 'financePerson' && !role)) {
+      throw new Error('WhatsApp source verification is incomplete.');
+    }
+
+    // The same key can only refer to the same actor and same canonical
+    // attempt. Enforce idempotency under a cross-execution GAS ScriptLock.
+    lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    acquired = true;
+    const history = getAllRows_('WHATSAPP_SHARE_LOG');
+    const prior = history.filter(function (r) { return String(r['Event Key'] || '') === eventKey; });
+    if (prior.length > 1) throw new Error('Duplicate audit identifiers need review.');
+    if (prior.length === 1) {
+      const stored = prior[0];
+      if (String(stored.Actor) !== actorId ||
+          String(stored.Source) !== source || String(stored['Entity ID']) !== entityId ||
+          String(stored['Account Role'] || '') !== role ||
+          String(stored.Mode) !== mode ||
+          String(stored['Recipient Last4']) !== last4 ||
+          String(stored['Recipient Override']).toLowerCase() !== String(!!recipient.overridden)) {
+        throw new Error('This WhatsApp audit identifier belongs to another attempt.');
+      }
+      return ok_({ eventId: String(stored['Event ID']), status: 'OPEN_ATTEMPTED', duplicate: true });
+    }
+
+    const eventId = generateId_('WHATSAPP_SHARE_LOG');
+    appendRow_('WHATSAPP_SHARE_LOG', {
+      'Event ID': eventId,
+      'Event Key': eventKey,
+      'Timestamp': new Date().toISOString(),
+      'Actor': actorId,
+      'Source': source,
+      'Entity ID': entityId,
+      'Account Role': role,
+      'Mode': mode,
+      'Row Count': rowCount,
+      'Recipient Last4': last4,
+      'Recipient Override': !!recipient.overridden,
+      'Status': 'OPEN_ATTEMPTED'
+    });
+    return ok_({ eventId: eventId, status: 'OPEN_ATTEMPTED', duplicate: false });
+  } catch (err) {
+    // An audit failure cannot retroactively stop a synchronously opened link,
+    // and is never a sent/delivered confirmation.
+    return fail_(err && err.message ? err.message : String(err));
+  } finally {
+    if (acquired && lock) lock.releaseLock();
+  }
+}
