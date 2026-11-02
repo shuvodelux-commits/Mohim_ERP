@@ -250,6 +250,19 @@ async function main() {
       assert.deepEqual(calls.at(-1).rowIds,['CLEAN|'+kind+'|INV-1','SOURCE|'+kind+'|INV-2']);
       assert.equal(Object.keys(calls.at(-1).rowVersions).length,2);
     });
+    await check(kind+' mobile WhatsApp selection keeps a touch-sized checkbox and contained toolbar',async()=>{
+      await page.setViewportSize({width:375,height:812});
+      const m=await page.evaluate(prefix=>{
+        const label=document.querySelector('#'+prefix+'Body label.wa-party-row-choice').getBoundingClientRect();
+        const controls=document.querySelector('#'+prefix+'Selected .party-ledger-list-controls') ||
+          document.querySelector('#'+prefix+'Workspace .party-ledger-list-controls');
+        const r=controls.getBoundingClientRect();
+        return {w:label.width,h:label.height,left:r.left,right:r.right,viewport:document.documentElement.clientWidth};
+      },prefix);
+      assert.ok(m.w>=32 && m.h>=32,'Checkbox touch target '+m.w+'x'+m.h);
+      assert.ok(m.left>=-1 && m.right<=m.viewport+1,'Toolbar clipped on mobile '+JSON.stringify(m));
+      await page.setViewportSize({width:1440,height:1000});
+    });
     await check(kind+' clears cross-page WhatsApp selections without changing ledger rows',async()=>{
       await page.click('#'+prefix+'ClearSelectedBtn');
       assert.equal(await page.locator('#'+prefix+'ShareSelectedBtn').isDisabled(),true);
@@ -352,6 +365,17 @@ async function main() {
     requests=await page.evaluate(()=>window.__waFinanceRequests);
     assert.deepEqual(requests.at(-1).rowIds,['F2','F1']);
     assert.ok(requests.at(-1).rowVersions.F1.includes('"loanPayable"'));
+  });
+  await check('Finance mobile WhatsApp selection touch target remains usable',async()=>{
+    await page.setViewportSize({width:375,height:812});
+    const m=await page.evaluate(()=>{
+      const rect=document.querySelector('#fplTransactionBody label.wa-party-row-choice').getBoundingClientRect();
+      const clear=document.getElementById('fplClearSelectedBtn').getBoundingClientRect();
+      return {w:rect.width,h:rect.height,clearLeft:clear.left,clearRight:clear.right,viewport:document.documentElement.clientWidth};
+    });
+    assert.ok(m.w>=32 && m.h>=32,'Finance checkbox touch target '+m.w+'x'+m.h);
+    assert.ok(m.clearLeft>=-1 && m.clearRight<=m.viewport+1,'Finance Clear selection offscreen '+JSON.stringify(m));
+    await page.setViewportSize({width:1440,height:1000});
   });
   await check('Finance clears WhatsApp selection and unchecks visible rows',async()=>{
     await page.click('#fplClearSelectedBtn');
