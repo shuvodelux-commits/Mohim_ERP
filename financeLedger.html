@@ -429,12 +429,53 @@
   function finLedFillBankAccountSelect_(paymentMethod) { fillBankAccountSelect_(document.getElementById('finLedEditBankAccount'), finLedState.bankAccounts, paymentMethod); }
   function finLedRowByIdx_(idx) { return finLedState.rows[Number(idx)]; }
 
+  // Finance Ledger is an all-persons view: only a uniquely bound Finance ID,
+  // Person ID and recognized relationship account can be shared. Never infer
+  // a recipient from the untrusted legacy free-text person name.
+  function finLedCanWhatsAppRow_(row) {
+    if (!row || !row.financeId || !row.personId ||
+        row.personKey !== 'id:' + row.personId) return false;
+    if (userPermissions !== null && !(userPermissions && userPermissions.whatsappShare &&
+        userPermissions.whatsappShare.edit && userPermissions.finance &&
+        userPermissions.finance.view)) return false;
+    var type=finLedType_(row.transactionType);
+    if (!type || ['Owner','Lender','Borrower'].indexOf(type.role)===-1 ||
+        row.account !== type.account) return false;
+    var matches=(finLedState.persons || []).filter(function(p){
+      return String(p.id) === String(row.personId);
+    });
+    if (matches.length !== 1) return false;
+    if (finLedPersonRoles_(matches[0]).indexOf(type.role)===-1) return false;
+    return Number.isFinite(Number(row.amount)) && Number(row.amount)>0 &&
+      Number.isFinite(Number(row.balance));
+  }
+
+  function finLedShareWhatsAppRow_(row,trigger) {
+    if (!finLedCanWhatsAppRow_(row)) {
+      showToast('This Finance entry needs a verified Person ID and matching role before WhatsApp sharing.', 'error');
+      return false;
+    }
+    var type=finLedType_(row.transactionType),id=String(row.financeId);
+    var versions={};
+    versions[id]=waFinanceRowVersion_(row);
+    return openWhatsAppShare_({
+      source:'financePerson',entityId:String(row.personId),
+      accountRole:type.role,mode:'single',rowIds:[id],rowVersions:versions
+    },trigger);
+  }
+
   document.getElementById('finLedTableBody').addEventListener('click', function (e) {
     var btn = e.target.closest('button[data-act="menuTxn"]'); if (!btn) return;
     var row = finLedRowByIdx_(btn.dataset.idx); if (!row) return;
-    openRowActionMenu_(btn, [
-      { action: 'view', label: 'View' }, { action: 'edit', label: 'Edit' }, { divider: true }, { action: 'delete', label: 'Delete', danger: true }
-    ], function (action) {
+    var actions=[
+      { action: 'view', label: 'View' }, { action: 'edit', label: 'Edit' },
+      { divider: true }, { action: 'delete', label: 'Delete', danger: true }
+    ];
+    if (finLedCanWhatsAppRow_(row)) {
+      actions.push({ divider: true }, { action: 'whatsapp', label: 'WhatsApp' });
+    }
+    openRowActionMenu_(btn, actions, function (action) {
+      if (action === 'whatsapp') { finLedShareWhatsAppRow_(row,btn); return; }
       if (action === 'view') finLedOpenView_(row.financeId);
       if (action === 'edit') finLedOpenEdit_(row.financeId);
       if (action === 'delete') finLedDelete_(row.financeId);
