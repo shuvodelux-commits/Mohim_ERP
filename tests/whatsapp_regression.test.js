@@ -52,6 +52,7 @@ function harness({allow=true,phoneMissing=false,partyRows,financeOverride}={}){
    return {from,to};
  },
  getPartyLedgerStatement_:(kind,token,id,from,to)=>{
+   const period=context.partyLedgerValidateStatementDates_(from,to);
    const rows=indices[kind].filter(r=>r.Date>=from&&r.Date<=to),before=indices[kind].filter(r=>r.Date<from);
    return {party:{id,name:kind==='supplier'?'Supplier A':'Customer A',phone:kind==='supplier'?'01812345678':phoneMissing?'':'01712345678',balance:indices[kind].at(-1)?.Balance||0},
    business:{name:'ERP Shop'},rows,period:{from,to},openingBalance:before.at(-1)?.Balance||0,
