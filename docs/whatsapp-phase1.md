@@ -1,6 +1,6 @@
 # WhatsApp Phase 1 — operator guide and release checklist
 
-Status: **Draft / not deployed**. Scope: **manual WhatsApp Click-to-Chat only**.
+Status: **Draft PR / deployed to isolated TEST copy only (version 5 of the earlier PR code; latest short-copy changes still pending preview redeploy)**. No production deployment or merge. Scope: **manual WhatsApp Click-to-Chat only**.
 
 ## What this feature does
 
@@ -30,13 +30,35 @@ Administrators use the existing administrator permission model. A hidden button 
 ## Correctness, length and exceptions
 
 - The **server**, never the browser, derives balances, dates, rows and totals. Do not use a pre-edited screenshot as accounting evidence.
-- **Current due** and **selected entries** are different: selected, non-contiguous transactions are **not** a reconciled date-range statement. A period statement has opening/closing balances for the requested dates.
+- **Current due** and **selected entries** are different: selected, non-contiguous transactions are **not** a reconciled date-range statement. The message always shows the authoritative **current full-account balance**, not the selected-entry subtotal. A date-range message names the period but still explicitly labels the figure as the **current** balance, not that period's closing balance.
 - In a very long date-range statement, the first 12 transactions may be listed while totals still include all transactions. The preview says when rows were omitted.
-- At most 25 individually selected rows can be shared. Choose fewer if the message becomes too long. The direct URL has a conservative **8,000-character encoded URL budget**, not an official WhatsApp limit. If exceeded, **Copy** remains available; do not silently truncate or claim that the link is usable.
+- At most 25 individually selected rows can be shared; none of their references are included in the selected summary. The direct URL has a conservative **8,000-character encoded URL budget**, not an official WhatsApp limit. If exceeded (e.g. extremely long party/shop names), **Copy** remains available; do not silently truncate or claim that the link is usable.
 - If the saved phone is missing/invalid, use **Copy** or enter a correct number and confirm. Only Bangladesh mobile numbers in accepted 01 / +8801 forms are valid.
 - Edited, deleted, synthetic/corrected, wrong-party or wrong-role transactions can be rejected during fresh server validation. Refresh the relevant ledger, reselect the rows, and try again. Internal correction entries are not shared as normal business rows.
 - If the browser blocks WhatsApp, use **Copy** and paste into the intended WhatsApp chat after checking the recipient. On mobile, behavior depends on installed WhatsApp/browser handling; do not assume auto-opening works on every device.
 - An audit error warns that an open attempt may not have been recorded. **It is never a delivery status.**
+
+## Approved concise copy — 2026-11-03
+
+The user approved the short Bangladesh-local wording without debit/credit. Figures still come from the authenticated server, with no accounting mutations. The shop name comes from settings (Bangla name when configured); the party name is shown unprefixed, e.g.:
+
+\`\`\`text
+*শের মোহাম্মাদ স্যানিটারি হাউস*
+
+মো: ইত্তাকুর রহমান
+
+*আপনার মোট বাকি: ১৪,৬২০ টাকা*
+
+ধন্যবাদ।
+\`\`\`
+
+- **Due/Balance:** the compact four-part format above; only one bold relationship-appropriate current balance.
+- **Single:** one short transaction line before the bold full-account balance. Customer sale: \`বিল INV-000106: ১৪,৬২০ টাকা\`; supplier purchase: \`মাল কেনা: ১২,০০০ টাকা\`. Finance lines are role-specific (loan received, repaid, given, borrower repayment, owner capital deposited/withdrawn).
+- **Selected:** \`নির্বাচিত লেনদেন: ৩টি\` before the bold full-account balance. Selected transaction amounts and IDs are intentionally omitted.
+- **Dates:** \`হিসাব: ১–৩১ অক্টোবর ২০২৬\` before a bold balance explicitly marked \`বর্তমান\`; this is **not** the date-range closing balance. No row details or period totals appear in the outbound message.
+- **Sign-aware variants:** customer due vs advance; supplier payable vs advance; lender outstanding vs excess paid; borrower outstanding vs extra paid; owner capital vs excess withdrawal; zero/settled statement.
+- **Display:** Bangla digits, Bangladeshi thousand/lakh grouping, \`টাকা\`, optional paisa only when nonzero. English remains selectable with concise role-appropriate text and \`Tk\`. No debit, credit, opening/closing ledger jargon in outbound copy.
+- **Security:** Only message rendering changed. Verification against source ledger, role authorization, finance person scoping, row version revalidation, phone override confirmation, manual Send, and attempt-only audit are unchanged.
 
 ## Privacy and audit
 
