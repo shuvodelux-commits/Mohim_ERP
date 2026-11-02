@@ -33,6 +33,13 @@ function rig({rows=baseRows,people=basePeople,allow=true,failLedger=false}={}){
   isDeleted_:row=>row['Is Deleted']==='TRUE',
   getSettingsMap_:()=>({'Shop Name':'Example Shop','Currency Symbol':'৳'}),
   partyLedgerBusinessIdentity_:()=>({name:'Example Shop'}),
+  partyLedgerValidateStatementDates_:(from,to)=>{
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(from||'')) ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(String(to||''))) throw Error('Invalid date range');
+    if (from>to) throw Error('Invalid date range');
+    if (to>'2026-11-02') throw Error('Future statement date');
+    return {from,to};
+  },
   sanitizeInput_:x=>String(x==null?'':x).trim(),
   safeDateOnly_:x=>String(x||'').slice(0,10),
   roundMoney_:x=>Math.round(Number(x)*100)/100,
@@ -128,7 +135,7 @@ test('reject unresolved legacy finance rows that alias selected person by name',
 });
 test('reject future or inverted period and rows provided in due/period modes',()=>{
  const h=rig();
- assert.throws(()=>h.call('whatsAppBuildFinanceSource_','valid',q('Lender','period',{from:'2026-11-03',to:'2026-11-04'})),/date|future/i);
+ assert.throws(()=>h.call('whatsAppBuildFinanceSource_','valid',q('Lender','period',{from:'2999-01-03',to:'2999-01-04'})),/date|future/i);
  assert.throws(()=>h.call('whatsAppBuildFinanceSource_','valid',q('Lender','period',{from:'2026-10-12',to:'2026-10-11'})),/date|range/i);
  assert.throws(()=>h.call('whatsAppBuildFinanceSource_','valid',q('Lender','due',{rowIds:['F1']})),/row|mode/i);
 });
