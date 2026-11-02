@@ -65,6 +65,7 @@ const CONFIG = {
     ROLES: "Roles",
     SESSIONS: "Sessions",
     LOGS: "Logs",
+    WHATSAPP_SHARE_LOG: "WhatsApp Share Log",
     DELETE_LOG: "Delete Log",
     OPENING_BALANCE_EDIT_LOG: "Opening Balance Edit Log",
     BANK_ACCOUNTS: "Bank Accounts",
@@ -674,6 +675,12 @@ const CONFIG = {
       "Last Activity",
     ],
     LOGS: ["Timestamp", "Context", "Message"],
+    // Manual Click-to-Chat audit. Never store the full recipient or message.
+    WHATSAPP_SHARE_LOG: [
+      "Event ID", "Event Key", "Timestamp", "Actor", "Source", "Entity ID",
+      "Account Role", "Mode", "Row Count", "Recipient Last4",
+      "Recipient Override", "Status"
+    ],
     // Phase 7 (Bank Module): CRUD + opening balance + disable, mirrors
     // Suppliers.gs's shape. "Current Balance" starts equal to Opening
     // Balance and is otherwise untouched until Phase 8's Bank Book
@@ -1043,6 +1050,7 @@ const CONFIG = {
     USERS: "USR",
     ROLES: "ROL",
     DELETE_LOG: "DEL",
+    WHATSAPP_SHARE_LOG: "WSA",
     OPENING_BALANCE_EDIT_LOG: "OBL",
     BANK_ACCOUNTS: "BNK",
     BANK_BOOK: "BB",
