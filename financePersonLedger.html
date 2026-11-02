@@ -48,6 +48,7 @@
           <label class="fpl-search-ledger">Reference or Notes<input type="search" id="fplLedgerSearch" data-search-clear="on" placeholder="Search reference or note..."></label>
           <button class="btn" type="button" id="fplClearFilters">× Clear Filters</button>
           <button type="button" class="btn wa-party-action" id="fplShareSelectedBtn" hidden disabled>WhatsApp Selected (0)</button>
+          <button type="button" class="btn wa-party-action" id="fplClearSelectedBtn" hidden title="Clear selected transactions on all pages">Clear selection</button>
           <label class="fpl-pagesize">Show<select id="fplPageSize"><option value="50">50</option><option value="100">100</option><option value="200">200</option></select></label>
         </div>
         <div class="fpl-period">
@@ -366,6 +367,10 @@
   });
   document.getElementById('fplShareSelectedBtn').addEventListener('click',function(){
     waFinanceSend_(finPersonLedgerState,'selected',null,null,this);
+  });
+  document.getElementById('fplClearSelectedBtn').addEventListener('click',function(){
+    waFinanceReset_(finPersonLedgerState);
+    finPersonLedgerRenderLedger_();
   });
   document.getElementById('fplSharePeriodBtn').addEventListener('click',function(){
     waFinanceSend_(finPersonLedgerState,'period',null,{
