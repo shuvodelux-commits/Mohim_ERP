@@ -632,6 +632,7 @@ function recordWhatsAppShare(token, request) {
     if (!snapshot || !snapshot.party) throw new Error('Unable to verify WhatsApp source.');
     if (String(snapshot.source || '') !== source ||
       String(snapshot.entityId || '') !== String(request.entityId || '') ||
+      String(snapshot.mode || '') !== String(request.mode || '') ||
       (source === 'financePerson'
         ? String(snapshot.accountRole || '') !== String(request.accountRole || '')
         : !!String(request.accountRole || '').trim())) {
