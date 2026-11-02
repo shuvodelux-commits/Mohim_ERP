@@ -157,6 +157,7 @@ const PERMISSION_MODULES = [
   // Special non-navigation right. Only the Edit checkbox is meaningful.
   { key: 'openingBalance', label: 'Opening Balance Edit', permissionMode: 'editOnly' },
   { key: 'settlementDiscount', label: 'Settlement Discount', permissionMode: 'editOnly' },
+  { key: 'whatsappShare', label: 'WhatsApp Share', permissionMode: 'editOnly' },
   // Purchase Price Visibility. Grantable but deliberately NOT a NAV_ITEMS
   // entry — there is no 'posCost' page, this is a right to SEE one extra
   // figure on the POS cart, not somewhere to navigate to. Only 'view' is
