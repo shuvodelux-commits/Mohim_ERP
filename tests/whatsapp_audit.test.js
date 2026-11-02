@@ -135,7 +135,7 @@ test('unconfirmed recipient override fails without audit write',()=>{
 });
 
 test('Finance attempts require selected person role and never persist account details',()=>{
- const h=setup({view:{...sourceView,source:'financePerson',accountRole:'Lender',entityId:'P1',rowCount:1,
+ const h=setup({view:{...sourceView,source:'financePerson',accountRole:'Lender',entityId:'P1',mode:'due',rowCount:1,
  party:{id:'P1',phone:'01712345678'}}});
  const r=h.call('valid',req({source:'financePerson',entityId:'P1',accountRole:'Lender',mode:'due',rowIds:[],rowVersions:{}}));
  assert.equal(r.success,true);
