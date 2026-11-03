@@ -83,7 +83,9 @@ test('incomplete FIFO/vendor costs show a visible accuracy warning, not just a t
   await new Promise(setImmediate);
   const warning=h.element('posCurrentInvoiceProfitWarning');
   assert.equal(warning.hidden,false);
-  assert.match(warning.textContent,/cost incomplete/i);
+  // This harness simulates element state, not HTML text-node parsing.
+  // Assert authored warning copy from the real template separately.
+  assert.match(pos, /id="posCurrentInvoiceProfitWarning"[^>]*>Cost incomplete/i);
   h.c.posScheduleProfitPreview_();
   h.fire(1);
   h.pending[1].resolve({profit:15,marginPercent:50,costComplete:true});
