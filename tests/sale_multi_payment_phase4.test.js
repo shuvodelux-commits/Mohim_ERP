@@ -105,3 +105,52 @@ test('multi-account edit, delete, return protections remain active until Phase 5
     assert.match(read(name),/Payment Detail Version/,name);
   }
 });
+
+test('restored split payment rows copy original Cash tender and preserve account order',()=>{
+  const source=read('pos.html');
+  const start=source.indexOf('  function posMultiPaymentEnabledForSale_(');
+  const end=source.indexOf('  function posMultiPaymentPayloadRows_(',start);
+  assert.ok(start>=0 && end>start);
+  const state={multiPaymentEnabled:true,updateInvoiceId:null,paymentModeLegacy:false,paymentRows:[]};
+  const ctx=vm.createContext({posState:state});
+  vm.runInContext(source.slice(start,end),ctx,{filename:'POS snapshot helpers'});
+  const src={paymentDetailVersion:'1',payments:[
+    {rowId:'SP1',method:'Cash',tendered:80,applied:50,change:30},
+    {rowId:'SP2',method:'Bank',bankAccountId:'B1',bankAccountName:'DBBL',tendered:50,applied:50,change:0}
+  ],originalPaidAmount:100,paidAmount:110};
+  assert.equal(ctx.posHasSplitPaymentSnapshot_(src),true);
+  assert.equal(ctx.posHasSplitPaymentSnapshot_({payment:{amountReceived:'100'}}),false);
+  ctx.posRestoreMultiPaymentSnapshot_(src);
+  assert.deepEqual(plain(state.paymentRows),[
+    {id:'pm-1',method:'Cash',accountId:'',amount:'80'},
+    {id:'pm-2',method:'Bank',accountId:'B1',amount:'50'}
+  ]);
+  assert.equal(ctx.posMultiPaymentEnabledForSale_(),true);
+  assert.equal(state.paymentSnapshotSplit,true);
+  state.multiPaymentEnabled=false;
+  assert.equal(ctx.posMultiPaymentEnabledForSale_(),false);
+});
+test('split draft preview displays the actual applied sum, due and Cash change',()=>{
+  const ctx=draftKernel();
+  const source=read('DraftSales.gs');
+  ctx.safeDateOnly_=x=>x;
+  ctx.buildInvoiceShopPayload_=()=>({currencySymbol:'৳'});
+  vm.runInContext(source.slice(source.indexOf('function parseSalesDraftRow_('),source.indexOf('function appendSalesDraftAudit_(')),ctx);
+  vm.runInContext(source.slice(source.indexOf('function buildSalesDraftPreviewPayload_('),source.indexOf('function getSalesDraftPreview(')),ctx);
+  const clean=ctx.validateSalesDraftPayload_(draftPayload({payments:split}));
+  const preview=plain(ctx.buildSalesDraftPreviewPayload_({
+    'Draft No':'DRF-1','Draft Date':'2026-11-03','Payment JSON':clean.paymentJson,'Items JSON':clean.itemsJson,
+    'Grand Total':100,'Subtotal':100,'Discount':0
+  }));
+  assert.equal(preview.paymentDetailVersion,'1');
+  assert.equal(preview.paidAmount,100);
+  assert.equal(preview.dueAmount,0);
+  assert.deepEqual(preview.payments.map(x=>[x.method,x.tendered,x.applied,x.change]),[
+    ['Cash',80,50,30],['Bank',50,50,0]
+  ]);
+});
+test('an interrupted split draft post cannot be treated as an already posted successful retry',()=>{
+  const src=read('Sales.gs');
+  assert.match(src,/if \(alreadyPosted\)[\s\S]*?SALE_POSTING_JOURNAL[\s\S]*?Committed[\s\S]*?readSalePaymentBreakdown_/);
+  assert.match(src,/savedSplit !== multiPayment/);
+});
