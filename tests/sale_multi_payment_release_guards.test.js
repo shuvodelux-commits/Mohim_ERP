@@ -6,6 +6,7 @@ const read=n=>fs.readFileSync(path.join(__dirname,'..',n),'utf8');
 function runtime() {
   let sale={'Invoice ID':'INV-1','Date':'2026-11-03','Payment Detail Version':1};
   const ctx=vm.createContext({
+    CONFIG:{LOCK_TIMEOUT_MS:1000},
     requirePermission_:()=>({id:'U1'}),
     requireDeletePermission_:()=>({id:'U1'}),
     requireActiveCashSession_:()=>{},
