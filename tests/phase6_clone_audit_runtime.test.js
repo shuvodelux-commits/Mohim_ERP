@@ -125,3 +125,16 @@ test('Phase 6 rejects a bank movement attached to an unknown bank account',()=>{
  assert.equal(result.status,'FAIL');
  assert.ok(result.issues.some(i=>/unknown bank account/i.test(i.problem)));
 });
+
+test('Phase 6 cannot report acceptance PASS for an empty clone with no split invoices',()=>{
+ const fixture=cloneFixture(),h=runtime(fixture);
+ fixture.data.SALES.length=0;
+ fixture.data.SALE_PAYMENTS.length=0;
+ fixture.data.SALE_POSTING_JOURNAL.length=0;
+ fixture.data.CASH_BOOK.length=0;
+ fixture.data.BANK_BOOK.length=0;
+ fixture.data.BANK_ACCOUNTS.length=0;
+ const result=h.ctx.phase6CloneAudit_();
+ assert.equal(result.status,'FAIL');
+ assert.ok(result.issues.some(i=>/no active split invoice/i.test(i.problem)));
+});
