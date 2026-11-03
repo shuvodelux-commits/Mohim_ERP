@@ -1114,6 +1114,8 @@ const CONFIG = {
     // the gate; a user also needs the 'posCost' view permission before
     // getPosBootstrap will send any cost figure. See Sales.gs.
     "POS Show Purchase Price": "false",
+    // Do not permit multi-payment posting until edits, returns and live E2E pass.
+    "POS Multi Payment Enabled": "false",
   },
 
   LOCK_TIMEOUT_MS: 15000,
