@@ -48,8 +48,44 @@
   #app { display: flex; min-height: 100vh; }
   #app[hidden] { display: none; }
 
-  /* ---------------- Wide-table horizontal scroll containment (new; doesn't touch .card/.table/.toolbar) ---------------- */
-.table-scroll { overflow-x: auto; }
+  /* ---------------- Wide data tables ----------------
+     A horizontally scrolling wrapper is the sticky containing block. Give
+     long desktop/tablet tables an actual vertical scroll area so the header
+     stays visible while the user scrolls rows; short tables remain natural.
+     Keep mobile record cards page-scrolling and print layouts unclipped. */
+  .table-scroll { overflow-x: auto; }
+  .table-scroll > table > thead > tr > th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--color-surface);
+    box-shadow: inset 0 -1px 0 var(--color-border);
+  }
+  @media screen and (min-width: 541px) {
+    .table-scroll {
+      max-height: clamp(240px, calc(100dvh - var(--topbar-height) - 190px), 840px);
+      overflow-y: auto;
+      overscroll-behavior-y: contain;
+    }
+  }
+  @media screen and (max-width: 540px) {
+    /* Non-card mobile data tables still show headings; mobile-card-table
+       already displays a label on every record and should scroll normally. */
+    .table-scroll:has(> table:not(.mobile-card-table)) {
+      max-height: min(68dvh, 520px);
+      overflow-y: auto;
+    }
+  }
+  @media screen and (orientation: landscape) and (max-height: 540px) and (pointer: coarse) {
+    .table-scroll:has(> table.mobile-card-table) {
+      max-height: none;
+      overflow-y: visible;
+    }
+  }
+  @media print {
+    .table-scroll { max-height: none !important; overflow: visible !important; }
+    .table-scroll > table > thead > tr > th { position: static; box-shadow: none; }
+  }
 
   /* ---------------- Sidebar ---------------- */
   .sidebar {
