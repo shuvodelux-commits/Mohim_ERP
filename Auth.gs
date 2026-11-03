@@ -103,6 +103,15 @@ function sessionCacheKey_(token) {
   return 'auth' + authCacheGeneration_() + ':u:' + sha256Hex_(token).slice(0, 32);
 }
 
+/** Share the same sanitized cache representation for new and restored sessions. */
+function cacheSessionUser_(token, user, expiresAt) {
+  const cacheable = {};
+  Object.keys(user).forEach(function (k) {
+    if (k !== "_rowIndex") cacheable[k] = user[k];
+  });
+  authCachePut_(sessionCacheKey_(token), { user: cacheable, expiresAt: expiresAt });
+}
+
 function forgetSessionCache_(token) {
   try { CacheService.getScriptCache().remove(sessionCacheKey_(token)); } catch (e) {}
 }
@@ -313,14 +322,8 @@ function validateSession(token) {
     if (upgradingLegacy) fields["Expires At"] = SESSION_NEVER_EXPIRES_;
     updateRowFields_("SESSIONS", session._rowIndex, fields);
     if (upgradingLegacy) {
-      const cacheable = {};
-      Object.keys(user).forEach(function (k) {
-        if (k !== "_rowIndex") cacheable[k] = user[k];
-      });
       // Update the cache only AFTER the sheet write succeeds.
-      authCachePut_(sessionCacheKey_(t), {
-        user: cacheable, expiresAt: SESSION_NEVER_EXPIRES_
-      });
+      cacheSessionUser_(t, user, SESSION_NEVER_EXPIRES_);
     }
     return ok_(buildAuthPayload_(user, t));
   } catch (err) {
@@ -395,11 +398,8 @@ function getSessionUser_(token) {
     );
   }
 
-  // _rowIndex is an internal bookkeeping field and would go stale as rows
-  // move, so it is stripped rather than cached.
-  const cacheable = {};
-  Object.keys(user).forEach(function (k) { if (k !== "_rowIndex") cacheable[k] = user[k]; });
-  authCachePut_(cacheKey, { user: cacheable, expiresAt: session["Expires At"] });
+  // Never cache _rowIndex: its value goes stale when sheet rows move.
+  cacheSessionUser_(t, user, session["Expires At"]);
 
   return user;
 }
