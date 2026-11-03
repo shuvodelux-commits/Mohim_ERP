@@ -404,8 +404,8 @@ function getSaleForUpdate(token, invoiceId) {
     if (!sale) return fail_('Invoice not found.');
     if (isDeleted_(sale)) return fail_('This invoice has been deleted.');
     const paymentDetailVersion = String(sale['Payment Detail Version'] || '').trim();
-    const payments = readSalePaymentBreakdown_(sale,
-      paymentDetailVersion === '1' ? findRows_('SALE_PAYMENTS', 'Invoice ID', invoiceId) : []);
+    const payments = paymentDetailVersion === '1'
+      ? readSalePaymentBreakdown_(sale,findRows_('SALE_PAYMENTS', 'Invoice ID', invoiceId)) : [];
     const hasReturn = activeSalesReturnItems_().some(function (ri) { return ri['Invoice ID'] === invoiceId; });
     if (hasReturn) return fail_('This invoice has Sales Return records and can no longer be updated. Use Sales Return for further corrections.');
 
