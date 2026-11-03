@@ -23,10 +23,10 @@ function runtime() {
     activeRows_:()=>{throw new Error('LEGACY_DELETE_PATH_REACHED');},
     safeDateOnly_:()=>{throw new Error('LEGACY_RETURN_PATH_REACHED');}
   });
-  ctx.salePostingPayloadHash_=()=> 'TEST_HASH'; // avoid Utilities in fixture; hash is not under test
   for(const src of ['SalePayments.gs','SalesManagement.gs','DeleteEngine.gs','SalesReturn.gs']) {
     vm.runInContext(read(src),ctx,{filename:src});
   }
+  ctx.salePostingPayloadHash_=()=> 'TEST_HASH'; // overwrite function after VM script evaluation
   return {ctx,setSale:next=>{sale=next}};
 }
 
