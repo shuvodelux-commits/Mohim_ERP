@@ -171,6 +171,30 @@ test('manual logout revokes an unexpired cached no-timeout token', () => {
   deny(h.c.getUsersBootstrap('staff'), /Session expired/);
 });
 
+test('user deactivation and deletion revoke persistent cached sessions immediately', () => {
+  for (const operation of ['deactivate', 'delete']) {
+    const h = harness(); h.user('admin', 'Administrator');
+    h.user('staff', 'Staff', {users:{view:true}});
+    h.db.SESSIONS[1]['Expires At'] = 'Never';
+    assert.equal(h.c.getUsersBootstrap('staff').success, true);
+    const result = operation === 'deactivate'
+      ? h.c.setUserStatus('admin', 'staff', 'Inactive')
+      : h.c.deleteUser('admin', 'staff');
+    assert.equal(result.success, true, JSON.stringify(result));
+    assert.equal(h.db.SESSIONS.some(s => s['User ID'] === 'staff'), false);
+    deny(h.c.getUsersBootstrap('staff'), /Session expired/);
+  }
+});
+
+test('malformed legacy sessions cannot be upgraded during page restoration', () => {
+  for (const expiry of ['', 'never', 'Never ', 'invalid']) {
+    const h = harness(); h.user('staff', 'Staff', {users:{view:true}});
+    h.db.SESSIONS[0]['Expires At'] = expiry;
+    deny(h.c.validateSession('staff'), /Session expired/);
+    assert.equal(h.db.SESSIONS[0]['Expires At'], expiry);
+  }
+});
+
 test('password reset and role deactivation revoke cached access on the next RPC', () => {
   for (const operation of ['password','role']) {
     const h = harness(); h.user('admin','Administrator'); h.user('staff','Staff',{users:{view:true}});
