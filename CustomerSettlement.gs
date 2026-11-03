@@ -535,12 +535,26 @@ function customerInvoiceSettlementSnapshot_(invoiceId) {
   return customerInvoiceSettlementSnapshotFromState_(sale, state);
 }
 
+/**
+ * Money actually received at checkout. Versioned sales use the immutable
+ * child applied amounts: 'Multiple' is not itself a payment method, and Cash
+ * tender returned as change must never inflate refundable provenance.
+ */
+function customerSaleCheckoutCashCollected_(sale, preloadedPaymentRows) {
+  if (!sale || isDeleted_(sale)) return 0;
+  if (String(sale['Payment Detail Version'] || '') === '1') {
+    const paymentRows = Array.isArray(preloadedPaymentRows) ? preloadedPaymentRows : getAllRows_('SALE_PAYMENTS');
+    const original = readSalePaymentBreakdown_(sale, paymentRows);
+    return roundMoney_(original.reduce(function (sum, p) { return sum + (Number(p.applied) || 0); }, 0));
+  }
+  return customerSettlementIsCashBackedMethod_(sale['Payment Method'])
+    ? roundMoney_(Number(sale['Paid Amount']) || 0) : 0;
+}
+
 function customerInvoiceCashCollected_(invoiceId) {
   const sale = findUniqueSalesRow_(invoiceId);
   if (!sale || isDeleted_(sale)) return 0;
-  const directPaid = customerSettlementIsCashBackedMethod_(sale['Payment Method'])
-    ? roundMoney_(Number(sale['Paid Amount']) || 0)
-    : 0;
+  const directPaid = customerSaleCheckoutCashCollected_(sale);
   const customerId = String(sale['Customer ID'] || '');
   if (!customerId) return directPaid;
   const state = customerSettlementState_(customerId);
@@ -554,6 +568,8 @@ function getCustomerPaymentContext(token, customerId) {
     if (!customer || customer['Status'] === 'Inactive') return fail_('Customer not found or inactive.');
     const state = customerSettlementState_(customerId);
     const sales = activeRows_('SALES').filter(function (s) { return String(s['Customer ID'] || '') === String(customerId || ''); });
+    const checkoutPayments = sales.some(function (s) { return String(s['Payment Detail Version'] || '') === '1'; })
+      ? getAllRows_('SALE_PAYMENTS') : [];
     const invoices = sales.map(function (s) {
       const invoiceId = String(s['Invoice ID'] || '');
       const remaining = roundMoney_(Number(state.invoiceRemaining[invoiceId]) || 0);
@@ -563,7 +579,7 @@ function getCustomerPaymentContext(token, customerId) {
         grandTotal: roundMoney_(Number(s['Grand Total']) || 0),
         remainingDue: remaining,
         cashCollected: roundMoney_(
-          (customerSettlementIsCashBackedMethod_(s['Payment Method']) ? (Number(s['Paid Amount']) || 0) : 0) +
+          customerSaleCheckoutCashCollected_(s, checkoutPayments) +
           (Number(state.cashByInvoice[invoiceId]) || 0)
         )
       };
