@@ -350,6 +350,7 @@ function getInvoiceForReturn(token, invoiceId) {
       invoiceId: sale['Invoice ID'], date: safeDateOnly_(sale['Date']), customerId: sale['Customer ID'],
       customerName: sale['Customer Name'], customerPhone: sale['Customer Phone'], customerAddress: sale['Customer Address'],
       grandTotal: grandTotal, paidAmount: paidAmount,
+      paymentDetailVersion: String(sale['Payment Detail Version'] || ''),
       dueAmount: dueAmount, previouslyReturnedAmount: previouslyReturnedAmount,
       netSale: grandTotal - previouslyReturnedAmount,
       cashRefundAvailable: salesReturnCashRefundAvailable_(sale['Invoice ID'], paidAmount),
@@ -387,7 +388,9 @@ function prepareSalesReturn_(payload, options) {
   const sale = opts.sale || findUniqueSalesRow_(payload.invoiceId);
   if (!sale || isDeleted_(sale)) throw new Error('Invoice not found or has been deleted.');
   if (String(sale['Payment Detail Version']) === '1') {
-    throw new Error('Multi-payment invoice returns are not yet enabled. Refund reconciliation is required.');
+    const originalPayments = readSalePaymentBreakdown_(sale,getAllRows_('SALE_PAYMENTS'));
+    assertSalePaymentBookEvidence_(sale['Invoice ID'],originalPayments,
+      getAllRows_('CASH_BOOK'),getAllRows_('BANK_BOOK'));
   }
   assertSalesReturnDateNotBeforeSale_(dateStr, sale);
 
@@ -607,7 +610,8 @@ function commitPreparedSalesReturn_(prepared, options) {
     'Is Backdated': prepared.txDate.isBackdated,
     'Backdated Days': prepared.txDate.backdatedDays,
     'Backdated Reason': prepared.txDate.reason,
-    'Batch ID': opts.batchId || ''
+    'Batch ID': opts.batchId || '',
+    'Return Operation ID': opts.operationId || ''
   });
 
   const returnItemRows = prepared.validatedItems.map(function (v) {
@@ -675,6 +679,8 @@ function commitPreparedSalesReturn_(prepared, options) {
  * }
  */
 function completeReturn(token, payload) {
+  let returnJournalIndex = -1;
+  let returnJournalStage = '';
   const lock = LockService.getScriptLock();
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
@@ -682,14 +688,73 @@ function completeReturn(token, payload) {
     requireActiveCashSession_();
     const txDate = resolveTransactionDate_(token, 'returns', payload && payload.date, payload && payload.backdatedReason, 'Return');
     const prepared = prepareSalesReturn_(payload, { txDate: txDate });
+    const isSplitReturn = String(prepared.sale['Payment Detail Version']) === '1';
+    let operationId = '';
+    if (isSplitReturn) {
+      operationId = sanitizeInput_(payload.operationId);
+      if (!/^[A-Za-z0-9_-]{12,100}$/.test(operationId)) {
+        throw new Error('A stable return operation ID is required for split-payment invoice refunds.');
+      }
+      const actor = String(actingUser['User ID'] || actorName_(actingUser));
+      const hash = salePostingPayloadHash_({operationType:'Return',invoiceId:prepared.invoiceId,payload:payload});
+      const prior = getAllRows_('SALE_POSTING_JOURNAL').filter(function (row) {
+        return String(row['Operation ID']) === operationId;
+      });
+      if (prior.length > 1) throw new Error('Duplicate return journal. Needs Review.');
+      if (prior.length) {
+        const journal = prior[0];
+        if (String(journal['Operation Type']) !== 'Return' ||
+            String(journal['Actor']) !== actor ||
+            String(journal['Invoice ID']) !== String(prepared.invoiceId)) {
+          throw new Error('Conflicting refund operation ID.');
+        }
+        if (salePostingJournalDecision_(journal,hash) !== 'replay') {
+          throw new Error('Refund operation interrupted. Needs Review; do not repost.');
+        }
+        const posted = getAllRows_('SALES_RETURN').filter(function (row) {
+          return String(row['Return Operation ID']) === operationId &&
+            String(row['Invoice ID']) === String(prepared.invoiceId) && !isDeleted_(row);
+        });
+        if (posted.length !== 1) throw new Error('Committed refund is missing or ambiguous. Needs Review.');
+        return ok_({returnId:posted[0]['Return ID'],
+          totalReturnAmount:Number(posted[0]['Total Return Amount'])||0,
+          customerId:posted[0]['Customer ID']||'',newDue:null});
+      }
+      const now = new Date();
+      appendRow_('SALE_POSTING_JOURNAL',{
+        'Operation ID':operationId,'Operation Type':'Return',
+        'Payload Hash':hash,'Invoice ID':prepared.invoiceId,
+        State:'Writing','Last Completed Stage':'Validated',
+        Actor:actor,'Created At':now,'Updated At':now,Error:''
+      });
+      returnJournalIndex = findRowIndex_('SALE_POSTING_JOURNAL','Operation ID',operationId);
+      if (returnJournalIndex < 2) throw new Error('Refund journal reservation missing.');
+      returnJournalStage = 'Validated';
+    }
     const returnId = generateId_('SALES_RETURN');
-    return ok_(commitPreparedSalesReturn_(prepared, {
+    const completed = commitPreparedSalesReturn_(prepared, {
       returnId: returnId,
       batchId: '',
+      operationId: operationId,
       actingUser: actingUser,
       now: new Date()
-    }));
+    });
+    if (returnJournalIndex >= 2) {
+      updateRowFields_('SALE_POSTING_JOURNAL',returnJournalIndex,{
+        State:'Committed','Last Completed Stage':returnId,'Updated At':new Date()
+      });
+      returnJournalStage = 'Committed';
+    }
+    return ok_(completed);
   } catch (err) {
+    if (returnJournalIndex >= 2) {
+      try {
+        updateRowFields_('SALE_POSTING_JOURNAL',returnJournalIndex,{
+          State:'Needs Review','Last Completed Stage':returnJournalStage,
+          'Updated At':new Date(),Error:String(err && err.message || err)
+        });
+      } catch (journalError) { logError_('completeReturnJournal',journalError); }
+    }
     logError_('completeReturn', err);
     return fail_(err.message);
   } finally {
@@ -771,6 +836,9 @@ function completeReturnBatch(token, payload) {
       }
       const sale = matches[0];
       if (!sale || isDeleted_(sale)) throw new Error(invoiceId + ': invoice not found or has been deleted.');
+      if (String(sale['Payment Detail Version']) === '1') {
+        throw new Error('Split-payment invoice returns must be submitted individually for auditable refund idempotency.');
+      }
       const customerId = sanitizeInput_(sale['Customer ID']);
       if (!customerId) {
         throw new Error('Multi-invoice returns require a customer account. Walk-in invoices must be returned one invoice at a time.');
