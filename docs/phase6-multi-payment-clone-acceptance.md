@@ -14,7 +14,7 @@
 ## 2. Create disposable clone (never touch source)
 
 1. In Google Drive, identify the currently bound production spreadsheet by verifying its Apps Script binding and currently deployed source, **not by its title**. Several "Sher ERP" sheets may exist. Document the confirmed source IDs **privately**; do not commit private spreadsheet IDs to GitHub.
-2. Copy that spreadsheet into a private, disposable QA spreadsheet. Remove customer phone numbers/other personal details and replace transactions with synthetic fixtures. Confirm the original workbook remains unchanged. Do not share or publish the copy.
+2. **Prefer a new blank, private QA spreadsheet with entirely synthetic business data** to avoid copying real customer information. If a copy of the verified source is essential to preserve schema, sanitize it in the controlled test environment before any broad sharing or testing; do not log or commit real customer data. Confirm the original workbook remains unchanged and keep the clone private. A historical workbook selected by title is not acceptable identity evidence.
 3. Create/verify a **new, separate** container-bound Apps Script project for this QA workbook. Obtain both *clone* IDs (script ID and spreadsheet ID). Neither can be the production or existing shared preview script.
 4. Check out the reviewed PR branch locally. Prepare a **detached** package (this only writes local files):
 
@@ -23,14 +23,15 @@
    ```
 
    The command prints a temporary directory containing the branch's root Apps Script sources, a clone-only `.clasp.json` and `Phase6CloneAudit.gs`. It does **not** invoke clasp or write to Drive. Verify the generated IDs and source SHA before continuing.
-5. Only from the generated directory, run `clasp status`. After the IDs and OAuth account are independently verified against the **disposable** project, explicitly run `clasp push`. Do **not** deploy or modify production.
-6. In that clone's Apps Script editor, run `phase6CloneAudit_` and save its log output with the test evidence. The function checks both IDs **before reading**; it reads directly from existing Sheets without schema creation and refuses production.
+5. In the **disposable, bound** Apps Script project only, initialize the new spreadsheet's schema with the existing `setupSystem_()` menu operation if its configured tabs or headers are absent. This initialization **does write to the test spreadsheet**; never execute it in production as part of QA. Create a synthetic admin, synthetic Bank/Mobile accounts, products and open Cash Session through the normal test workflow. In the clone SETTINGS only, enable `POS Multi Payment Enabled` when running split-payment scenarios; revert it afterward. Verify only synthetic customer details are used.
+6. Only from the generated directory, run `clasp status`. After the IDs and OAuth account are independently verified against the **disposable** project, explicitly run `clasp push`. Do **not** deploy or modify production.
+7. In that clone's Apps Script editor, run `phase6CloneAudit_` and save its log output with the test evidence. The function checks both IDs **before reading**; it reads directly from existing Sheets without schema creation and refuses production.
 
 ### Important limitations of this read-only clone audit
 
-- This scan checks invoice payment allocations, Cash/Bank source-book movements, child row ownership, operation journal state, duplicate IDs and orphaned active Sales Returns.
+- This scan checks invoice payment allocations, Cash/Bank source-book movements, **Bank Account master balances against all Bank Book movements (including opening-balance backfills, manual reversal mirrors and deleted entries)**, child row ownership, operation journal state, duplicate IDs and orphaned active Sales Returns.
 - It does **not** create a sale, alter an invoice, actually move money, verify user roles, or exercise receipt printing. These require the functional tests in Section 3.
-- It does not prove every Bank Account master balance or subsequent Customer Settlement allocation; the corresponding reconciliation checks must be performed separately on the clone.
+- It does not prove subsequent Customer Settlement allocation or Cash Session balance; those reconciliation checks must be performed separately on the clone.
 - It refuses workbooks with more than 15,000 rows in any scanned sheet. Use an appropriately sized disposable clone.
 - `tests/phase6_clone_audit.gs` is excluded by `.claspignore` from the normal production upload; the detached package deliberately includes it ONLY in the clone.
 
