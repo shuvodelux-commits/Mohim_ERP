@@ -153,3 +153,15 @@ function salePostingJournalDecision_(existing, payloadHash) {
   if (['Prepared','Writing','Needs Review'].indexOf(existing['State']) >= 0) return 'review';
   throw new Error('Unknown posting journal state.');
 }
+
+/**
+ * A retry must use the exact original payload. SHA-256 avoids retaining
+ * sensitive POS customer details in the posting journal.
+ */
+function salePostingPayloadHash_(payload) {
+  const raw = JSON.stringify(payload);
+  if (!raw || raw.length > 100000) throw new Error('Sale payload is too large.');
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, raw)
+    .map(function (b) { return ('0' + (b & 255).toString(16)).slice(-2); })
+    .join('');
+}
