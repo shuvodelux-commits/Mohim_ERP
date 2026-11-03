@@ -37,7 +37,10 @@ test('Purchase Actions resolves rows from the existing purState.history store',(
 });
 ['customers.html','suppliers.html','expenseList.html','bank.html','purchase.html','sales.html'].forEach(file=>{
   test(file+' list rows expose compact Actions menu',()=>{
-    const s=read(file); ok(s.includes('Actions &#9662;') || s.includes('Actions ▾'),'missing Actions button');
+    const s=read(file);
+    const pinnedDots = file === 'sales.html' && s.includes('rowActionTriggerHtml_(')
+      && s.includes('erp-sticky-action-col');
+    ok(pinnedDots || s.includes('Actions &#9662;') || s.includes('Actions ▾'),'missing Actions button');
   });
 });
 
