@@ -209,7 +209,7 @@
 </div>
 
 <script>
-  var posState = { products: [], productStockById: {}, productCostById: {}, showCost: false, canViewProfit: false, customers: [], bankAccounts: [], vendors: [], vendorsAll: [], cart: [], cartEditIndex: null, cartEntryIndex: null, activeSession: null, openingCashMismatch: null, dismissedCashMismatchKey: '', closeSessionSummary: null, updateInvoiceId: null, updateReason: null, draftId: null, draftNo: '', draftVersion: null, recentDrafts: [], saleNotes: '', searchResults: [], searchActiveIndex: -1, multiPaymentEnabled: false, paymentRows: [{id:'pm-1',method:'Cash',amount:'',accountId:''}], paymentRowSeq: 1, paymentOperationId: '', paymentAttemptFingerprint: '', copyMode: false };
+  var posState = { products: [], productStockById: {}, productCostById: {}, showCost: false, canViewProfit: false, customers: [], bankAccounts: [], vendors: [], vendorsAll: [], cart: [], cartEditIndex: null, cartEntryIndex: null, activeSession: null, openingCashMismatch: null, dismissedCashMismatchKey: '', closeSessionSummary: null, updateInvoiceId: null, updateReason: null, draftId: null, draftNo: '', draftVersion: null, recentDrafts: [], saleNotes: '', searchResults: [], searchActiveIndex: -1, multiPaymentEnabled: false, paymentModeLegacy: false, paymentSnapshotSplit: false, paymentRows: [{id:'pm-1',method:'Cash',amount:'',accountId:''}], paymentRowSeq: 1, paymentOperationId: '', paymentAttemptFingerprint: '', copyMode: false };
 
 
   // POS uses the shared touch-select presentation layer. The native select
@@ -1757,8 +1757,35 @@
   }
 
   function posMultiPaymentEnabledForSale_() {
+    // New sales default to split when enabled; legacy drafts/duplicates retain
+    // their original one-method editor. Split drafts and copies stay split.
     return !!(posState.multiPaymentEnabled && !posState.updateInvoiceId &&
-      !posState.draftId && !posState.copyMode);
+      !posState.paymentModeLegacy);
+  }
+
+  function posHasSplitPaymentSnapshot_(source) {
+    var payment = source && source.payment || {};
+    return !!(source && ((Object.prototype.hasOwnProperty.call(payment, 'payments')) ||
+      String(source.paymentDetailVersion || '') === '1'));
+  }
+
+  function posRestoreMultiPaymentSnapshot_(source) {
+    // Draft rows store amount; posted invoice rows store original tendered.
+    // Never use paidAmount from a later settlement as a copied payment.
+    var payment = source && source.payment || {};
+    var input = Array.isArray(payment.payments) ? payment.payments : source.payments;
+    if (!Array.isArray(input)) throw new Error('Payment breakdown is missing from the source invoice.');
+    if (input.length > 20) throw new Error('Source contains too many payment rows.');
+    posState.paymentRows = input.length ? input.map(function (r, i) {
+      var amount = r.amount === undefined || r.amount === null ? r.tendered : r.amount;
+      return {id:'pm-' + (i + 1), method:r.method, accountId:r.accountId || r.bankAccountId || '',
+        amount:amount === undefined || amount === null ? '' : String(amount)};
+    }) : [{id:'pm-1',method:'Cash',accountId:'',amount:''}];
+    posState.paymentRowSeq = posState.paymentRows.length;
+    posState.paymentOperationId = '';
+    posState.paymentAttemptFingerprint = '';
+    posState.paymentModeLegacy = false;
+    posState.paymentSnapshotSplit = true;
   }
 
   function posMultiPaymentPayloadRows_() {
@@ -2231,6 +2258,8 @@
     posState.cartEntryIndex = null;
     posState._addVendorForLineIndex = null;
     posState.paymentRows = [{id:'pm-1',method:'Cash',accountId:'',amount:''}];
+    posState.paymentModeLegacy = false;
+    posState.paymentSnapshotSplit = false;
     posState.paymentRowSeq = 1;
     posState.paymentOperationId = '';
     posState.paymentAttemptFingerprint = '';
@@ -2266,7 +2295,9 @@
           vendorId: line.vendorId || '', vendorName: line.vendorName || '', vendorUnitCost: line.vendorUnitCost === '' ? '' : Number(line.vendorUnitCost),
           serialSelections: Array.isArray(line.serialSelections) ? line.serialSelections : [], warrantyData: line.warrantyData || null };
       }),
-      payment: { amountReceived: document.getElementById('posAmountReceived').value, paymentMethod: document.getElementById('posPaymentMethod').value, bankAccountId: document.getElementById('posBankAccount').value },
+      payment: posMultiPaymentEnabledForSale_()
+        ? {payments:posMultiPaymentPayloadRows_()}
+        : { amountReceived: document.getElementById('posAmountReceived').value, paymentMethod: document.getElementById('posPaymentMethod').value, bankAccountId: document.getElementById('posBankAccount').value },
       notes: posState.saleNotes || '', subtotal: subtotal, discount: discount, grandTotal: Math.max(0, subtotal-discount)
     };
   }
@@ -2281,9 +2312,17 @@
 
   function posSaveDraft_() {
     var errEl=document.getElementById('posFormError'); errEl.style.display='none';
-    if (posMultiPaymentEnabledForSale_()) {
-      errEl.textContent = 'Split-payment drafts are not available until payment recovery support is completed.';
+    if (posState.paymentSnapshotSplit && !posState.multiPaymentEnabled) {
+      errEl.textContent = 'Multiple payments were disabled. This split draft cannot be saved as a single-payment draft.';
       errEl.style.display = 'block'; return;
+    }
+    if (posMultiPaymentEnabledForSale_()) {
+      try {
+        var draftGrand = Math.max(0, (posState.cart.reduce(function (sum, line) {
+          return sum + (Number(line.lineTotal) || 0);
+        }, 0) - (Number(document.getElementById('posDiscount').value) || 0)));
+        posMultiPaymentTerms_(Math.round(draftGrand * 100) / 100, posState.paymentRows, posState.bankAccounts);
+      } catch (paymentError) { errEl.textContent = paymentError.message; errEl.style.display = 'block'; return; }
     }
     if(!posState.cart.length){errEl.textContent='Cart is empty.';errEl.style.display='block';return;}
     var payload=posBuildDraftPayload_();
@@ -2336,6 +2375,10 @@
   }
 
   function posRestoreDraft_(draft) {
+    if (posHasSplitPaymentSnapshot_(draft) && !posState.multiPaymentEnabled) {
+      showToast('Multiple payments are disabled. This split draft cannot be opened as a single-payment sale.', 'error');
+      return;
+    }
     posExitUpdateMode_();
     posState.saleNotes = draft.notes || '';
     posState.cartEditIndex = null;
@@ -2352,8 +2395,14 @@
     document.getElementById('posDiscount').value=Number(draft.discount)>0?draft.discount:'';
     var payment=draft.payment||{}; document.getElementById('posAmountReceived').value=payment.amountReceived||''; document.getElementById('posPaymentMethod').value=payment.paymentMethod||'Cash';
     document.getElementById('posBankAccountRow').style.display=paymentMethodNeedsAccount_(payment.paymentMethod)?'':'none'; fillBankAccountSelect_(document.getElementById('posBankAccount'),posState.bankAccounts,payment.paymentMethod||'Cash'); document.getElementById('posBankAccount').value=payment.bankAccountId||'';
+    if (posHasSplitPaymentSnapshot_(draft)) {
+      posRestoreMultiPaymentSnapshot_(draft);
+    } else {
+      posState.paymentModeLegacy = true;
+      posState.paymentSnapshotSplit = false;
+    }
     posState.draftId=draft.draftId; posState.draftNo=draft.draftNo; posState.draftVersion=draft.version;
-    posApplyPaymentMode_(); // Older draft format continues with the legacy one-payment fields.
+    posApplyPaymentMode_(); // Legacy draft keeps single-payment fields; split draft keeps all rows.
     document.getElementById('posDraftBanner').hidden=false; document.getElementById('posDraftBannerNo').textContent=draft.draftNo; document.getElementById('posSaveDraftBtn').textContent='Update Draft';
     posSetCustomerMoreExpanded_(!!(draft.customerFatherName||draft.customerAddress)); posRenderCart_(); posRenderSessionUI_();
   }
@@ -2393,6 +2442,10 @@
   document.getElementById('posCompleteBtn').addEventListener('click', function () {
     var errEl = document.getElementById('posFormError');
     errEl.style.display = 'none';
+    if (posState.paymentSnapshotSplit && !posState.multiPaymentEnabled) {
+      errEl.textContent = 'Multiple payments were disabled. Re-enable them before posting this split-payment form.';
+      errEl.style.display = 'block'; return;
+    }
     if (!posState.activeSession) { errEl.textContent = 'Start your cash session first.'; errEl.style.display = 'block'; return; }
     if (!posState.cart.length) { errEl.textContent = 'Cart is empty.'; errEl.style.display = 'block'; return; }
 
@@ -2679,7 +2732,10 @@
 
   function posRestoreCopiedSaleFields_(source) {
     source = source || {};
-    posState.copyMode = true; // Phase 4 restores complete multi-payment snapshots.
+    posState.copyMode = true; // A copy never mutates the source invoice.
+    if (posHasSplitPaymentSnapshot_(source) && !posState.multiPaymentEnabled) {
+      throw new Error('Multiple payments are disabled. Cannot duplicate this split-payment invoice into a single-payment sale.');
+    }
     var customerId = source.customerId || '';
     var custMatch = customerId ? posState.customers.filter(function (c) { return String(c.id) === String(customerId); })[0] : null;
     var payment = posCopiedPaymentSnapshot_(source);
@@ -2703,6 +2759,12 @@
     posRefreshTabletSelect_(document.getElementById('posPaymentMethod'));
     posRefreshTabletSelect_(document.getElementById('posBankAccount'));
     posState.saleNotes = source.notes || '';
+    if (posHasSplitPaymentSnapshot_(source)) {
+      posRestoreMultiPaymentSnapshot_(source);
+    } else {
+      posState.paymentModeLegacy = true;
+      posState.paymentSnapshotSplit = false;
+    }
     posApplyPaymentMode_();
     posSetCustomerMoreExpanded_(!!(document.getElementById('posCustomerFatherName').value || source.customerAddress));
     posUpdateCustomerDueDisplay_(custMatch ? custMatch.due : 0);
@@ -2722,6 +2784,9 @@
     posState._loadPromise = posLoad();
 
     return posState._loadPromise.then(function () {
+      if (posHasSplitPaymentSnapshot_(inv) && !posState.multiPaymentEnabled) {
+        throw new Error('Multiple payments are disabled. Cannot duplicate this split-payment invoice.');
+      }
       posState.cart = [];
       posState.cartEntryIndex = null;
       var skipped = [];
