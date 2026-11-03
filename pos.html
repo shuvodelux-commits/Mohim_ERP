@@ -2162,6 +2162,8 @@
     var dueNow = Math.max(0, grandTotal - paidNow);
     var saleConfirmDetails = [
       { label: 'Customer', value: custName, emphasis: true },
+      { label: 'Subtotal', value: formatMoney(subtotal) },
+      { label: 'Discount', value: formatMoney(discount) },
       { label: 'Grand Total', value: formatMoney(grandTotal), emphasis: true },
       { label: 'In words', value: banglaAmountInWords_(grandTotal) },
       { label: 'Paid Now', value: formatMoney(paidNow) },
