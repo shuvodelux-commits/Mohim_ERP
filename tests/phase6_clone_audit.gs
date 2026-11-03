@@ -68,6 +68,90 @@ function phase6IsDeleted_(row) {
 }
 
 /**
+ * Recompute BANK_ACCOUNTS Current Balance using the exact same opening and
+ * reversal semantics as BankLedger.gs. No accounting rows are modified.
+ *
+ * Opening Balance is counted through the single backfill row, when present,
+ * otherwise directly from the account master; never through both.
+ * A Reversed row is normally excluded, except manual correction entries
+ * with a linked opposite "Reversal Of" Bank Book entry.
+ */
+function phase6AuditBankMasters_(accounts, bankBookRows) {
+  var issues = [];
+  var byAccount = Object.create(null);
+  var byEntry = Object.create(null);
+  var reversalTargets = Object.create(null);
+  var accountRows = Array.isArray(accounts) ? accounts : [];
+  var movements = (Array.isArray(bankBookRows) ? bankBookRows : []).filter(function (r) {
+    return !phase6IsDeleted_(r);
+  });
+  function signedPaisa(value,label) {
+    if (value === '' || value === null || value === undefined) return 0;
+    var raw = String(value).trim();
+    if (!/^-?(?:\d+(?:\.\d{1,2})?|\.\d{1,2})$/.test(raw)) {
+      throw new Error(label + ' is not an exact-paisa value.');
+    }
+    return (raw.charAt(0) === '-' ? -1 : 1) *
+      salePaymentPaisa_(raw.charAt(0) === '-' ? raw.slice(1) : raw,label,false);
+  }
+  accountRows.forEach(function (a) {
+    var id = String(a['Bank Account ID'] || '').trim();
+    if (!id || byAccount[id]) {
+      issues.push({invoiceId:'',problem:'Duplicate or missing bank account ID'});
+    } else byAccount[id] = a;
+  });
+  movements.forEach(function (row) {
+    var entryId = String(row['Entry ID'] || '').trim();
+    var accountId = String(row['Bank Account ID'] || '').trim();
+    if (!entryId || byEntry[entryId]) {
+      issues.push({invoiceId:'',problem:'Duplicate or missing Bank Book entry ID'});
+    }
+    if (entryId) byEntry[entryId] = row;
+    if (row['Reversal Of']) reversalTargets[String(row['Reversal Of'])] = true;
+    if (!byAccount[accountId] && String(row.Status) !== 'Reversed') {
+      issues.push({invoiceId:'',problem:'Active Bank Book references unknown bank account ' + accountId});
+    }
+  });
+  movements.forEach(function (row) {
+    var originalId = String(row['Reversal Of'] || '').trim();
+    if (!originalId) return;
+    var original = byEntry[originalId];
+    if (!original || String(original['Bank Account ID']) !== String(row['Bank Account ID'])) {
+      issues.push({invoiceId:'',problem:'Bank reversal refers to missing or different account entry'});
+    }
+  });
+  accountRows.forEach(function (a) {
+    var id = String(a['Bank Account ID'] || '').trim();
+    if (!id) return;
+    try {
+      var own = movements.filter(function(r){return String(r['Bank Account ID']) === id;});
+      var included = own.filter(function (r) {
+        return String(r.Status) !== 'Reversed' || reversalTargets[String(r['Entry ID'] || '')];
+      });
+      var openings = included.filter(function (r) { return String(r.Type) === 'Opening Balance'; });
+      if (openings.length > 1) {
+        issues.push({invoiceId:'',problem:'Multiple active opening balance entries for bank account ' + id});
+      }
+      var net = openings.length ? 0 : signedPaisa(a['Opening Balance'],'Opening Bank Balance');
+      included.forEach(function (r) {
+        net += salePaymentPaisa_(r.Credit || 0,'Bank Book credit',false) -
+          salePaymentPaisa_(r.Debit || 0,'Bank Book debit',false);
+        if (!Number.isSafeInteger(net)) throw new Error('Bank ledger paisa total overflow.');
+      });
+      var actual = signedPaisa(a['Current Balance'],'Stored Bank Balance');
+      if (actual !== net) {
+        issues.push({invoiceId:'',problem:'Bank master balance mismatch for account ' + id +
+          ' (computed ' + net / 100 + ', stored ' + actual / 100 + ')'});
+      }
+    } catch (err) {
+      issues.push({invoiceId:'',problem:'Bank master reconciliation failed for ' + id +
+        ': ' + String(err.message || err)});
+    }
+  });
+  return {bankAccountsChecked:accountRows.length,issues:issues};
+}
+
+/**
  * Run in the clone Apps Script editor: phase6CloneAudit_()
  * Returns PASS or FAIL with anonymized invoice IDs only; no PII is logged.
  * Never repairs, posts, soft-deletes, or migrates data.
@@ -79,11 +163,13 @@ function phase6CloneAudit_() {
   assertPhase6CloneIdentity_(PHASE6_CLONE_EXPECTED_,spreadsheet.getId(),scriptId);
 
   var keys = ['SALES','SALE_PAYMENTS','SALE_POSTING_JOURNAL',
-    'CASH_BOOK','BANK_BOOK','SALES_RETURN'];
+    'CASH_BOOK','BANK_BOOK','BANK_ACCOUNTS','SALES_RETURN'];
   var rows = {};
   keys.forEach(function (key) { rows[key] = phase6ReadCloneRows_(spreadsheet,key); });
   var salesById = Object.create(null), issues = [];
   var splitCount = 0, checkedCount = 0, deletedCount = 0;
+  var bankMasterAudit = phase6AuditBankMasters_(rows.BANK_ACCOUNTS,rows.BANK_BOOK);
+  issues = issues.concat(bankMasterAudit.issues);
   rows.SALES.forEach(function (sale) {
     var invoiceId = String(sale['Invoice ID'] || '');
     if (!invoiceId) return;
@@ -160,6 +246,7 @@ function phase6CloneAudit_() {
     splitInvoices:splitCount,
     activeSplitInvoicesChecked:checkedCount,
     deletedSplitInvoices:deletedCount,
+    bankAccountsChecked:bankMasterAudit.bankAccountsChecked,
     uncommittedJournals:journalNeedsReview,
     issues:issues.slice(0,200),
     issueCount:issues.length,
