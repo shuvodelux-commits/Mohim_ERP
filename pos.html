@@ -121,6 +121,7 @@
         <div class="pos-checkout-totals">
           <div class="totals-row"><span>Subtotal</span><span class="v" id="posSubtotal">0</span></div>
           <div class="totals-row grand"><span>Grand Total</span><span class="v" id="posGrandTotal">0</span></div>
+          <div class="totals-row" id="posCurrentInvoiceProfitRow" style="display:none;" hidden><span>Estimated Profit</span><span class="v" id="posCurrentInvoiceProfit"></span></div>
           <div class="totals-row" id="posChangeRow" style="display:none;"><span>Change Due</span><span class="v" id="posChangeDue">0</span></div>
           <div class="totals-row" id="posDueRow" style="display:none;"><span>Due Amount</span><span class="v" id="posDueAmountDisplay">0</span></div>
         </div>
@@ -196,7 +197,7 @@
 </div>
 
 <script>
-  var posState = { products: [], productStockById: {}, productCostById: {}, showCost: false, customers: [], bankAccounts: [], vendors: [], vendorsAll: [], cart: [], cartEditIndex: null, cartEntryIndex: null, activeSession: null, openingCashMismatch: null, dismissedCashMismatchKey: '', closeSessionSummary: null, updateInvoiceId: null, updateReason: null, draftId: null, draftNo: '', draftVersion: null, recentDrafts: [], saleNotes: '', searchResults: [], searchActiveIndex: -1 };
+  var posState = { products: [], productStockById: {}, productCostById: {}, showCost: false, canViewProfit: false, customers: [], bankAccounts: [], vendors: [], vendorsAll: [], cart: [], cartEditIndex: null, cartEntryIndex: null, activeSession: null, openingCashMismatch: null, dismissedCashMismatchKey: '', closeSessionSummary: null, updateInvoiceId: null, updateReason: null, draftId: null, draftNo: '', draftVersion: null, recentDrafts: [], saleNotes: '', searchResults: [], searchActiveIndex: -1 };
 
 
   // POS uses the shared touch-select presentation layer. The native select
@@ -223,6 +224,7 @@
       // the payload and this map stays empty. Nothing here re-checks the
       // permission, because nothing here could be trusted to.
       posState.showCost = !!data.showPurchasePrice;
+      posState.canViewProfit = !!data.canViewCurrentInvoiceProfit;
       posState.productCostById = {};
       posState.products.forEach(function (p) {
         posState.productStockById[p.id] = Number(p.stock) || 0;
@@ -1633,6 +1635,55 @@
    * full Due sale. posDeriveSaleTerms_() below turns this same number back
    * into the paymentType/paidAmount pair completeSale() already expects.
    */
+  var posProfitRequestSequence_ = 0;
+  var posProfitTimer_ = null;
+
+  // Debounced server-side estimate: no cost figures are sent to a user without
+  // profit permission, and stale response #N can never overwrite newer cart #N+1.
+  function posScheduleProfitPreview_() {
+    var row = document.getElementById('posCurrentInvoiceProfitRow');
+    var output = document.getElementById('posCurrentInvoiceProfit');
+    if (posProfitTimer_ !== null) { clearTimeout(posProfitTimer_); posProfitTimer_ = null; }
+    var requestNo = ++posProfitRequestSequence_;
+    var items = posState.cart.filter(function (l) { return l.productId && Number(l.qty) > 0; });
+    if (!posState.canViewProfit || !items.length) {
+      row.hidden = true;
+      row.style.display = 'none';
+      output.textContent = '';
+      return;
+    }
+    var snapshot = {
+      discount: Number(document.getElementById('posDiscount').value) || 0,
+      items: items.map(function (l) {
+        return {
+          productId:l.productId, name:l.name, qty:Number(l.qty),
+          unitPrice:Number(l.unitPrice)||0, lineTotal:Number(l.lineTotal)||0,
+          priceMode:l.priceMode||'manual', vendorId:l.vendorId||'',
+          vendorUnitCost:l.vendorUnitCost, bundleRevision:l.bundleRevision||0
+        };
+      })
+    };
+    row.hidden = false;
+    row.style.display = 'flex';
+    output.textContent = 'Calculating...';
+    posProfitTimer_ = setTimeout(function () {
+      posProfitTimer_ = null;
+      serverCall('previewPosInvoiceProfit', authToken, snapshot).then(function (data) {
+        if (requestNo !== posProfitRequestSequence_) return;
+        if (!data || typeof data.profit !== 'number') throw new Error('Profit estimate unavailable.');
+        output.textContent = formatMoney(data.profit) +
+          ' (' + (Number(data.marginPercent)||0).toFixed(1) + '%)';
+        output.style.color = data.profit < 0 ? 'var(--color-danger)' : 'var(--color-success)';
+        output.title = data.costComplete ? 'Estimated using current FIFO and vendor cost.' : 'Estimated; some stock costs are zero or incomplete.';
+      }).catch(function () {
+        if (requestNo !== posProfitRequestSequence_) return;
+        output.textContent = 'Unavailable';
+        output.style.color = 'var(--color-text-muted)';
+        output.title = 'Could not calculate profit from the current stock snapshot.';
+      });
+    }, 450);
+  }
+
   function posRecalcTotals_() {
     var subtotal = posState.cart.reduce(function (s, l) { return s + (Number(l.lineTotal) || 0); }, 0);
     var discount = Number(document.getElementById('posDiscount').value) || 0;
@@ -1655,6 +1706,7 @@
       changeRow.style.display = 'none';
       dueRow.style.display = 'none';
     }
+    posScheduleProfitPreview_();
   }
 
   /** received<=0 -> full Due; 0<received<grandTotal -> Partial; received>=grandTotal -> Cash (with change). */
