@@ -209,7 +209,7 @@
 </div>
 
 <script>
-  var posState = { products: [], productStockById: {}, productCostById: {}, showCost: false, canViewProfit: false, customers: [], bankAccounts: [], vendors: [], vendorsAll: [], cart: [], cartEditIndex: null, cartEntryIndex: null, activeSession: null, openingCashMismatch: null, dismissedCashMismatchKey: '', closeSessionSummary: null, updateInvoiceId: null, updateReason: null, draftId: null, draftNo: '', draftVersion: null, recentDrafts: [], saleNotes: '', searchResults: [], searchActiveIndex: -1 };
+  var posState = { products: [], productStockById: {}, productCostById: {}, showCost: false, canViewProfit: false, customers: [], bankAccounts: [], vendors: [], vendorsAll: [], cart: [], cartEditIndex: null, cartEntryIndex: null, activeSession: null, openingCashMismatch: null, dismissedCashMismatchKey: '', closeSessionSummary: null, updateInvoiceId: null, updateReason: null, draftId: null, draftNo: '', draftVersion: null, recentDrafts: [], saleNotes: '', searchResults: [], searchActiveIndex: -1, multiPaymentEnabled: false, paymentRows: [{id:'pm-1',method:'Cash',amount:'',accountId:''}], paymentRowSeq: 1, paymentOperationId: '', paymentAttemptFingerprint: '', copyMode: false };
 
 
   // POS uses the shared touch-select presentation layer. The native select
@@ -244,6 +244,8 @@
       });
       posState.customers = data.customers;
       posState.bankAccounts = data.bankAccounts;
+      posState.multiPaymentEnabled = !!data.multiPaymentEnabled;
+      posApplyPaymentMode_();
       posState.vendors = data.vendors || [];
       posState.vendorsAll = data.vendorsAll || [];
       posState.activeSession = data.activeSession;
@@ -1749,6 +1751,78 @@
       }
     }
     return posState.paymentOperationId;
+  }
+
+
+  function posRenderMultiPaymentRows_() {
+    var target = document.getElementById('posMultiPaymentRows');
+    if (!target || !posMultiPaymentEnabledForSale_()) return;
+    target.innerHTML = posState.paymentRows.map(function (r, index) {
+      var label = 'Payment ' + (index + 1);
+      var methodOptions = ['Cash', 'Bank', 'Mobile Banking'].map(function (m) {
+        return '<option value="' + m + '"' + (r.method === m ? ' selected' : '') + '>' + m + '</option>';
+      }).join('');
+      var accountOptions = '<option value="">Select account...</option>' +
+        (posState.bankAccounts || []).filter(function (a) { return a.type === r.method; }).map(function (a) {
+          return '<option value="' + escapeHtml(a.id) + '"' + (r.accountId === a.id ? ' selected' : '') + '>' + escapeHtml(a.name) + '</option>';
+        }).join('');
+      var accountControl = r.method === 'Cash'
+        ? '<span class="pos-multi-cash-label">Cash drawer</span>'
+        : '<select data-payment-field="accountId" aria-label="' + label + ' account">' + accountOptions + '</select>';
+      return '<div class="pos-multi-payment-row" data-payment-row="' + escapeHtml(r.id) + '">' +
+        '<select data-payment-field="method" aria-label="' + label + ' method">' + methodOptions + '</select>' +
+        '<div class="pos-multi-account">' + accountControl + '</div>' +
+        '<input type="text" inputmode="decimal" autocomplete="off" data-payment-field="amount" aria-label="' + label + ' amount" placeholder="৳ Amount" value="' + escapeHtml(r.amount) + '">' +
+        '<button type="button" class="btn btn-sm pos-multi-remaining" data-payment-action="remaining" aria-label="Fill remaining in ' + label + '">Remaining</button>' +
+        '<button type="button" class="btn btn-sm pos-multi-remove" data-payment-action="remove" aria-label="Remove ' + label + '"' +
+        (posState.paymentRows.length < 2 ? ' disabled' : '') + '>&times;</button></div>';
+    }).join('');
+    posEnhanceTabletSelects_();
+  }
+
+  function posApplyPaymentMode_() {
+    var enabled = posMultiPaymentEnabledForSale_();
+    var singleAmount = document.getElementById('posAmountReceivedRow');
+    var method = document.getElementById('posPaymentMethodRow');
+    var bank = document.getElementById('posBankAccountRow');
+    var split = document.getElementById('posMultiPaymentFields');
+    if (!singleAmount || !split) return;
+    singleAmount.style.display = enabled ? 'none' : 'flex';
+    method.style.display = enabled ? 'none' : 'flex';
+    bank.style.display = enabled ? 'none' :
+      (paymentMethodNeedsAccount_(document.getElementById('posPaymentMethod').value) ? '' : 'none');
+    split.hidden = !enabled;
+    split.style.display = enabled ? 'block' : 'none';
+    if (enabled) posRenderMultiPaymentRows_();
+    posRecalcTotals_();
+  }
+
+  function posMultiPaymentError_(message) {
+    var error = document.getElementById('posMultiPaymentError');
+    error.textContent = message || '';
+    error.hidden = !message;
+    error.style.display = message ? 'block' : 'none';
+  }
+
+  function posHandleMultiPaymentAction_(event) {
+    var button = event.target.closest('[data-payment-action]');
+    if (!button) return;
+    var el = button.closest('[data-payment-row]');
+    if (!el) return;
+    var row = posState.paymentRows.filter(function (r) { return r.id === el.dataset.paymentRow; })[0];
+    if (!row) return;
+    if (button.dataset.paymentAction === 'remove') {
+      if (posState.paymentRows.length <= 1) return;
+      posState.paymentRows = posState.paymentRows.filter(function (r) { return r.id !== row.id; });
+    } else {
+      try {
+        var subtotal = posState.cart.reduce(function (sum, l) { return sum + (Number(l.lineTotal) || 0); }, 0);
+        var discount = Number(document.getElementById('posDiscount').value) || 0;
+        row.amount = posMultiPaymentRemaining_(Math.max(0, Math.round((subtotal - discount) * 100) / 100), posState.paymentRows, row.id);
+      } catch (err) { posMultiPaymentError_(err.message); return; }
+    }
+    posRenderMultiPaymentRows_();
+    posRecalcTotals_();
   }
 
   var posProfitRequestSequence_ = 0;
