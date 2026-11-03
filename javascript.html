@@ -3262,6 +3262,14 @@
     element.classList.add(partyLedgerBalanceTone_(balance));
   }
 
+  // Supplier balances: positive means payable (Credit), negative means
+  // receivable / advance paid to the supplier (Debit). Display only.
+  function supplierBalanceText_(balance) {
+    var amount = Number(balance) || 0;
+    var prefix = amount > 0.004 ? 'Credit ' : (amount < -0.004 ? 'Debit ' : '');
+    return prefix + formatMoney(Math.abs(amount));
+  }
+
   function partyLedgerPrintStatement_(statement) {
     var s = statement || {};
     var host = document.getElementById('printHost');
