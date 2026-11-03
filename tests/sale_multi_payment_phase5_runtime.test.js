@@ -98,3 +98,39 @@ test('Phase 5: single split return journal replay decision occurs before return 
  assert.match(s,/Return Operation ID/);
  assert.match(read('returns.html'),/payloadSingle\.operationId\s*=\s*rtReturnOperationId_\(\)/);
 });
+
+
+test('Phase 5: committed split return replay never re-runs stock restoration or refund posting',()=>{
+ const operationId='return-operation-0001',invoiceId='INV-1',changes=[];
+ const journal={'Operation ID':operationId,'Operation Type':'Return','Invoice ID':invoiceId,
+   State:'Committed',Actor:'U1','Payload Hash':'HASH'};
+ const posted={'Return ID':'RET-1','Invoice ID':invoiceId,'Return Operation ID':operationId,'Total Return Amount':30,'Customer ID':'C1'};
+ const ctx=vm.createContext({
+   CONFIG:{LOCK_TIMEOUT_MS:1000},
+   LockService:{getScriptLock:()=>({waitLock(){},releaseLock(){}})},
+   requirePermission_:()=>({'User ID':'U1'}),requireActiveCashSession_:()=>{throw Error('Replay must not require new cash session');},
+   findUniqueSalesRow_:()=>({...sale}),
+   isDeleted_:()=>false,sanitizeInput_:x=>String(x||''),
+   salePostingPayloadHash_:()=> 'HASH',
+   salePostingJournalDecision_:row=>row.State==='Committed'?'replay':'review',
+   getAllRows_:key=>key==='SALE_POSTING_JOURNAL'?[journal]:key==='SALES_RETURN'?[posted]:[],
+   prepareSalesReturn_:()=>{throw Error('Replay must not prepare new quantity');},
+   appendRow_:()=>{changes.push('append');},updateRowFields_:()=>{changes.push('update');},
+   ok_:x=>({success:true,data:x}),fail_:x=>({success:false,message:String(x)}),
+   actorName_:()=> 'Owner',logError_:()=>{}
+ });
+ const src=read('SalesReturn.gs'),start=src.indexOf('function completeReturn(token, payload) {'),
+   end=src.indexOf('/** Derive a readable grouping ID',start);
+ assert.ok(start>0&&end>start);
+ vm.runInContext(src.slice(start,end),ctx);
+ const payload={invoiceId,items:[{productId:'P1',qty:1}],refundMethod:'Cash',operationId};
+ const replay=ctx.completeReturn('TOKEN',payload);
+ assert.equal(replay.success,true,replay.message);
+ assert.equal(replay.data.returnId,'RET-1');
+ assert.deepEqual(changes,[]);
+ journal.State='Needs Review';
+ const interrupted=ctx.completeReturn('TOKEN',payload);
+ assert.equal(interrupted.success,false);
+ assert.match(interrupted.message,/Needs Review|interrupted/i);
+ assert.deepEqual(changes,[]);
+});
