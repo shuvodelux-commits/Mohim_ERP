@@ -237,6 +237,13 @@ function phase6CloneAudit_() {
     // cash-only original checkout amount is the sole eligible provenance.
   });
 
+  if (!checkedCount) {
+    issues.push({invoiceId:'',problem:'No active split invoice fixture checked; clone audit is not valid release evidence.'});
+  }
+  if (!bankMasterAudit.bankAccountsChecked) {
+    issues.push({invoiceId:'',problem:'No bank account fixtures checked; create a synthetic bank account before acceptance.'});
+  }
+
   var report = {
     status:issues.length ? 'FAIL':'PASS',
     mode:'READ_ONLY_ISOLATED_CLONE',
