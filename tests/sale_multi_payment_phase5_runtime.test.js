@@ -37,6 +37,7 @@ function deletionHarness(failAt=''){
   ok_:data=>({success:true,data}),fail_:m=>({success:false,message:String(m)})
  });
  vm.runInContext(read('SalePayments.gs'),ctx);
+ ctx.salePostingPayloadHash_=()=> 'TEST_HASH'; // deterministic mocked Apps Script digest
  vm.runInContext(read('DeleteEngine.gs'),ctx);
  return {ctx,db,writes,rows};
 }
