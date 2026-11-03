@@ -111,8 +111,10 @@ test('semantic labels/cards use existing theme colors; no ledger backend changes
   assert.match(customer, /id="customerLedgerDueCard"/);
   assert.match(customer, /id="customerLedgerCreditCard"/);
   assert.match(supplier, /id="supplierLedgerBalanceNote"/);
-  assert.match(supplier, /'To Pay'/);
-  assert.match(supplier, /'Credit Available'/);
+  assert.match(supplier, /'Supplier Payable'/);
+  assert.match(supplier, /'Supplier Receivable'/);
+  assert.match(supplier, /'Credit Balance'/);
+  assert.match(supplier, /'Debit Balance'/);
   assert.match(style, /#page-customerLedger \.party-ledger-balance-item\.is-due/);
   assert.match(style, /#page-customerLedger \.party-ledger-balance-item\.is-credit/);
   assert.match(style, /\.party-ledger-inline-money\.is-sales-due \{ color:var\(--color-danger\)/);
