@@ -122,6 +122,7 @@
           <div class="totals-row"><span>Subtotal</span><span class="v" id="posSubtotal">0</span></div>
           <div class="totals-row grand"><span>Grand Total</span><span class="v" id="posGrandTotal">0</span></div>
           <div class="totals-row" id="posCurrentInvoiceProfitRow" style="display:none;" hidden><span>Estimated Profit</span><span class="v" id="posCurrentInvoiceProfit"></span></div>
+          <div class="bn-hint" id="posCurrentInvoiceProfitWarning" hidden style="font-size:11px;color:var(--color-danger);text-align:right;">Cost incomplete — profit estimate may be inaccurate.</div>
           <div class="totals-row" id="posChangeRow" style="display:none;"><span>Change Due</span><span class="v" id="posChangeDue">0</span></div>
           <div class="totals-row" id="posDueRow" style="display:none;"><span>Due Amount</span><span class="v" id="posDueAmountDisplay">0</span></div>
         </div>
@@ -1643,6 +1644,8 @@
   function posScheduleProfitPreview_() {
     var row = document.getElementById('posCurrentInvoiceProfitRow');
     var output = document.getElementById('posCurrentInvoiceProfit');
+    var warning = document.getElementById('posCurrentInvoiceProfitWarning');
+    warning.hidden = true;
     if (posProfitTimer_ !== null) { clearTimeout(posProfitTimer_); posProfitTimer_ = null; }
     var requestNo = ++posProfitRequestSequence_;
     var items = posState.cart.filter(function (l) { return l.productId && Number(l.qty) > 0; });
@@ -1675,6 +1678,7 @@
           ' (' + (Number(data.marginPercent)||0).toFixed(1) + '%)';
         output.style.color = data.profit < 0 ? 'var(--color-danger)' : 'var(--color-success)';
         output.title = data.costComplete ? 'Estimated using current FIFO and vendor cost.' : 'Estimated; some stock costs are zero or incomplete.';
+        warning.hidden = !!data.costComplete;
       }).catch(function () {
         if (requestNo !== posProfitRequestSequence_) return;
         output.textContent = 'Unavailable';
