@@ -354,6 +354,13 @@ function completeSale(token, payload) {
         return ok_(buildInvoicePayload_(alreadyPosted['Invoice ID']));
       }
       sourceDraft = prepareSalesDraftForPosting_(actingUser, sourceDraftId, sourceDraftVersion);
+      // Never let a modified/stale client silently post split draft payments
+      // through the legacy single-account route (or vice versa).
+      const savedPayment = sourceDraft.parsed && sourceDraft.parsed.payment || {};
+      const savedSplit = Object.prototype.hasOwnProperty.call(savedPayment, 'payments');
+      if (savedSplit !== multiPayment) {
+        throw new Error('Draft payment format changed. Reload the draft before posting.');
+      }
       fixedDraftLines = fixedDraftLineByProduct_(sourceDraft.parsed);
     }
 
