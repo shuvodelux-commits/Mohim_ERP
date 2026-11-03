@@ -55,7 +55,7 @@
             <button class="btn btn-primary" id="custPaySaveBtn">Receive</button>
           </div>
           <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; margin-top:8px;">
-            <div id="custPayDiscountReasonRow" style="flex:1; min-width:240px; display:none;"><label>Discount Reason *</label><input id="custPayDiscountReason" type="text" placeholder="Why is this discount being given?"></div>
+            <div id="custPayDiscountReasonRow" style="flex:1; min-width:240px; display:none;"><label>Discount Reason (optional)</label><input id="custPayDiscountReason" type="text" placeholder="Why is this discount being given?"></div>
             <button type="button" class="btn" id="custPaySettleFullBtn">Settle Full Balance</button>
             <div style="font-size:12px; color:var(--color-text-muted); min-width:230px; padding:7px 0;" class="mobile-payment-summary"><div class="mobile-payment-summary-row"><span>Total Settled</span><strong id="custPayTotalSettled">0</strong></div><div class="mobile-payment-summary-row"><span>Balance After</span><strong id="custPayBalanceAfter">0</strong></div></div>
           </div>
@@ -392,7 +392,7 @@
     var payDate = document.getElementById('custPayDate').value || custPayToday_();
     var backdatedReason = document.getElementById('custPayBackdatedReason').value.trim();
     if (payDate < custPayToday_() && !backdatedReason) { errEl.textContent = 'A reason is required when dating a payment in the past.'; errEl.style.display = 'block'; return; }
-    if (discountAmount > 0 && !discountReason) { errEl.textContent = 'Discount Reason is required.'; errEl.style.display = 'block'; return; }
+
     if (discountAmount > 0 && ((Number(amount) || 0) + discountAmount) - custState.detailDue > 0.004) { errEl.textContent = 'Receive amount plus discount cannot exceed the current due.'; errEl.style.display = 'block'; return; }
     var bankAccountId = document.getElementById('custPayBankAccount').value;
     if (paymentMethodNeedsAccount_(method) && !bankAccountId) { errEl.textContent = 'Choose a bank account.'; errEl.style.display = 'block'; return; }
