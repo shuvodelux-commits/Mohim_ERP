@@ -137,6 +137,9 @@ function getPosBootstrap(token) {
       // Lets POS tell "feature is off / not mine to see" (render nothing at
       // all) apart from "on, but this product's cost happens to be 0".
       showPurchasePrice: showPurchasePrice,
+      // A profit preview is a sensitive cost-derived figure. Expose only
+      // whether the logged-in user's existing report/cost rights allow it.
+      canViewCurrentInvoiceProfit: canViewInvoiceProfit_(actingUser),
       customers: customers.map(function (c) {
         return { id: c['Customer ID'], name: c['Customer Name'], phone: c['Phone'], address: c['Address'],fatherName:c['Father Name'] || '', due: Number(c['Current Due']) || 0 };
       }),
@@ -177,6 +180,125 @@ function getPosBootstrap(token) {
  * ordinary lines and for a shortfall the user wants to leave as today's
  * default Negative Stock Sale.
  */
+/**
+ * Pure, read-only current-cart profit estimate. Uses the same FIFO cost
+ * planner, vendor shortage and bundle demand aggregation as completeSale.
+ * This never mutates lots, stock, orders or cash/bank sheets.
+ */
+function estimatePosInvoiceProfit_(payload, productsById, allLots, bundleDefinitions) {
+  payload = payload || {};
+  const items = payload.items;
+  if (!Array.isArray(items) || !items.length) throw new Error('Cart is empty.');
+  if (items.length > 200) throw new Error('Too many POS lines for a single preview.');
+  const definitions = bundleDefinitions || {};
+  const seen = {};
+  const lines = [];
+  let subtotal = 0, cogs = 0, costComplete = true;
+
+  function addPlanCost_(plan, vendorCost) {
+    (plan.draws || []).forEach(function (draw) {
+      const qty = Number(draw.take) || 0, unitCost = Number(draw.unitCost) || 0;
+      cogs += qty * unitCost;
+      if (qty > 0 && unitCost <= 0) costComplete = false;
+    });
+    const missing = Number(plan.shortfall) || 0;
+    if (missing > 0) {
+      const unitCost = vendorCost === null ? (Number(plan.fallbackPrice) || 0) : vendorCost;
+      cogs += missing * unitCost;
+      if (unitCost <= 0) costComplete = false;
+    }
+  }
+
+  items.forEach(function (item, i) {
+    const productId = String(item && item.productId || '');
+    const qty = Number(item && item.qty);
+    const product = productsById[productId];
+    if (!product || !productId || seen[productId]) throw new Error('Invalid or duplicate POS item: ' + (productId || String(i + 1)));
+    seen[productId] = true;
+    if (!isValidNonNegativeNumber_(qty) || qty <= 0) throw new Error('Line ' + (i + 1) + ': enter a positive quantity.');
+    const isBundle = bundleProductType_(product) === 'Bundle';
+    const vendorId = String(item.vendorId || '').trim();
+    if (isBundle) {
+      const recipe = definitions[productId];
+      if (!recipe || !Number.isSafeInteger(qty) || Number(item.bundleRevision) !== Number(recipe.revision)) {
+        throw new Error('Bundle recipe changed. Refresh POS before checking profit.');
+      }
+      if (vendorId) throw new Error('Vendor shortages cannot be sourced inside a bundle.');
+    }
+    const plan = isBundle ? null : (vendorId
+      ? planSaleVendorConsumption_(productId, qty, allLots, product)
+      : planStockConsumption_(productId, qty, allLots, product));
+    let lineTotal;
+    if (item.priceMode === 'auto') {
+      lineTotal = isBundle
+        ? roundMoney_(qty * (Number(product['Selling Price']) || 0))
+        : computePlanSellingPrice_(plan, qty).lineTotal;
+    } else if (item.priceMode === 'fixed' && isValidNonNegativeNumber_(item.lineTotal)) {
+      lineTotal = roundMoney_(Number(item.lineTotal));
+    } else {
+      if (!isValidNonNegativeNumber_(item.unitPrice)) throw new Error('Line ' + (i + 1) + ': invalid selling price.');
+      lineTotal = roundMoney_(qty * Number(item.unitPrice));
+    }
+    subtotal = roundMoney_(subtotal + lineTotal);
+    if (vendorId && (plan.shortfall <= 0 || !isValidNonNegativeNumber_(item.vendorUnitCost))) {
+      throw new Error('Vendor sourcing cost or shortage is not valid.');
+    }
+    lines.push({productId:productId, qty:qty, productType:isBundle?'Bundle':'Standard',
+      vendorId:vendorId, vendorUnitCost:vendorId?Number(item.vendorUnitCost):0, plan:plan});
+  });
+
+  const bundleLines = lines.filter(function (l) { return l.productType === 'Bundle'; });
+  const overlaps = {};
+  if (bundleLines.length) {
+    const first = buildSaleStockDemands_(bundleLines, definitions, {});
+    const shared = lines.filter(function (l) {
+      if (l.productType !== 'Standard' || !Object.prototype.hasOwnProperty.call(first.requirementsByProductId,l.productId)) return false;
+      if (l.vendorId) throw new Error('Bundle and vendor-sourced standalone component cannot share an invoice.');
+      overlaps[l.productId] = true;
+      return true;
+    });
+    const demand = buildSaleStockDemands_(bundleLines.concat(shared), definitions, {});
+    Object.keys(demand.requirementsByProductId).forEach(function (productId) {
+      const product = productsById[productId];
+      if (!product || bundleProductType_(product) !== 'Standard') throw new Error('Bundle component unavailable.');
+      addPlanCost_(planStockConsumption_(productId,demand.requirementsByProductId[productId],allLots,product), null);
+    });
+  }
+
+  lines.forEach(function (line) {
+    if (line.productType !== 'Standard' || overlaps[line.productId]) return;
+    addPlanCost_(line.plan, line.vendorId ? line.vendorUnitCost : null);
+  });
+  if (!isValidNonNegativeNumber_(payload.discount)) throw new Error('Invalid invoice discount.');
+  const discount = roundMoney_(Number(payload.discount) || 0);
+  const grandTotal = roundMoney_(Math.max(0, subtotal - discount));
+  cogs = roundMoney_(cogs);
+  const profit = roundMoney_(grandTotal - cogs);
+  return {
+    subtotal:subtotal, discount:discount, grandTotal:grandTotal, cogs:cogs,
+    profit:profit, marginPercent:grandTotal > 0 ? roundMoney_(profit * 100 / grandTotal) : 0,
+    costComplete:costComplete, estimated:true
+  };
+}
+
+/** Authenticated, cost-permission-gated read-only cart preview for POS. */
+function previewPosInvoiceProfit(token, payload) {
+  try {
+    const actingUser = requirePermission_(token,'pos','view');
+    if (!canViewInvoiceProfit_(actingUser)) return fail_('No permission to view invoice profit.');
+    const productsById = {};
+    activeRows_('PRODUCTS').forEach(function (p) { productsById[p['Product ID']] = p; });
+    const bundleIds = ((payload && payload.items) || []).filter(function (i) {
+      return bundleProductType_(productsById[i.productId]) === 'Bundle';
+    }).map(function (i) { return i.productId; });
+    const defs = bundleIds.length ? getBundleDefinitions_(bundleIds, productsById, getAllRows_('BUNDLE_COMPONENTS')) : {};
+    return ok_(estimatePosInvoiceProfit_(payload, productsById, getAllRows_('STOCK_LOTS'), defs));
+  } catch (err) {
+    logError_('previewPosInvoiceProfit', err);
+    return fail_(err.message);
+  }
+}
+
 function completeSale(token, payload) {
   const lock = LockService.getScriptLock();
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
