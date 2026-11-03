@@ -975,6 +975,13 @@
   .inv-payment-methods { display: flex; flex-wrap: wrap; gap: 2mm; }
   .inv-payment-chip { border: 1px solid var(--inv-border-soft); padding: 1.2mm 2.6mm; font-size: 11px; color: var(--inv-muted); }
   .inv-payment-chip.used { border-color: var(--inv-ink); color: var(--inv-ink); font-weight: 600; }
+.inv-payment-breakdown { border-top: 1px solid var(--inv-border-soft); padding-top: 1.5mm; font-size: 10px; }
+.inv-payment-breakdown-row { display: flex; justify-content: space-between; gap: 3mm; padding: .65mm 0; align-items: flex-start; }
+.inv-payment-breakdown-row > span { min-width: 0; overflow-wrap: anywhere; }
+.inv-payment-breakdown-row > strong { white-space: nowrap; }
+.inv-payment-change { font-size: 9px; font-weight: 400; color: var(--inv-muted); }
+.thermal-payment-breakdown { border-top: 1px dashed #777; padding-top: 1.5mm; font-size: 10px; }
+.thermal-payment-breakdown .inv-side-label { font-size: 9px; }
   .inv-terms { margin: 0; padding-left: 4mm; font-size: 11px; color: var(--inv-muted); line-height: 1.5; }
 
   .inv-totals { width: 60mm; flex-shrink: 0; }
