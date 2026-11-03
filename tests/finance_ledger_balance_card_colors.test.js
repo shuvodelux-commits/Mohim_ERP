@@ -56,10 +56,10 @@ function createHarness() {
 const summaries = [
   ['finLedCapital', 'ownerCapital', 'positive', 'Credit Balance'],
   ['finLedOwnerAdvance', 'ownerAdvance', 'negative', 'Debit Balance'],
-  ['finLedLoan', 'outstandingLoan', 'negative', 'Debit Balance'],
-  ['finLedLenderCredit', 'lenderCredit', 'positive', 'Credit Balance'],
-  ['finLedBorrowerReceivable', 'borrowerReceivable', 'positive', 'Credit Balance'],
-  ['finLedBorrowerCredit', 'borrowerCredit', 'negative', 'Debit Balance']
+  ['finLedLoan', 'outstandingLoan', 'positive', 'Credit Balance'],
+  ['finLedLenderCredit', 'lenderCredit', 'negative', 'Debit Balance'],
+  ['finLedBorrowerReceivable', 'borrowerReceivable', 'negative', 'Debit Balance'],
+  ['finLedBorrowerCredit', 'borrowerCredit', 'positive', 'Credit Balance']
 ];
 
 test('every nonzero finance summary card has its approved green/red credit/debit meaning', () => {
@@ -79,10 +79,10 @@ test('every nonzero finance summary card has its approved green/red credit/debit
 test('zero balances are neutral and an amount changing from nonzero clears stale color', () => {
   const { context, node } = createHarness();
   context.finLedRenderSummary_({ outstandingLoan: 9000 });
-  assert.ok(node('finLedLoanCard').classList.contains('is-negative'));
+  assert.ok(node('finLedLoanCard').classList.contains('is-positive'));
   context.finLedRenderSummary_({ outstandingLoan: 0 });
   assert.ok(node('finLedLoanCard').classList.contains('is-neutral'));
-  assert.ok(!node('finLedLoanCard').classList.contains('is-negative'));
+  assert.ok(!node('finLedLoanCard').classList.contains('is-positive'));
   assert.equal(node('finLedLoanNote').textContent, '');
   assert.equal(node('finLedLoan').textContent, '৳0');
 });
@@ -95,8 +95,8 @@ test('selected person cards use the same semantics across lender and borrower ro
   };
   context.finLedRenderSelectedPersonBalance_();
   assert.equal(node('finLedSelectedPersonCard').hidden, false);
-  assert.match(node('finLedSelectedPersonBalances').innerHTML, /Outstanding Loan[\s\S]*?৳90,000[\s\S]*?Debit Balance/);
-  assert.match(node('finLedSelectedPersonBalances').innerHTML, /Borrower Receivable[\s\S]*?৳6,000[\s\S]*?Credit Balance/);
+  assert.match(node('finLedSelectedPersonBalances').innerHTML, /Lender Credit[\s\S]*?৳90,000[\s\S]*?Credit Balance/);
+  assert.match(node('finLedSelectedPersonBalances').innerHTML, /Borrower Debit[\s\S]*?৳6,000[\s\S]*?Debit Balance/);
   assert.match(node('finLedSelectedPersonBalances').innerHTML, /is-negative/);
   assert.match(node('finLedSelectedPersonBalances').innerHTML, /is-positive/);
 });
