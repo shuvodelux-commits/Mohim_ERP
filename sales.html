@@ -35,7 +35,6 @@
     <table class="mobile-card-table erp-action-table">
       <thead>
         <tr>
-          <th class="erp-sticky-action-col" scope="col"><span class="erp-action-visually-hidden">Actions</span><span class="erp-action-header-dots" aria-hidden="true">···</span></th>
           <th>Invoice</th>
           <th>Date</th>
           <th>Customer</th>
@@ -46,6 +45,7 @@
           <th class="num">Returned</th>
           <th class="num" id="smProfitHeader" style="display:none;">Profit</th>
           <th>Status</th>
+          <th class="erp-sticky-action-col" scope="col"><span class="erp-action-visually-hidden">Actions</span><span class="erp-action-header-dots" aria-hidden="true">···</span></th>
         </tr>
       </thead>
       <tbody id="smTableBody"></tbody>
@@ -261,12 +261,6 @@
         : '';
       var tr = document.createElement("tr");
       tr.innerHTML =
-        '<td class="erp-sticky-action-col">' + rowActionTriggerHtml_(
-          'data-act="menu" data-id="' + escapeHtml(s.invoiceId) + '"',
-          'Actions for invoice ' + s.invoiceId,
-          !!s.duplicateInvoiceId,
-          s.duplicateInvoiceId ? 'Duplicate invoice ID must be repaired before actions can continue' : ''
-        ) + '</td>' +
         '<td><button type="button" class="party-ledger-link" data-invoice-view-id="' + s.invoiceId + '" title="Open invoice">' +
         escapeHtml(s.invoiceId) + '</button>' + integrityBadge +
         "</td>" +
@@ -312,7 +306,13 @@
             s.returnStatus +
             "</span>"
           : "") +
-        "</td>";
+        "</td>" +
+        '<td class="erp-sticky-action-col">' + rowActionTriggerHtml_(
+          'data-act="menu" data-id="' + escapeHtml(s.invoiceId) + '"',
+          'Actions for invoice ' + s.invoiceId,
+          !!s.duplicateInvoiceId,
+          s.duplicateInvoiceId ? 'Duplicate invoice ID must be repaired before actions can continue' : ''
+        ) + '</td>';
       body.appendChild(tr);
     });
     document.getElementById("smEmpty").hidden = rows.length > 0;

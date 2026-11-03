@@ -101,7 +101,7 @@ async function main() {
     assert.equal(mobile.maxHeight,'none','mobile record cards should not have nested table height limit');
     assert.equal(mobile.headerDisplay,'none');
   });
-  await check('tablet keeps Sales Actions pinned left across horizontal scrolling',async()=>{
+  await check('tablet keeps Sales Actions pinned right across horizontal scrolling',async()=>{
     await page.setViewportSize({width:768,height:1024});
     const position=await page.evaluate(()=>{
       const scroll=document.getElementById('smTableScroll');
@@ -109,18 +109,22 @@ async function main() {
       const td=scroll.querySelector('tbody td.erp-sticky-action-col');
       const th=scroll.querySelector('thead th.erp-sticky-action-col');
       if(!td||!th)throw new Error('Sticky action column missing');
-      const before=td.getBoundingClientRect().left;
+      const before=td.getBoundingClientRect().right;
+      const sr=scroll.getBoundingClientRect();
       scroll.scrollLeft=scroll.scrollWidth;
-      const sr=scroll.getBoundingClientRect(), r=td.getBoundingClientRect();
+      const r=td.getBoundingClientRect();
       return {overflow:scroll.scrollWidth>scroll.clientWidth+10,
-        left:scroll.scrollLeft,before:before,after:r.left,scrollLeft:sr.left,
-        position:getComputedStyle(td).position,head:getComputedStyle(th).position};
+        scrollAmount:scroll.scrollLeft,before:before,after:r.right,containerRight:sr.right,
+        position:getComputedStyle(td).position,head:getComputedStyle(th).position,
+        lastHeader:th===scroll.querySelector('thead tr').lastElementChild,
+        lastRowCell:td===scroll.querySelector('tbody tr').lastElementChild};
     });
     assert.equal(position.overflow,true,'tablet should be able to scroll horizontally');
-    assert.ok(position.left>10,'test must actually scroll horizontally');
+    assert.ok(position.scrollAmount>10,'test must actually scroll horizontally');
     assert.equal(position.position,'sticky');assert.equal(position.head,'sticky');
-    assert.ok(Math.abs(position.before-position.after)<=2,'action column does not move with horizontal scroll');
-    assert.ok(position.after>=position.scrollLeft-1 && position.after<position.scrollLeft+90,'left action stays visible');
+    assert.equal(position.lastHeader,true);assert.equal(position.lastRowCell,true);
+    assert.ok(Math.abs(position.before-position.after)<=2,'right action column does not move with horizontal scroll');
+    assert.ok(position.after<=position.containerRight+1 && position.after>position.containerRight-90,'right action stays visible');
   });
   await check('Sales row three-dot actions show icons and preserve keyboard/menu semantics',async()=>{
     const button=page.locator('#smTableBody button[data-id="INV-000017"]').first();

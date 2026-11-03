@@ -21,7 +21,6 @@
     <table class="erp-action-table">
       <thead>
         <tr>
-          <th class="erp-sticky-action-col" scope="col"><span class="erp-action-visually-hidden">Actions</span><span class="erp-action-header-dots" aria-hidden="true">···</span></th>
           <th>Time</th><th>Date</th><th>Reference</th><th>Module</th><th>Type</th>
           <th>Party</th><th>Description</th><th>Method</th>
           <th class="num">Cash In<br><span class="bn-hint" style="display:inline;">জমা</span></th>
@@ -30,6 +29,7 @@
           <th class="num">Bank Out<br><span class="bn-hint" style="display:inline;">খরচ</span></th>
           <th class="num">Cash Balance</th>
           <th>By</th><th>Status</th>
+          <th class="erp-sticky-action-col" scope="col"><span class="erp-action-visually-hidden">Actions</span><span class="erp-action-header-dots" aria-hidden="true">···</span></th>
         </tr>
       </thead>
       <tbody id="dbTableBody"></tbody>
@@ -123,10 +123,6 @@
       var backdatedBadge = r.isBackdated ? ' <span class="badge badge-warning" title="Entered ' + r.backdatedDays + ' day(s) late' + (r.backdatedReason ? ' \u2014 ' + escapeHtml(r.backdatedReason) : '') + '">\u26a0 Backdated</span>' : '';
       var tr = document.createElement('tr');
       tr.innerHTML =
-        '<td class="erp-sticky-action-col">' + rowActionTriggerHtml_(
-          'data-act="menu" data-idx="' + idx + '"',
-          'Actions for transaction ' + String(r.referenceNo || idx)
-        ) + '</td>' +
         '<td>' + escapeHtml(r.time || '') + '</td>' +
         '<td>' + escapeHtml(r.date || '') + backdatedBadge + '</td>' +
         '<td>' + escapeHtml(r.referenceNo || '') + '</td>' +
@@ -141,7 +137,11 @@
         '<td class="num" style="color:var(--color-danger);">' + (r.bankOut ? formatMoney(r.bankOut) : '') + '</td>' +
         '<td class="num">' + (r.runningCashBalance === null || r.runningCashBalance === undefined ? '\u2014' : formatMoney(r.runningCashBalance)) + '</td>' +
         '<td>' + escapeHtml(r.createdBy || '') + '</td>' +
-        '<td>' + statusBadge + '</td>';
+        '<td>' + statusBadge + '</td>' +
+        '<td class="erp-sticky-action-col">' + rowActionTriggerHtml_(
+          'data-act="menu" data-idx="' + idx + '"',
+          'Actions for transaction ' + String(r.referenceNo || idx)
+        ) + '</td>';
       if (r.isDeleted) tr.className = 'row-deleted';
       body.appendChild(tr);
     });

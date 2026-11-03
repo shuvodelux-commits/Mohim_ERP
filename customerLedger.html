@@ -58,7 +58,7 @@
       </div>
       <div class="table-scroll party-ledger-table-scroll">
         <table class="mobile-card-table party-ledger-table erp-action-table">
-          <thead><tr><th class="erp-sticky-action-col" scope="col"><span class="erp-action-visually-hidden">Actions</span><span class="erp-action-header-dots" aria-hidden="true">···</span></th><th>Date</th><th>Type</th><th>Reference</th><th class="num">Credit</th><th class="num">Debit</th><th class="num">Balance</th></tr></thead>
+          <thead><tr><th>Date</th><th>Type</th><th>Reference</th><th class="num">Credit</th><th class="num">Debit</th><th class="num">Balance</th><th class="erp-sticky-action-col" scope="col"><span class="erp-action-visually-hidden">Actions</span><span class="erp-action-header-dots" aria-hidden="true">···</span></th></tr></thead>
           <tbody id="customerLedgerBody"></tbody>
         </table>
       </div>
@@ -431,16 +431,16 @@
       var actions = (row.availableActions || []).filter(function (action) { return customerLedgerActionAllowed_(row, action); });
       var tr = document.createElement('tr');
       tr.innerHTML =
-        '<td class="erp-sticky-action-col">' + (actions.length ? rowActionTriggerHtml_(
-          'data-customer-ledger-action-index="' + index + '"',
-          'Actions for customer ledger ' + String(row['Reference'] || row['Ledger ID'] || index)
-        ) : '') + '</td>' +
         '<td data-label="Date">' + escapeHtml(String(row['Date'] || '').slice(0,10)) + '</td>' +
         '<td data-label="Type">' + escapeHtml(displayType) + '</td>' +
         '<td data-label="Reference">' + escapeHtml(displayReference) + '</td>' +
         '<td class="num ledger-txn--decrease" data-label="Credit">' + credit + '</td>' +
         '<td class="num ledger-txn--increase" data-label="Debit">' + customerLedgerAmountCell_(row, 'Debit') + '</td>' +
-        '<td class="num ' + partyLedgerBalanceTone_(row['Balance']) + '" data-label="Balance">' + escapeHtml(formatMoney(Number(row['Balance']) || 0)) + '</td>';
+        '<td class="num ' + partyLedgerBalanceTone_(row['Balance']) + '" data-label="Balance">' + escapeHtml(formatMoney(Number(row['Balance']) || 0)) + '</td>' +
+        '<td class="erp-sticky-action-col">' + (actions.length ? rowActionTriggerHtml_(
+          'data-customer-ledger-action-index="' + index + '"',
+          'Actions for customer ledger ' + String(row['Reference'] || row['Ledger ID'] || index)
+        ) : '') + '</td>';
       body.appendChild(tr);
     });
     document.getElementById('customerLedgerEmpty').hidden = customerLedgerState.rows.length > 0;
