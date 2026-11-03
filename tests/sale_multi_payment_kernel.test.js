@@ -139,3 +139,23 @@ test('schema is additive and distinguishes new-format fully-Due invoices from le
   assert.match(cfg,/SALE_POSTING_JOURNAL:\s*\[[\s\S]*?"Operation ID"[\s\S]*?"Payload Hash"[\s\S]*?"State"/);
   assert.match(cfg,/SALES:\s*\[[\s\S]*?"Payment Detail Version"/);
 });
+
+test('Cash tender refunded entirely after a bank pays the whole invoice remains receipt metadata only',()=>{
+  const result=allocate(100,[row('cash','Cash','40'),row('bank','Bank','100','B1')]);
+  assert.equal(result.paidAmount,100);
+  assert.equal(result.changeAmount,40);
+  assert.deepEqual(result.payments.map(p=>({method:p.method,applied:p.applied,tendered:p.tendered,change:p.change})),[
+    {method:'Cash',applied:0,tendered:40,change:40},
+    {method:'Bank',applied:100,tendered:100,change:0}
+  ]);
+});
+
+test('readback ignores unrelated invoices but detects mixed active revision corruption',()=>{
+  const ctx=load();
+  const sale={'Invoice ID':'INV-22','Paid Amount':40,'Payment Detail Version':1};
+  const expected={'Invoice ID':'INV-22','Payment ID':'P1','Row Order':1,'Revision':1,'Method':'Cash',
+    'Applied Amount':40,'Tendered Amount':50,'Change Amount':10,'Status':'Active'};
+  const unrelated={...expected,'Invoice ID':'INV-99','Payment ID':'P99','Applied Amount':100};
+  assert.deepEqual(plain(ctx.readSalePaymentBreakdown_(sale,[unrelated,expected])).map(r=>r.applied),[40]);
+  assert.throws(()=>ctx.readSalePaymentBreakdown_(sale,[expected,{...expected,'Payment ID':'P2','Revision':2,'Applied Amount':0,'Tendered Amount':25,'Change Amount':25}]),/revision|integrity/i);
+});
