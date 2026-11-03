@@ -403,6 +403,9 @@ function getSaleForUpdate(token, invoiceId) {
     const sale = findUniqueSalesRow_(invoiceId);
     if (!sale) return fail_('Invoice not found.');
     if (isDeleted_(sale)) return fail_('This invoice has been deleted.');
+    if (String(sale['Payment Detail Version']) === '1') {
+      return fail_('Multi-payment invoice editing is not yet enabled. Existing payment allocations must be reconciled first.');
+    }
 
     const hasReturn = activeSalesReturnItems_().some(function (ri) { return ri['Invoice ID'] === invoiceId; });
     if (hasReturn) return fail_('This invoice has Sales Return records and can no longer be updated. Use Sales Return for further corrections.');
@@ -475,6 +478,9 @@ function updateSaleInternal_(token, invoiceId, payload, options) {
     const sale = findUniqueSalesRow_(invoiceId);
     if (!sale) return fail_('Invoice not found.');
     if (isDeleted_(sale)) return fail_('This invoice has been deleted.');
+    if (String(sale['Payment Detail Version']) === '1') {
+      return fail_('Multi-payment invoice editing is not yet enabled. Existing payment allocations must be reconciled first.');
+    }
 
 
     const originalDate = safeDateOnly_(sale['Date']);
