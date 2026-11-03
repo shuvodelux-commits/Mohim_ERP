@@ -104,11 +104,36 @@ function validateSalesDraftPayload_(payload) {
   [subtotal, discount, grandTotal].forEach(function (n) {
     if (!isValidNonNegativeNumber_(n)) throw new Error('Draft totals must be valid non-negative numbers.');
   });
-  const payment = payload.payment && typeof payload.payment === 'object' ? {
-    amountReceived: cleanDraftText_(payload.payment.amountReceived),
-    paymentMethod: cleanDraftText_(payload.payment.paymentMethod),
-    bankAccountId: cleanDraftText_(payload.payment.bankAccountId)
-  } : { amountReceived: '', paymentMethod: '', bankAccountId: '' };
+  // The same Payment JSON column supports legacy drafts and the new
+  // {payments:[...]} snapshot. Never convert one format into the other.
+  const incomingPayment = payload.payment && typeof payload.payment === 'object' ? payload.payment : {};
+  const isSplitDraft = Object.prototype.hasOwnProperty.call(incomingPayment, 'payments');
+  let payment;
+  if (isSplitDraft) {
+    if (String(getSettingsMap_()['POS Multi Payment Enabled'] || '').toLowerCase() !== 'true') {
+      throw new Error('POS multiple payments are not enabled for this business.');
+    }
+    if (!Array.isArray(incomingPayment.payments) || !incomingPayment.payments.length) {
+      throw new Error('Add at least one payment row to the split-payment draft.');
+    }
+    // Validate money, duplicate row IDs and active Bank/Mobile accounts
+    // without posting. The real sale will revalidate immediately before writes.
+    normalizeSalePayments_(grandTotal, incomingPayment.payments, getAllRows_('BANK_ACCOUNTS'));
+    payment = { payments: incomingPayment.payments.map(function (row) {
+      return {
+        id: cleanDraftText_(row.id),
+        method: cleanDraftText_(row.method),
+        amount: row.amount === null || row.amount === undefined ? '' : String(row.amount).trim(),
+        accountId: cleanDraftText_(row.accountId)
+      };
+    }) };
+  } else {
+    payment = {
+      amountReceived: cleanDraftText_(incomingPayment.amountReceived),
+      paymentMethod: cleanDraftText_(incomingPayment.paymentMethod),
+      bankAccountId: cleanDraftText_(incomingPayment.bankAccountId)
+    };
+  }
   const itemsJson = JSON.stringify(cleanItems);
   const paymentJson = JSON.stringify(payment);
   if (itemsJson.length > SALES_DRAFT_JSON_LIMIT_ || paymentJson.length > SALES_DRAFT_JSON_LIMIT_) {
@@ -295,8 +320,19 @@ function removeSalesDraftAfterPost_(draftId, version, invoiceId, actingUser, ret
 function buildSalesDraftPreviewPayload_(row) {
   const parsed = parseSalesDraftRow_(row);
   const grand = Number(row['Grand Total']) || 0;
+  const isSplitDraft = !!(parsed.payment && Object.prototype.hasOwnProperty.call(parsed.payment, 'payments'));
+  const breakdown = isSplitDraft
+    ? normalizeSalePayments_(grand, parsed.payment.payments, getAllRows_('BANK_ACCOUNTS'))
+    : null;
   const receivedRaw = Number(parsed.payment && parsed.payment.amountReceived);
-  const provisionalPaid = Math.min(Math.max(isFinite(receivedRaw) ? receivedRaw : 0, 0), grand);
+  const provisionalPaid = breakdown
+    ? breakdown.paidAmount
+    : Math.min(Math.max(isFinite(receivedRaw) ? receivedRaw : 0, 0), grand);
+  const paymentRows = breakdown ? breakdown.payments.map(function (p) {
+    return {rowId:p.rowId, method:p.method, bankAccountId:p.bankAccountId,
+      bankAccountName:p.bankAccountName, tendered:p.tendered,
+      applied:p.applied, change:p.change, legacy:false};
+  }) : [];
   return {
     isDraft: true,
     draftNo: row['Draft No'],
@@ -306,8 +342,12 @@ function buildSalesDraftPreviewPayload_(row) {
     customerId: row['Customer ID'] || '', customerName: row['Customer Name'] || '', customerPhone: row['Customer Phone'] || '',
     customerFatherName: row['Customer Father Name'] || '', customerAddress: row['Customer Address'] || '',
     items: parsed.items || [], subtotal: Number(row['Subtotal']) || 0, discount: Number(row['Discount']) || 0, grandTotal: grand,
-    paidAmount: provisionalPaid, dueAmount: Math.max(0, grand - provisionalPaid), paymentType: 'Draft', paymentStatus: 'Draft',
-    paymentMethod: parsed.payment && parsed.payment.paymentMethod || '', bankAccountName: '',
+    paidAmount: provisionalPaid, originalPaidAmount: provisionalPaid,
+    dueAmount: Math.max(0, grand - provisionalPaid), paymentType: 'Draft', paymentStatus: 'Draft',
+    paymentDetailVersion: isSplitDraft ? '1' : '',
+    payments: paymentRows,
+    paymentMethod: breakdown ? breakdown.paymentMethod : (parsed.payment && parsed.payment.paymentMethod || ''),
+    bankAccountName: breakdown ? breakdown.bankAccountName : '',
     shop: buildInvoiceShopPayload_(getSettingsMap_())
   };
 }
