@@ -9,7 +9,7 @@ test('Sales, Daybook and both Party ledgers put pinned action first for horizont
   for (const name of ['sales.html','daybook.html','customerLedger.html','supplierLedger.html']) {
     const html = read(name);
     assert.match(html, /<thead>\s*<tr>\s*<th[^>]*erp-sticky-action-col/, name + ' needs first action header');
-    assert.match(html, /<td class=\\"erp-sticky-action-col/, name + ' needs first action row cell');
+    assert.match(html, /<td class="erp-sticky-action-col/, name + ' needs first action row cell');
   }
 });
 test('sticky Actions is an opaque leftmost column above rows and preserved on desktop/tablet', () => {
@@ -22,11 +22,14 @@ test('sticky Actions is an opaque leftmost column above rows and preserved on de
 test('tablet actions are three-dot icon buttons, with descriptive names and click handlers preserved', () => {
   const sales=read('sales.html'), customer=read('customerLedger.html'), supplier=read('supplierLedger.html'), daybook=read('daybook.html');
   for (const page of [sales, customer, supplier, daybook]) {
-    assert.match(page, /class=\\"[^\\"]*erp-row-action-trigger[^\\"]*\\"/);
-    assert.match(page, /aria-label=\\"(?:Actions|Transaction actions)[^\\"]*\\"/);
+    assert.match(page, /rowActionTriggerHtml_\(/, 'page must use shared accessible three-dot trigger');
+    assert.match(page, /Actions for (?:invoice|transaction|customer|supplier)/);
     assert.doesNotMatch(page, /Actions &#9662;/);
   }
-  assert.match(sales, /data-act=\\"menu\\"/);
+  const shared=read('javascript.html');
+  assert.match(shared, /class="erp-row-action-trigger"/);
+  assert.match(shared, /aria-label="' \+ escapeHtml/);
+  assert.match(sales, /data-act="menu"/);
   assert.match(customer, /data-customer-ledger-action-index=/);
   assert.match(supplier, /data-supplier-ledger-action-index=/);
   assert.match(daybook, /openRowActionMenu_\(btn,/);
