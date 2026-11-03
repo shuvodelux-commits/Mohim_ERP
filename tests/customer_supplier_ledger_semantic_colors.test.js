@@ -69,6 +69,17 @@ test('customer payment is Money In, credit refund Money Out, and opening is neut
   assert.equal(render({'Type':'Sale', Debit:970}, 'Credit'), '');
 });
 
+test('linked source-invoice projection labels gross sale and checkout payment without implying due or new ledger money-in', () => {
+  const {context} = harness(customer, 'customerLedger');
+  const project = {'Type':'Sale', Debit:300, Credit:240, _invoiceProjection:true};
+  assert.match(context.customerLedgerAmountCell_(project, 'Debit'), /is-sales-due[\s\S]*Invoice Total/);
+  const checkoutCredit = context.customerLedgerAmountCell_(project, 'Credit');
+  assert.match(checkoutCredit, /৳240/);
+  assert.doesNotMatch(checkoutCredit, /Money In/);
+  assert.match(customer, /row\._invoiceProjection && Number\(row\['Credit'\]\) > 0[\s\S]*Paid at Checkout/);
+  assert.match(context.customerLedgerAmountCell_({'Type':'Sale',Debit:60},'Debit'), /Sales Due/);
+});
+
 test('supplier payment is Money Out despite credit column; cash-free discount is Adjustment', () => {
   const {context} = harness(supplier, 'supplierLedger');
   const render = (row, column) => context.supplierLedgerAmountCell_(row, column);

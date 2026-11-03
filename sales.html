@@ -101,6 +101,7 @@
         <div class="totals-row grand">
           <span>Grand Total</span><span class="v" id="smViewGrandTotal"></span>
         </div>
+        <div id="smViewPaymentBreakdown" style="display:none;border-top:1px solid var(--border);padding:8px 0;font-size:12px;" aria-label="Original sale payment breakdown"></div>
         <div class="totals-row">
           <span>Paid / Settled</span><span class="v" id="smViewPaid"></span>
         </div>
@@ -426,6 +427,21 @@
       });
     });
 
+  function smSalePaymentBreakdownHtml_(inv) {
+    var payments = Array.isArray(inv.payments) ? inv.payments : [];
+    if (!payments.length) return '';
+    return '<div style="font-weight:600;margin-bottom:4px;">Payments at Sale</div>' +
+      payments.map(function (p) {
+        var label = p.method || 'Cash';
+        if (p.bankAccountName) label += ' · ' + p.bankAccountName;
+        var extra = p.method === 'Cash' && Number(p.change) > 0
+          ? '<small style="display:block;color:var(--text-muted);">Tendered ' +
+            formatMoney(p.tendered) + ' · Cash Change ' + formatMoney(p.change) + '</small>' : '';
+        return '<div class="totals-row"><span>' + escapeHtml(label) + extra +
+          '</span><span class="v">' + formatMoney(p.applied) + '</span></div>';
+      }).join('');
+  }
+
   function smOpenView_(invoiceId) {
     withLoader(serverCall("getSaleDetail", authToken, invoiceId))
       .then(function (inv) {
@@ -467,6 +483,9 @@
         document.getElementById("smViewGrandTotal").textContent = formatMoney(
           inv.grandTotal,
         );
+        var paymentBreakdown = document.getElementById("smViewPaymentBreakdown");
+        paymentBreakdown.innerHTML = smSalePaymentBreakdownHtml_(inv);
+        paymentBreakdown.style.display = paymentBreakdown.innerHTML ? "block" : "none";
         document.getElementById("smViewPaid").textContent = formatMoney(
           inv.paidAmount,
         );

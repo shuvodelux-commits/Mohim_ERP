@@ -113,8 +113,27 @@
     selectedInvoiceIds: [],
     selectedInvoiceCustomerId: '',
     batchInvoices: [],
-    batchMode: false
+    batchMode: false,
+    returnOperationId: '', returnAttemptFingerprint: ''
   };
+
+  function rtReturnOperationId_() {
+    if (!rtState.returnOperationId) {
+      if (!window.crypto || !window.crypto.getRandomValues) {
+        throw new Error('Secure refund operation ID unavailable.');
+      }
+      if (typeof window.crypto.randomUUID === 'function') {
+        rtState.returnOperationId = window.crypto.randomUUID();
+      } else {
+        var bytes = new Uint8Array(16);
+        window.crypto.getRandomValues(bytes);
+        rtState.returnOperationId = 'return-' + Array.from(bytes).map(function (n) {
+          return n.toString(16).padStart(2,'0');
+        }).join('');
+      }
+    }
+    return rtState.returnOperationId;
+  }
 
   document.getElementById('rtInvoiceSearchModeBtn').addEventListener('click', function () { rtSetSearchMode_('invoice'); });
   document.getElementById('rtCustomerSearchModeBtn').addEventListener('click', function () { rtSetSearchMode_('customer'); });
@@ -300,6 +319,8 @@
     rtState.selectedInvoiceCustomerId = '';
     rtState.batchInvoices = [];
     rtState.batchMode = false;
+    rtState.returnOperationId = '';
+    rtState.returnAttemptFingerprint = '';
     document.getElementById('rtSearchCard').hidden = false;
     document.getElementById('rtCompleteBtn').textContent = 'Complete Return';
     document.getElementById('rtSearchInput').value = '';
@@ -328,6 +349,8 @@
     return withLoader(serverCall('getInvoiceForReturn', authToken, invoiceId)).then(function (inv) {
       rtState.batchMode = false;
       rtState.batchInvoices = [];
+      rtState.returnOperationId = '';
+      rtState.returnAttemptFingerprint = '';
       rtState.invoice = inv;
       rtState.selectedInvoiceIds = [];
       rtRenderInvoiceSummary_();
@@ -650,6 +673,14 @@
       loadingLabel: 'Completing...',
       trigger: document.getElementById('rtCompleteBtn')
     }, function () {
+      if (rtState.invoice && String(rtState.invoice.paymentDetailVersion || '') === '1') {
+        var fingerprint = JSON.stringify(payloadSingle);
+        if (rtState.returnAttemptFingerprint && rtState.returnAttemptFingerprint !== fingerprint) {
+          throw new Error('Previous refund request changed. Check the original return before retrying.');
+        }
+        rtState.returnAttemptFingerprint = fingerprint;
+        payloadSingle.operationId = rtReturnOperationId_();
+      }
       return withLoader(serverCall('completeReturn', authToken, payloadSingle)).then(function (res) {
         showToast('Return ' + res.returnId + ' completed — ' + formatMoney(res.totalReturnAmount) + ' refunded', 'success');
         rtReset_();

@@ -44,6 +44,8 @@ const CONFIG = {
     PURCHASES: "Purchases",
     PURCHASE_ITEMS: "Purchase Items",
     SALES: "Sales",
+    SALE_PAYMENTS: "Sale Payments",
+    SALE_POSTING_JOURNAL: "Sale Posting Journal",
     SALES_DRAFTS: "Draft Invoices",
     SALES_DRAFT_AUDIT: "Draft Invoice Audit",
     SALE_ITEMS: "Sale Items",
@@ -269,6 +271,8 @@ const CONFIG = {
       "Backdated Days",
       "Backdated Reason",
       "Source Draft ID",
+      // Blank for legacy rows. New multi-payment posting writes version 1.
+      "Payment Detail Version",
 
       // ---- Soft delete (Delete System). Additive: getSheetHeaders_ appends
       // these to the live sheet on first touch, and every existing row just
@@ -279,6 +283,18 @@ const CONFIG = {
       "Deleted At",
       "Delete Reason",
 ],
+    SALE_PAYMENTS: [
+      "Payment ID", "Invoice ID", "Revision", "Row Order", "Method",
+      "Bank Account ID", "Bank Account Name", "Tendered Amount",
+      "Applied Amount", "Change Amount", "Transaction Date",
+      "Created At", "Created By", "Operation ID", "Status",
+      "Reversed At", "Reversed By", "Reversal Operation ID"
+    ],
+    SALE_POSTING_JOURNAL: [
+      "Operation ID", "Operation Type", "Payload Hash", "Invoice ID",
+      "State", "Last Completed Stage", "Actor", "Created At",
+      "Updated At", "Error"
+    ],
     SALES_DRAFTS: [
       "Draft ID", "Draft No", "Draft Date", "Customer ID", "Customer Name", "Customer Phone",
       "Customer Father Name", "Customer Address", "Items JSON", "Payment JSON", "Notes",
@@ -540,6 +556,8 @@ const CONFIG = {
       // Optional grouping metadata for one operator action spanning several
       // source invoices. Accounting still keys every child by Return ID.
       "Batch ID",
+      // Stable idempotency key for versioned split-payment invoice refunds.
+      "Return Operation ID",
 ],
     SALES_RETURN_ITEMS: [
       "Return ID",
@@ -1027,6 +1045,7 @@ const CONFIG = {
     STOCK_LOTS: "LOT",
     STOCK_LOT_COST_CORRECTIONS: "SLC",
     SALES: "INV",
+    SALE_PAYMENTS: "SPAY",
     SALES_DRAFTS: "DRF",
     SALES_DRAFT_AUDIT: "DRA",
     CUSTOMERS: "CUS",
@@ -1097,6 +1116,8 @@ const CONFIG = {
     // the gate; a user also needs the 'posCost' view permission before
     // getPosBootstrap will send any cost figure. See Sales.gs.
     "POS Show Purchase Price": "false",
+    // Do not permit multi-payment posting until edits, returns and live E2E pass.
+    "POS Multi Payment Enabled": "false",
   },
 
   LOCK_TIMEOUT_MS: 15000,

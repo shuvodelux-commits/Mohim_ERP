@@ -403,7 +403,9 @@ function getSaleForUpdate(token, invoiceId) {
     const sale = findUniqueSalesRow_(invoiceId);
     if (!sale) return fail_('Invoice not found.');
     if (isDeleted_(sale)) return fail_('This invoice has been deleted.');
-
+    const paymentDetailVersion = String(sale['Payment Detail Version'] || '').trim();
+    const payments = paymentDetailVersion === '1'
+      ? readSalePaymentBreakdown_(sale,findRows_('SALE_PAYMENTS', 'Invoice ID', invoiceId)) : [];
     const hasReturn = activeSalesReturnItems_().some(function (ri) { return ri['Invoice ID'] === invoiceId; });
     if (hasReturn) return fail_('This invoice has Sales Return records and can no longer be updated. Use Sales Return for further corrections.');
 
@@ -427,6 +429,7 @@ function getSaleForUpdate(token, invoiceId) {
       customerId: sale['Customer ID'], customerName: sale['Customer Name'],
       customerPhone: sale['Customer Phone'], customerAddress: sale['Customer Address'],
       discount: Number(sale['Discount']) || 0, paidAmount: Number(sale['Paid Amount']) || 0,
+      paymentDetailVersion: paymentDetailVersion, payments: payments,
       paymentMethod: sale['Payment Method'] || (Number(sale['Paid Amount']) > 0 ? 'Cash' : ''),
       bankAccountId: sale['Bank Account ID'] || '',
       items: items.map(function (i) {
@@ -464,6 +467,9 @@ function updateSale(token, invoiceId, payload) {
 
 function updateSaleInternal_(token, invoiceId, payload, options) {
   const opts = options || {};
+  let paymentJournalRowIndex = -1;
+  let paymentJournalStage = '';
+  let paymentOperationId = '';
   const lock = opts.lockHeld ? null : LockService.getScriptLock();
   if (lock) lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
@@ -475,7 +481,52 @@ function updateSaleInternal_(token, invoiceId, payload, options) {
     const sale = findUniqueSalesRow_(invoiceId);
     if (!sale) return fail_('Invoice not found.');
     if (isDeleted_(sale)) return fail_('This invoice has been deleted.');
-
+    const isSplitInvoice = String(sale['Payment Detail Version'] || '') === '1';
+    const hasSplitRequest = !!(payload && Object.prototype.hasOwnProperty.call(payload,'payments'));
+    if (isSplitInvoice !== hasSplitRequest) {
+      return fail_('Invoice payment format mismatch. Reload the original payment rows.');
+    }
+    let oldPaymentRows = [];
+    let previousPayments = [];
+    let paymentHash = '';
+    let paymentActor = '';
+    if (isSplitInvoice) {
+      if (String(getSettingsMap_()['POS Multi Payment Enabled'] || '').toLowerCase() !== 'true') {
+        return fail_('Multi-payment editing is disabled for this business.');
+      }
+      paymentOperationId = sanitizeInput_(payload.operationId);
+      if (!/^[A-Za-z0-9_-]{12,100}$/.test(paymentOperationId)) {
+        return fail_('A stable payment correction operation ID is required.');
+      }
+      paymentActor = String(user['User ID'] || actorName_(user));
+      paymentHash = salePostingPayloadHash_({operationType:'Update',invoiceId:invoiceId,payload:payload});
+      const previousJournal = getAllRows_('SALE_POSTING_JOURNAL').filter(function (row) {
+        return String(row['Operation ID']) === paymentOperationId;
+      });
+      if (previousJournal.length > 1) return fail_('Duplicate payment correction operation. Needs Review.');
+      if (previousJournal.length) {
+        const journal = previousJournal[0];
+        if (String(journal['Actor']) !== paymentActor ||
+            String(journal['Invoice ID']) !== String(invoiceId) ||
+            String(journal['Operation Type']) !== 'Update') return fail_('Conflicting payment correction.');
+        if (salePostingJournalDecision_(journal,paymentHash) !== 'replay') {
+          return fail_('Payment correction was interrupted. Needs Review; do not repost.');
+        }
+        return ok_(buildInvoicePayload_(invoiceId));
+      }
+      oldPaymentRows = getAllRows_('SALE_PAYMENTS');
+      previousPayments = readSalePaymentBreakdown_(sale,oldPaymentRows);
+      assertSalePaymentBookEvidence_(invoiceId,previousPayments,
+        getAllRows_('CASH_BOOK'),getAllRows_('BANK_BOOK'));
+      if (typeof customerInvoiceSettlementSnapshot_ === 'function') {
+        const settlement = customerInvoiceSettlementSnapshot_(invoiceId);
+        if (settlement &&
+            (Math.abs((Number(settlement.paidAmount)||0)-(Number(sale['Paid Amount'])||0)) > 0.004 ||
+             Math.abs((Number(settlement.dueAmount)||0)-(Number(sale['Due Amount'])||0)) > 0.004)) {
+          return fail_('This invoice has later customer settlements. Reconcile those payments first.');
+        }
+      }
+    }
 
     const originalDate = safeDateOnly_(sale['Date']);
     const editDate = originalDate;
@@ -772,8 +823,19 @@ function updateSaleInternal_(token, invoiceId, payload, options) {
     const discount = isValidNonNegativeNumber_(payload.discount) ? Number(payload.discount) : 0;
     const grandTotal = Math.max(0, subtotal - discount);
 
-    let paidAmount, dueAmount;
-    const paymentType = payload.paymentType;
+    let paidAmount, dueAmount, paymentType, paymentStatus, paymentMethod, bankAccountId, bankAccountName;
+    let replacementAllocations = null;
+    if (isSplitInvoice) {
+      replacementAllocations = normalizeSalePayments_(roundMoney_(grandTotal),payload.payments,getAllRows_('BANK_ACCOUNTS'));
+      paidAmount = replacementAllocations.paidAmount;
+      dueAmount = replacementAllocations.dueAmount;
+      paymentType = replacementAllocations.paymentType;
+      paymentStatus = replacementAllocations.paymentStatus;
+      paymentMethod = replacementAllocations.paymentMethod;
+      bankAccountId = replacementAllocations.bankAccountId;
+      bankAccountName = replacementAllocations.bankAccountName;
+    } else {
+    paymentType = payload.paymentType;
     if (paymentType === 'Cash') {
       paidAmount = grandTotal; dueAmount = 0;
     } else if (paymentType === 'Due') {
@@ -785,11 +847,12 @@ function updateSaleInternal_(token, invoiceId, payload, options) {
     } else {
       throw new Error('Choose a payment type.');
     }
-    const paymentStatus = dueAmount <= 0 ? 'Paid' : (paidAmount > 0 ? 'Partial' : 'Due');
-
-    const paymentMethod = paidAmount > 0 ? (payload.paymentMethod || 'Cash') : '';
-    const bankAccount = resolveBankAccount_(paymentMethod, payload.bankAccountId);
-    const bankAccountId = bankAccount.id, bankAccountName = bankAccount.name;
+    paymentStatus = dueAmount <= 0 ? 'Paid' : (paidAmount > 0 ? 'Partial' : 'Due');
+    paymentMethod = paidAmount > 0 ? (payload.paymentMethod || 'Cash') : '';
+    const bankAccount = resolveBankAccount_(paymentMethod,payload.bankAccountId);
+    bankAccountId = bankAccount.id;
+    bankAccountName = bankAccount.name;
+    }
 
     const oldPaidAmount = Number(sale['Paid Amount']) || 0;
     const oldDueAmount = Number(sale['Due Amount']) || 0;
@@ -834,6 +897,24 @@ function updateSaleInternal_(token, invoiceId, payload, options) {
 
     // ---- validation passed — write everything ----
     const now = new Date();
+    if (isSplitInvoice) {
+      appendRow_('SALE_POSTING_JOURNAL',{
+        'Operation ID':paymentOperationId,'Operation Type':'Update',
+        'Payload Hash':paymentHash,'Invoice ID':invoiceId,
+        State:'Writing','Last Completed Stage':'Validated',
+        Actor:paymentActor,'Created At':now,'Updated At':now,Error:''
+      });
+      paymentJournalRowIndex = findRowIndex_('SALE_POSTING_JOURNAL','Operation ID',paymentOperationId);
+      if (paymentJournalRowIndex < 2) throw new Error('Payment correction journal missing.');
+      paymentJournalStage = 'Validated';
+    }
+    function recordPaymentEditStage_(stage,state) {
+      if (paymentJournalRowIndex < 2) return;
+      updateRowFields_('SALE_POSTING_JOURNAL',paymentJournalRowIndex,{
+        State:state||'Writing','Last Completed Stage':stage,'Updated At':new Date()
+      });
+      paymentJournalStage = stage;
+    }
 
     // Seed missing pre-lot evidence once before applying a legacy edit. The
     // blank Lot ID uses the existing restoration fallback, and preserves the
@@ -937,6 +1018,53 @@ function updateSaleInternal_(token, invoiceId, payload, options) {
       'Payment Method': paymentMethod, 'Bank Account ID': bankAccountId, 'Bank Account Name': bankAccountName
     });
 
+    recordPaymentEditStage_('Invoice and Stock');
+    if (isSplitInvoice) {
+      // Revisions preserve original tender/change while only the applied
+      // differences move Cash/Bank account balances.
+      const revision = salePaymentNextRevision_(invoiceId,oldPaymentRows);
+      const deltas = salePaymentAccountDeltas_(previousPayments,replacementAllocations.payments);
+      oldPaymentRows.filter(function (p) {
+        return String(p['Invoice ID']) === String(invoiceId) && String(p['Status']) === 'Active';
+      }).forEach(function (p) {
+        updateRowFields_('SALE_PAYMENTS',p._rowIndex,{
+          Status:'Reversed','Reversed At':now,'Reversed By':actorName_(user),
+          'Reversal Operation ID':paymentOperationId
+        });
+      });
+      if (replacementAllocations.payments.length) {
+        appendRows_('SALE_PAYMENTS',replacementAllocations.payments.map(function(p){
+          return {
+            'Payment ID':generateId_('SALE_PAYMENTS'),
+            'Invoice ID':invoiceId, Revision:revision, 'Row Order':p.rowOrder,
+            Method:p.method,'Bank Account ID':p.bankAccountId,
+            'Bank Account Name':p.bankAccountName,'Tendered Amount':p.tendered,
+            'Applied Amount':p.applied,'Change Amount':p.change,
+            'Transaction Date':editDate,'Created At':now,'Created By':actorName_(user),
+            'Operation ID':paymentOperationId,Status:'Active'
+          };
+        }));
+      }
+      recordPaymentEditStage_('Payment Revision');
+      deltas.forEach(function (delta) {
+        const positive = delta.amount > 0, amount = Math.abs(delta.amount);
+        if (delta.method === 'Cash') {
+          addCashBookEntry_({
+            Type:'Sale Update',Reference:invoiceId,
+            Description:'Split payment correction ' + invoiceId,
+            Debit:positive?'':amount,Credit:positive?amount:'',
+            PaymentMethod:'Cash',Date:editDate
+          });
+        } else {
+          addBankBookEntry_(delta.accountId,{
+            Type:'Sale Update',Reference:invoiceId,
+            Description:'Split payment correction ' + invoiceId,
+            Debit:positive?'':amount,Credit:positive?amount:'',Date:editDate
+          });
+        }
+      });
+      recordPaymentEditStage_('Money Books');
+    } else {
     const bankOldAmount = isBankLikePaymentMethod_(oldPaymentMethod) ? oldPaidAmount : 0;
     const bankNewAmount = isBankLikePaymentMethod_(paymentMethod) ? paidAmount : 0;
     
@@ -957,6 +1085,8 @@ function updateSaleInternal_(token, invoiceId, payload, options) {
         if (bankAccountId && bankNewAmount > 0) addBankBookEntry_(bankAccountId, { Type: 'Sale Update', Reference: invoiceId, Description: 'Additional payment from invoice update ' + invoiceId, Debit: '', Credit: bankNewAmount, Date: editDate });
       }
     
+
+    }
 
     if (oldCustomerId && oldDueAmount > 0) {
       const oldCustRowIndex = findRowIndex_('CUSTOMERS', 'Customer ID', oldCustomerId);
@@ -990,8 +1120,18 @@ function updateSaleInternal_(token, invoiceId, payload, options) {
       'Reason': sanitizeInput_(payload.reason), 'Before Grand Total': oldGrandTotal, 'After Grand Total': grandTotal
     });
 
-    return ok_(buildInvoicePayload_(invoiceId));
+    const resultInvoice = buildInvoicePayload_(invoiceId);
+    recordPaymentEditStage_('Committed','Committed');
+    return ok_(resultInvoice);
   } catch (err) {
+    if (paymentJournalRowIndex >= 2) {
+      try {
+        updateRowFields_('SALE_POSTING_JOURNAL',paymentJournalRowIndex,{
+          State:'Needs Review','Last Completed Stage':paymentJournalStage,'Updated At':new Date(),
+          Error:String(err && err.message || err)
+        });
+      } catch (journalError) { logError_('updateSaleJournal',journalError); }
+    }
     logError_('updateSale', err);
     return fail_(err.message);
   } finally {

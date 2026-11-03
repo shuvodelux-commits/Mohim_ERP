@@ -140,6 +140,7 @@ function getPosBootstrap(token) {
       // A profit preview is a sensitive cost-derived figure. Expose only
       // whether the logged-in user's existing report/cost rights allow it.
       canViewCurrentInvoiceProfit: canViewInvoiceProfit_(actingUser),
+      multiPaymentEnabled: String(settings['POS Multi Payment Enabled'] || '').toLowerCase() === 'true',
       customers: customers.map(function (c) {
         return { id: c['Customer ID'], name: c['Customer Name'], phone: c['Phone'], address: c['Address'],fatherName:c['Father Name'] || '', due: Number(c['Current Due']) || 0 };
       }),
@@ -302,8 +303,43 @@ function previewPosInvoiceProfit(token, payload) {
 function completeSale(token, payload) {
   const lock = LockService.getScriptLock();
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
+  let postingJournalIndex = -1;
+  let postingOperationId = '';
+  let postingLastStage = '';
   try {
     const actingUser = requirePermission_(token, 'pos', 'add');
+    const multiPayment = payload && Object.prototype.hasOwnProperty.call(payload, 'payments');
+    const postingActor = String(actingUser['User ID'] || actorName_(actingUser));
+    let postingHash = '';
+    if (multiPayment) {
+      if (!Array.isArray(payload.payments)) throw new Error('Payment rows must be an array.');
+      if (String(getSettingsMap_()['POS Multi Payment Enabled'] || '').toLowerCase() !== 'true') {
+        throw new Error('POS multiple payments are not enabled for this business.');
+      }
+      postingOperationId = sanitizeInput_(payload.operationId);
+      if (!/^[A-Za-z0-9_-]{12,100}$/.test(postingOperationId)) {
+        throw new Error('A valid unique operation ID is required for multiple payments.');
+      }
+      postingHash = salePostingPayloadHash_(payload);
+      const prior = getAllRows_('SALE_POSTING_JOURNAL').filter(function (r) {
+        return String(r['Operation ID']) === postingOperationId;
+      });
+      if (prior.length > 1) throw new Error('Duplicate operation journal records. Needs Review.');
+      if (prior.length) {
+        const journal = prior[0];
+        if (String(journal['Actor']) !== postingActor) throw new Error('Payment operation belongs to a different user.');
+        const decision = salePostingJournalDecision_(journal, postingHash);
+        if (decision !== 'replay') throw new Error('Previous payment operation is interrupted. Needs Review; do not repost.');
+        const invoice = getAllRows_('SALES').filter(function (r) {
+          return String(r['Invoice ID']) === String(journal['Invoice ID']) && !isDeleted_(r);
+        });
+        if (invoice.length !== 1 || String(invoice[0]['Payment Detail Version']) !== '1') {
+          throw new Error('Committed payment invoice is missing or ambiguous. Needs Review.');
+        }
+        readSalePaymentBreakdown_(invoice[0], getAllRows_('SALE_PAYMENTS'));
+        return ok_(buildInvoicePayload_(journal['Invoice ID']));
+      }
+    }
     if (!payload.items || !payload.items.length) return fail_('Cart is empty.');
 
     const sourceDraftId = sanitizeInput_(payload.sourceDraftId);
@@ -314,10 +350,30 @@ function completeSale(token, payload) {
       const alreadyPosted = findPostedInvoiceByDraftId_(sourceDraftId);
       if (alreadyPosted) {
         authorizePostedDraftRetry_(actingUser, sourceDraftId, sourceDraftVersion);
+        // A stranded new-format sale header is NOT proof of successful
+        // posting. Do not clean up its draft or return success unless the
+        // original journal committed and all payment children reconcile.
+        if (String(alreadyPosted['Payment Detail Version']) === '1') {
+          const committed = getAllRows_('SALE_POSTING_JOURNAL').filter(function (r) {
+            return String(r['Invoice ID']) === String(alreadyPosted['Invoice ID']) &&
+              String(r['Operation Type']) === 'Create';
+          });
+          if (committed.length !== 1 || String(committed[0]['State']) !== 'Committed') {
+            throw new Error('Draft sale posting is interrupted. Needs Review; do not repost.');
+          }
+          readSalePaymentBreakdown_(alreadyPosted, getAllRows_('SALE_PAYMENTS'));
+        }
         removeSalesDraftAfterPost_(sourceDraftId, sourceDraftVersion, alreadyPosted['Invoice ID'], actingUser, true);
         return ok_(buildInvoicePayload_(alreadyPosted['Invoice ID']));
       }
       sourceDraft = prepareSalesDraftForPosting_(actingUser, sourceDraftId, sourceDraftVersion);
+      // Never let a modified/stale client silently post split draft payments
+      // through the legacy single-account route (or vice versa).
+      const savedPayment = sourceDraft.parsed && sourceDraft.parsed.payment || {};
+      const savedSplit = Object.prototype.hasOwnProperty.call(savedPayment, 'payments');
+      if (savedSplit !== multiPayment) {
+        throw new Error('Draft payment format changed. Reload the draft before posting.');
+      }
       fixedDraftLines = fixedDraftLineByProduct_(sourceDraft.parsed);
     }
 
@@ -484,24 +540,39 @@ function completeSale(token, payload) {
     const discount = isValidNonNegativeNumber_(payload.discount) ? Number(payload.discount) : 0;
     const grandTotal = Math.max(0, subtotal - discount);
 
-    let paidAmount, dueAmount;
-    const paymentType = payload.paymentType;
-    if (paymentType === 'Cash') {
-      paidAmount = grandTotal; dueAmount = 0;
-    } else if (paymentType === 'Due') {
-      paidAmount = 0; dueAmount = grandTotal;
-    } else if (paymentType === 'Partial') {
-      paidAmount = isValidNonNegativeNumber_(payload.paidAmount) ? Number(payload.paidAmount) : 0;
-      if (paidAmount <= 0 || paidAmount >= grandTotal) throw new Error('Partial payment must be more than 0 and less than the grand total.');
-      dueAmount = grandTotal - paidAmount;
+    let paidAmount, dueAmount, paymentType, paymentStatus, paymentMethod, bankAccountId, bankAccountName;
+    let allocations = null;
+    if (multiPayment) {
+      // All account/amount rejections occur BEFORE journal, stock or money writes.
+      // The existing paymentType enum uses Cash to mean fully paid, not
+      // necessarily a literal Cash tender.
+      allocations = normalizeSalePayments_(roundMoney_(grandTotal), payload.payments, getAllRows_('BANK_ACCOUNTS'));
+      paidAmount = allocations.paidAmount;
+      dueAmount = allocations.dueAmount;
+      paymentType = allocations.paymentType;
+      paymentStatus = allocations.paymentStatus;
+      paymentMethod = allocations.paymentMethod;
+      bankAccountId = allocations.bankAccountId;
+      bankAccountName = allocations.bankAccountName;
     } else {
-      throw new Error('Choose a payment type.');
+      paymentType = payload.paymentType;
+      if (paymentType === 'Cash') {
+        paidAmount = grandTotal; dueAmount = 0;
+      } else if (paymentType === 'Due') {
+        paidAmount = 0; dueAmount = grandTotal;
+      } else if (paymentType === 'Partial') {
+        paidAmount = isValidNonNegativeNumber_(payload.paidAmount) ? Number(payload.paidAmount) : 0;
+        if (paidAmount <= 0 || paidAmount >= grandTotal) throw new Error('Partial payment must be more than 0 and less than the grand total.');
+        dueAmount = grandTotal - paidAmount;
+      } else {
+        throw new Error('Choose a payment type.');
+      }
+      paymentStatus = dueAmount <= 0 ? 'Paid' : (paidAmount > 0 ? 'Partial' : 'Due');
+      paymentMethod = paidAmount > 0 ? (payload.paymentMethod || 'Cash') : '';
+      const bankAccount = resolveBankAccount_(paymentMethod, payload.bankAccountId);
+      bankAccountId = bankAccount.id;
+      bankAccountName = bankAccount.name;
     }
-    const paymentStatus = dueAmount <= 0 ? 'Paid' : (paidAmount > 0 ? 'Partial' : 'Due');
-
-    const paymentMethod = paidAmount > 0 ? (payload.paymentMethod || 'Cash') : '';
-    const bankAccount = resolveBankAccount_(paymentMethod, payload.bankAccountId);
-    const bankAccountId = bankAccount.id, bankAccountName = bankAccount.name;
 
     let customerName = sanitizeInput_(payload.customerName) || 'Walk-in Customer';
     let customerPhone = sanitizeInput_(payload.customerPhone);
@@ -524,6 +595,27 @@ function completeSale(token, payload) {
     // transactions, so this ordering is what stops a rejected sale from
     // leaving half-written records behind.
     const now = new Date();
+    // Reserve the invoice number and journal it before the first financial or
+    // stock write. A retry of a Writing/Needs Review operation never reposts.
+    const reservedInvoiceId = multiPayment ? generateId_('SALES') : '';
+    if (multiPayment) {
+      appendRow_('SALE_POSTING_JOURNAL', {
+        'Operation ID':postingOperationId, 'Operation Type':'Create',
+        'Payload Hash':postingHash, 'Invoice ID':reservedInvoiceId,
+        State:'Writing', 'Last Completed Stage':'Reserved',
+        Actor:postingActor, 'Created At':now, 'Updated At':now, Error:''
+      });
+      postingJournalIndex = findRowIndex_('SALE_POSTING_JOURNAL', 'Operation ID', postingOperationId);
+      if (postingJournalIndex < 2) throw new Error('Posting journal reservation is missing.');
+      postingLastStage = 'Reserved';
+    }
+    function recordStage_(stage, state) {
+      if (postingJournalIndex < 2) return;
+      updateRowFields_('SALE_POSTING_JOURNAL', postingJournalIndex, {
+        State:state || 'Writing', 'Last Completed Stage':stage, 'Updated At':new Date()
+      });
+      postingLastStage = stage;
+    }
 
     // Customer first: the sale row needs its ID. If this throws (it can't,
     // given the guard above) the worst case is a customer with no sale,
@@ -550,7 +642,7 @@ function completeSale(token, payload) {
       customerId = resolveOrCreateCustomer_(customerName, customerPhone, customerAddress, customerFatherName, customerId);
     }
 
-    const invoiceId = generateId_('SALES');
+    const invoiceId = multiPayment ? reservedInvoiceId : generateId_('SALES');
 
     appendRow_('SALES', {
       'Invoice ID': invoiceId, 'Date': dateStr, 'Time': Utilities.formatDate(now, Session.getScriptTimeZone(), 'HH:mm:ss'),
@@ -562,8 +654,10 @@ function completeSale(token, payload) {
       'Created At': now,
       'Payment Method': paymentMethod, 'Bank Account ID': bankAccountId, 'Bank Account Name': bankAccountName,
       'Is Backdated': txDate.isBackdated, 'Backdated Days': txDate.backdatedDays, 'Backdated Reason': txDate.reason,
-      'Source Draft ID': sourceDraftId || ''
+      'Source Draft ID': sourceDraftId || '',
+      'Payment Detail Version': multiPayment ? 1 : ''
     });
+    recordStage_('Invoice');
 
     const saleItemRows = [];
     const stockMovementRows = [];
@@ -635,6 +729,7 @@ function completeSale(token, payload) {
     if (bundleSnapshotRows.length) appendRows_('SALE_BUNDLE_COMPONENTS',bundleSnapshotRows);
     appendRows_('STOCK_MOVEMENT', stockMovementRows);
     appendRows_('SALE_ITEM_LOTS', saleItemLotRows);
+    recordStage_('Stock And Items');
 
     // Vendor/Consignment Sourcing: one row per line that had a vendor
     // resolution, plus a matching VENDOR_LEDGER 'Sourcing' entry that posts
@@ -660,7 +755,39 @@ function completeSale(token, payload) {
     });
     if (vendorSourcingRows.length) appendRows_('VENDOR_SOURCING', vendorSourcingRows);
 
-    if (paidAmount > 0) {
+    if (multiPayment) {
+      const paymentRows = allocations.payments.map(function (p) {
+        return {
+          'Payment ID':generateId_('SALE_PAYMENTS'),
+          'Invoice ID':invoiceId, Revision:1, 'Row Order':p.rowOrder,
+          Method:p.method, 'Bank Account ID':p.bankAccountId,
+          'Bank Account Name':p.bankAccountName,
+          'Tendered Amount':p.tendered, 'Applied Amount':p.applied,
+          'Change Amount':p.change, 'Transaction Date':dateStr,
+          'Created At':now, 'Created By':actorName_(actingUser),
+          'Operation ID':postingOperationId, Status:'Active'
+        };
+      });
+      // Persist tender/change metadata even if an entire Cash tender was
+      // returned as change. Only APPLIED amounts go into money books.
+      if (paymentRows.length) appendRows_('SALE_PAYMENTS',paymentRows);
+      recordStage_('Payment Details');
+      allocations.payments.forEach(function (p) {
+        if (p.applied <= 0) return;
+        if (p.method === 'Cash') {
+          addCashBookEntry_({
+            Type:'Sale',Reference:invoiceId,Description:'POS sale to '+customerName,
+            Debit:'',Credit:p.applied,PaymentMethod:'Cash',Date:dateStr
+          });
+        } else {
+          addBankBookEntry_(p.bankAccountId, {
+            Type:'Sale',Reference:invoiceId,Description:'POS sale to '+customerName,
+            Debit:'',Credit:p.applied,Date:dateStr
+          });
+        }
+      });
+      recordStage_('Money Books');
+    } else if (paidAmount > 0) {
       if (isBankLikePaymentMethod_(paymentMethod)) {
         addBankBookEntry_(bankAccountId, {
           Type: 'Sale', Reference: invoiceId, Description: 'POS sale to ' + customerName,
@@ -688,10 +815,21 @@ function completeSale(token, payload) {
       });
     }
 
+    recordStage_('Customer Due');
     if (sourceDraftId) removeSalesDraftAfterPost_(sourceDraftId, sourceDraftVersion, invoiceId, actingUser, false);
+    recordStage_('Committed','Committed');
     return ok_(buildInvoicePayload_(invoiceId));
   } catch (err) {
     logError_('completeSale', err);
+    if (postingJournalIndex >= 2) {
+      try {
+        updateRowFields_('SALE_POSTING_JOURNAL', postingJournalIndex, {
+          State:'Needs Review', 'Last Completed Stage':postingLastStage,
+          Error:String(err.message).slice(0,300), 'Updated At':new Date()
+        });
+      } catch (journalError) { logError_('salePostingJournalRepair',journalError); }
+      return fail_('Sale posting interrupted. Needs Review; do not submit as a new sale. ' + err.message);
+    }
     return fail_(err.message);
   } finally {
     lock.releaseLock();

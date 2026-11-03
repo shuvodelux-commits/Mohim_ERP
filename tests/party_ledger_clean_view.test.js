@@ -94,6 +94,7 @@ test('display index defaults to clean projection and raw mode preserves correcti
   const raw=[row(2,'Sale','INV-X',100,0),row(3,'Sale Update Credit','INV-X',0,100),row(4,'Sale Update Debit','INV-X',120,0)];
   ctx.partyLedgerBuildAscendingIndex_=()=>raw;
   ctx.partyLedgerSourceDateMap_=()=>({'INV-X':'2026-09-01'});
+  ctx.partyLedgerCustomerSaleIndex_=()=>[];
   const clean=ctx.partyLedgerBuildDisplayIndex_('customer','C1',false);
   const audit=ctx.partyLedgerBuildDisplayIndex_('customer','C1',true);
   assert.deepEqual(clean.map(r=>r.Type),['Sale']); assert.equal(clean[0].Debit,120);
@@ -115,6 +116,7 @@ test('page endpoint defaults to clean mode, allows privileged raw mode, and reje
   ctx.partyLedgerBuildAscendingIndex_=()=>raw;
   ctx.partyLedgerSourceDateMap_=()=>({'INV-P':'2026-09-01'});
   ctx.partyLedgerPageFromAscending_=(kind,asc)=>({rows:asc,page:{}});
+  ctx.partyLedgerCustomerSaleIndex_=()=>[];
   const clean=ctx.getPartyLedgerPage_('customer','cashier','C1',50,'',false);
   assert.deepEqual(clean.rows.map(r=>r.Type),['Sale']);
   const audit=ctx.getPartyLedgerPage_('customer','admin','C1',50,'',true);
@@ -131,6 +133,7 @@ test('workspace bootstrap exposes correction-view capability and defaults to cle
   ctx.partyLedgerSelectorParties_=()=>[]; ctx.getActiveBankAccountsForUI_=()=>[]; ctx.getSettingsMap_=()=>({'Currency Symbol':'৳'});
   ctx.partyLedgerSelectedParty_=()=>({id:'C1',name:'A',balance:125});
   ctx.partyLedgerPageFromAscending_=(kind,asc)=>({rows:asc,page:{pageSize:50}});
+  ctx.partyLedgerCustomerSaleIndex_=()=>[];
   const data=ctx.getPartyLedgerWorkspaceBootstrap_('customer','admin','C1',50,false);
   assert.equal(data.canViewCorrections,true); assert.deepEqual(data.page.rows.map(r=>r.Type),['Sale']);
   const cashier=ctx.getPartyLedgerWorkspaceBootstrap_('customer','cashier','C1',50,false);

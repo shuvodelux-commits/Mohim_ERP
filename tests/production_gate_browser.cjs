@@ -52,6 +52,55 @@ async function main() {
   await check('sales marks both duplicate rows',async()=>assert.equal(await page.locator('#smTableBody .badge-danger',{hasText:'Duplicate ID'}).count(),2));
   await check('sales disables all duplicate actions',async()=>{for(const b of await page.locator('#smTableBody button[data-id="INV-000005"]').all())assert.equal(await b.isDisabled(),true);});
   await check('sales allows unique actions',async()=>assert.equal(await page.locator('#smTableBody button[data-id="INV-000017"]').isDisabled(),false));
+  await check('sales sticky header remains visible while desktop table rows scroll',async()=>{
+    const geometry=await page.evaluate(()=>{
+      const container=document.getElementById('smTableScroll');
+      const body=container.querySelector('tbody');
+      const source=body.querySelector('tr');
+      if(!source) throw new Error('Sales fixture row missing');
+      for(let i=0;i<60;i++) body.appendChild(source.cloneNode(true));
+      const th=container.querySelector('thead th');
+      const before=th.getBoundingClientRect().top;
+      const rowBefore=source.getBoundingClientRect().top;
+      container.scrollTop=300;
+      return {
+        position:getComputedStyle(th).position,
+        background:getComputedStyle(th).backgroundColor,
+        overflowX:getComputedStyle(container).overflowX,
+        canScroll:container.scrollHeight>container.clientHeight+200,
+        scrollTop:container.scrollTop,
+        headerShift:Math.abs(th.getBoundingClientRect().top-before),
+        rowShift:rowBefore-source.getBoundingClientRect().top
+      };
+    });
+    assert.equal(geometry.position,'sticky');
+    assert.notEqual(geometry.background,'rgba(0, 0, 0, 0)');
+    assert.equal(geometry.overflowX,'auto');
+    assert.ok(geometry.canScroll,'long sales list needs its own vertical scroll');
+    assert.ok(geometry.scrollTop>=200);
+    assert.ok(geometry.headerShift<=2,'header must remain fixed inside table scroll');
+    assert.ok(geometry.rowShift>=200,'body rows must actually scroll');
+  });
+  await check('sales sticky header also works on tablet and mobile cards keep field labels',async()=>{
+    await page.setViewportSize({width:768,height:1024});
+    const tablet=await page.evaluate(()=>{
+      const wrap=document.getElementById('smTableScroll');
+      wrap.scrollTop=260;
+      const head=wrap.querySelector('thead th');
+      return {position:getComputedStyle(head).position,scroll:wrap.scrollTop,cap:getComputedStyle(wrap).maxHeight};
+    });
+    assert.equal(tablet.position,'sticky');
+    assert.ok(tablet.scroll>100);
+    assert.notEqual(tablet.cap,'none');
+    await page.setViewportSize({width:390,height:844});
+    const mobile=await page.evaluate(()=>{
+      const wrap=document.getElementById('smTableScroll');
+      return {maxHeight:getComputedStyle(wrap).maxHeight,headerDisplay:getComputedStyle(wrap.querySelector('thead')).display,
+        labels:getComputedStyle(wrap.querySelector('tbody tr td')).getPropertyValue('display')};
+    });
+    assert.equal(mobile.maxHeight,'none','mobile record cards should not have nested table height limit');
+    assert.equal(mobile.headerDisplay,'none');
+  });
   await check('sales browser errors',()=>assert.deepEqual(errors,[]));await page.close();
   ({page,errors}=await boot(browser));await route(page,'returns');await page.fill('#rtSearchInput','INV-000005');await page.click('#rtFindBtn');
   await check('return blocks duplicate invoice load',async()=>{const b=page.locator('#rtSearchResults button[data-id="INV-000005"]');await b.waitFor();assert.equal(await b.isDisabled(),true);assert.equal(await page.evaluate(()=>__rpcCalls.filter(c=>c.name==='getInvoiceForReturn').length),0);});

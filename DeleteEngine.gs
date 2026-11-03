@@ -225,6 +225,8 @@ function logReversalMovement_(productId, productName, type, reference, qtyIn, qt
  * would double-count. Returns must be deleted first.
  */
 function deleteSalesInvoice(token, invoiceId, reason) {
+  var paymentDeleteJournalIndex = -1;
+  var paymentDeleteJournalStage = '';
   var lock = LockService.getScriptLock();
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
@@ -237,6 +239,31 @@ function deleteSalesInvoice(token, invoiceId, reason) {
 
     var user = requireDeletePermission_(token, 'sales', sale['Date']);
     requireActiveCashSession_();
+    var splitPaymentInvoice = String(sale['Payment Detail Version']) === '1';
+    var deleteOperationId = '';
+    var deleteOperationHash = '';
+    var deletePayments = [];
+    if (splitPaymentInvoice) {
+      deleteOperationId = 'sale-delete-' + String(invoiceId);
+      deleteOperationHash = salePostingPayloadHash_({operationType:'Delete',invoiceId:invoiceId,reason:sanitizeInput_(reason)});
+      var priorDeletes = getAllRows_('SALE_POSTING_JOURNAL').filter(function (row) {
+        return String(row['Operation ID']) === deleteOperationId ||
+          (String(row['Operation Type']) === 'Delete' && String(row['Invoice ID']) === String(invoiceId));
+      });
+      if (priorDeletes.length) {
+        return fail_('This invoice deletion has an existing posting journal. Verify it before retrying. Needs Review.');
+      }
+      deletePayments = readSalePaymentBreakdown_(sale,getAllRows_('SALE_PAYMENTS'));
+      assertSalePaymentBookEvidence_(invoiceId,deletePayments,
+        getAllRows_('CASH_BOOK'),getAllRows_('BANK_BOOK'));
+      if (typeof customerInvoiceSettlementSnapshot_ === 'function') {
+        var snapshot = customerInvoiceSettlementSnapshot_(invoiceId);
+        if (snapshot && (Math.abs((Number(snapshot.paidAmount)||0)-(Number(sale['Paid Amount'])||0)) > 0.004 ||
+          Math.abs((Number(snapshot.dueAmount)||0)-(Number(sale['Due Amount'])||0)) > 0.004)) {
+          return fail_('This invoice has later customer settlements. Reconcile them before deletion.');
+        }
+      }
+    }
 
     var hasReturn = activeRows_('SALES_RETURN').some(function (r) { return r['Invoice ID'] === invoiceId; });
     if (hasReturn) {
@@ -274,6 +301,27 @@ function deleteSalesInvoice(token, invoiceId, reason) {
     var vendorRows = getAllRows_('VENDOR_SOURCING').filter(function (v) {
       return v['Invoice ID'] === invoiceId && !isDeleted_(v);
     });
+    // Mark an irreversible Sheets write boundary before touching stock/money.
+    if (splitPaymentInvoice) {
+      appendRow_('SALE_POSTING_JOURNAL',{
+        'Operation ID':deleteOperationId,'Operation Type':'Delete',
+        'Payload Hash':deleteOperationHash,'Invoice ID':invoiceId,
+        State:'Writing','Last Completed Stage':'Validated',
+        Actor:String(user['User ID'] || deleteActor_(user)),
+        'Created At':now,'Updated At':now,Error:''
+      });
+      paymentDeleteJournalIndex = findRowIndex_('SALE_POSTING_JOURNAL','Operation ID',deleteOperationId);
+      if (paymentDeleteJournalIndex < 2) throw new Error('Delete journal reservation missing.');
+      paymentDeleteJournalStage = 'Validated';
+    }
+    function recordSaleDeleteStage_(stage,state) {
+      if (paymentDeleteJournalIndex < 2) return;
+      updateRowFields_('SALE_POSTING_JOURNAL',paymentDeleteJournalIndex,{
+        State:state||'Writing','Last Completed Stage':stage,'Updated At':new Date()
+      });
+      paymentDeleteJournalStage = stage;
+    }
+
     // --- stock back in, through the same lots it came out of
     stockRestorations.forEach(function (line) {
       var newStock = adjustProductStock_(line.productId, line.qty, line.productName);
@@ -297,9 +345,21 @@ function deleteSalesInvoice(token, invoiceId, reason) {
       vendorDueReversed += Number(v['Total Cost']) || 0;
     });
 
+    recordSaleDeleteStage_('Stock and Vendors');
     // --- money back out
     markMatchingDeleted_('CASH_BOOK', function (c) { return c['Reference'] === invoiceId; }, user, reason, now);
     voidBankEntriesFor_(invoiceId, user, reason);
+    if (splitPaymentInvoice) {
+      getAllRows_('SALE_PAYMENTS').filter(function (row) {
+        return String(row['Invoice ID']) === String(invoiceId) && String(row['Status']) === 'Active';
+      }).forEach(function (row) {
+        updateRowFields_('SALE_PAYMENTS',row._rowIndex,{
+          Status:'Reversed','Reversed At':now,'Reversed By':deleteActor_(user),
+          'Reversal Operation ID':deleteOperationId
+        });
+      });
+    }
+    recordSaleDeleteStage_('Money and Payment Reversal');
 
     // --- customer due unwound
     var due = Number(sale['Due Amount']) || 0;
@@ -309,9 +369,18 @@ function deleteSalesInvoice(token, invoiceId, reason) {
 
     markRowDeleted_('SALES', sale._rowIndex, user, reason, now);
     logDeletion_('sales', invoiceId, invoiceId, reason, user);
+    recordSaleDeleteStage_('Committed','Committed');
 
     return ok_({ invoiceId: invoiceId, stockRestored: stockRestorations.length, dueReversed: due, vendorDueReversed: vendorDueReversed });
   } catch (err) {
+    if (paymentDeleteJournalIndex >= 2) {
+      try {
+        updateRowFields_('SALE_POSTING_JOURNAL',paymentDeleteJournalIndex,{
+          State:'Needs Review','Last Completed Stage':paymentDeleteJournalStage,
+          'Updated At':new Date(),Error:String(err && err.message || err)
+        });
+      } catch (journalError) { logError_('deleteSaleJournal',journalError); }
+    }
     logError_('deleteSalesInvoice', err);
     return fail_(err.message);
   } finally {

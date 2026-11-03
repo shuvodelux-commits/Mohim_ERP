@@ -36,8 +36,20 @@ test('ledger tones use existing semantic theme colors, not monetary mutations', 
 test('customer and supplier main ledger rows color debit credit and signed running balances', () => {
   for (const p of ['customerLedger.html', 'supplierLedger.html']) {
     const s = read(p);
-    assert.match(s, /class="num ledger-txn--increase" data-label="Debit"/);
-    assert.match(s, /class="num ledger-txn--decrease" data-label="Credit"/);
+    if (p === 'customerLedger.html') {
+      // Customer debit increases due; customer credit settles due.
+      assert.match(s, /class="num ledger-txn--increase" data-label="Debit"/);
+      assert.match(s, /class="num ledger-txn--decrease" data-label="Credit"/);
+    } else {
+      // Supplier-facing credit is the payable increase, debit its settlement.
+      // Stored sheet Debit/Credit columns remain unchanged: only labels are flipped.
+      assert.match(s, /<th class="num">Credit/);
+      assert.match(s, /<th class="num">Debit/);
+      assert.match(s, /class="num ledger-txn--increase" data-label="Credit"/);
+      assert.match(s, /class="num ledger-txn--decrease" data-label="Debit"/);
+      assert.match(s, /supplierLedgerAmountCell_\(row, 'Debit'\)/);
+      assert.match(s, /supplierLedgerAmountCell_\(row, 'Credit'\)/);
+    }
     assert.match(s, /partyLedgerBalanceTone_\(row\['Balance'\]\)/);
     if (p === 'customerLedger.html') {
       // Customer ledger has separate Due and Credit cards, not a single
