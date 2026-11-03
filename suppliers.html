@@ -44,7 +44,7 @@
     <div class="modal-header"><div><h3 id="supDetailName"></h3><span class="bn-hint">সাপ্লায়ারের বাকি ও হিসাব</span></div><button class="modal-close" onclick="closeModal('supDetailModal')">&#10005;</button></div>
     <div class="modal-body">
       <div style="display:flex; gap:24px; flex-wrap:wrap; margin-bottom:16px; align-items:flex-start;">
-        <div><div class="stat-label">Current Due (You Owe)</div><div class="stat-value" id="supDetailDue"></div></div>
+        <div><div class="stat-label" id="supDetailBalanceLabel">Supplier Balance</div><div class="stat-value" id="supDetailDue"></div></div>
         <div class="mobile-payment-workspace" style="flex:1; min-width:520px;">
           <div style="display:flex; align-items:flex-end; gap:8px; flex-wrap:wrap;" class="mobile-payment-panel">
             <div style="flex:1; min-width:110px;"><label>Pay Amount</label><input id="supPayAmount" type="number" min="0" step="0.01" placeholder="Amount"></div>
@@ -134,7 +134,7 @@
     var total = Math.round((payment + discount) * 100) / 100;
     var balance = Math.round((supState.detailDue - total) * 100) / 100;
     document.getElementById('supPayTotalSettled').textContent = formatMoney(total);
-    document.getElementById('supPayBalanceAfter').textContent = balance < 0 ? ('Credit ' + formatMoney(Math.abs(balance))) : formatMoney(balance);
+    document.getElementById('supPayBalanceAfter').textContent = supplierBalanceText_(balance);
     partyLedgerPaintBalance_(document.getElementById('supPayBalanceAfter'), balance);
     document.getElementById('supPayDiscountReasonRow').style.display = discount > 0 ? '' : 'none';
     var canDiscount = supCanSettlementDiscount_() && supState.detailDue > 0;
@@ -177,9 +177,9 @@
     body.innerHTML = '';
     rows.forEach(function (s) {
       var due = Number(s['Current Due']) || 0;
-      var dueCell = due > 0
-        ? '<span class="badge badge-danger">' + formatMoney(due) + '</span>'
-        : (due < 0 ? '<span class="badge badge-success">Credit ' + formatMoney(Math.abs(due)) + '</span>' : formatMoney(0));
+      var dueCell = due > 0.004
+        ? '<span class="badge badge-danger">' + supplierBalanceText_(due) + '</span>'
+        : (due < -0.004 ? '<span class="badge badge-success">' + supplierBalanceText_(due) + '</span>' : formatMoney(0));
       var statusBadge = s['Status'] === 'Active' ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-danger">Inactive</span>';
       var tr = document.createElement('tr');
       tr.innerHTML =
@@ -338,7 +338,8 @@
     document.getElementById('supDetailName').textContent = data.supplier['Supplier Name'] + ' \u2014 ' + (data.supplier['Phone'] || '');
     var detailDue = Number(data.supplier['Current Due']) || 0;
     supState.detailDue = detailDue;
-    document.getElementById('supDetailDue').textContent = detailDue < 0 ? ('Credit ' + formatMoney(Math.abs(detailDue))) : formatMoney(detailDue);
+    document.getElementById('supDetailBalanceLabel').textContent = detailDue > 0.004 ? 'Supplier Payable' : (detailDue < -0.004 ? 'Supplier Receivable' : 'Supplier Balance');
+    document.getElementById('supDetailDue').textContent = supplierBalanceText_(detailDue);
     partyLedgerPaintBalance_(document.getElementById('supDetailDue'), detailDue);
 
     document.getElementById('supPayAmount').value = '';
