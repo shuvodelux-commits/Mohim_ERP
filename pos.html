@@ -2429,7 +2429,17 @@
     var subtotal = posState.cart.reduce(function (s, l) { return s + (Number(l.lineTotal) || 0); }, 0);
     var discount = Number(document.getElementById('posDiscount').value) || 0;
     var grandTotal = Math.max(0, subtotal - discount);
-    var terms = posDeriveSaleTerms_(grandTotal);
+    var splitSale = posMultiPaymentEnabledForSale_();
+    var terms;
+    try {
+      terms = splitSale
+        ? posMultiPaymentTerms_(Math.round(grandTotal * 100) / 100, posState.paymentRows, posState.bankAccounts)
+        : posDeriveSaleTerms_(grandTotal);
+    } catch (paymentError) {
+      errEl.textContent = paymentError.message;
+      errEl.style.display = 'block';
+      return;
+    }
 
     var payload = {
       customerId: document.getElementById('posCustomerName').dataset.customerId || '',
@@ -2454,6 +2464,15 @@
       bankAccountId: document.getElementById('posBankAccount').value
     };
     
+    if (posMultiPaymentEnabledForSale_()) {
+      payload.payments = posMultiPaymentPayloadRows_();
+      // The server derives aggregate Paid/Due/Method only from payment rows.
+      delete payload.paymentType;
+      delete payload.paidAmount;
+      delete payload.paymentMethod;
+      delete payload.bankAccountId;
+    }
+
     if (posState.draftId) {
       payload.sourceDraftId = posState.draftId;
       payload.sourceDraftVersion = posState.draftVersion;
@@ -2481,14 +2500,22 @@
       { label: 'Subtotal', value: formatMoney(subtotal) },
       { label: 'Discount', value: formatMoney(discount) },
       { label: 'Grand Total', value: formatMoney(grandTotal), emphasis: true },
-      { label: 'In words', value: banglaAmountInWords_(grandTotal) },
-      { label: 'Paid Now', value: formatMoney(paidNow) },
-      { label: 'Due', value: formatMoney(dueNow) },
-      { label: 'Item Count', value: String(payload.items.length) },
-      { label: 'Method', value: payload.paymentMethod },
-      { label: 'Account', value: payload.bankAccountId ? selectedOptionText_('posBankAccount') : '' },
-      { label: 'Update Reason', value: isUpdate ? (posState.updateReason || '') : '' }
+      { label: 'In words', value: banglaAmountInWords_(grandTotal) }
     ];
+    if (splitSale) {
+      saleConfirmDetails = saleConfirmDetails.concat(posMultiPaymentConfirmationDetails_(terms, posState.bankAccounts));
+    } else {
+      saleConfirmDetails.push(
+        { label: 'Paid Now', value: formatMoney(paidNow) },
+        { label: 'Due', value: formatMoney(dueNow) },
+        { label: 'Method', value: payload.paymentMethod },
+        { label: 'Account', value: payload.bankAccountId ? selectedOptionText_('posBankAccount') : '' }
+      );
+    }
+    saleConfirmDetails.push(
+      { label: 'Item Count', value: String(payload.items.length) },
+      { label: 'Update Reason', value: isUpdate ? (posState.updateReason || '') : '' }
+    );
     runConfirmedAction({
       type: 'financial',
       title: isUpdate ? 'Update Sale?' : 'Complete Sale?',
@@ -2498,6 +2525,16 @@
       loadingLabel: isUpdate ? 'Updating...' : 'Completing...',
       trigger: document.getElementById('posCompleteBtn')
     }, function () {
+      if (splitSale) {
+        // Do not generate a fresh ID for an uncertain retry; a changed cart
+        // must be reviewed instead of creating a second, different sale.
+        var fingerprint = JSON.stringify(payload);
+        if (posState.paymentAttemptFingerprint && posState.paymentAttemptFingerprint !== fingerprint) {
+          throw new Error('Previous payment request changed. Check the original sale before retrying.');
+        }
+        posState.paymentAttemptFingerprint = fingerprint;
+        payload.operationId = posMultiPaymentOperationId_();
+      }
       var call = isUpdate
         ? serverCall('updateSale', authToken, targetInvoiceId, payload)
         : serverCall('completeSale', authToken, payload);
