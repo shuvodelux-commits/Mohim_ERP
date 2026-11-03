@@ -217,7 +217,7 @@ function deleteSalesDraft(token,draftId,expectedVersion,reason) {
     const user=requireSalesDraftFeatureAccess_(token), id=sanitizeInput_(draftId), row=findFirstRow_('SALES_DRAFTS','Draft ID',id);
     requireSalesDraftAccess_(user,row,'manage');
     if (Number(row['Version']) !== Number(expectedVersion)) throw new Error('This draft was changed by another user. Reload the latest version.');
-    const why=cleanDraftText_(reason); if(!why) throw new Error('Reason is required.');
+    const why=cleanDraftText_(reason); // Optional note; deletion audit still records actor and time.
     appendSalesDraftAudit_('DELETED',row,user,'',why); deleteRow_('SALES_DRAFTS',row._rowIndex);
     return ok_({draftId:id});
   } catch(err){ logError_('deleteSalesDraft',err); return fail_(err.message); } finally { lock.releaseLock(); }
