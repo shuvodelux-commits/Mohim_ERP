@@ -20,7 +20,7 @@ const balanceFunctions = section(sharedJs, '  // UI-only: all ledgers retain', '
 const renderLedger = section(supplierLedger, '  function supplierLedgerRender_() {', '  function supplierLedgerActionAllowed_');
 const renderList = section(supplierList, '  function supRender() {', "  document.getElementById('supSearch').addEventListener");
 const recalcLedger = section(supplierLedger, '  function supplierLedgerPaymentRecalc_() {', '  function supplierLedgerOpenPayment_() {');
-const recalcList = section(supplierList, '  function supPayRecalc_() {', '  function supConfigureOpeningBalance_() {');
+const recalcList = section(supplierList, '  function supPayRecalc_() {', '  function supConfigureOpeningBalance_(');
 
 function node() {
   const classes = new Set();
