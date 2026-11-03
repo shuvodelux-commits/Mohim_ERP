@@ -2356,6 +2356,27 @@
     return '<div><div class="inv-side-label">সেন্ড-মানি</div><div class="inv-payment-methods">' + chips + '</div></div>';
   }
 
+  /**
+   * Original checkout breakdown, not later settlements. A4/JPG and thermal
+   * share these values; tendered/applied/change never become extra revenue.
+   */
+  function buildInvSalePaymentBreakdown_(inv, thermal) {
+    var payments = Array.isArray(inv.payments) ? inv.payments : [];
+    if (!payments.length) return '';
+    var symbol = (inv.shop && inv.shop.currencySymbol) || '';
+    var rows = payments.map(function (p) {
+      var label = String(p.method || 'Cash');
+      if (p.bankAccountName) label += ' · ' + p.bankAccountName;
+      var change = p.method === 'Cash' && Number(p.change) > 0
+        ? '<div class="inv-payment-change">Tendered: ' + bnMoney_(p.tendered, symbol) +
+          ' · Cash Change: ' + bnMoney_(p.change, symbol) + '</div>' : '';
+      return '<div class="inv-payment-breakdown-row"><span>' + escapeHtml(label) +
+        change + '</span><strong>' + bnMoney_(p.applied, symbol) + '</strong></div>';
+    }).join('');
+    return '<div class="' + (thermal ? 'thermal-payment-breakdown' : 'inv-payment-breakdown') + '">' +
+      '<div class="inv-side-label">Payments at Sale</div>' + rows + '</div>';
+  }
+
   function buildInvTerms_(inv) {
     var terms;
     try { terms = JSON.parse(inv.shop.terms || '[]'); } catch (e) { terms = []; }
@@ -2391,7 +2412,7 @@
 
   /** Payment/terms (left) + totals (right) — only the last page of a multi-page invoice. */
   function buildInvBottom_(inv) {
-    var sideParts = [buildInvPaymentMethods_(inv), buildInvTerms_(inv)].filter(function (s) { return s; });
+    var sideParts = [buildInvPaymentMethods_(inv), buildInvSalePaymentBreakdown_(inv, false), buildInvTerms_(inv)].filter(function (s) { return s; });
     var side = sideParts.length ? '<div class="inv-side">' + sideParts.join('') + '</div>' : '';
     return '<div class="inv-bottom">' + side + buildInvTotalsPanel_(inv) + '</div>';
   }
@@ -2520,7 +2541,8 @@
     if (customerCreditUsed > 0) rows += '<div><span>' + BN.customerCredit + '</span><span>− ' + bnMoney_(customerCreditUsed, sym) + '</span></div>';
     if (moneyPaid > 0) rows += '<div><span>' + BN.paid + '</span><span>− ' + bnMoney_(moneyPaid, sym) + '</span></div>';
     if (due > 0) rows += '<div class="thermal-due"><span>' + BN.due + '</span><b>' + bnMoney_(due, sym) + '</b></div>';
-    return '<div class="thermal-totals">' + rows + '</div>';
+    return '<div class="thermal-totals">' + rows + '</div>' +
+      buildInvSalePaymentBreakdown_(inv, true);
   }
 
   function renderInvoiceHtmlThermal_(inv) {
