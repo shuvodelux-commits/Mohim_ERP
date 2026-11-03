@@ -249,3 +249,52 @@ test('adding a new bundle to a standard invoice consumes the current revision on
   assert.equal(w.ctx.buildInvoicePayload_('INV-1').items.length,2);
   assert.deepEqual(w.errors,[]);
 });
+
+
+test('split payment invoice correction keeps original bundle recipe, posts account-only deltas and replays exactly once',()=>{
+  const w=workbook(false);
+  Object.assign(w.sheet.SALES[0],{
+    'Payment Detail Version':1,'Payment Method':'Multiple','Paid Amount':30000,'Due Amount':0
+  });
+  w.sheet.BANK_ACCOUNTS=[{'Bank Account ID':'B1','Account Name':'DBBL','Account Type':'Bank',Status:'Active','Current Balance':20000,_rowIndex:2}];
+  w.sheet.BANK_BOOK=[{'Entry ID':'BE1','Bank Account ID':'B1',Type:'Sale',Reference:'INV-1',Credit:20000,Debit:'',Status:'Active',_rowIndex:2}];
+  w.sheet.CASH_BOOK=[{'Entry ID':'CE1',Type:'Sale',Reference:'INV-1',Credit:10000,Debit:'',_rowIndex:2}];
+  w.sheet.SALE_PAYMENTS=[
+    {'Invoice ID':'INV-1','Payment ID':'P1',Revision:1,'Row Order':1,Method:'Cash','Tendered Amount':12000,'Applied Amount':10000,'Change Amount':2000,Status:'Active',_rowIndex:2},
+    {'Invoice ID':'INV-1','Payment ID':'P2',Revision:1,'Row Order':2,Method:'Bank','Bank Account ID':'B1','Bank Account Name':'DBBL','Tendered Amount':20000,'Applied Amount':20000,'Change Amount':0,Status:'Active',_rowIndex:3}
+  ];
+  w.sheet.SALE_POSTING_JOURNAL=[];
+  w.ctx.getSettingsMap_=()=>({'POS Multi Payment Enabled':'true'});
+  w.ctx.salePostingPayloadHash_=()=> 'VALID_UPDATE_HASH';
+  w.ctx.addBankBookEntry_=(accountId,entry)=>{
+    const account=w.sheet.BANK_ACCOUNTS.find(row=>row['Bank Account ID']===accountId);
+    assert.ok(account,'original bank account must exist');
+    account['Current Balance'] += (Number(entry.Credit)||0)-(Number(entry.Debit)||0);
+    const rows=w.sheet.BANK_BOOK;
+    rows.push({'Bank Account ID':accountId,Type:entry.Type,Reference:entry.Reference,
+      Credit:entry.Credit,Debit:entry.Debit,Status:'Active',_rowIndex:rows.length+2});
+  };
+  const payload={
+    reason:'Split correction',customerName:'Test',customerPhone:'01700000000',
+    discount:0,items:[{productId:'kit',name:'Tubewell Set',qty:2,unitPrice:15000,bundleRevision:1}],
+    payments:[
+      {id:'r1',method:'Cash',amount:'5000',accountId:''},
+      {id:'r2',method:'Bank',amount:'25000',accountId:'B1'}
+    ],operationId:'update-test-op-001'
+  };
+  const originalStock=w.sheet.PRODUCTS.map(row=>row['Current Stock']);
+  const first=w.ctx.updateSaleInternal_('token','INV-1',payload,{});
+  assert.equal(first.success,true,JSON.stringify({errors:w.errors,message:first.message}));
+  assert.deepEqual(w.sheet.PRODUCTS.map(row=>row['Current Stock']),originalStock);
+  assert.equal(w.sheet.BANK_ACCOUNTS[0]['Current Balance'],25000);
+  assert.equal(w.sheet.CASH_BOOK.reduce((sum,row)=>sum+(Number(row.Credit)||0)-(Number(row.Debit)||0),0),5000);
+  assert.deepEqual(w.sheet.SALE_PAYMENTS.map(row=>row.Status),['Reversed','Reversed','Active','Active']);
+  assert.deepEqual(w.sheet.SALE_PAYMENTS.slice(2).map(row=>row.Revision),[2,2]);
+  assert.equal(w.sheet.SALE_POSTING_JOURNAL[0].State,'Committed');
+  const before={bank:w.sheet.BANK_BOOK.length,cash:w.sheet.CASH_BOOK.length,payments:w.sheet.SALE_PAYMENTS.length};
+  const replay=w.ctx.updateSaleInternal_('token','INV-1',payload,{});
+  assert.equal(replay.success,true,JSON.stringify({errors:w.errors,message:replay.message}));
+  assert.equal(w.sheet.BANK_BOOK.length,before.bank);
+  assert.equal(w.sheet.CASH_BOOK.length,before.cash);
+  assert.equal(w.sheet.SALE_PAYMENTS.length,before.payments);
+});
