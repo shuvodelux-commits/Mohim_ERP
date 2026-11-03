@@ -34,7 +34,7 @@
           <input id="counterCustomerDiscount" type="number" inputmode="decimal" min="0" step="0.01" value="0">
         </div>
         <div class="counter-field counter-span-2" id="counterCustomerDiscountReasonRow" hidden>
-          <label for="counterCustomerDiscountReason">Discount Reason *</label>
+          <label for="counterCustomerDiscountReason">Discount Reason (optional)</label>
           <input id="counterCustomerDiscountReason" type="text" placeholder="Why is this discount being given?">
         </div>
         <div class="counter-field">
@@ -88,7 +88,7 @@
           <input id="counterSupplierDiscount" type="number" inputmode="decimal" min="0" step="0.01" value="0">
         </div>
         <div class="counter-field counter-span-2" id="counterSupplierDiscountReasonRow" hidden>
-          <label for="counterSupplierDiscountReason">Discount Reason *</label>
+          <label for="counterSupplierDiscountReason">Discount Reason (optional)</label>
           <input id="counterSupplierDiscountReason" type="text" placeholder="Why did the supplier give this discount?">
         </div>
         <div class="counter-field">
@@ -549,7 +549,7 @@
     if (!customerId) { errEl.textContent = 'Choose a customer.'; errEl.style.display = 'block'; document.getElementById('counterCustomerSearch').focus(); return; }
     if (payment <= 0) { errEl.textContent = 'Enter a valid payment amount.'; errEl.style.display = 'block'; document.getElementById('counterCustomerAmount').focus(); return; }
     if (discountAmount > 0 && !counterState.capabilities.settlementDiscount) { errEl.textContent = 'You do not have permission to give a settlement discount.'; errEl.style.display = 'block'; return; }
-    if (discountAmount > 0 && !discountReason) { errEl.textContent = 'Discount Reason is required.'; errEl.style.display = 'block'; document.getElementById('counterCustomerDiscountReason').focus(); return; }
+
     if (discountAmount > 0 && payment + discountAmount - currentDue > 0.004) { errEl.textContent = 'Payment plus discount cannot exceed the current due.'; errEl.style.display = 'block'; return; }
     if (paymentMethodNeedsAccount_(method) && !bankId) { errEl.textContent = 'Choose an account.'; errEl.style.display = 'block'; document.getElementById('counterCustomerAccount').focus(); return; }
     if (date && counterState.businessDate && date < counterState.businessDate && !backdatedReason) { errEl.textContent = 'A reason is required when dating a payment in the past.'; errEl.style.display = 'block'; document.getElementById('counterCustomerBackdatedReason').focus(); return; }
@@ -746,7 +746,7 @@
     if (!supplierId) { errEl.textContent = 'Choose a supplier.'; errEl.style.display = 'block'; document.getElementById('counterSupplierSearch').focus(); return; }
     if (payment <= 0) { errEl.textContent = 'Enter a valid payment amount.'; errEl.style.display = 'block'; document.getElementById('counterSupplierAmount').focus(); return; }
     if (discountAmount > 0 && !counterState.capabilities.settlementDiscount) { errEl.textContent = 'You do not have permission to receive a settlement discount.'; errEl.style.display = 'block'; return; }
-    if (discountAmount > 0 && !discountReason) { errEl.textContent = 'Discount Reason is required.'; errEl.style.display = 'block'; document.getElementById('counterSupplierDiscountReason').focus(); return; }
+
     if (discountAmount > 0 && payment + discountAmount - currentDue > 0.004) { errEl.textContent = 'Pay amount plus discount cannot exceed the current payable.'; errEl.style.display = 'block'; return; }
     if (paymentMethodNeedsAccount_(method) && !bankId) { errEl.textContent = 'Choose an account.'; errEl.style.display = 'block'; document.getElementById('counterSupplierAccount').focus(); return; }
     if (date && counterState.businessDate && date < counterState.businessDate && !backdatedReason) { errEl.textContent = 'A reason is required when dating a payment in the past.'; errEl.style.display = 'block'; document.getElementById('counterSupplierBackdatedReason').focus(); return; }
