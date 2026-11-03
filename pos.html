@@ -104,7 +104,7 @@
       <div class="pos-checkout-summary">
         <div class="pos-checkout-fields">
           <div class="totals-row"><span>Discount</span><input id="posDiscount" type="number" min="0" step="0.01" placeholder="0"></div>
-          <div class="totals-row pos-inline-field"><span>Amount Received</span><input id="posAmountReceived" type="number" min="0" step="0.01" placeholder="Enter amount"></div>
+          <div class="totals-row pos-inline-field" id="posAmountReceivedRow"><span>Amount Received</span><input id="posAmountReceived" type="number" min="0" step="0.01" placeholder="Enter amount"></div>
           <div id="posPaymentMethodRow" class="totals-row pos-inline-field">
             <span>Payment Method</span>
             <select id="posPaymentMethod">
@@ -116,6 +116,17 @@
           <div id="posBankAccountRow" class="pos-bank-account-row" style="display:none;">
             <label id="posBankAccountLabel">Bank Account *</label>
             <select id="posBankAccount"><option value="">Select bank account...</option></select>
+          </div>
+          <!-- New split-payment workflow is server-flagged OFF until release. -->
+          <div id="posMultiPaymentFields" hidden style="display:none;">
+            <div class="pos-multi-heading"><strong>Payments <span class="bn-hint">— পেমেন্ট</span></strong><button type="button" class="btn btn-sm" id="posAddPaymentRowBtn">+ Add Payment</button></div>
+            <div id="posMultiPaymentRows" class="pos-multi-payment-rows"></div>
+            <div class="field-error" id="posMultiPaymentError" role="alert" hidden style="display:none;"></div>
+            <div class="pos-multi-totals">
+              <div class="totals-row"><span>Total Received</span><strong id="posMultiPaidAmount">৳0.00</strong></div>
+              <div class="totals-row"><span>Due / বাকি</span><strong id="posMultiDueAmount">৳0.00</strong></div>
+              <div class="totals-row" id="posMultiChangeRow" hidden style="display:none;"><span>Cash Change</span><strong id="posMultiChangeAmount">৳0.00</strong></div>
+            </div>
           </div>
         </div>
         <div class="pos-checkout-totals">
@@ -1636,6 +1647,110 @@
    * full Due sale. posDeriveSaleTerms_() below turns this same number back
    * into the paymentType/paidAmount pair completeSale() already expects.
    */
+
+  // Split payment calculations use integer paisa, matching SalePayments.gs.
+  // Browser calculations improve feedback; the server validates independently.
+  function posMultiPaymentMoneyPaisa_(value, label) {
+    if (value === '' || value === null || value === undefined) return 0;
+    var raw = String(value).trim();
+    if (!/^(?:\d+(?:\.\d{1,2})?|\.\d{1,2})$/.test(raw)) {
+      throw new Error((label || 'Amount') + ' must have at most two decimal places.');
+    }
+    var parts = raw.split('.');
+    var total = Number(parts[0] || 0) * 100 + Number((parts[1] || '').padEnd(2, '0') || 0);
+    if (!Number.isSafeInteger(total) || total < 0) throw new Error('Payment amount is out of range.');
+    return total;
+  }
+
+  function posMultiPaymentTerms_(grandTotal, rows, accounts) {
+    var total = posMultiPaymentMoneyPaisa_(grandTotal, 'Invoice total');
+    if (!Array.isArray(rows) || rows.length > 20) throw new Error('Maximum 20 payment rows allowed.');
+    var used = Object.create(null), cashCount = 0, cashTender = 0, nonCash = 0;
+    var payments = rows.map(function (row) {
+      var id = String(row.id || '');
+      if (!id || used[id]) throw new Error('Duplicate or missing payment row.');
+      used[id] = true;
+      var method = row.method;
+      if (['Cash', 'Bank', 'Mobile Banking'].indexOf(method) === -1) throw new Error('Invalid payment method.');
+      var amount = String(row.amount === undefined || row.amount === null ? '' : row.amount);
+      var tender = posMultiPaymentMoneyPaisa_(amount, 'Payment amount');
+      var accountId = String(row.accountId || '');
+      if (method === 'Cash') {
+        if (++cashCount > 1) throw new Error('Only one Cash payment is allowed.');
+        if (accountId) throw new Error('Cash cannot have a bank account.');
+        cashTender = tender;
+      } else if (tender > 0) {
+        var account = (accounts || []).filter(function (a) { return a.id === accountId && a.type === method; })[0];
+        if (!account) throw new Error('Choose a valid ' + method + ' account.');
+        nonCash += tender;
+      }
+      return { id:id, method:method, amount:amount, accountId:accountId };
+    });
+    if (nonCash > total) throw new Error('Bank/Mobile payments exceed the invoice total.');
+    if (total === 0 && cashTender > 0) throw new Error('Cash tender exceeds the zero-value invoice.');
+    var cashApplied = Math.min(cashTender, total - nonCash);
+    var paid = nonCash + cashApplied, due = total - paid;
+    return {
+      payments:payments, paidAmount:paid / 100, dueAmount:due / 100,
+      change:(cashTender - cashApplied) / 100, cashApplied:cashApplied / 100,
+      paymentType:due === 0 ? 'Cash' : paid ? 'Partial' : 'Due'
+    };
+  }
+
+  function posMultiPaymentRemaining_(grandTotal, rows, selectedId) {
+    var total = posMultiPaymentMoneyPaisa_(grandTotal, 'Invoice total');
+    var other = (rows || []).reduce(function (sum, row) {
+      return sum + (row.id === selectedId ? 0 : posMultiPaymentMoneyPaisa_(row.amount, 'Other payment'));
+    }, 0);
+    if (!(rows || []).some(function (r) { return r.id === selectedId; })) throw new Error('Payment row not found.');
+    return (Math.max(0, total - other) / 100).toFixed(2);
+  }
+
+  function posMultiPaymentConfirmationDetails_(terms, accounts) {
+    function money(value) {
+      return typeof formatMoney === 'function' ? formatMoney(value) : '৳' + Number(value).toFixed(2);
+    }
+    var details = terms.payments.filter(function (r) { return Number(r.amount) > 0; }).map(function (r) {
+      var account = (accounts || []).filter(function (a) { return a.id === r.accountId; })[0];
+      return {
+        label: r.method === 'Cash' ? 'Cash' : r.method + ' · ' + (account ? account.name : r.accountId),
+        value: money(Number(r.amount))
+      };
+    });
+    details.push({label:'Paid Now',value:money(terms.paidAmount)});
+    details.push({label:'Due',value:money(terms.dueAmount)});
+    if (terms.change > 0) details.push({label:'Cash Change',value:money(terms.change)});
+    return details;
+  }
+
+  function posMultiPaymentEnabledForSale_() {
+    return !!(posState.multiPaymentEnabled && !posState.updateInvoiceId &&
+      !posState.draftId && !posState.copyMode);
+  }
+
+  function posMultiPaymentPayloadRows_() {
+    return posState.paymentRows.map(function (r) {
+      return {id:r.id, method:r.method, amount:r.amount, accountId:r.accountId || ''};
+    });
+  }
+
+  // Keep this ID across uncertain network responses and retries.
+  function posMultiPaymentOperationId_() {
+    if (!posState.paymentOperationId) {
+      if (!window.crypto || !window.crypto.getRandomValues) throw new Error('Secure sale operation ID unavailable.');
+      if (typeof window.crypto.randomUUID === 'function') {
+        posState.paymentOperationId = window.crypto.randomUUID();
+      } else {
+        var bytes = new Uint8Array(16);
+        window.crypto.getRandomValues(bytes);
+        posState.paymentOperationId = 'pos-' + Array.from(bytes).map(function (n) {
+          return n.toString(16).padStart(2, '0');
+        }).join('');
+      }
+    }
+    return posState.paymentOperationId;
+  }
+
   var posProfitRequestSequence_ = 0;
   var posProfitTimer_ = null;
 
