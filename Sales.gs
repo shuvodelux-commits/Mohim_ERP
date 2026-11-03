@@ -140,6 +140,7 @@ function getPosBootstrap(token) {
       // A profit preview is a sensitive cost-derived figure. Expose only
       // whether the logged-in user's existing report/cost rights allow it.
       canViewCurrentInvoiceProfit: canViewInvoiceProfit_(actingUser),
+      multiPaymentEnabled: String(settings['POS Multi Payment Enabled'] || '').toLowerCase() === 'true',
       customers: customers.map(function (c) {
         return { id: c['Customer ID'], name: c['Customer Name'], phone: c['Phone'], address: c['Address'],fatherName:c['Father Name'] || '', due: Number(c['Current Due']) || 0 };
       }),
