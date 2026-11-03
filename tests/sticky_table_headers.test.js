@@ -10,10 +10,11 @@ const sales=fs.readFileSync(path.join(root,'sales.html'),'utf8');
 test('sales list preserves scroll wrapper, 11 labeled columns and existing horizontal scroll sync',()=>{
   assert.match(sales,/id="smTableScroll"/);
   assert.match(sales,/id="smTopScroll"/);
-  for(const heading of ['Invoice','Date','Customer','Phone','Total','Paid','Due','Returned','Profit','Status','Action']){
+  for(const heading of ['Invoice','Date','Customer','Phone','Total','Paid','Due','Returned','Profit','Status']){
     assert.match(sales,new RegExp('<th[^>]*>\\s*'+heading+'\\s*<\\/th>'));
   }
   assert.match(sales,/smTopScrollSyncing_/);
+  assert.match(sales,/<th class="erp-sticky-action-col"[^>]*>[\s\S]*?Actions<\/span>/);
 });
 
 test('all scroll-wrapped table heading cells stick to the bounded scroll container',()=>{
