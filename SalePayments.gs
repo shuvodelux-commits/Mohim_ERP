@@ -29,7 +29,7 @@ function normalizeSalePayments_(grandTotal, inputRows, accountRows) {
   if (!Array.isArray(inputRows)) throw new Error('Payment rows are required.');
   if (inputRows.length > 20) throw new Error('Too many payment rows (maximum 20).');
   const accounts = Array.isArray(accountRows) ? accountRows : [];
-  const seen = {};
+  const seen = Object.create(null);
   const prepared = [];
   let bankTotal = 0, cashTender = 0, cashCount = 0;
 
