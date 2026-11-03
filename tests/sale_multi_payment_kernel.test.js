@@ -159,3 +159,7 @@ test('readback ignores unrelated invoices but detects mixed active revision corr
   assert.deepEqual(plain(ctx.readSalePaymentBreakdown_(sale,[unrelated,expected])).map(r=>r.applied),[40]);
   assert.throws(()=>ctx.readSalePaymentBreakdown_(sale,[expected,{...expected,'Payment ID':'P2','Revision':2,'Applied Amount':0,'Tendered Amount':25,'Change Amount':25}]),/revision|integrity/i);
 });
+
+test('special JavaScript object-key row IDs cannot bypass duplicate row detection',()=>{
+  assert.throws(()=>allocate(100,[row('__proto__','Cash','25'),row('__proto__','Bank','25','B1')]),/duplicate/i);
+});
