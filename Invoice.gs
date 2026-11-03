@@ -86,6 +86,13 @@ function buildInvoicePayload_(invoiceId) {
     if (customer) customerFatherName = customer['Father Name'] || '';
   }
 
+  // Original checkout allocation is immutable invoice history. Later due
+  // collections and customer credit belong to the settlement snapshot below,
+  // never to the originally tendered Cash/Bank/Mobile breakdown.
+  const paymentDetailVersion = String(sale['Payment Detail Version'] || '').trim();
+  const payments = readSalePaymentBreakdown_(sale,
+    paymentDetailVersion === '1' ? findRows_('SALE_PAYMENTS', 'Invoice ID', invoiceId) : []);
+
   const settlement = customerInvoiceSettlementSnapshot_(invoiceId) || {
     paidAmount: Number(sale['Paid Amount']) || 0,
     dueAmount: Number(sale['Due Amount']) || 0,
@@ -115,6 +122,8 @@ function buildInvoicePayload_(invoiceId) {
     // Duplicate Invoice can reproduce the original checkout form without
     // accidentally copying later collections.
     originalPaidAmount: Number(sale['Paid Amount']) || 0,
+    paymentDetailVersion: paymentDetailVersion,
+    payments: payments,
     paymentMethod: sale['Payment Method'] || '', bankAccountId: sale['Bank Account ID'] || '',
     bankAccountName: sale['Bank Account Name'] || '',
     shop: buildInvoiceShopPayload_(settings)
