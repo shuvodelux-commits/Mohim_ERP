@@ -5,7 +5,8 @@ const fs=require('node:fs');
 const path=require('node:path');
 const vm=require('node:vm');
 
-const scripts=['Bundles.gs','StockLots.gs','SalesManagement.gs','SalesReturn.gs','Invoice.gs']
+// Invoice.gs now uses the shared read-only payment kernel for legacy and split invoices.
+const scripts=['Bundles.gs','StockLots.gs','SalePayments.gs','SalesManagement.gs','SalesReturn.gs','Invoice.gs']
   .map(file=>fs.readFileSync(path.join(__dirname,'..',file),'utf8')).join('\n');
 
 function workbook(withStandalone) {
