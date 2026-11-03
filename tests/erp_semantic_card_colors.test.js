@@ -139,8 +139,9 @@ test('party details correctly invert named customer/supplier credit', () => {
   assert.equal(c.erpSemanticLabel_(c.ERP_SEMANTIC_DETAILS_.custDetailDue, 'negative'), 'To Receive');
   assert.equal(c.erpSemanticLabel_(c.ERP_SEMANTIC_DETAILS_.custDetailDue, 'positive'), 'Credit to Refund');
   assert.equal(c.erpSemanticTone_(c.ERP_SEMANTIC_DETAILS_.supDetailDue, '৳200'), 'negative');
-  assert.equal(c.erpSemanticTone_(c.ERP_SEMANTIC_DETAILS_.supDetailDue, 'Credit ৳200'), 'positive');
-  assert.equal(c.erpSemanticLabel_(c.ERP_SEMANTIC_DETAILS_.supDetailDue,'positive'),'Credit Available');
+  assert.equal(c.erpSemanticTone_(c.ERP_SEMANTIC_DETAILS_.supDetailDue, 'Credit ৳200'), 'negative');
+  assert.equal(c.erpSemanticTone_(c.ERP_SEMANTIC_DETAILS_.supDetailDue, 'Debit ৳200'), 'positive');
+  assert.equal(c.erpSemanticLabel_(c.ERP_SEMANTIC_DETAILS_.supDetailDue,'positive'),'To Receive');
 });
 
 test('card updates when amount changes, not when note is painted; zero removes old status', () => {

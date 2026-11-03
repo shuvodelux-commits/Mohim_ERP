@@ -82,7 +82,7 @@
         <div class="full"><label for="customerLedgerPayInvoice">Apply to invoice (optional)</label><select id="customerLedgerPayInvoice"><option value="">Auto — oldest due first</option></select></div>
         <div><label>Payment Amount *</label><input id="customerLedgerPayAmount" type="number" min="0" step="0.01"></div>
         <div><label>Discount Given</label><input id="customerLedgerPayDiscount" type="number" min="0" step="0.01" value="0"></div>
-        <div class="full" id="customerLedgerPayDiscountReasonRow" hidden><label>Discount Reason *</label><input id="customerLedgerPayDiscountReason" type="text"></div>
+        <div class="full" id="customerLedgerPayDiscountReasonRow" hidden><label>Discount Reason (optional)</label><input id="customerLedgerPayDiscountReason" type="text"></div>
         <div><label>Payment Method</label><select id="customerLedgerPayMethod"><option value="Cash">Cash</option><option value="Bank">Bank</option><option value="Mobile Banking">Mobile Banking</option></select></div>
         <div id="customerLedgerPayBankRow" hidden><label id="customerLedgerPayBankLabel">Bank Account *</label><select id="customerLedgerPayBank"><option value="">Select bank account...</option></select></div>
         <div><label>Payment Date</label><input id="customerLedgerPayDate" type="date"></div>
@@ -564,7 +564,7 @@
     var due = customerLedgerState.party ? Number(customerLedgerState.party.balance) || 0 : 0;
     if ((Number(amount) || 0) <= 0) { errEl.textContent='Enter a valid payment amount.'; errEl.style.display='block'; return; }
     if (payDate < customerLedgerToday_() && !backdatedReason) { errEl.textContent='A reason is required when dating a payment in the past.'; errEl.style.display='block'; return; }
-    if (discount > 0 && !discountReason) { errEl.textContent='Discount Reason is required.'; errEl.style.display='block'; return; }
+
     if (discount > 0 && ((Number(amount) || 0) + discount) - due > 0.004) { errEl.textContent='Payment plus discount cannot exceed the current due.'; errEl.style.display='block'; return; }
     if (paymentMethodNeedsAccount_(method) && !bankId) { errEl.textContent='Choose a bank account.'; errEl.style.display='block'; return; }
     var partyName = customerLedgerState.party ? (customerLedgerState.party.name || customerLedgerState.party['Customer Name'] || 'Customer') : 'Customer';

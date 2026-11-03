@@ -44,7 +44,7 @@ function validateSettlementDiscount_(token, moduleKey, currentDue, paymentAmount
 
   if (discount > 0) {
     if (balance <= 0) throw new Error('Settlement discount is available only when there is a positive due balance.');
-    if (!reason) throw new Error('Discount Reason is required when a settlement discount is used.');
+    // Reason is optional; the discount amount, privilege and cap remain validated.
     if (total - balance > 0.004) throw new Error('Payment plus discount cannot exceed the current due. Reduce the discount or payment amount.');
   }
 
