@@ -294,13 +294,20 @@
 
   function doLogout_() {
     var token = authToken;
-    authToken = '';
-    currentUser = null;
-    allowedModules = null;
-    userPermissions = null;
-    clearStoredToken_();
-    serverCall('logout', token).catch(function () { /* the local session is gone either way */ });
-    window.location.reload();
+    // With non-expiring sessions, clearing only the browser token on an RPC
+    // failure would leave a valid server session behind indefinitely.
+    return serverCall('logout', token)
+      .then(function () {
+        authToken = '';
+        currentUser = null;
+        allowedModules = null;
+        userPermissions = null;
+        clearStoredToken_();
+        window.location.reload();
+      })
+      .catch(function () {
+        showToast('Could not sign out securely. Check your connection and try again.', 'error');
+      });
   }
 
   function showLogin_() {
