@@ -73,7 +73,7 @@
       <div class="form-grid party-ledger-payment-grid">
         <div><label>Payment Amount *</label><input id="supplierLedgerPayAmount" type="number" min="0" step="0.01"></div>
         <div><label>Discount Received</label><input id="supplierLedgerPayDiscount" type="number" min="0" step="0.01" value="0"></div>
-        <div class="full" id="supplierLedgerPayDiscountReasonRow" hidden><label>Discount Reason *</label><input id="supplierLedgerPayDiscountReason" type="text"></div>
+        <div class="full" id="supplierLedgerPayDiscountReasonRow" hidden><label>Discount Reason (optional)</label><input id="supplierLedgerPayDiscountReason" type="text"></div>
         <div><label>Payment Method</label><select id="supplierLedgerPayMethod"><option value="Cash">Cash</option><option value="Bank">Bank</option><option value="Mobile Banking">Mobile Banking</option></select></div>
         <div id="supplierLedgerPayBankRow" hidden><label id="supplierLedgerPayBankLabel">Bank Account *</label><select id="supplierLedgerPayBank"><option value="">Select bank account...</option></select></div>
         <div><label>Payment Date</label><input id="supplierLedgerPayDate" type="date"></div>
@@ -508,7 +508,7 @@
     var due = supplierLedgerState.party ? Number(supplierLedgerState.party.balance) || 0 : 0;
     if ((Number(amount) || 0) <= 0) { errEl.textContent='Enter a valid payment amount.'; errEl.style.display='block'; return; }
     if (payDate < supplierLedgerToday_() && !backdatedReason) { errEl.textContent='A reason is required when dating a payment in the past.'; errEl.style.display='block'; return; }
-    if (discount > 0 && !discountReason) { errEl.textContent='Discount Reason is required.'; errEl.style.display='block'; return; }
+
     if (discount > 0 && ((Number(amount) || 0) + discount) - due > 0.004) { errEl.textContent='Payment plus discount cannot exceed the current due.'; errEl.style.display='block'; return; }
     if (paymentMethodNeedsAccount_(method) && !bankId) { errEl.textContent='Choose a bank account.'; errEl.style.display='block'; return; }
     var partyName = supplierLedgerState.party ? (supplierLedgerState.party.name || supplierLedgerState.party['Supplier Name'] || 'Supplier') : 'Supplier';
