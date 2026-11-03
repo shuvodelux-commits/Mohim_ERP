@@ -1093,7 +1093,6 @@ const CONFIG = {
     "Delete Confirmation Key": "",
     "Day Book Editable Days": "0",
     "Default Bank Account": "",
-    "Session Timeout Hours": "12",
     // Purchase Price Visibility — off by default. Turning it on is only half
     // the gate; a user also needs the 'posCost' view permission before
     // getPosBootstrap will send any cost figure. See Sales.gs.

@@ -1051,8 +1051,8 @@ Customer collections and Supplier payments support negotiated settlement discoun
   before edit/delete; reversal never guesses between same-value movements.
 - Deleted expenses and sales cannot re-enter native update/cancel paths, and
   purchase product validation completes before the first transaction write.
-- Malformed session expiry values fail closed, Administrator credentials remain
-  Administrator-controlled, and Administrator status changes are serialized.
+- Malformed and expired legacy session values fail closed, Administrator
+  credentials remain Administrator-controlled, and status changes are serialized.
 
 ## Calculation and Sheets performance corrections (2026-09-08)
 
@@ -1160,3 +1160,20 @@ from before adopting the ERP, but also now seed the running ERP cash baseline
 using auditable cash-book references. They do **not** represent money received
 or paid during the current session. Never infer a duplicate historical cash
 movement from the same invoice/payment, and never silently re-seed old records.
+
+## Login session policy (2026-11-03)
+
+- New login tokens are stored in the existing `SESSIONS` sheet with
+  `Expires At = Never`. No fixed or inactivity-based logout occurs.
+- Manual Sign out deletes the session row and clears the browser token.
+  Password reset, user deactivation/deletion, and role deactivation still
+  revoke sessions; user/role edits invalidate authorization caches.
+- On page restoration, an **unexpired** legacy dated session is upgraded to
+  `Never` after checking the session row and user. Already expired,
+  missing, or malformed legacy sessions remain rejected and need re-login.
+- The five-minute `CacheService` authorization cache is not a session
+  lifetime. Browser `localStorage` still persists the token when available.
+- The old `Session Timeout Hours` Settings key is no longer seeded, editable,
+  or used. Historical Settings rows may remain but have no effect.
+- There is no device-duration cap: protect endpoint/browser access and sign
+  out on shared devices. This policy does not alter POS cash sessions.

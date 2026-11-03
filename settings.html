@@ -36,18 +36,21 @@
 </div>
 
 <div class="card" style="margin-top:18px;">
-  <h3 style="font-size:14px; margin-bottom:12px;">Bank &amp; Session <span class="bn-hint" style="display:inline;">— ব্যাংক ও ক্যাশ সেশন</span></h3>
+  <h3 style="font-size:14px; margin-bottom:12px;">Bank Account <span class="bn-hint" style="display:inline;">— ব্যাংক অ্যাকাউন্ট</span></h3>
   <div class="form-grid">
     <div>
       <label>Default Bank Account</label>
       <select id="setDefaultBank"><option value="">None</option></select>
     </div>
-    <div><label>Session Timeout (hours)</label><input id="setSessionTimeout" type="number" min="1" step="1"></div>
   </div>
 </div>
 
 <div class="card" style="margin-top:18px;">
   <h3 style="font-size:14px; margin-bottom:12px;">Security <span class="bn-hint" style="display:inline;">— নিরাপত্তা</span></h3>
+  <p style="font-size:12px; color:var(--color-text-muted); margin-bottom:12px;">
+    Login stays active until you sign out or an administrator revokes access.
+    There is no automatic sign-out timer.
+  </p>
   <div class="form-grid">
     <div class="full"><label>Delete Confirmation Key</label><input id="setDeleteKey" type="text" placeholder="Staff type this exact phrase to confirm a permanent delete"></div>
     <div><label>Day Book Editable Days</label><input id="setDayBookDays" type="number" min="0" step="1"></div>
@@ -103,7 +106,6 @@
     document.getElementById('setTimezone').value = s['Timezone'] || '';
     document.getElementById('setDriveFolder').value = s['Drive Folder Id'] || '';
     document.getElementById('setDefaultBank').value = s['Default Bank Account'] || '';
-    document.getElementById('setSessionTimeout').value = s['Session Timeout Hours'] || 12;
     document.getElementById('setDeleteKey').value = s['Delete Confirmation Key'] || '';
     document.getElementById('setDayBookDays').value = s['Day Book Editable Days'] || 0;
     // Not `=== 'true'`: this setting is written as the string 'true' but
@@ -139,7 +141,6 @@
       'Timezone': document.getElementById('setTimezone').value.trim(),
       'Drive Folder Id': document.getElementById('setDriveFolder').value.trim(),
       'Default Bank Account': document.getElementById('setDefaultBank').value,
-      'Session Timeout Hours': document.getElementById('setSessionTimeout').value,
       'Delete Confirmation Key': document.getElementById('setDeleteKey').value.trim(),
       'Day Book Editable Days': document.getElementById('setDayBookDays').value,
       'POS Show Purchase Price': document.getElementById('setPosShowCost').checked ? 'true' : 'false'

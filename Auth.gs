@@ -25,9 +25,11 @@
  * unreachable at once. Blunt, but user and role edits are rare and it is
  * impossible to miss a key this way.
  *
- * Session expiry is NOT left to the cache TTL — the cached entry carries
- * its own Expires At and that is re-checked on every hit, so a five-minute
- * cache can never extend a session past its real end.
+ * New sessions do not expire automatically. "Never" is the explicit value
+ * stored in SESSIONS.Expires At; legacy dated sessions are checked against
+ * their original expiry (including on cache hits). Only still-valid legacy
+ * sessions are upgraded on successful page/session restoration.
+ * Logout and account/role/password revocation remain server-enforced.
  *
  * MERGED FINAL VERSION. Also: verifyPassword_ now compares
  * in constant time via timingSafeEquals_ below. Everything else in this
@@ -42,7 +44,13 @@
  * ---------------------------------------------------------------------
  */
 
-const SESSION_DURATION_MS = 12 * 60 * 60 * 1000; // 12 hours (fallback if Settings has no valid override)
+const SESSION_NEVER_EXPIRES_ = "Never";
+
+/** No idle/absolute expiry for new sessions. Legacy dates still fail closed. */
+function isSessionExpiryValid_(expiresAt) {
+  return expiresAt === SESSION_NEVER_EXPIRES_ ||
+    new Date(expiresAt).getTime() > Date.now();
+}
 
 /** How long a resolved session/permission lookup may be reused. */
 const AUTH_CACHE_SECONDS = 300;
@@ -97,13 +105,6 @@ function sessionCacheKey_(token) {
 
 function forgetSessionCache_(token) {
   try { CacheService.getScriptCache().remove(sessionCacheKey_(token)); } catch (e) {}
-}
-
-/** Session length in ms, from Settings ('Session Timeout Hours') when set, else the 12-hour fallback above. */
-function getSessionDurationMs_() {
-  const hours = Number(getSettingsMap_()["Session Timeout Hours"]);
-  if (!hours || hours <= 0) return SESSION_DURATION_MS;
-  return hours * 60 * 60 * 1000;
 }
 
 // ---------------- Password hashing ----------------
@@ -263,7 +264,7 @@ function login(mobile, password) {
       "User ID": user["User ID"],
       "Mobile Number": user["Mobile Number"],
       "Created At": now,
-      "Expires At": new Date(now.getTime() + getSessionDurationMs_()),
+      "Expires At": SESSION_NEVER_EXPIRES_,
       "Last Activity": now,
     });
     updateRowFields_(
@@ -296,11 +297,32 @@ function logout(token) {
 /** Called on every page load to silently restore a session from a stored token. */
 function validateSession(token) {
   try {
-    const user = getSessionUser_(token);
-    const rowIndex = findRowIndex_("SESSIONS", "Token", sanitizeInput_(token));
-    if (rowIndex !== -1)
-      updateRowFields_("SESSIONS", rowIndex, { "Last Activity": new Date() });
-    return ok_(buildAuthPayload_(user, token));
+    const t = sanitizeInput_(token);
+    const user = getSessionUser_(t);
+    const session = getAllRows_("SESSIONS").filter(function (s) {
+      return s["Token"] === t;
+    })[0];
+    // Recheck the source row, even if getSessionUser_ was served from cache.
+    // A previously expired, revoked, or malformed legacy session must not
+    // regain access when no-expiry login is enabled.
+    if (!session || !isSessionExpiryValid_(session["Expires At"])) {
+      throw new Error("Session expired. Please sign in again.");
+    }
+    const fields = { "Last Activity": new Date() };
+    const upgradingLegacy = session["Expires At"] !== SESSION_NEVER_EXPIRES_;
+    if (upgradingLegacy) fields["Expires At"] = SESSION_NEVER_EXPIRES_;
+    updateRowFields_("SESSIONS", session._rowIndex, fields);
+    if (upgradingLegacy) {
+      const cacheable = {};
+      Object.keys(user).forEach(function (k) {
+        if (k !== "_rowIndex") cacheable[k] = user[k];
+      });
+      // Update the cache only AFTER the sheet write succeeds.
+      authCachePut_(sessionCacheKey_(t), {
+        user: cacheable, expiresAt: SESSION_NEVER_EXPIRES_
+      });
+    }
+    return ok_(buildAuthPayload_(user, t));
   } catch (err) {
     return fail_(err.message);
   }
@@ -351,7 +373,7 @@ function getSessionUser_(token) {
   const cacheKey = sessionCacheKey_(t);
   const cached = authCacheGet_(cacheKey);
   if (cached) {
-    if (!(new Date(cached.expiresAt).getTime() > Date.now())) {
+    if (!isSessionExpiryValid_(cached.expiresAt)) {
       throw new Error("Session expired. Please sign in again.");
     }
     return cached.user;
@@ -361,7 +383,7 @@ function getSessionUser_(token) {
     return s["Token"] === t;
   })[0];
   if (!session) throw new Error("Session expired. Please sign in again.");
-  if (!(new Date(session["Expires At"]).getTime() > Date.now())) {
+  if (!isSessionExpiryValid_(session["Expires At"])) {
     throw new Error("Session expired. Please sign in again.");
   }
   const user = getAllRows_("USERS").filter(function (u) {
