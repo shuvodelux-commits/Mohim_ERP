@@ -685,18 +685,21 @@ function completeReturn(token, payload) {
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     const actingUser = requirePermission_(token, 'returns', 'add');
-    requireActiveCashSession_();
-    const txDate = resolveTransactionDate_(token, 'returns', payload && payload.date, payload && payload.backdatedReason, 'Return');
-    const prepared = prepareSalesReturn_(payload, { txDate: txDate });
-    const isSplitReturn = String(prepared.sale['Payment Detail Version']) === '1';
+    const requestedInvoiceId = sanitizeInput_(payload && payload.invoiceId);
+    // Resolve idempotent replay BEFORE return-quantity validation: a
+    // successful first attempt has already consumed the available quantity.
+    const originalSale = requestedInvoiceId ? findUniqueSalesRow_(requestedInvoiceId) : null;
+    const isSplitReturn = !!(originalSale && String(originalSale['Payment Detail Version']) === '1');
     let operationId = '';
+    let paymentHash = '';
+    let postingActor = '';
     if (isSplitReturn) {
       operationId = sanitizeInput_(payload.operationId);
       if (!/^[A-Za-z0-9_-]{12,100}$/.test(operationId)) {
         throw new Error('A stable return operation ID is required for split-payment invoice refunds.');
       }
-      const actor = String(actingUser['User ID'] || actorName_(actingUser));
-      const hash = salePostingPayloadHash_({operationType:'Return',invoiceId:prepared.invoiceId,payload:payload});
+      postingActor = String(actingUser['User ID'] || actorName_(actingUser));
+      paymentHash = salePostingPayloadHash_({operationType:'Return',invoiceId:requestedInvoiceId,payload:payload});
       const prior = getAllRows_('SALE_POSTING_JOURNAL').filter(function (row) {
         return String(row['Operation ID']) === operationId;
       });
@@ -704,28 +707,34 @@ function completeReturn(token, payload) {
       if (prior.length) {
         const journal = prior[0];
         if (String(journal['Operation Type']) !== 'Return' ||
-            String(journal['Actor']) !== actor ||
-            String(journal['Invoice ID']) !== String(prepared.invoiceId)) {
+            String(journal['Actor']) !== postingActor ||
+            String(journal['Invoice ID']) !== requestedInvoiceId) {
           throw new Error('Conflicting refund operation ID.');
         }
-        if (salePostingJournalDecision_(journal,hash) !== 'replay') {
+        if (salePostingJournalDecision_(journal,paymentHash) !== 'replay') {
           throw new Error('Refund operation interrupted. Needs Review; do not repost.');
         }
         const posted = getAllRows_('SALES_RETURN').filter(function (row) {
           return String(row['Return Operation ID']) === operationId &&
-            String(row['Invoice ID']) === String(prepared.invoiceId) && !isDeleted_(row);
+            String(row['Invoice ID']) === requestedInvoiceId && !isDeleted_(row);
         });
         if (posted.length !== 1) throw new Error('Committed refund is missing or ambiguous. Needs Review.');
         return ok_({returnId:posted[0]['Return ID'],
           totalReturnAmount:Number(posted[0]['Total Return Amount'])||0,
           customerId:posted[0]['Customer ID']||'',newDue:null});
       }
+    }
+
+    requireActiveCashSession_();
+    const txDate = resolveTransactionDate_(token, 'returns', payload && payload.date, payload && payload.backdatedReason, 'Return');
+    const prepared = prepareSalesReturn_(payload, { txDate: txDate });
+    if (isSplitReturn) {
       const now = new Date();
       appendRow_('SALE_POSTING_JOURNAL',{
         'Operation ID':operationId,'Operation Type':'Return',
-        'Payload Hash':hash,'Invoice ID':prepared.invoiceId,
+        'Payload Hash':paymentHash,'Invoice ID':prepared.invoiceId,
         State:'Writing','Last Completed Stage':'Validated',
-        Actor:actor,'Created At':now,'Updated At':now,Error:''
+        Actor:postingActor,'Created At':now,'Updated At':now,Error:''
       });
       returnJournalIndex = findRowIndex_('SALE_POSTING_JOURNAL','Operation ID',operationId);
       if (returnJournalIndex < 2) throw new Error('Refund journal reservation missing.');
@@ -761,7 +770,6 @@ function completeReturn(token, payload) {
     lock.releaseLock();
   }
 }
-
 
 /** Derive a readable grouping ID without introducing a second counter. */
 function deriveSalesReturnBatchId_(firstReturnId) {
