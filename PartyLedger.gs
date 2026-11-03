@@ -182,9 +182,9 @@ function partyLedgerBuildDisplayIndex_(kind, partyId, includeCorrections) {
   const raw = partyLedgerBuildAscendingIndex_(kind, partyId);
   if (includeCorrections) return raw;
   const clean = partyLedgerProjectClean_(kind, raw, partyLedgerSourceDateMap_(kind, raw));
-  return kind === 'supplier'
-    ? partyLedgerProjectSupplierPurchases_(partyId, clean)
-    : clean;
+  if (kind === 'supplier') return partyLedgerProjectSupplierPurchases_(partyId, clean);
+  if (kind === 'customer') return partyLedgerProjectCustomerSales_(partyId, clean);
+  return clean;
 }
 
 function partyLedgerProjectClean_(kind, rawAsc, sourceDateMap) {
@@ -252,6 +252,120 @@ function partyLedgerProjectClean_(kind, rawAsc, sourceDateMap) {
     throw new Error('Clean ledger projection does not reconcile with the accounting ledger.');
   }
   return clean;
+}
+
+/**
+ * Narrow, read-only index of Sales invoices explicitly linked to a Customer ID.
+ *
+ * A paid sale can have a Customer ID but no CUSTOMER_LEDGER row: the original
+ * Sale writer records only Due Amount there. Never search by customer name or
+ * phone, as an ordinary cash invoice must not silently create ledger identity.
+ */
+function partyLedgerCustomerSaleIndex_(customerId) {
+  const cid = String(customerId || '');
+  if (!cid) return [];
+
+  const sheetKey = 'SALES';
+  const sheet = getSheet_(sheetKey);
+  const headers = getSheetHeaders_(sheetKey).slice();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+
+  const needed = [
+    'Invoice ID', 'Date', 'Customer ID', 'Customer Name',
+    'Grand Total', 'Paid Amount', 'Due Amount', 'Payment Status',
+    'Created At', 'Is Deleted'
+  ];
+  const colByHeader = {};
+  headers.forEach(function (header, i) { colByHeader[header] = i + 1; });
+  needed.forEach(function (header) {
+    if (!colByHeader[header]) throw new Error(sheetKey + ' missing required header: ' + header);
+  });
+  const ranges = sheet.getRangeList(needed.map(function (header) {
+    const col = partyLedgerColumnA1_(colByHeader[header]);
+    return col + '2:' + col + lastRow;
+  })).getRanges();
+  const cols = ranges.map(function (range) { return range.getValues(); });
+  const out = [];
+
+  for (let i = 0; i < lastRow - 1; i++) {
+    const row = { _rowIndex: i + 2 };
+    needed.forEach(function (header, col) {
+      row[header] = serializeCellValue_(cols[col][i][0]);
+    });
+    if (String(row['Customer ID'] || '') !== cid || isDeleted_(row)) continue;
+    out.push(row);
+  }
+  return out;
+}
+
+/**
+ * Customer Ledger's display-only invoice projection: show the *whole* sale
+ * and checkout payment as Debit/Credit, not only the outstanding portion.
+ * The net effect is exactly the original Due Amount, so existing customer
+ * balances, subsequent settlement entries, returns and edits stay intact.
+ *
+ * A missing unpaid liability must never be fabricated. Only a fully settled
+ * linked invoice may be added without an existing CUSTOMER_LEDGER Sale row.
+ * Any inconsistent or anomalous ledger chain remains untouched.
+ */
+function partyLedgerProjectCustomerSales_(customerId, cleanAsc) {
+  const cid = String(customerId || '');
+  const rows = (cleanAsc || []).map(function (r) { return Object.assign({}, r); });
+  if (!cid) return partyLedgerRebalanceDisplayRows_(rows);
+
+  const positionsByRef = {};
+  rows.forEach(function (row, i) {
+    const ref = String(row['Reference'] || '');
+    if (!ref || !partyLedgerIsCorrectionChainRow_('customer', row)) return;
+    if (!positionsByRef[ref]) positionsByRef[ref] = [];
+    positionsByRef[ref].push(i);
+  });
+
+  partyLedgerCustomerSaleIndex_(cid).forEach(function (sale) {
+    const invoiceId = String(sale['Invoice ID'] || '');
+    if (!invoiceId) return;
+    const positions = positionsByRef[invoiceId] || [];
+    // Duplicate/ambiguous correction chains must stay visible for repair.
+    if (positions.length > 1) return;
+    if (positions.length === 1 && String(rows[positions[0]]['Type'] || '') !== 'Sale') return;
+
+    const grandTotal = roundMoney_(Number(sale['Grand Total']) || 0);
+    const paidAmount = roundMoney_(Number(sale['Paid Amount']) || 0);
+    const dueAmount = roundMoney_(Number(sale['Due Amount']) || 0);
+    if (grandTotal < 0 || paidAmount < 0 || dueAmount < 0) return;
+    if (Math.abs(roundMoney_(grandTotal - paidAmount - dueAmount)) > 0.004) return;
+
+    let anchor = null;
+    if (positions.length === 1) {
+      anchor = rows[positions[0]];
+      const bookedDue = roundMoney_((Number(anchor['Debit']) || 0) - (Number(anchor['Credit']) || 0));
+      if (Math.abs(roundMoney_(bookedDue - dueAmount)) > 0.004) return;
+    } else if (Math.abs(dueAmount) > 0.004) {
+      // No source obligation: fail closed, never hide missing financial rows.
+      return;
+    }
+
+    const view = Object.assign({}, anchor || {});
+    view._synthetic = true;
+    view._invoiceProjection = true; // UI labels the gross invoice separately from genuine Sales Due.
+    view._rowIndex = anchor ? Number(anchor._rowIndex) : Number(sale._rowIndex);
+    view['Ledger ID'] = 'SOURCE|customer|' + invoiceId;
+    view['Date'] = safeDateOnly_(sale['Date']);
+    view['Customer ID'] = cid;
+    view['Customer Name'] = sale['Customer Name'] || (anchor ? anchor['Customer Name'] : '');
+    view['Type'] = 'Sale';
+    view['Reference'] = invoiceId;
+    view['Debit'] = grandTotal;
+    view['Credit'] = paidAmount > 0.004 ? paidAmount : '';
+    view['Notes'] = '';
+    view['Created At'] = sale['Created At'] || (anchor ? anchor['Created At'] : '');
+
+    if (anchor) rows[positions[0]] = view;
+    else rows.push(view);
+  });
+
+  return partyLedgerRebalanceDisplayRows_(rows);
 }
 
 /**

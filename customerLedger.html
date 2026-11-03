@@ -388,11 +388,17 @@
     }
     var value = escapeHtml(formatMoney(amount));
     if (!kind) return value;
-    var labels = { in:'Money In', out:'Money Out', opening:'Opening', adjustment:'Adjustment', 'sales-due':'Sales Due' };
+    // A read-only source-invoice projection shows gross Debit and checkout-paid
+    // Credit together; the net balance is still only the original due.
+    var invoiceTotalRow = type === 'Sale' && !!row._invoiceProjection;
+    var labels = { in:'Money In', out:'Money Out', opening:'Opening', adjustment:'Adjustment',
+      'sales-due':invoiceTotalRow ? 'Invoice Total' : 'Sales Due' };
     var hints = {
       in:'Customer payment received', out:'Customer credit refund paid',
       opening:'Opening balance (no money moved)', adjustment:'Non-cash discount',
-      'sales-due':'Unpaid sale amount added to customer due (no cash moved)'
+      'sales-due':invoiceTotalRow
+        ? 'Full sale value; checkout payment is shown in Credit without changing customer due'
+        : 'Unpaid sale amount added to customer due (no cash moved)'
     };
     var shapes = {
       in:'<path d="M17 7 7 17M17 17H7V7"/>',
@@ -418,6 +424,9 @@
       var payment = (row['Payment Amount'] === '' || row['Payment Amount'] == null) ? (Number(row['Credit']) || 0) : (Number(row['Payment Amount']) || 0);
       if (row.sourceModule === 'customerPayment' && discount > 0) {
         credit += '<div class="party-ledger-row-note">Payment ' + escapeHtml(formatMoney(payment)) + ' + Discount ' + escapeHtml(formatMoney(discount)) + '</div>';
+      }
+      if (row._invoiceProjection && Number(row['Credit']) > 0) {
+        credit += '<div class="party-ledger-row-note">Paid at Checkout</div>';
       }
       var actions = (row.availableActions || []).filter(function (action) { return customerLedgerActionAllowed_(row, action); });
       var tr = document.createElement('tr');
