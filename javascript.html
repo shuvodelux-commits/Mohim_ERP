@@ -1385,6 +1385,7 @@
       loadingLabel: o.loadingLabel || 'Processing...',
       reason: {
         required: !!reason.required,
+        visible: !!reason.visible || !!reason.required,
         label: reason.label || 'Reason',
         placeholder: reason.placeholder || 'Enter reason...',
         maxLength: Number(reason.maxLength) > 0 ? Number(reason.maxLength) : 200
@@ -1493,7 +1494,7 @@
     reasonInput.disabled = false;
     reasonInput.placeholder = o.reason.placeholder;
     reasonInput.maxLength = o.reason.maxLength;
-    reasonRow.hidden = !o.reason.required;
+    reasonRow.hidden = !o.reason.visible;
     var reasonError = document.getElementById('confirmActionReasonError');
     reasonError.textContent = '';
     reasonError.style.display = 'none';
@@ -3044,8 +3045,9 @@
       confirmLabel: o.confirmLabel || 'Delete',
       loadingLabel: o.loadingLabel || 'Deleting...',
       reason: {
-        required: true,
-        label: o.reasonLabel || 'Reason',
+        required: false,
+        visible: true,
+        label: o.reasonLabel || 'Reason (optional)',
         placeholder: o.reasonPlaceholder || 'e.g. entered twice by mistake',
         maxLength: 200
       },
@@ -4302,7 +4304,7 @@
   // Details are individual values inside an existing modal/card, not a new module layout.
   var ERP_SEMANTIC_DETAILS_ = {
     custDetailDue:['customer','To Receive','Credit to Refund'],
-    supDetailDue:['supplier','To Pay','Credit Available'],
+    supDetailDue:['supplierBalance','To Pay','To Receive'],
     vlDetailDue:['supplier','To Pay','Credit Available'],
     vlDetailReceivable:['gain','To Receive','Owed by Business']
   };
@@ -4335,6 +4337,8 @@
     if (value === null || Math.abs(value) < 0.005) return 'neutral';
     var mode = rule && rule[0] || '';
     var isCredit = /^\s*Credit\b/i.test(String(display));
+    var isDebit = /^\s*Debit\b/i.test(String(display));
+    if (mode === 'supplierBalance') return isDebit || value < 0 ? 'positive' : 'negative';
     if (mode === 'customer') return isCredit || value < 0 ? 'positive' : 'negative';
     if (mode === 'supplier') return isCredit || value < 0 ? 'positive' : 'negative';
     if (mode === 'signed') return value > 0 ? 'positive' : 'negative';
@@ -4346,7 +4350,7 @@
 
   function erpSemanticLabel_(rule, tone) {
     if (!rule || tone === 'neutral') return '';
-    if (rule[0] === 'customer' || rule[0] === 'supplier') {
+    if (rule[0] === 'customer' || rule[0] === 'supplier' || rule[0] === 'supplierBalance') {
       return tone === 'negative' ? (rule[1] || '') : (rule[2] || '');
     }
     if (rule[0] === 'signed') return tone === 'positive' ? (rule[1] || '') : (rule[2] || '');
