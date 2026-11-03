@@ -54,6 +54,6 @@ test('corrupted split-payment rows block deletion and return preparation before 
   assert.match(del.message,/integrity|mismatch|missing/i);
   assert.throws(()=>h.ctx.prepareSalesReturn_(
     {invoiceId:'INV-1',items:[{productId:'P1',qty:1}],refundMethod:'Cash'},
-    {sale:{'Invoice ID':'INV-1','Payment Detail Version':1},txDate:{dateStr:'2026-11-03'}}
+    {sale:{'Invoice ID':'INV-1','Payment Detail Version':1,'Paid Amount':100},txDate:{dateStr:'2026-11-03'}}
   ),/integrity|mismatch|missing/i);
 });
