@@ -192,10 +192,10 @@
   var FIN_LED_BALANCE_META = {
     ownerCapital: { kind:'positive', label:'Credit Balance' },
     ownerAdvance: { kind:'negative', label:'Debit Balance' },
-    outstandingLoan: { kind:'negative', label:'Debit Balance' },
-    lenderCredit: { kind:'positive', label:'Credit Balance' },
-    borrowerReceivable: { kind:'positive', label:'Credit Balance' },
-    borrowerCredit: { kind:'negative', label:'Debit Balance' }
+    outstandingLoan: { kind:'positive', label:'Credit Balance' },
+    lenderCredit: { kind:'negative', label:'Debit Balance' },
+    borrowerReceivable: { kind:'negative', label:'Debit Balance' },
+    borrowerCredit: { kind:'positive', label:'Credit Balance' }
   };
 
   function finLedMoney_(v) {
@@ -323,13 +323,13 @@
     var balances = [];
     if (roles.indexOf('Lender') !== -1) {
       balances.push(summary.lenderCredit > 0
-        ? { label:'Lender Credit', value:summary.lenderCredit }
-        : { label:'Outstanding Loan', value:summary.outstandingLoan });
+        ? { label:'Lender Debit', value:summary.lenderCredit }
+        : { label:'Lender Credit', value:summary.outstandingLoan });
     }
     if (roles.indexOf('Borrower') !== -1) {
       balances.push(summary.borrowerCredit > 0
         ? { label:'Borrower Credit', value:summary.borrowerCredit }
-        : { label:'Borrower Receivable', value:summary.borrowerReceivable });
+        : { label:'Borrower Debit', value:summary.borrowerReceivable });
     }
     if (roles.indexOf('Owner') !== -1) {
       balances.push(summary.ownerAdvance > 0
@@ -342,8 +342,8 @@
     document.getElementById('finLedSelectedPersonBalances').innerHTML = balances.map(function (item) {
       var metaKey = {
         'Owner Credit':'ownerCapital', 'Owner Debit':'ownerAdvance',
-        'Outstanding Loan':'outstandingLoan', 'Lender Credit':'lenderCredit',
-        'Borrower Receivable':'borrowerReceivable', 'Borrower Credit':'borrowerCredit'
+        'Lender Credit':'outstandingLoan', 'Lender Debit':'lenderCredit',
+        'Borrower Debit':'borrowerReceivable', 'Borrower Credit':'borrowerCredit'
       }[item.label] || '';
       var kind = finLedBalanceKind_(item.value, metaKey);
       return '<div class="finance-selected-person-balance-item fin-led-balance-card is-' + kind + '">'
