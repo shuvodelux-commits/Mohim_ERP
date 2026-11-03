@@ -51,6 +51,7 @@ function environment() {
       pageSize: 50, canViewCorrections: false, showCorrections: false
     },
     supplierLedgerCan_: () => true,
+    supplierLedgerCanDiscount_: () => true,
     supplierLedgerRenderRows_: () => {},
     supplierLedgerRenderPagination_: () => {},
     supState: {suppliers: [], detailDue: 0},
