@@ -209,6 +209,10 @@ function revokeUserSessions_(userId) {
   getAllRows_('SESSIONS').filter(function (s) { return s['User ID'] === userId; }).forEach(function (s) {
     const ri = findRowIndex_('SESSIONS', 'Token', s['Token']);
     if (ri !== -1) deleteRow_('SESSIONS', ri);
+    // Revocation must not rely solely on bumpAuthCacheGeneration_().
+    // A Script Properties write failure would otherwise leave this token
+    // usable from the five-minute auth cache despite the deleted sheet row.
+    forgetSessionCache_(s['Token']);
   });
 }
 

@@ -119,9 +119,107 @@ test('malformed session expiry fails closed in both sheet and cached session', (
   }
 });
 
+test('new login creates a revocable session that never expires automatically', () => {
+  const h = harness();
+  h.user('01712345678', 'Staff', {users:{view:true}});
+  const secret = 'secure-password-123';
+  const hashed = h.c.hashPassword_(secret);
+  Object.assign(h.db.USERS[0], {'Password Hash':hashed.hash, 'Password Salt':hashed.salt});
+
+  const loginResult = h.c.login('01712345678', secret);
+  assert.equal(loginResult.success, true, JSON.stringify(loginResult));
+  const token = loginResult.data.token;
+  const session = h.db.SESSIONS.find(s => s.Token === token);
+  assert.equal(session['Expires At'], 'Never');
+  session['Created At'] = new Date('2000-01-01T00:00:00Z');
+  session['Last Activity'] = new Date('2000-01-01T00:00:00Z');
+
+  // Both the sheet path and cached auth path must continue to work.
+  assert.equal(h.c.getUsersBootstrap(token).success, true);
+  assert.equal(h.c.getUsersBootstrap(token).success, true);
+  assert.equal(h.c.validateSession(token).success, true);
+});
+
+test('valid legacy session upgrades on restore, including a warmed cache', () => {
+  for (const warm of [false, true]) {
+    const h = harness(); h.user('staff', 'Staff', {users:{view:true}});
+    if (warm) assert.equal(h.c.getUsersBootstrap('staff').success, true);
+    const restored = h.c.validateSession('staff');
+    assert.equal(restored.success, true, JSON.stringify(restored));
+    assert.equal(h.db.SESSIONS[0]['Expires At'], 'Never');
+    const cached = JSON.parse(h.cache[h.c.sessionCacheKey_('staff')]);
+    assert.equal(cached.expiresAt, 'Never');
+    assert.equal(h.c.getUsersBootstrap('staff').success, true);
+  }
+});
+
+test('already expired legacy sessions are never revived by restore', () => {
+  for (const warm of [false, true]) {
+    const h = harness(); h.user('staff', 'Staff', {users:{view:true}});
+    if (warm) assert.equal(h.c.getUsersBootstrap('staff').success, true);
+    h.db.SESSIONS[0]['Expires At'] = new Date(Date.now() - 1000);
+    deny(h.c.validateSession('staff'), /Session expired/);
+    assert.notEqual(h.db.SESSIONS[0]['Expires At'], 'Never');
+  }
+});
+
+test('manual logout revokes an unexpired cached no-timeout token', () => {
+  const h = harness(); h.user('staff', 'Staff', {users:{view:true}});
+  h.db.SESSIONS[0]['Expires At'] = 'Never';
+  assert.equal(h.c.getUsersBootstrap('staff').success, true);
+  assert.equal(h.c.logout('staff').success, true);
+  deny(h.c.getUsersBootstrap('staff'), /Session expired/);
+});
+
+test('user deactivation and deletion revoke persistent cached sessions immediately', () => {
+  for (const operation of ['deactivate', 'delete']) {
+    const h = harness(); h.user('admin', 'Administrator');
+    h.user('staff', 'Staff', {users:{view:true}});
+    h.db.SESSIONS[1]['Expires At'] = 'Never';
+    assert.equal(h.c.getUsersBootstrap('staff').success, true);
+    const result = operation === 'deactivate'
+      ? h.c.setUserStatus('admin', 'staff', 'Inactive')
+      : h.c.deleteUser('admin', 'staff');
+    assert.equal(result.success, true, JSON.stringify(result));
+    assert.equal(h.db.SESSIONS.some(s => s['User ID'] === 'staff'), false);
+    deny(h.c.getUsersBootstrap('staff'), /Session expired/);
+  }
+});
+
+test('password reset and role deactivation revoke cached tokens even if generation bump fails', () => {
+  for (const operation of ['password', 'role']) {
+    const h = harness();
+    h.user('admin', 'Administrator');
+    h.user('staff', 'Staff', { users: { view: true } });
+    h.db.SESSIONS[1]['Expires At'] = 'Never';
+    assert.equal(h.c.getUsersBootstrap('staff').success, true);
+
+    // Simulate a Script Properties write outage: the generation cannot bump,
+    // so per-token cache invalidation must be sufficient for revocation.
+    const store = h.c.PropertiesService.getScriptProperties();
+    store.setProperty = () => { throw new Error('Script Properties unavailable'); };
+    const result = operation === 'password'
+      ? h.c.resetPassword('admin', 'staff', 'new-password123')
+      : h.c.setRoleStatus('admin', 'Staff', 'Inactive');
+    assert.equal(result.success, true, JSON.stringify(result));
+    assert.equal(h.db.SESSIONS.some(s => s['User ID'] === 'staff'), false);
+    deny(h.c.getUsersBootstrap('staff'), /Session expired|inactive/);
+  }
+});
+
+test('malformed legacy sessions cannot be upgraded during page restoration', () => {
+  for (const expiry of ['', 'never', 'Never ', 'invalid']) {
+    const h = harness(); h.user('staff', 'Staff', {users:{view:true}});
+    h.db.SESSIONS[0]['Expires At'] = expiry;
+    deny(h.c.validateSession('staff'), /Session expired/);
+    assert.equal(h.db.SESSIONS[0]['Expires At'], expiry);
+  }
+});
+
 test('password reset and role deactivation revoke cached access on the next RPC', () => {
   for (const operation of ['password','role']) {
     const h = harness(); h.user('admin','Administrator'); h.user('staff','Staff',{users:{view:true}});
+    h.db.SESSIONS[1]['Expires At'] = 'Never';
     assert.equal(h.c.getUsersBootstrap('staff').success,true);
     const result = operation === 'password' ? h.c.resetPassword('admin','staff','new-password123') : h.c.setRoleStatus('admin','Staff','Inactive');
     assert.equal(result.success,true);

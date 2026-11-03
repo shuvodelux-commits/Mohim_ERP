@@ -3,17 +3,12 @@
  * ---------------------------------------------------------------------
  * Backend for the general Settings page — makes the values already
  * sitting in the Settings sheet (with defaults from CONFIG.DEFAULT_SETTINGS)
- * editable from the UI, plus three fields tied to other modules:
+ * editable from the UI, plus two fields tied to other modules:
  *   - 'Default Bank Account': a Bank Account ID, offered as a dropdown of
  *     Active accounts (Phase 7's BANK_ACCOUNTS). Not consumed by any
  *     writer yet (Expense/Purchase/POS bank-payment flows still require
  *     an explicit account per transaction) — this just gives future
  *     "preselect the default" wiring a place to read from.
- *   - 'Session Timeout Hours': read by Auth.gs's getSessionDurationMs_()
- *     on every new login, falling back to its original 12-hour constant
- *     if unset/invalid. Existing sessions already issued keep their
- *     original Expires At — this only affects sessions created after
- *     the change.
  *   - 'POS Show Purchase Price': the shop-wide master switch for Purchase
  *     Price Visibility, read by getPosBootstrap in Sales.gs. It is the
  *     OUTER of two gates — with it on, a user still sees nothing unless
@@ -39,13 +34,13 @@ const SETTINGS_EDITABLE_KEYS = [
   "Invoice Show Bismillah", "Invoice Bismillah Text", "Invoice Show Signature",
   "Drive Folder Id", "Timezone", "Receipt Size",
   "Delete Confirmation Key", "Day Book Editable Days",
-  "Default Bank Account", "Session Timeout Hours",
+  "Default Bank Account",
   "POS Show Purchase Price"
 ];
 
 const SETTINGS_NUMERIC_KEYS = [
   "Tax Percent", "Default Discount", "Low Stock Threshold",
-  "Day Book Editable Days", "Session Timeout Hours", "Invoice Payment Terms Days"
+  "Day Book Editable Days", "Invoice Payment Terms Days"
 ];
 
 /**
