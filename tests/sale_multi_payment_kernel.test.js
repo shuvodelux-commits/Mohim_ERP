@@ -163,3 +163,9 @@ test('readback ignores unrelated invoices but detects mixed active revision corr
 test('special JavaScript object-key row IDs cannot bypass duplicate row detection',()=>{
   assert.throws(()=>allocate(100,[row('__proto__','Cash','25'),row('__proto__','Bank','25','B1')]),/duplicate/i);
 });
+
+test('a soft-deleted but Status Active bank account cannot receive POS funds',()=>{
+  const deleted=[...accounts,{'Bank Account ID':'GONE','Account Name':'Archived',
+    'Account Type':'Bank',Status:'Active','Is Deleted':'TRUE'}];
+  assert.throws(()=>allocate(100,[row('b','Bank','50','GONE')],deleted),/active|deleted|account/i);
+});
