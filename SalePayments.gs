@@ -120,19 +120,44 @@ function readSalePaymentBreakdown_(sale, childRows) {
   const rows = (Array.isArray(childRows) ? childRows : [])
     .filter(function (r) { return r['Invoice ID'] === sale['Invoice ID'] && String(r['Status']) === 'Active'; })
     .sort(function (a,b) { return (Number(a['Row Order'])||0) - (Number(b['Row Order'])||0); });
-  const revisions = {};
-  rows.forEach(function (r) { revisions[String(r['Revision'] || 1)] = true; });
-  if (Object.keys(revisions).length > 1) throw new Error('Payment data integrity error: mixed active revisions.');
+  if (rows.length > 20) throw new Error('Payment data integrity error: too many active payment rows.');
+  const revisions = Object.create(null);
+  const paymentIds = Object.create(null);
+  const rowOrders = Object.create(null);
+  let cashRows = 0;
   const payments = rows.map(function (r) {
+    const revision = Number(r['Revision'] || 1);
+    const order = Number(r['Row Order']);
+    const paymentId = String(r['Payment ID'] || '').trim();
+    const method = String(r['Method'] || '').trim();
+    const bankAccountId = String(r['Bank Account ID'] || '').trim();
+    if (!Number.isSafeInteger(revision) || revision < 1 ||
+        !Number.isSafeInteger(order) || order < 1 || order > 20 ||
+        !paymentId || paymentIds[paymentId] || rowOrders[order]) {
+      throw new Error('Payment data integrity error: invalid or duplicate payment ID, revision or row order.');
+    }
+    revisions[String(revision)] = true;
+    paymentIds[paymentId] = true;
+    rowOrders[order] = true;
+    if (['Cash','Bank','Mobile Banking'].indexOf(method) < 0) {
+      throw new Error('Payment data integrity error: unsupported stored payment method.');
+    }
     const applied = salePaymentPaisa_(r['Applied Amount'], 'Stored applied amount', false);
     const tendered = salePaymentPaisa_(r['Tendered Amount'],'Stored tendered amount',false);
     const change = salePaymentPaisa_(r['Change Amount']||0,'Stored change amount',false);
-    if (!applied && !(r['Method'] === 'Cash' && tendered > 0 && change === tendered)) {
+    if (method === 'Cash') {
+      if (++cashRows > 1 || bankAccountId || tendered !== applied + change) {
+        throw new Error('Payment data integrity error: Cash tender, applied amount, change or account mismatch.');
+      }
+    } else if (!bankAccountId || change !== 0 || tendered !== applied) {
+      throw new Error('Payment data integrity error: Bank/Mobile account, tender or applied amount mismatch.');
+    }
+    if (!applied && !(method === 'Cash' && tendered > 0 && change === tendered)) {
       throw new Error('Payment data integrity error: unexpected zero-value active payment.');
     }
     return {
-      rowId:String(r['Payment ID']),method:String(r['Method']),
-      bankAccountId:String(r['Bank Account ID']||''),
+      rowId:paymentId,method:method,
+      bankAccountId:bankAccountId,
       bankAccountName:String(r['Bank Account Name']||''),
       tendered:tendered/100,
       applied:applied/100,
@@ -140,6 +165,9 @@ function readSalePaymentBreakdown_(sale, childRows) {
       legacy:false
     };
   });
+  if (Object.keys(revisions).length > 1) {
+    throw new Error('Payment data integrity error: mixed active revisions.');
+  }
   const appliedSum = payments.reduce(function (sum,p) { return sum + Math.round(p.applied * 100); },0);
   if (appliedSum !== paid) throw new Error('Payment data integrity mismatch: invoice paid amount differs from payment rows.');
   return payments;
