@@ -72,4 +72,8 @@ test('Phase 6 clone audit refuses identity mismatch and production ID before ins
  assert.throws(()=>context.assertPhase6CloneIdentity_(
   {spreadsheetId:cloneSpreadsheetId,scriptId:original.scriptId},cloneSpreadsheetId,original.scriptId
  ),/production/i);
+ assert.throws(()=>context.assertPhase6CloneIdentity_(
+  {spreadsheetId:cloneSpreadsheetId,scriptId:'1c1wtUuO0xISTw0JTfAKnqry28UeJaIcW8CWwJVDSo1Y31BbPad4glp4G'},
+  cloneSpreadsheetId,'1c1wtUuO0xISTw0JTfAKnqry28UeJaIcW8CWwJVDSo1Y31BbPad4glp4G'
+ ),/shared preview/i);
 });
