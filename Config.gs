@@ -556,6 +556,8 @@ const CONFIG = {
       // Optional grouping metadata for one operator action spanning several
       // source invoices. Accounting still keys every child by Return ID.
       "Batch ID",
+      // Stable idempotency key for versioned split-payment invoice refunds.
+      "Return Operation ID",
 ],
     SALES_RETURN_ITEMS: [
       "Return ID",
