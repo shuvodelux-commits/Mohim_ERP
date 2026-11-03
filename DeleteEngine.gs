@@ -229,7 +229,7 @@ function deleteSalesInvoice(token, invoiceId, reason) {
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     if (!invoiceId) return fail_('No invoice specified.');
-    if (!sanitizeInput_(reason)) return fail_('Enter a reason for deleting this invoice.');
+
 
     var sale = findUniqueSalesRow_(invoiceId);
     if (!sale) return fail_('Invoice not found.');
@@ -337,7 +337,7 @@ function deletePurchase(token, purchaseId, reason) {
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     if (!purchaseId) return fail_('No purchase specified.');
-    if (!sanitizeInput_(reason)) return fail_('Enter a reason for deleting this purchase.');
+
 
     var purchase = findFirstRow_('PURCHASES', 'Purchase ID', purchaseId);
     if (!purchase) return fail_('Purchase not found.');
@@ -450,7 +450,7 @@ function deleteExpense(token, expenseId, reason) {
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     if (!expenseId) return fail_('No expense specified.');
-    if (!sanitizeInput_(reason)) return fail_('Enter a reason for deleting this expense.');
+
 
     var exp = getAllRows_('EXPENSES').filter(function (e) { return e['Expense ID'] === expenseId; })[0];
     if (!exp) return fail_('Expense not found.');
@@ -490,7 +490,7 @@ function deleteSupplier(token, supplierId, reason) {
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     if (!supplierId) return fail_('No supplier specified.');
-    if (!sanitizeInput_(reason)) return fail_('Enter a reason for deleting this supplier.');
+
 
     var sup = getAllRows_('SUPPLIERS').filter(function (s) { return s['Supplier ID'] === supplierId; })[0];
     if (!sup) return fail_('Supplier not found.');
@@ -537,7 +537,7 @@ function deleteProduct(token, productId, reason) {
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     if (!productId) return fail_('No product specified.');
-    if (!sanitizeInput_(reason)) return fail_('Enter a reason for deleting this product.');
+
 
     var prod = getAllRows_('PRODUCTS').filter(function (p) { return p['Product ID'] === productId; })[0];
     if (!prod) return fail_('Product not found.');
@@ -604,7 +604,7 @@ function deleteBankTransaction(token, entryId, reason) {
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     if (!entryId) return fail_('No bank entry specified.');
-    if (!sanitizeInput_(reason)) return fail_('Enter a reason for deleting this transaction.');
+
 
     var entry = getAllRows_('BANK_BOOK').filter(function (e) { return e['Entry ID'] === entryId; })[0];
     if (!entry) return fail_('Bank transaction not found.');
@@ -804,7 +804,7 @@ function deleteSupplierPayment(token, ledgerId, reason) {
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     if (!ledgerId) return fail_('No payment specified.');
-    if (!sanitizeInput_(reason)) return fail_('Enter a reason for deleting this payment.');
+
 
     var row = getAllRows_('SUPPLIER_LEDGER').filter(function (l) { return l['Ledger ID'] === ledgerId; })[0];
     if (!row) return fail_('Payment not found.');
@@ -981,7 +981,7 @@ function deleteCustomerPayment(token, ledgerId, reason) {
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     if (!ledgerId) return fail_('No payment specified.');
-    if (!sanitizeInput_(reason)) return fail_('Enter a reason for deleting this payment.');
+
 
     var row = getAllRows_('CUSTOMER_LEDGER').filter(function (l) { return l['Ledger ID'] === ledgerId; })[0];
     if (!row) return fail_('Payment not found.');
@@ -1119,7 +1119,7 @@ function deleteFinanceTransaction(token, financeId, reason) {
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     if (!financeId) return fail_('No transaction specified.');
-    if (!sanitizeInput_(reason)) return fail_('Enter a reason for deleting this transaction.');
+
 
     var row = getAllRows_('FINANCE_TRANSACTIONS').filter(function (f) { return f['Finance ID'] === financeId; })[0];
     if (!row) return fail_('Transaction not found.');
@@ -1260,7 +1260,7 @@ function deleteVendorPayment(token, ledgerId, reason) {
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     if (!ledgerId) return fail_('No payment specified.');
-    if (!sanitizeInput_(reason)) return fail_('Enter a reason for deleting this payment.');
+
 
     var row = getAllRows_('VENDOR_LEDGER').filter(function (l) { return l['Ledger ID'] === ledgerId; })[0];
     if (!row) return fail_('Payment not found.');
@@ -1432,7 +1432,7 @@ function deleteVendorReturn(token, returnId, reason) {
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     if (!returnId) return fail_('No return specified.');
-    if (!sanitizeInput_(reason)) return fail_('Enter a reason for deleting this return.');
+
 
     var row = getAllRows_('VENDOR_RETURNS').filter(function (r) { return r['Return ID'] === returnId; })[0];
     if (!row) return fail_('Return not found.');
@@ -1555,7 +1555,7 @@ function deleteVendorSourcing(token, sourcingId, reason) {
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     if (!sourcingId) return fail_('No transaction specified.');
-    if (!sanitizeInput_(reason)) return fail_('Enter a reason for deleting this transaction.');
+
 
     var row = getAllRows_('VENDOR_SOURCING').filter(function (s) { return s['Sourcing ID'] === sourcingId; })[0];
     if (!row) return fail_('Sourcing transaction not found.');
@@ -1770,7 +1770,7 @@ function deleteVendorIssue(token, issueId, reason) {
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     if (!issueId) return fail_('No transaction specified.');
-    if (!sanitizeInput_(reason)) return fail_('Enter a reason for deleting this transaction.');
+
 
     var row = getAllRows_('VENDOR_ISSUES').filter(function (s) { return s['Issue ID'] === issueId; })[0];
     if (!row) return fail_('Issue transaction not found.');
@@ -1888,7 +1888,7 @@ function deleteVendorIssueMemo(token, memoId, reason) {
     memoId = String(memoId || '').trim();
     reason = sanitizeInput_(reason);
     if (!memoId) return fail_('No memo specified.');
-    if (!reason) return fail_('Enter a reason for deleting this memo.');
+
     var rows = activeRows_('VENDOR_ISSUES').filter(function (row) {
       return String(row['Memo ID'] || row['Issue ID']) === memoId;
     });
@@ -2020,7 +2020,7 @@ function deleteVendorReceipt(token, ledgerId, reason) {
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     if (!ledgerId) return fail_('No receipt specified.');
-    if (!sanitizeInput_(reason)) return fail_('Enter a reason for deleting this receipt.');
+
 
     var row = getAllRows_('VENDOR_LEDGER').filter(function (l) { return l['Ledger ID'] === ledgerId; })[0];
     if (!row) return fail_('Receipt not found.');
@@ -2185,7 +2185,7 @@ function deleteVendorReturnReceived(token, returnId, reason) {
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     if (!returnId) return fail_('No return specified.');
-    if (!sanitizeInput_(reason)) return fail_('Enter a reason for deleting this return.');
+
 
     var row = getAllRows_('VENDOR_RETURNS_RECEIVED').filter(function (r) { return r['Return ID'] === returnId; })[0];
     if (!row) return fail_('Return not found.');
