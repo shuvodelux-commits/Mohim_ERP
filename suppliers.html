@@ -178,8 +178,8 @@
     rows.forEach(function (s) {
       var due = Number(s['Current Due']) || 0;
       var dueCell = due > 0.004
-        ? '<span class="badge badge-danger">' + supplierBalanceText_(due) + '</span>'
-        : (due < -0.004 ? '<span class="badge badge-success">' + supplierBalanceText_(due) + '</span>' : formatMoney(0));
+        ? '<span class="badge badge-danger">Credit ' + formatMoney(due) + '</span>'
+        : (due < -0.004 ? '<span class="badge badge-success">Debit ' + formatMoney(Math.abs(due)) + '</span>' : formatMoney(0));
       var statusBadge = s['Status'] === 'Active' ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-danger">Inactive</span>';
       var tr = document.createElement('tr');
       tr.innerHTML =
