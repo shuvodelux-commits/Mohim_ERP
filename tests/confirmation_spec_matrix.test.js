@@ -154,7 +154,7 @@ check(35,'Delete Supplier Payment danger path',()=>confirmedRpc('suppliers.html'
 check(36,'Delete Expense danger path',()=>confirmedRpc('expenseList.html','deleteExpense'));
 check(37,'Delete Finance danger path',()=>confirmedRpc('financeLedger.html','deleteFinanceTransaction'));
 check(38,'confirmDelete compatibility',()=>runTest('tests/confirmation_dialog_core.test.js'));
-check(39,'required destructive reason rendered',()=>{assert.match(js,/reason:\s*\{[\s\S]{0,220}required:\s*true/); assert.match(index,/id="confirmActionReason"/);});
+check(39,'optional destructive reason is visible',()=>{assert.match(js,/function confirmDelete\(opts\)[\s\S]{0,650}required:\s*false/); assert.match(js,/visible:\s*true/); assert.match(index,/id="confirmActionReason"/);});
 check(40,'blank reason blocked',()=>runTest('tests/confirmation_acceptance.test.js'));
 check(41,'reason reaches native function',()=>assert.match(js,/concat\(o\.args\s*\|\|\s*\[\],\s*\[reason\]\)/));
 check(42,'financial numeric amount summary',()=>runTest('tests/confirmation_financial_flows.test.js'));
