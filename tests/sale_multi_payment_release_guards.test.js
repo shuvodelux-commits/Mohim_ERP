@@ -46,7 +46,7 @@ test('server updateSale refuses split-to-legacy request conversion',()=>{
   assert.match(res.message,/integrity|mismatch|missing|payment format/i);
 });
 
-test('corrupted split-payment rows stop delete before stock work; returns remain guarded',()=>{
+test('corrupted split-payment rows block deletion and return preparation before stock writes',()=>{
   const h=runtime();
   const del=h.ctx.deleteSalesInvoice('token','INV-1','');
   assert.equal(del.success,false);
@@ -54,5 +54,5 @@ test('corrupted split-payment rows stop delete before stock work; returns remain
   assert.throws(()=>h.ctx.prepareSalesReturn_(
     {invoiceId:'INV-1',items:[{productId:'P1',qty:1}],refundMethod:'Cash'},
     {sale:{'Invoice ID':'INV-1','Payment Detail Version':1},txDate:{dateStr:'2026-11-03'}}
-  ),/multi.payment|split.payment|not yet enabled/i);
+  ),/integrity|mismatch|missing/i);
 });
