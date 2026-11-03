@@ -75,7 +75,7 @@ function normalizeSalePayments_(grandTotal, inputRows, accountRows) {
       p.change = cashChange;
     }
     return p;
-  }).filter(function (p) { return p.applied > 0; }).map(function(p){
+  }).filter(function (p) { return p.applied > 0 || (p.method === 'Cash' && p.tendered > 0); }).map(function(p){
     return {
       rowId:p.rowId,rowOrder:p.rowOrder,method:p.method,
       bankAccountId:p.bankAccountId,bankAccountName:p.bankAccountName,
@@ -83,13 +83,14 @@ function normalizeSalePayments_(grandTotal, inputRows, accountRows) {
     };
   });
   const paid = bankTotal + cashApplied, due = total - paid;
-  const one = payments.length === 1 ? payments[0] : null;
+  const appliedPayments = payments.filter(function (p) { return p.applied > 0; });
+  const one = appliedPayments.length === 1 ? appliedPayments[0] : null;
   return {
     payments:payments,
     paidAmount:paid / 100,dueAmount:due / 100,changeAmount:cashChange / 100,
     paymentType:due === 0 ? 'Cash' : paid ? 'Partial' : 'Due',
     paymentStatus:due === 0 ? 'Paid' : paid ? 'Partial' : 'Due',
-    paymentMethod:one ? one.method : payments.length ? 'Multiple' : '',
+    paymentMethod:one ? one.method : appliedPayments.length ? 'Multiple' : '',
     bankAccountId:one ? one.bankAccountId : '',
     bankAccountName:one ? one.bankAccountName : ''
   };
@@ -115,18 +116,25 @@ function readSalePaymentBreakdown_(sale, childRows) {
   }
   if (version !== '1') throw new Error('Unsupported sale payment detail version.');
   const rows = (Array.isArray(childRows) ? childRows : [])
-    .filter(function (r) { return String(r['Status']) === 'Active'; })
+    .filter(function (r) { return r['Invoice ID'] === sale['Invoice ID'] && String(r['Status']) === 'Active'; })
     .sort(function (a,b) { return (Number(a['Row Order'])||0) - (Number(b['Row Order'])||0); });
+  const revisions = {};
+  rows.forEach(function (r) { revisions[String(r['Revision'] || 1)] = true; });
+  if (Object.keys(revisions).length > 1) throw new Error('Payment data integrity error: mixed active revisions.');
   const payments = rows.map(function (r) {
     const applied = salePaymentPaisa_(r['Applied Amount'], 'Stored applied amount', false);
-    if (!applied) throw new Error('Payment data integrity error: zero-value active payment.');
+    const tendered = salePaymentPaisa_(r['Tendered Amount'],'Stored tendered amount',false);
+    const change = salePaymentPaisa_(r['Change Amount']||0,'Stored change amount',false);
+    if (!applied && !(r['Method'] === 'Cash' && tendered > 0 && change === tendered)) {
+      throw new Error('Payment data integrity error: unexpected zero-value active payment.');
+    }
     return {
       rowId:String(r['Payment ID']),method:String(r['Method']),
       bankAccountId:String(r['Bank Account ID']||''),
       bankAccountName:String(r['Bank Account Name']||''),
-      tendered:salePaymentPaisa_(r['Tendered Amount'],'Stored tendered amount',false)/100,
+      tendered:tendered/100,
       applied:applied/100,
-      change:salePaymentPaisa_(r['Change Amount']||0,'Stored change amount',false)/100,
+      change:change/100,
       legacy:false
     };
   });
