@@ -282,10 +282,10 @@ test('draft CRUD preserves owner identity, optimistic version and financial isol
   const before = h.writes.length;
   deny(h.c.updateSalesDraft('owner',id,99,payload()), /changed by another/);
   deny(h.c.deleteSalesDraft('owner',id,99,'reason'), /changed by another/);
-  deny(h.c.deleteSalesDraft('owner',id,1,''), /Reason/); assert.equal(h.writes.length,before);
+  assert.equal(h.writes.length,before); // stale-version attempts still do not write
   assert.equal(h.c.updateSalesDraft('owner',id,1,payload()).data.version,2);
   const preview = h.c.getSalesDraftPreview('owner',id); assert.equal(preview.success,true); assert.equal(preview.data.isDraft,true);
-  assert.equal(h.c.deleteSalesDraft('owner',id,2,'No longer needed').success,true);
+  assert.equal(h.c.deleteSalesDraft('owner',id,2,'').success,true); // optional reason
   assert.equal(h.c.getSalesDraftList('owner').data.length,0);
   assert.deepEqual(h.db.SALES_DRAFT_AUDIT.map(r => r.Action),['CREATED','UPDATED','DELETED']);
   assert.deepEqual([...new Set(h.writes.map(w => w.key))].sort(),['SALES_DRAFTS','SALES_DRAFT_AUDIT']);
