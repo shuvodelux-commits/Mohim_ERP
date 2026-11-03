@@ -51,7 +51,9 @@ function normalizeSalePayments_(grandTotal, inputRows, accountRows) {
     let bankAccountId = '', bankAccountName = '';
     if (method !== 'Cash') {
       const bank = accounts.filter(function (a) { return String(a['Bank Account ID']) === accountId; })[0];
-      if (!bank || bank['Status'] !== 'Active') throw new Error('Choose an active payment account.');
+      if (!bank || bank['Status'] !== 'Active' || String(bank['Is Deleted'] || '').toUpperCase() === 'TRUE') {
+        throw new Error('Choose an active payment account.');
+      }
       const type = String(bank['Account Type'] || 'Bank');
       if (type !== method) throw new Error('Payment account type does not match the payment method.');
       bankAccountId = accountId;
