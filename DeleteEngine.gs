@@ -244,7 +244,6 @@ function deleteSalesInvoice(token, invoiceId, reason) {
     var deleteOperationHash = '';
     var deletePayments = [];
     if (splitPaymentInvoice) {
-      if (!sanitizeInput_(reason)) return fail_('Enter a reason to reverse this multi-payment invoice.');
       deleteOperationId = 'sale-delete-' + String(invoiceId);
       deleteOperationHash = salePostingPayloadHash_({operationType:'Delete',invoiceId:invoiceId,reason:sanitizeInput_(reason)});
       var priorDeletes = getAllRows_('SALE_POSTING_JOURNAL').filter(function (row) {
