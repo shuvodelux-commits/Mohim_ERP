@@ -350,6 +350,19 @@ function completeSale(token, payload) {
       const alreadyPosted = findPostedInvoiceByDraftId_(sourceDraftId);
       if (alreadyPosted) {
         authorizePostedDraftRetry_(actingUser, sourceDraftId, sourceDraftVersion);
+        // A stranded new-format sale header is NOT proof of successful
+        // posting. Do not clean up its draft or return success unless the
+        // original journal committed and all payment children reconcile.
+        if (String(alreadyPosted['Payment Detail Version']) === '1') {
+          const committed = getAllRows_('SALE_POSTING_JOURNAL').filter(function (r) {
+            return String(r['Invoice ID']) === String(alreadyPosted['Invoice ID']) &&
+              String(r['Operation Type']) === 'Create';
+          });
+          if (committed.length !== 1 || String(committed[0]['State']) !== 'Committed') {
+            throw new Error('Draft sale posting is interrupted. Needs Review; do not repost.');
+          }
+          readSalePaymentBreakdown_(alreadyPosted, getAllRows_('SALE_PAYMENTS'));
+        }
         removeSalesDraftAfterPost_(sourceDraftId, sourceDraftVersion, alreadyPosted['Invoice ID'], actingUser, true);
         return ok_(buildInvoicePayload_(alreadyPosted['Invoice ID']));
       }
