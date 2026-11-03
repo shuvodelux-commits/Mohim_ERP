@@ -113,3 +113,10 @@ test('new-sale payload has stable operation ID; legacy/draft/update paths cannot
   assert.match(pos,/if \(posMultiPaymentEnabledForSale_\(\)\)\s*\{/);
   assert.match(pos,/isUpdate\s*\?\s*serverCall\('updateSale'/);
 });
+
+test('POS V2 multi-payment rows keep full-width compact inputs and a phone/tablet wrap layout',()=>{
+  const css=read('posv2.html');
+  assert.match(css,/\.pos-multi-payment-row\s*\{/);
+  assert.match(css,/\.pos-multi-payment-row (?:select|input)/);
+  assert.match(css,/@media\s*\(max-width:\s*700px\)[\s\S]*?\.pos-multi-payment-row/);
+});
