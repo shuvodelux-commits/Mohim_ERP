@@ -1376,7 +1376,7 @@
       ],
       confirmLabel: 'Delete Draft',
       cancelLabel: 'Cancel',
-      reason: { required: true, label: 'Reason', placeholder: 'Why are you deleting this draft?' }
+      reason: { required: false, visible: true, label: 'Reason (optional)', placeholder: 'Why are you deleting this draft? (optional)' }
     }).then(function (result) {
       if (!result || !result.confirmed) return null;
       return withLoader(serverCall('deleteSalesDraft', authToken, row.draftId, row.version, result.reason)).then(function () {
