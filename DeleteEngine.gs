@@ -237,6 +237,9 @@ function deleteSalesInvoice(token, invoiceId, reason) {
 
     var user = requireDeletePermission_(token, 'sales', sale['Date']);
     requireActiveCashSession_();
+    if (String(sale['Payment Detail Version']) === '1') {
+      return fail_('Multi-payment invoice deletion is not yet enabled. Reversal of all payment accounts is required.');
+    }
 
     var hasReturn = activeRows_('SALES_RETURN').some(function (r) { return r['Invoice ID'] === invoiceId; });
     if (hasReturn) {
