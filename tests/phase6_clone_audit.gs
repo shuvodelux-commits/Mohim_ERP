@@ -19,12 +19,14 @@ function assertPhase6CloneIdentity_(expected, actualSpreadsheetId, actualScriptI
   var targetScriptId = String(expected && expected.scriptId || '').trim();
   // This script ID is already in the repository's production .clasp.json.
   var productionScriptId = '11zr6QpAODCdXOaYIQwIOYbkiajSukagTOSj_z9TVjBR3TPJgJvgSHg27';
+  var sharedPreviewScriptId = '1c1wtUuO0xISTw0JTfAKnqry28UeJaIcW8CWwJVDSo1Y31BbPad4glp4G';
   if (!targetSpreadsheetId || !targetScriptId ||
       /REPLACE|EXAMPLE|PLACEHOLDER/i.test(targetSpreadsheetId + ' ' + targetScriptId)) {
     throw new Error('Phase 6 clone IDs are not configured. Refusing to read business data.');
   }
-  if (targetScriptId === productionScriptId || actualScriptId === productionScriptId) {
-    throw new Error('Phase 6 cannot run in the production Apps Script project.');
+  if (targetScriptId === productionScriptId || actualScriptId === productionScriptId ||
+      targetScriptId === sharedPreviewScriptId || actualScriptId === sharedPreviewScriptId) {
+    throw new Error('Phase 6 cannot run in production or the existing shared preview Apps Script project.');
   }
   if (String(actualSpreadsheetId) !== targetSpreadsheetId ||
       String(actualScriptId) !== targetScriptId) {
