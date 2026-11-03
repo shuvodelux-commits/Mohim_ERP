@@ -1634,6 +1634,37 @@
   document.addEventListener('click', posCartEntryOutsideClick_);
 
   document.getElementById('posDiscount').addEventListener('input', posRecalcTotals_);
+  document.getElementById('posAddPaymentRowBtn').addEventListener('click', function () {
+    if (!posMultiPaymentEnabledForSale_()) return;
+    if (posState.paymentRows.length >= 20) { posMultiPaymentError_('Maximum 20 payments allowed.'); return; }
+    var cashExists = posState.paymentRows.some(function (r) { return r.method === 'Cash'; });
+    var id = 'pm-' + (++posState.paymentRowSeq);
+    posState.paymentRows.push({id:id,method:cashExists?'Bank':'Cash',accountId:'',amount:''});
+    posRenderMultiPaymentRows_();
+    posRecalcTotals_();
+  });
+  document.getElementById('posMultiPaymentRows').addEventListener('input', function (event) {
+    if (event.target.dataset.paymentField !== 'amount') return;
+    var wrapper = event.target.closest('[data-payment-row]');
+    var row = wrapper && posState.paymentRows.filter(function (r) { return r.id === wrapper.dataset.paymentRow; })[0];
+    if (!row) return;
+    row.amount = event.target.value; // Do not re-render while typing; preserve caret and keyboard focus.
+    posRecalcTotals_();
+  });
+  document.getElementById('posMultiPaymentRows').addEventListener('change', function (event) {
+    var field = event.target.dataset.paymentField;
+    if (field !== 'method' && field !== 'accountId') return;
+    var wrapper = event.target.closest('[data-payment-row]');
+    var row = wrapper && posState.paymentRows.filter(function (r) { return r.id === wrapper.dataset.paymentRow; })[0];
+    if (!row) return;
+    row[field] = event.target.value;
+    if (field === 'method') {
+      row.accountId = '';
+      posRenderMultiPaymentRows_();
+    }
+    posRecalcTotals_();
+  });
+  document.getElementById('posMultiPaymentRows').addEventListener('click', posHandleMultiPaymentAction_);
   document.getElementById('posAmountReceived').addEventListener('input', posRecalcTotals_);
   document.getElementById('posPaymentMethod').addEventListener('change', function () {
     document.getElementById('posBankAccountRow').style.display = paymentMethodNeedsAccount_(this.value) ? '' : 'none';
@@ -1886,10 +1917,36 @@
     document.getElementById('posSubtotal').textContent = formatMoney(subtotal);
     document.getElementById('posGrandTotal').textContent = formatMoney(grandTotal);
 
-    var terms = posDeriveSaleTerms_(grandTotal);
+    var splitEnabled = posMultiPaymentEnabledForSale_();
+    var terms;
+    if (splitEnabled) {
+      try {
+        terms = posMultiPaymentTerms_(Math.round(grandTotal * 100) / 100, posState.paymentRows, posState.bankAccounts);
+        posMultiPaymentError_('');
+        document.getElementById('posMultiPaidAmount').textContent = formatMoney(terms.paidAmount);
+        document.getElementById('posMultiDueAmount').textContent = formatMoney(terms.dueAmount);
+        document.getElementById('posMultiDueAmount').style.color = terms.dueAmount > 0 ? 'var(--pos-v2-danger)' : 'var(--pos-v2-success)';
+        var splitChange = document.getElementById('posMultiChangeRow');
+        splitChange.hidden = terms.change <= 0;
+        splitChange.style.display = terms.change > 0 ? 'flex' : 'none';
+        document.getElementById('posMultiChangeAmount').textContent = formatMoney(terms.change);
+      } catch (err) {
+        posMultiPaymentError_(err.message);
+        document.getElementById('posMultiPaidAmount').textContent = '—';
+        document.getElementById('posMultiDueAmount').textContent = '—';
+        document.getElementById('posMultiChangeRow').hidden = true;
+        document.getElementById('posMultiChangeRow').style.display = 'none';
+        terms = {paymentType:'Due',dueAmount:0,change:0};
+      }
+    } else {
+      terms = posDeriveSaleTerms_(grandTotal);
+    }
     var changeRow = document.getElementById('posChangeRow');
     var dueRow = document.getElementById('posDueRow');
-    if (terms.paymentType === 'Cash' && terms.change > 0) {
+    if (splitEnabled) {
+      changeRow.style.display = 'none';
+      dueRow.style.display = 'none';
+    } else if (terms.paymentType === 'Cash' && terms.change > 0) {
       changeRow.style.display = 'flex';
       dueRow.style.display = 'none';
       document.getElementById('posChangeDue').textContent = formatMoney(terms.change);
@@ -2173,6 +2230,11 @@
     posState.cartEditIndex = null;
     posState.cartEntryIndex = null;
     posState._addVendorForLineIndex = null;
+    posState.paymentRows = [{id:'pm-1',method:'Cash',accountId:'',amount:''}];
+    posState.paymentRowSeq = 1;
+    posState.paymentOperationId = '';
+    posState.paymentAttemptFingerprint = '';
+    posState.copyMode = false;
     document.getElementById('posDiscount').value = '';
     document.getElementById('posAmountReceived').value = '';
     document.getElementById('posPaymentMethod').value = 'Cash';
@@ -2183,6 +2245,7 @@
     document.getElementById('posDueRow').style.display = 'none';
     posSetCustomerMoreExpanded_(false);
     posUpdateCustomerDueDisplay_(0);
+    posApplyPaymentMode_();
     posRenderCart_();
   }
 
@@ -2218,6 +2281,10 @@
 
   function posSaveDraft_() {
     var errEl=document.getElementById('posFormError'); errEl.style.display='none';
+    if (posMultiPaymentEnabledForSale_()) {
+      errEl.textContent = 'Split-payment drafts are not available until payment recovery support is completed.';
+      errEl.style.display = 'block'; return;
+    }
     if(!posState.cart.length){errEl.textContent='Cart is empty.';errEl.style.display='block';return;}
     var payload=posBuildDraftPayload_();
     var call=posState.draftId ? serverCall('updateSalesDraft',authToken,posState.draftId,posState.draftVersion,payload) : serverCall('saveSalesDraft',authToken,payload);
@@ -2239,7 +2306,8 @@
       document.getElementById('posCustomerFatherName').value.trim() ||
       document.getElementById('posCustomerAddress').value.trim() ||
       Number(document.getElementById('posDiscount').value) > 0 ||
-      document.getElementById('posAmountReceived').value.trim());
+      document.getElementById('posAmountReceived').value.trim() ||
+      (posMultiPaymentEnabledForSale_() && posState.paymentRows.some(function (r) { return Number(r.amount) > 0; })));
   }
 
   function posOpenDraft_(draftId) {
@@ -2285,6 +2353,7 @@
     var payment=draft.payment||{}; document.getElementById('posAmountReceived').value=payment.amountReceived||''; document.getElementById('posPaymentMethod').value=payment.paymentMethod||'Cash';
     document.getElementById('posBankAccountRow').style.display=paymentMethodNeedsAccount_(payment.paymentMethod)?'':'none'; fillBankAccountSelect_(document.getElementById('posBankAccount'),posState.bankAccounts,payment.paymentMethod||'Cash'); document.getElementById('posBankAccount').value=payment.bankAccountId||'';
     posState.draftId=draft.draftId; posState.draftNo=draft.draftNo; posState.draftVersion=draft.version;
+    posApplyPaymentMode_(); // Older draft format continues with the legacy one-payment fields.
     document.getElementById('posDraftBanner').hidden=false; document.getElementById('posDraftBannerNo').textContent=draft.draftNo; document.getElementById('posSaveDraftBtn').textContent='Update Draft';
     posSetCustomerMoreExpanded_(!!(draft.customerFatherName||draft.customerAddress)); posRenderCart_(); posRenderSessionUI_();
   }
@@ -2573,6 +2642,7 @@
 
   function posRestoreCopiedSaleFields_(source) {
     source = source || {};
+    posState.copyMode = true; // Phase 4 will restore an item's full multi-payment snapshot.
     var customerId = source.customerId || '';
     var custMatch = customerId ? posState.customers.filter(function (c) { return String(c.id) === String(customerId); })[0] : null;
     var payment = posCopiedPaymentSnapshot_(source);
@@ -2596,6 +2666,7 @@
     posRefreshTabletSelect_(document.getElementById('posPaymentMethod'));
     posRefreshTabletSelect_(document.getElementById('posBankAccount'));
     posState.saleNotes = source.notes || '';
+    posApplyPaymentMode_();
     posSetCustomerMoreExpanded_(!!(document.getElementById('posCustomerFatherName').value || source.customerAddress));
     posUpdateCustomerDueDisplay_(custMatch ? custMatch.due : 0);
   }
@@ -2765,6 +2836,7 @@ function posEnterUpdateMode_() {
   document.getElementById('posUpdateBannerId').textContent = posState.updateInvoiceId;
   var btn = document.getElementById('posCompleteBtn');
   btn.textContent = 'Save Update';
+  posApplyPaymentMode_();
 }
 
 function posExitUpdateMode_() {
@@ -2773,6 +2845,7 @@ function posExitUpdateMode_() {
   posState._addVendorForLineIndex = null;
   document.getElementById('posUpdateBanner').hidden = true;
   document.getElementById('posCompleteBtn').textContent = 'Complete Sale';
+  posApplyPaymentMode_();
   posRenderSessionUI_();
 }
 
