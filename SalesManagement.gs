@@ -1018,6 +1018,53 @@ function updateSaleInternal_(token, invoiceId, payload, options) {
       'Payment Method': paymentMethod, 'Bank Account ID': bankAccountId, 'Bank Account Name': bankAccountName
     });
 
+    recordPaymentEditStage_('Invoice and Stock');
+    if (isSplitInvoice) {
+      // Revisions preserve original tender/change while only the applied
+      // differences move Cash/Bank account balances.
+      const revision = salePaymentNextRevision_(invoiceId,oldPaymentRows);
+      const deltas = salePaymentAccountDeltas_(previousPayments,replacementAllocations.payments);
+      oldPaymentRows.filter(function (p) {
+        return String(p['Invoice ID']) === String(invoiceId) && String(p['Status']) === 'Active';
+      }).forEach(function (p) {
+        updateRowFields_('SALE_PAYMENTS',p._rowIndex,{
+          Status:'Reversed','Reversed At':now,'Reversed By':actorName_(user),
+          'Reversal Operation ID':paymentOperationId
+        });
+      });
+      if (replacementAllocations.payments.length) {
+        appendRows_('SALE_PAYMENTS',replacementAllocations.payments.map(function(p){
+          return {
+            'Payment ID':generateId_('SALE_PAYMENTS'),
+            'Invoice ID':invoiceId, Revision:revision, 'Row Order':p.rowOrder,
+            Method:p.method,'Bank Account ID':p.bankAccountId,
+            'Bank Account Name':p.bankAccountName,'Tendered Amount':p.tendered,
+            'Applied Amount':p.applied,'Change Amount':p.change,
+            'Transaction Date':editDate,'Created At':now,'Created By':actorName_(user),
+            'Operation ID':paymentOperationId,Status:'Active'
+          };
+        }));
+      }
+      recordPaymentEditStage_('Payment Revision');
+      deltas.forEach(function (delta) {
+        const positive = delta.amount > 0, amount = Math.abs(delta.amount);
+        if (delta.method === 'Cash') {
+          addCashBookEntry_({
+            Type:'Sale Update',Reference:invoiceId,
+            Description:'Split payment correction ' + invoiceId,
+            Debit:positive?'':amount,Credit:positive?amount:'',
+            PaymentMethod:'Cash',Date:editDate
+          });
+        } else {
+          addBankBookEntry_(delta.accountId,{
+            Type:'Sale Update',Reference:invoiceId,
+            Description:'Split payment correction ' + invoiceId,
+            Debit:positive?'':amount,Credit:positive?amount:'',Date:editDate
+          });
+        }
+      });
+      recordPaymentEditStage_('Money Books');
+    } else {
     const bankOldAmount = isBankLikePaymentMethod_(oldPaymentMethod) ? oldPaidAmount : 0;
     const bankNewAmount = isBankLikePaymentMethod_(paymentMethod) ? paidAmount : 0;
     
@@ -1038,6 +1085,8 @@ function updateSaleInternal_(token, invoiceId, payload, options) {
         if (bankAccountId && bankNewAmount > 0) addBankBookEntry_(bankAccountId, { Type: 'Sale Update', Reference: invoiceId, Description: 'Additional payment from invoice update ' + invoiceId, Debit: '', Credit: bankNewAmount, Date: editDate });
       }
     
+
+    }
 
     if (oldCustomerId && oldDueAmount > 0) {
       const oldCustRowIndex = findRowIndex_('CUSTOMERS', 'Customer ID', oldCustomerId);
@@ -1071,8 +1120,18 @@ function updateSaleInternal_(token, invoiceId, payload, options) {
       'Reason': sanitizeInput_(payload.reason), 'Before Grand Total': oldGrandTotal, 'After Grand Total': grandTotal
     });
 
-    return ok_(buildInvoicePayload_(invoiceId));
+    const resultInvoice = buildInvoicePayload_(invoiceId);
+    recordPaymentEditStage_('Committed','Committed');
+    return ok_(resultInvoice);
   } catch (err) {
+    if (paymentJournalRowIndex >= 2) {
+      try {
+        updateRowFields_('SALE_POSTING_JOURNAL',paymentJournalRowIndex,{
+          State:'Needs Review','Last Completed Stage':paymentJournalStage,'Updated At':new Date(),
+          Error:String(err && err.message || err)
+        });
+      } catch (journalError) { logError_('updateSaleJournal',journalError); }
+    }
     logError_('updateSale', err);
     return fail_(err.message);
   } finally {
