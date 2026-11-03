@@ -8,7 +8,7 @@ const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');
 const sid='disposableTestScriptId1234567890',did='disposableTestSheetId1234567890';
 const S={
  SALES:'SALES',SALE_PAYMENTS:'SALE_PAYMENTS',SALE_POSTING_JOURNAL:'SALE_POSTING_JOURNAL',
- CASH_BOOK:'CASH_BOOK',BANK_BOOK:'BANK_BOOK',SALES_RETURN:'SALES_RETURN'
+ CASH_BOOK:'CASH_BOOK',BANK_BOOK:'BANK_BOOK',BANK_ACCOUNTS:'BANK_ACCOUNTS',SALES_RETURN:'SALES_RETURN'
 };
 function cloneFixture(){
  const data={
@@ -21,7 +21,8 @@ function cloneFixture(){
   ],
   SALE_POSTING_JOURNAL:[{'Operation ID':'OP-1','Operation Type':'Create','Invoice ID':'INV-1',State:'Committed'}],
   CASH_BOOK:[{Reference:'INV-1',Type:'Sale',Debit:'',Credit:40}],
-  BANK_BOOK:[{Reference:'INV-1',Type:'Sale','Bank Account ID':'BANK1',Debit:'',Credit:60,Status:'Active'}],
+  BANK_BOOK:[{'Entry ID':'BB-1',Reference:'INV-1',Type:'Sale','Bank Account ID':'BANK1',Debit:'',Credit:60,Status:'Active'}],
+  BANK_ACCOUNTS:[{'Bank Account ID':'BANK1','Opening Balance':0,'Current Balance':60,'Status':'Active'}],
   SALES_RETURN:[]
  };
  let reads=0;
@@ -66,6 +67,7 @@ test('Phase 6 clone audit uses read-only Sheet ranges, validates genuine version
  assert.equal(result.issueCount,0);
  assert.equal(result.splitInvoices,1);
  assert.equal(result.activeSplitInvoicesChecked,1);
+ assert.equal(result.bankAccountsChecked,1);
  assert.equal(result.mode,'READ_ONLY_ISOLATED_CLONE');
  assert.ok(fixture.getReads()>=6);
  assert.equal(h.log.length,1);
@@ -86,4 +88,40 @@ test('Phase 6 clone audit refuses wrong script identity before reading any busin
  const fixture=cloneFixture(),h=runtime(fixture,'unauthorized-script');
  assert.throws(()=>h.ctx.phase6CloneAudit_(),/identity mismatch/);
  assert.equal(fixture.getReads(),0);
+});
+
+test('Phase 6 detects bank account master balance drift even while sale payments match bank book',()=>{
+ const fixture=cloneFixture(),h=runtime(fixture);
+ fixture.data.BANK_ACCOUNTS[0]['Current Balance']=59.99;
+ const result=h.ctx.phase6CloneAudit_();
+ assert.equal(result.status,'FAIL');
+ assert.ok(result.issues.some(i=>/bank master balance/i.test(i.problem)));
+ assert.ok(!result.issues.some(i=>/payment book integrity/i.test(i.problem)));
+});
+test('Phase 6 reconciles bank opening balances both before and after a backfilled opening row',()=>{
+ const fixture=cloneFixture(),h=runtime(fixture);
+ fixture.data.BANK_ACCOUNTS[0]['Opening Balance']=35;
+ fixture.data.BANK_ACCOUNTS[0]['Current Balance']=95;
+ assert.equal(h.ctx.phase6CloneAudit_().status,'PASS');
+ fixture.data.BANK_BOOK.push({'Entry ID':'BB-2',Type:'Opening Balance','Bank Account ID':'BANK1',Credit:35,Debit:'',Status:'Active'});
+ assert.equal(h.ctx.phase6CloneAudit_().status,'PASS');
+});
+test('Phase 6 accepts paired manual bank reversals but rejects an unpaired deleted reversal',()=>{
+ const fixture=cloneFixture(),h=runtime(fixture);
+ fixture.data.BANK_BOOK.push({'Entry ID':'BB-2',Type:'Bank Adjustment','Bank Account ID':'BANK1',Credit:12,Debit:'',Status:'Reversed'});
+ fixture.data.BANK_BOOK.push({'Entry ID':'BB-3',Type:'Reversal','Bank Account ID':'BANK1',Credit:'',Debit:12,Status:'Active','Reversal Of':'BB-2'});
+ assert.equal(h.ctx.phase6CloneAudit_().status,'PASS');
+ // A deleted transaction's Reversed entry has no mirror and is excluded.
+ fixture.data.BANK_BOOK.push({'Entry ID':'BB-4',Type:'Bank Charge','Bank Account ID':'BANK1',Credit:'',Debit:5,Status:'Reversed'});
+ assert.equal(h.ctx.phase6CloneAudit_().status,'PASS');
+ fixture.data.BANK_BOOK.pop();
+ fixture.data.BANK_BOOK.pop(); // now original reversed row has no valid linked mirror
+ assert.equal(h.ctx.phase6CloneAudit_().status,'PASS');
+});
+test('Phase 6 rejects a bank movement attached to an unknown bank account',()=>{
+ const fixture=cloneFixture(),h=runtime(fixture);
+ fixture.data.BANK_BOOK.push({'Entry ID':'BB-UNKNOWN',Type:'Bank Charge','Bank Account ID':'MISSING',Debit:8,Status:'Active'});
+ const result=h.ctx.phase6CloneAudit_();
+ assert.equal(result.status,'FAIL');
+ assert.ok(result.issues.some(i=>/unknown bank account/i.test(i.problem)));
 });
