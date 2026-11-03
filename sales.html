@@ -32,9 +32,10 @@
     <div id="smTopScrollInner" style="height:1px;"></div>
   </div>
   <div class="table-scroll" id="smTableScroll">
-    <table class="mobile-card-table">
+    <table class="mobile-card-table erp-action-table">
       <thead>
         <tr>
+          <th class="erp-sticky-action-col" scope="col"><span class="erp-action-visually-hidden">Actions</span><span class="erp-action-header-dots" aria-hidden="true">···</span></th>
           <th>Invoice</th>
           <th>Date</th>
           <th>Customer</th>
@@ -45,7 +46,6 @@
           <th class="num">Returned</th>
           <th class="num" id="smProfitHeader" style="display:none;">Profit</th>
           <th>Status</th>
-          <th>Action</th>
         </tr>
       </thead>
       <tbody id="smTableBody"></tbody>
@@ -261,6 +261,12 @@
         : '';
       var tr = document.createElement("tr");
       tr.innerHTML =
+        '<td class="erp-sticky-action-col">' + rowActionTriggerHtml_(
+          'data-act="menu" data-id="' + escapeHtml(s.invoiceId) + '"',
+          'Actions for invoice ' + s.invoiceId,
+          !!s.duplicateInvoiceId,
+          s.duplicateInvoiceId ? 'Duplicate invoice ID must be repaired before actions can continue' : ''
+        ) + '</td>' +
         '<td><button type="button" class="party-ledger-link" data-invoice-view-id="' + s.invoiceId + '" title="Open invoice">' +
         escapeHtml(s.invoiceId) + '</button>' + integrityBadge +
         "</td>" +
@@ -306,8 +312,7 @@
             s.returnStatus +
             "</span>"
           : "") +
-        "</td>" +
-        '<td style="white-space:nowrap;"><button class="btn" data-act="menu" data-id="' + s.invoiceId + '" aria-haspopup="menu" aria-expanded="false"' + (s.duplicateInvoiceId ? ' disabled title="Duplicate invoice ID must be repaired before actions can continue"' : '') + '>Actions &#9662;</button></td>';
+        "</td>";
       body.appendChild(tr);
     });
     document.getElementById("smEmpty").hidden = rows.length > 0;
