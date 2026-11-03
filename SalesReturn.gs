@@ -386,6 +386,9 @@ function prepareSalesReturn_(payload, options) {
 
   const sale = opts.sale || findUniqueSalesRow_(payload.invoiceId);
   if (!sale || isDeleted_(sale)) throw new Error('Invoice not found or has been deleted.');
+  if (String(sale['Payment Detail Version']) === '1') {
+    throw new Error('Multi-payment invoice returns are not yet enabled. Refund reconciliation is required.');
+  }
   assertSalesReturnDateNotBeforeSale_(dateStr, sale);
 
   const saleItemsSource = opts.saleItems || getAllRows_('SALE_ITEMS');
