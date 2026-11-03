@@ -186,6 +186,27 @@ test('user deactivation and deletion revoke persistent cached sessions immediate
   }
 });
 
+test('password reset and role deactivation revoke cached tokens even if generation bump fails', () => {
+  for (const operation of ['password', 'role']) {
+    const h = harness();
+    h.user('admin', 'Administrator');
+    h.user('staff', 'Staff', { users: { view: true } });
+    h.db.SESSIONS[1]['Expires At'] = 'Never';
+    assert.equal(h.c.getUsersBootstrap('staff').success, true);
+
+    // Simulate a Script Properties write outage: the generation cannot bump,
+    // so per-token cache invalidation must be sufficient for revocation.
+    const store = h.c.PropertiesService.getScriptProperties();
+    store.setProperty = () => { throw new Error('Script Properties unavailable'); };
+    const result = operation === 'password'
+      ? h.c.resetPassword('admin', 'staff', 'new-password123')
+      : h.c.setRoleStatus('admin', 'Staff', 'Inactive');
+    assert.equal(result.success, true, JSON.stringify(result));
+    assert.equal(h.db.SESSIONS.some(s => s['User ID'] === 'staff'), false);
+    deny(h.c.getUsersBootstrap('staff'), /Session expired|inactive/);
+  }
+});
+
 test('malformed legacy sessions cannot be upgraded during page restoration', () => {
   for (const expiry of ['', 'never', 'Never ', 'invalid']) {
     const h = harness(); h.user('staff', 'Staff', {users:{view:true}});
