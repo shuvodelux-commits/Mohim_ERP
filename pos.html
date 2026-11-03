@@ -1759,8 +1759,7 @@
   function posMultiPaymentEnabledForSale_() {
     // New sales default to split when enabled; legacy drafts/duplicates retain
     // their original one-method editor. Split drafts and copies stay split.
-    return !!(posState.multiPaymentEnabled && !posState.updateInvoiceId &&
-      !posState.paymentModeLegacy);
+    return !!(posState.multiPaymentEnabled && !posState.paymentModeLegacy);
   }
 
   function posHasSplitPaymentSnapshot_(source) {
@@ -2864,6 +2863,9 @@ function posLoadUpdateInvoice_(inv, reason, mode) {
   posState._loadPromise = posLoad();
 
   posState._loadPromise.then(function () {
+    if (posHasSplitPaymentSnapshot_(inv) && !posState.multiPaymentEnabled) {
+      throw new Error('Multi-payment editing is disabled. Existing split payments must not be changed through the single-method form.');
+    }
     posState.cart = [];
     posState.cartEntryIndex = null;
     var skipped = [];
@@ -2926,10 +2928,16 @@ function posLoadUpdateInvoice_(inv, reason, mode) {
     posSetCustomerMoreExpanded_(!!(document.getElementById('posCustomerFatherName').value || inv.customerAddress));
     posUpdateCustomerDueDisplay_(custMatch ? custMatch.due : 0);
 
+    if (posHasSplitPaymentSnapshot_(inv)) {
+      posRestoreMultiPaymentSnapshot_(inv);
+    } else {
+      posState.paymentModeLegacy = true;
+      posState.paymentSnapshotSplit = false;
+    }
     posState.updateInvoiceId = inv.invoiceId;
     posState.updateReason = reason;
     posEnterUpdateMode_();
-  });
+  }).catch(function (err) { showToast(err.message || 'Cannot open this invoice for editing.', 'error'); });
 }
 
 function posEnterUpdateMode_() {
