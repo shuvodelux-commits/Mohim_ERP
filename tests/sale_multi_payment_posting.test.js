@@ -200,3 +200,28 @@ test('fully Due multi-payment invoice records a version with no payment child ro
   assert.equal(h.rows('BANK_BOOK').length,0);
   assert.equal(h.rows('CUSTOMER_LEDGER').length,1);
 });
+
+test('feature remains disabled by default until complete accounting UI and reversals ship',()=>{
+  const cfg=read('Config.gs');
+  assert.match(cfg,/"POS Multi Payment Enabled":\s*"false"/);
+});
+
+test('all posting-stage write failures remain quarantined and a retry never duplicates stock or money',()=>{
+  for(const stage of ['SALES','SALE_ITEMS','SALE_PAYMENTS','CASH_BOOK','BANK_BOOK','CUSTOMER_LEDGER']) {
+    const h=harness(true,stage);
+    const p=payload([payment('cash','Cash','20'),payment('bank','Bank','30','B1')],
+      'failure-stage-'+stage+'-operation');
+    const one=h.context.completeSale('token',p);
+    assert.equal(one.success,false,'expected failure at '+stage);
+    assert.equal(h.rows('SALE_POSTING_JOURNAL').length,1,stage);
+    assert.equal(h.rows('SALE_POSTING_JOURNAL')[0].State,'Needs Review',stage);
+    const count=h.writes.length;
+    const again=h.context.completeSale('token',p);
+    assert.equal(again.success,false,stage);
+    assert.match(again.message,/Needs Review/i,stage);
+    assert.equal(h.writes.length,count,stage);
+    assert.ok(h.rows('SALES').length<=1,stage);
+    assert.ok(h.rows('CASH_BOOK').length<=1,stage);
+    assert.ok(h.rows('BANK_BOOK').length<=1,stage);
+  }
+});
