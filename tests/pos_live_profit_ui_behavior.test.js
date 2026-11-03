@@ -83,6 +83,7 @@ test('incomplete FIFO/vendor costs show a visible accuracy warning, not just a t
   await new Promise(setImmediate);
   const warning=h.element('posCurrentInvoiceProfitWarning');
   assert.equal(warning.hidden,false);
+  assert.equal(warning.style.display,'block', 'warning must override .bn-hint display: block and hidden attribute consistently');
   // This harness simulates element state, not HTML text-node parsing.
   // Assert authored warning copy from the real template separately.
   assert.match(pos, /id="posCurrentInvoiceProfitWarning"[^>]*>Cost incomplete/i);
@@ -91,4 +92,5 @@ test('incomplete FIFO/vendor costs show a visible accuracy warning, not just a t
   h.pending[1].resolve({profit:15,marginPercent:50,costComplete:true});
   await new Promise(setImmediate);
   assert.equal(warning.hidden,true);
+  assert.equal(warning.style.display,'none', 'completed estimate must hide the warning even with author CSS');
 });
