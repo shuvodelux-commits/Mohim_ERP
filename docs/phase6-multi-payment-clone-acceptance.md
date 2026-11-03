@@ -14,6 +14,7 @@
 ## 2. Create disposable clone (never touch source)
 
 1. In Google Drive, identify the currently bound production spreadsheet by verifying its Apps Script binding and currently deployed source, **not by its title**. Several "Sher ERP" sheets may exist. Document the confirmed source IDs **privately**; do not commit private spreadsheet IDs to GitHub.
+   **Read-only identity check:** In each candidate Google Sheet, use **Extensions → Apps Script → Project Settings → Script ID**. The script ID must exactly equal the known production project ID recorded in the repository's production `.clasp.json`. If it does not, that sheet is not proven to be the live bound source. Do not run setup, add functions, copy its contents, or deploy merely to verify the ID. No Drive listing/title alone proves the binding. If no candidate matches, stop source-clone work and use a **fresh synthetic QA workbook** instead.
 2. **Prefer a new blank, private QA spreadsheet with entirely synthetic business data** to avoid copying real customer information. If a copy of the verified source is essential to preserve schema, sanitize it in the controlled test environment before any broad sharing or testing; do not log or commit real customer data. Confirm the original workbook remains unchanged and keep the clone private. A historical workbook selected by title is not acceptable identity evidence.
 3. Create/verify a **new, separate** container-bound Apps Script project for this QA workbook. Obtain both *clone* IDs (script ID and spreadsheet ID). Neither can be the production or existing shared preview script.
 4. Check out the reviewed PR branch locally. Prepare a **detached** package (this only writes local files):
@@ -33,6 +34,8 @@
 - It does **not** create a sale, alter an invoice, actually move money, verify user roles, or exercise receipt printing. These require the functional tests in Section 3.
 - It does not prove subsequent Customer Settlement allocation or Cash Session balance; those reconciliation checks must be performed separately on the clone.
 - It refuses workbooks with more than 15,000 rows in any scanned sheet. Use an appropriately sized disposable clone.
+- It **fails**, rather than reporting a misleading green audit, when there are no active split-payment invoices or no test bank accounts. First post synthetic payment fixtures through the real clone workflows, then rerun it.
+- Do not publish a public /exec deployment with customer data. For a clone browser test, use entirely synthetic data and limit access appropriately.
 - `tests/phase6_clone_audit.gs` is excluded by `.claspignore` from the normal production upload; the detached package deliberately includes it ONLY in the clone.
 
 ## 3. Functional acceptance matrix on clone
