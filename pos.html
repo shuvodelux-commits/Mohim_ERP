@@ -46,7 +46,7 @@
           <circle cx="11" cy="11" r="8"></circle>
           <path d="m21 21-4.35-4.35"></path>
         </svg>
-        <input id="posCustomerName" type="text" data-search-clear="on" list="posCustomerList" placeholder="Enter customer name — কাস্টমারের নাম" aria-label="Customer Name — কাস্টমারের নাম" autocomplete="off" required>
+        <input id="posCustomerName" type="text" data-search-clear="on" list="posCustomerList" placeholder="Customer name — কাস্টমারের নাম" aria-label="Customer Name — কাস্টমারের নাম" autocomplete="off" required>
         <div id="posCustomerNameResults" class="counter-combo-results" hidden></div>
       </div>
       <datalist id="posCustomerList"></datalist>
@@ -56,7 +56,7 @@
         <svg class="pos-customer-input-icon" data-pos-icon="phone" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
           <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.69 2.8a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.33 1.84.56 2.8.69A2 2 0 0 1 22 16.92z"></path>
         </svg>
-        <input id="posCustomerPhone" type="text" data-search-clear="on" list="posCustomerPhoneList" placeholder="Enter phone number — ফোন নম্বর" aria-label="Phone Number — ফোন নম্বর" autocomplete="off" required>
+        <input id="posCustomerPhone" type="text" data-search-clear="on" list="posCustomerPhoneList" placeholder="Phone number — ফোন নম্বর" aria-label="Phone Number — ফোন নম্বর" autocomplete="off" required>
         <div id="posCustomerPhoneResults" class="counter-combo-results" hidden></div>
       </div>
       <datalist id="posCustomerPhoneList"></datalist>
@@ -119,11 +119,11 @@
           </div>
           <!-- New split-payment workflow is server-flagged OFF until release. -->
           <div id="posMultiPaymentFields" hidden style="display:none;">
-            <div class="pos-multi-heading"><strong>Payments <span class="bn-hint">— পেমেন্ট</span></strong><button type="button" class="btn btn-sm" id="posAddPaymentRowBtn">+ Add Payment</button></div>
+            <div class="pos-multi-heading"><span class="pos-multi-title">Payments <span class="pos-multi-subtitle">পেমেন্ট</span></span><button type="button" class="btn btn-sm" id="posAddPaymentRowBtn">+ Add payment</button></div>
             <div id="posMultiPaymentRows" class="pos-multi-payment-rows"></div>
             <div class="field-error" id="posMultiPaymentError" role="alert" hidden style="display:none;"></div>
             <div class="pos-multi-totals">
-              <div class="totals-row"><span>Paid Now <span class="bn-hint">— জমা</span></span><strong id="posMultiPaidAmount">৳0.00</strong></div>
+              <div class="totals-row"><span>Paid Now <span class="bn-hint">/ জমা</span></span><strong id="posMultiPaidAmount">৳0.00</strong></div>
               <div class="totals-row"><span>Due / বাকি</span><strong id="posMultiDueAmount">৳0.00</strong></div>
               <div class="totals-row" id="posMultiChangeRow" hidden style="display:none;"><span>Cash Change</span><strong id="posMultiChangeAmount">৳0.00</strong></div>
             </div>

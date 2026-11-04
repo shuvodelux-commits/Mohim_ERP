@@ -121,9 +121,11 @@ async function main() {
       const rm=row.querySelector('.pos-multi-remove').getBoundingClientRect();
       const totals=document.querySelector('#page-pos .pos-checkout-totals').getBoundingClientRect();
       const fields=document.querySelector('#page-pos .pos-checkout-fields').getBoundingClientRect();
-      return {removeRight:rm.right,totalsLeft:totals.left,fieldsRight:fields.right,rowRight:row.getBoundingClientRect().right};
+      return {removeRight:rm.right,fieldsRight:fields.right,rowRight:row.getBoundingClientRect().right,
+        rowBottom:row.getBoundingClientRect().bottom,totalsTop:totals.top};
     });
-    assert.ok(geo.removeRight<=geo.totalsLeft+1,JSON.stringify(geo));
+    assert.ok(geo.rowBottom<=geo.totalsTop+1,JSON.stringify(geo));
+    assert.ok(geo.removeRight<=geo.fieldsRight+1,JSON.stringify(geo));
     assert.ok(geo.rowRight<=geo.fieldsRight+1,JSON.stringify(geo));
   });
   await page.locator('#posMultiPaymentRows [data-payment-row="pm-2"] [data-payment-action="remove"]').click();
@@ -134,6 +136,86 @@ async function main() {
     const calls=await page.evaluate(()=>__rpcCalls.filter(c=>c.name==='completeSale'));
     assert.equal(calls.length,0);
     assert.deepEqual(errors,[]);
+  });
+  // Approved CSS reference: test rendered geometry at multiple actual
+  // payment container widths, not only at particular viewport breakpoints.
+  await page.click('#posAddPaymentRowBtn');
+  await check('approved minimal checkout at 610px card uses flat five-column rows and stacked summary',async()=>{
+    await page.setViewportSize({width:900,height:1000});
+    await page.evaluate(()=>{
+      document.querySelector('#page-pos .pos-customer-section').style.maxWidth='610px';
+    });
+    const m=await page.evaluate(()=>{
+      const style=selector=>getComputedStyle(document.querySelector(selector));
+      const rect=selector=>document.querySelector(selector).getBoundingClientRect();
+      const row=rect('#posMultiPaymentRows .pos-multi-payment-row');
+      const fields=rect('#page-pos .pos-checkout-fields'),totals=rect('#page-pos .pos-checkout-totals');
+      return {
+        customerHeading:style('#page-pos .pos-customer-section .pos-section-head h3').fontSize,
+        customerInputHeight:style('#posCustomerName').height,
+        discountHeight:style('#posDiscount').height,
+        totalFont:style('#page-pos .pos-checkout-totals .totals-row.grand').fontSize,
+        completeHeight:style('#posCompleteBtn').height,
+        paymentColumns:style('#posMultiPaymentRows .pos-multi-payment-row').gridTemplateColumns.trim().split(/\s+/).length,
+        rowBackground:style('#posMultiPaymentRows .pos-multi-payment-row').backgroundColor,
+        addBackground:style('#posAddPaymentRowBtn').backgroundColor,
+        addBorder:style('#posAddPaymentRowBtn').borderTopWidth,
+        panelWidth:rect('#page-pos .pos-customer-section').width,
+        paymentRight:row.right,fieldRight:fields.right,totalsTop:totals.top,fieldsBottom:fields.bottom
+      };
+    });
+    assert.equal(m.customerHeading,'16px');
+    assert.equal(m.customerInputHeight,'40px');
+    assert.equal(m.discountHeight,'36px');
+    assert.equal(m.totalFont,'18px');
+    assert.equal(m.completeHeight,'43px');
+    assert.equal(m.paymentColumns,5,JSON.stringify(m));
+    assert.equal(m.rowBackground,'rgba(0, 0, 0, 0)');
+    assert.equal(m.addBackground,'rgba(0, 0, 0, 0)');
+    assert.equal(m.addBorder,'0px');
+    assert.ok(m.panelWidth<=611 && m.panelWidth>=580,JSON.stringify(m));
+    assert.ok(m.paymentRight<=m.fieldRight+1,JSON.stringify(m));
+    assert.ok(m.fieldsBottom<=m.totalsTop+1,JSON.stringify(m));
+  });
+  await check('narrow desktop sidebar wraps payments to two lines within actual panel width',async()=>{
+    await page.setViewportSize({width:1440,height:1000});
+    await page.evaluate(()=>{
+      document.querySelector('#page-pos .pos-customer-section').style.maxWidth='';
+    });
+    const m=await page.evaluate(()=>{
+      const row=document.querySelector('#posMultiPaymentRows .pos-multi-payment-row');
+      const rect=row.getBoundingClientRect();
+      const method=row.querySelector('.pos-multi-method').getBoundingClientRect();
+      const amount=row.querySelector('.pos-multi-amount').getBoundingClientRect();
+      const fields=document.querySelector('#page-pos .pos-checkout-fields').getBoundingClientRect();
+      return {columns:getComputedStyle(row).gridTemplateColumns.trim().split(/\s+/).length,
+        amountTop:amount.top,methodBottom:method.bottom,rowRight:rect.right,fieldsRight:fields.right};
+    });
+    assert.equal(m.columns,3,JSON.stringify(m));
+    assert.ok(m.amountTop>=m.methodBottom,JSON.stringify(m));
+    assert.ok(m.rowRight<=m.fieldsRight+1,JSON.stringify(m));
+  });
+  await check('phone Payment tab keeps checkout accessible and compact without clipping',async()=>{
+    await page.setViewportSize({width:375,height:812});
+    await page.evaluate(()=>posV2SelectTab_('payment'));
+    await page.locator('#posMultiPaymentRows').waitFor({state:'visible'});
+    const m=await page.evaluate(()=>{
+      const row=document.querySelector('#posMultiPaymentRows .pos-multi-payment-row');
+      const r=row.getBoundingClientRect();
+      const fields=document.querySelector('#page-pos .pos-checkout-fields').getBoundingClientRect();
+      const buttons=document.querySelector('#page-pos .pos-checkout-actions').getBoundingClientRect();
+      return {columns:getComputedStyle(row).gridTemplateColumns.trim().split(/\s+/).length,
+        rowRight:r.right,fieldsRight:fields.right,actionsRight:buttons.right,windowWidth:innerWidth,
+        paymentVisible:!!r.width && !!r.height,
+        completeHeight:getComputedStyle(document.getElementById('posCompleteBtn')).height};
+    });
+    assert.equal(m.columns,3,JSON.stringify(m));
+    assert.equal(m.completeHeight,'43px');
+    assert.ok(m.paymentVisible);
+    assert.ok(m.rowRight<=m.fieldsRight+1,JSON.stringify(m));
+    assert.ok(m.actionsRight<=m.windowWidth+1,JSON.stringify(m));
+    assert.deepEqual(errors,[]);
+    assert.equal((await page.evaluate(()=>__rpcCalls.filter(c=>c.name==='completeSale'))).length,0);
   });
   await page.close();
 
