@@ -264,7 +264,6 @@
   </div>
 </div>
 
-<div id="prodActionMenu" class="action-menu" role="menu" hidden></div>
 
 <script>
   var prodState = { bundleItems: [], products: [], categories: [], units: [], lowStockThreshold: 5, editingId: null, addSource: '', stockEditingId: null, stockEditingName: '', stockEditingCurrent: 0, sortKey: '', sortDir: 'asc', currentLotsProduct: null, currentLots: [], lotCostSelected: null, unpricedLots: [] };
@@ -347,58 +346,39 @@
     }
   }
 
-  var prodActionMenuState_ = { productId: null, trigger: null };
-
+  // Reuse the Sales/ERP row Actions menu: identical icons, spacing, focus
+  // behavior, and mobile presentation. Product-specific actions remain intact.
   function prodCloseActionMenu_() {
-    var menu = document.getElementById('prodActionMenu');
-    if (prodActionMenuState_.trigger) prodActionMenuState_.trigger.setAttribute('aria-expanded', 'false');
-    menu.hidden = true;
-    menu.innerHTML = '';
-    prodActionMenuState_.productId = null;
-    prodActionMenuState_.trigger = null;
+    closeRowActionMenu_();
   }
 
   function prodOpenActionMenu_(trigger, product) {
-    var menu = document.getElementById('prodActionMenu');
-    if (prodActionMenuState_.trigger === trigger && !menu.hidden) {
-      prodCloseActionMenu_();
-      return;
+    if (!product) return;
+    var isBundle = product['Product Type'] === 'Bundle';
+    var items = [{ action: 'edit', label: 'Edit' }];
+    if (!isBundle) {
+      items.push({ action: 'stock', label: 'Adjust Stock' });
+      items.push({ action: 'lots', label: 'View Lots' });
     }
-    prodCloseActionMenu_();
-    prodActionMenuState_.productId = product['Product ID'];
-    prodActionMenuState_.trigger = trigger;
-    trigger.setAttribute('aria-expanded', 'true');
-    menu.innerHTML =
-      '<button type="button" class="action-menu-item" role="menuitem" data-menu-act="edit">Edit</button>' +
-      (product['Product Type'] === 'Bundle' ? '' :
-      '<button type="button" class="action-menu-item" role="menuitem" data-menu-act="stock">Adjust Stock</button>' +
-      '<button type="button" class="action-menu-item" role="menuitem" data-menu-act="lots">View Lots</button>') +
-      '<button type="button" class="action-menu-item" role="menuitem" data-menu-act="toggle">' + (product['Status'] === 'Active' ? 'Deactivate' : 'Activate') + '</button>' +
-      '<div class="action-menu-divider" role="separator"></div>' +
-      '<button type="button" class="action-menu-item danger" role="menuitem" data-menu-act="del">Delete</button>';
-    menu.hidden = false;
-
-    var triggerRect = trigger.getBoundingClientRect();
-    var menuRect = menu.getBoundingClientRect();
-    var left = Math.max(8, Math.min(window.innerWidth - menuRect.width - 8, triggerRect.right - menuRect.width));
-    var top = triggerRect.bottom + 6;
-    if (top + menuRect.height > window.innerHeight - 8 && triggerRect.top - menuRect.height - 6 >= 8) {
-      top = triggerRect.top - menuRect.height - 6;
-    }
-    menu.style.left = Math.round(left) + 'px';
-    menu.style.top = Math.round(Math.max(8, top)) + 'px';
+    items.push(product['Status'] === 'Active'
+      ? { action: 'deactivate', label: 'Deactivate' }
+      : { action: 'activate', label: 'Activate' });
+    items.push({ divider: true });
+    items.push({ action: 'delete', label: 'Delete', danger: true });
+    var id = product['Product ID'];
+    openRowActionMenu_(trigger, items, function (action) {
+      prodRunActionMenuItem_(action, id);
+    });
   }
 
-  function prodRunActionMenuItem_(action) {
-    var id = prodActionMenuState_.productId;
+  function prodRunActionMenuItem_(action, id) {
     var product = prodState.products.filter(function (p) { return p['Product ID'] === id; })[0];
-    prodCloseActionMenu_();
     if (!product) return;
     if (action === 'edit') prodOpenEdit_(product);
     if (action === 'stock') prodOpenStock_(product);
     if (action === 'lots') prodOpenLots_(product);
-    if (action === 'toggle') prodToggleStatus_(product, product['Status']);
-    if (action === 'del') prodDelete_(product['Product ID'], product['Product Name']);
+    if (action === 'activate' || action === 'deactivate') prodToggleStatus_(product, product['Status']);
+    if (action === 'delete') prodDelete_(product['Product ID'], product['Product Name']);
   }
 
   function prodSyncSearchClear_() {
@@ -735,41 +715,7 @@
     var product = prodState.products.filter(function (p) { return p['Product ID'] === btn.dataset.id; })[0];
     if (!product) return;
     prodOpenActionMenu_(btn, product);
-    var first = document.querySelector('#prodActionMenu [data-menu-act]');
-    if (first) first.focus();
   });
-
-  document.getElementById('prodActionMenu').addEventListener('click', function (e) {
-    var item = e.target.closest('[data-menu-act]');
-    if (!item) return;
-    prodRunActionMenuItem_(item.dataset.menuAct);
-  });
-
-  document.getElementById('prodActionMenu').addEventListener('keydown', function (e) {
-    var items = Array.prototype.slice.call(this.querySelectorAll('[data-menu-act]'));
-    var index = items.indexOf(document.activeElement);
-    if (e.key === 'Escape') {
-      var trigger = prodActionMenuState_.trigger;
-      prodCloseActionMenu_();
-      if (trigger) trigger.focus();
-      return;
-    }
-    if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && items.length) {
-      e.preventDefault();
-      var next = e.key === 'ArrowDown' ? (index + 1 + items.length) % items.length : (index - 1 + items.length) % items.length;
-      items[next].focus();
-    }
-  });
-
-  document.addEventListener('click', function (e) {
-    if (e.target.closest('#prodActionMenu') || e.target.closest('button[data-act="menu"]')) return;
-    prodCloseActionMenu_();
-  });
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && !document.getElementById('prodActionMenu').hidden) prodCloseActionMenu_();
-  });
-  window.addEventListener('resize', prodCloseActionMenu_);
-  window.addEventListener('scroll', prodCloseActionMenu_, true);
 
   // The bundle picker reuses the ERP's ranked product search. Its popup
   // lives on <body> so the product modal's scroll area cannot clip it.
