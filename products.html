@@ -21,9 +21,9 @@
         <tr>
           <th aria-sort="none"><button type="button" class="prod-sort-button" data-sort-key="name">Product <span class="prod-sort-indicator" aria-hidden="true">↕</span></button></th>
           <th aria-sort="none"><button type="button" class="prod-sort-button" data-sort-key="category">Category <span class="prod-sort-indicator" aria-hidden="true">↕</span></button></th>
-          <th class="num prod-sort-th" aria-sort="none"><button type="button" class="prod-sort-button" data-sort-key="stockQty">Stock <span class="prod-sort-indicator" aria-hidden="true">↕</span></button></th>
           <th class="num prod-sort-th" aria-sort="none"><button type="button" class="prod-sort-button" data-sort-key="purchasePrice">Purchase <span class="prod-sort-indicator" aria-hidden="true">↕</span></button></th>
           <th class="num prod-sort-th" aria-sort="none"><button type="button" class="prod-sort-button" data-sort-key="sellingPrice">Selling <span class="prod-sort-indicator" aria-hidden="true">↕</span></button></th>
+          <th class="num prod-sort-th" aria-sort="none"><button type="button" class="prod-sort-button" data-sort-key="stockQty">Stock <span class="prod-sort-indicator" aria-hidden="true">↕</span></button></th>
           <th class="num prod-sort-th" aria-sort="none"><button type="button" class="prod-sort-button" data-sort-key="stockValue">Stock Value <span class="prod-sort-indicator" aria-hidden="true">↕</span></button></th>
           <th aria-sort="none"><button type="button" class="prod-sort-button" data-sort-key="status">Status <span class="prod-sort-indicator" aria-hidden="true">↕</span></button></th>
           <th class="erp-sticky-action-col" scope="col">Actions</th>
@@ -548,12 +548,13 @@
   prodWirePinnedHeader_();
 
   // Display-only normalizations; product settings retain their stored Unit value.
+  // Display-only labels; stored units and stock arithmetic remain unchanged.
   function prodUnitLabel_(unit) {
     var raw = String(unit || '').trim();
     var displayNames = {
-      pc: 'Pcs', pcs: 'Pcs', piece: 'Pcs', pieces: 'Pcs',
+      pc: 'pcs', pcs: 'pcs', piece: 'pcs', pieces: 'pcs',
       kg: 'Kg', box: 'Box', bag: 'Bag', coil: 'Coil',
-      gauge: 'Gauge', gira: 'Gira', set: 'Set', sets: 'Sets'
+      gauge: 'Gauge', gira: 'Gira', set: 'set', sets: 'sets'
     };
     return displayNames[raw.toLowerCase()] || raw;
   }
@@ -563,7 +564,6 @@
     var q = document.getElementById('prodSearch').value || '';
     var cat = document.getElementById('prodCategoryFilter').value;
     var brand = document.getElementById('prodBrandFilter').value;
-    // Preserve filtered smart search and the existing user-selected sorting.
     var filtered = prodState.products.filter(function (p) {
       return (!cat || p['Category'] === cat) && (!brand || p['Brand'] === brand);
     });
@@ -575,42 +575,40 @@
     rows.forEach(function (p) {
       var isBundle = p['Product Type'] === 'Bundle';
       var qty = isBundle ? (Number(p['Available Sets']) || 0) : (Number(p['Current Stock']) || 0);
-      var stockUnit = isBundle ? 'Sets' : prodUnitLabel_(p['Unit']);
-      var sellingUnit = prodUnitLabel_(p['Unit']) || (isBundle ? 'Set' : '');
-      var lowStock = !isBundle && qty <= Number(p['Minimum Stock']);
+      var stockUnit = isBundle ? 'sets' : prodUnitLabel_(p['Unit']);
+      var minimum = p['Minimum Stock'];
+      var hasMinimum = !isBundle && minimum != null && minimum !== '';
+      var lowStock = hasMinimum && qty <= Number(minimum);
       var outOfStock = !isBundle && qty <= 0;
-      var statusBadge = p['Status'] !== 'Active'
-        ? '<span class="badge badge-danger">Inactive</span>'
-        : isBundle
-          ? '<span class="badge badge-success">Active</span>'
-          : outOfStock
-            ? '<span class="badge badge-danger">Out of stock</span>'
-            : lowStock
-              ? '<span class="badge badge-warning">Low stock</span>'
-              : '<span class="badge badge-success">In stock</span>';
-      var qtyText = qty.toLocaleString('en-US', { maximumFractionDigits: 6 });
-      var stockCell = '<div class="prod-cell-main' + (lowStock ? ' prod-stock-low' : '') + '">' +
-        escapeHtml(qtyText) + (stockUnit ? ' <span class="prod-cell-unit">' + escapeHtml(stockUnit) + '</span>' : '') + '</div>' +
-        (!isBundle && p['Minimum Stock'] != null && p['Minimum Stock'] !== ''
-          ? '<div class="prod-cell-sub">min ' +
-            escapeHtml(Number(p['Minimum Stock']).toLocaleString('en-US', { maximumFractionDigits: 6 })) +
-            (stockUnit ? ' ' + escapeHtml(stockUnit) : '') + '</div>'
-          : '');
-      var priceCell = '<span class="prod-price-main">' + formatMoney(p['Selling Price']) + '</span>' +
-        (sellingUnit ? '<span class="prod-price-unit">/' + escapeHtml(sellingUnit) + '</span>' : '');
+      // Stock carries warning details without adding a second visual row.
+      var stockTitle = '';
+      if (hasMinimum) {
+        stockTitle = (outOfStock ? 'Out of stock; ' : lowStock ? 'Low stock; ' : '') +
+          'Minimum stock: ' + Number(minimum).toLocaleString('en-US', { maximumFractionDigits: 6 }) +
+          (stockUnit ? ' ' + stockUnit : '');
+      }
       var unpricedCount = Number(p['Unpriced Lot Count']) || 0;
-      var unpricedBadge = unpricedCount > 0 ? ' <span class="badge badge-warning">Unpriced lots: ' + unpricedCount + '</span>' : '';
-      var productBrand = String(p['Brand'] || '').trim();
+      if (unpricedCount > 0) {
+        stockTitle += (stockTitle ? '; ' : '') + 'Unpriced lots: ' + unpricedCount;
+      }
+      var qtyText = qty.toLocaleString('en-US', { maximumFractionDigits: 6 });
+      var stockClass = outOfStock ? ' prod-stock-out' : lowStock ? ' prod-stock-low' : '';
+      var stockCell = '<div class="prod-cell-main' + stockClass + '"' +
+        (stockTitle ? ' title="' + escapeHtml(stockTitle) + '"' : '') + '>' +
+        escapeHtml(qtyText) + (stockUnit ? ' <span class="prod-cell-unit">' + escapeHtml(stockUnit) + '</span>' : '') +
+        '</div>';
+      var statusBadge = p['Status'] === 'Active'
+        ? '<span class="badge badge-success">Active</span>'
+        : '<span class="badge badge-danger">Inactive</span>';
 
       var tr = document.createElement('tr');
       tr.innerHTML =
-        '<td><div class="prod-item-name">' + escapeHtml(p['Product Name']) +
-          (isBundle ? ' <span class="badge">Bundle</span>' : '') + unpricedBadge + '</div>' +
-          (productBrand ? '<div class="prod-item-meta">' + escapeHtml(productBrand) + '</div>' : '') + '</td>' +
+        '<td><div class="prod-item-name" title="' + escapeHtml(p['Product Name']) + '">' +
+          escapeHtml(p['Product Name']) + '</div></td>' +
         '<td>' + escapeHtml(p['Category'] || '') + '</td>' +
-        '<td class="num">' + stockCell + '</td>' +
         '<td class="num">' + (isBundle ? '—' : formatMoney(p['Purchase Price'])) + '</td>' +
-        '<td class="num">' + priceCell + '</td>' +
+        '<td class="num"><span class="prod-price-main">' + formatMoney(p['Selling Price']) + '</span></td>' +
+        '<td class="num">' + stockCell + '</td>' +
         '<td class="num">' + (isBundle ? '—' : formatMoney(p['Stock Value'])) + '</td>' +
         '<td>' + statusBadge + '</td>' +
         '<td class="erp-sticky-action-col">' +
