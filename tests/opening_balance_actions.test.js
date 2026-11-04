@@ -154,7 +154,8 @@ test('customer and supplier UIs unlock signed opening balance only with special 
 test('product rows render one Actions trigger instead of five inline action buttons', () => {
   const html = read('products.html');
   const render = fnSource(html, 'prodRender');
-  assert.match(render, />Actions/);
+  assert.match(render, /rowActionTriggerHtml_\(/, 'one accessible icon trigger per product row');
+  assert.match(render, /Actions for product/);
   assert.match(render, /data-act=["']menu["']/);
   assert.doesNotMatch(render, />Edit<\/button>/);
   assert.doesNotMatch(render, />Stock<\/button>/);

@@ -3536,6 +3536,63 @@
 @media print {
   .sm-pinned-sales-header { display: none !important; }
 }
+/* Products follows the Sales continuous page scroll: horizontal overflow
+   stays local and the visible pinned header appears only as needed. */
+@media screen and (min-width: 541px) {
+  #page-products #prodTableScroll {
+    max-height: none !important;
+    overflow-y: hidden;
+    overflow-x: auto;
+    overscroll-behavior-y: auto;
+  }
+  #page-products #prodTable th.erp-sticky-action-col,
+  #page-products #prodTable td.erp-sticky-action-col {
+    padding: 4px 2px;
+  }
+}
+.prod-pinned-header {
+  position: fixed;
+  z-index: 80;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+.prod-pinned-header[hidden] { display: none !important; }
+.prod-pinned-header::-webkit-scrollbar { display: none; }
+.prod-pinned-header table {
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  margin: 0;
+  background: var(--color-surface);
+}
+.prod-pinned-header th {
+  position: relative;
+  top: auto;
+  padding: 9px 12px;
+  box-sizing: border-box;
+  background: var(--color-surface);
+  font-weight: 600;
+}
+.prod-pinned-header th.erp-sticky-action-col {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+  width: 58px;
+  min-width: 58px;
+  padding: 4px 2px;
+  background: var(--color-surface);
+  border-left: 0;
+  box-shadow: none;
+}
+@media screen and (max-width: 540px) {
+  .prod-pinned-header { display: none !important; }
+}
+@media print {
+  .prod-pinned-header { display: none !important; }
+}
 @media print {
   .erp-sticky-action-col { position: static !important; box-shadow: none !important; }
   .erp-row-action-trigger { display: none !important; }
