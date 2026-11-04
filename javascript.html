@@ -681,6 +681,15 @@
     else setup();
   })();
 
+  // The active tab remains in the sub-navigation. The shared header names
+  // only its module, never the full Parent › Child route.
+  function moduleHeaderFor_(key, group) {
+    return {
+      title: group && group.label ? group.label : (key === 'noAccess' ? 'No Access' : key),
+      bn: group && group.bn ? group.bn : ''
+    };
+  }
+
   function goToPage(key) {
     if (allowedModules !== null && key !== 'noAccess') {
       var direct = navGroupFor_(key);
@@ -711,17 +720,10 @@
 
     renderSubNav_(group, key);
 
-    var title = group ? group.label : key;
-    var titleBn = group ? group.bn : '';
-    if (group && group.children) {
-      var child = group.children.filter(function (c) { return c.key === key; })[0];
-      if (child && child.key !== group.key) {
-        title = group.label + ' \u203A ' + child.label;
-        titleBn = child.bn || group.bn;
-      }
-    }
-    document.getElementById('pageTitle').innerHTML = escapeHtml(title) +
-      (titleBn ? '<span class="bn-hint">' + escapeHtml(titleBn) + '</span>' : '');
+    var moduleHeader = moduleHeaderFor_(key, group);
+    document.getElementById('pageTitle').innerHTML =
+      '<span class="topbar-module-name">' + escapeHtml(moduleHeader.title) + '</span>' +
+      (moduleHeader.bn ? '<span class="bn-hint">' + escapeHtml(moduleHeader.bn) + '</span>' : '');
     document.getElementById('sidebar').classList.remove('open');
     collapseSidebarOverlay_();
     closeMobileMore_();
