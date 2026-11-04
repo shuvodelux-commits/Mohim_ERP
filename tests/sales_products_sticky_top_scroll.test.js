@@ -53,3 +53,10 @@ test('Top scrollbar is suppressed on phones and print; floating bottom scrollbar
   assert.match(sales, /class="mobile-card-table erp-action-table"/);
   assert.match(products, /class="mobile-card-table erp-action-table"/);
 });
+
+test('Both tables remeasure top scrollbar after rendering and resize', () => {
+  assert.match(sales, /requestAnimationFrame\(smSyncTopScrollbar_\)/);
+  assert.match(sales, /window\.addEventListener\(["']resize["'],\s*smSyncTopScrollbar_\)/);
+  assert.match(products, /requestAnimationFrame\(function \(\) \{ prodSyncTopScrollbar_\(\); \}\)/);
+  assert.match(products, /window\.addEventListener\('resize',\s*function \(\) \{ prodSyncTopScrollbar_\(\); \}\)/);
+});
