@@ -3496,6 +3496,52 @@
     grid-template-columns: minmax(180px, 1.8fr) repeat(2, minmax(130px,1fr));
   }
 }
+/* Thin native horizontal scrollbars available above wide Sales/Products tables,
+   including above the floating heading while the table scrolls vertically. */
+.erp-table-top-scrollbar,
+.erp-pinned-table-scrollbar {
+  height: 14px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #5dd8cf #e8eff1;
+  background: var(--color-surface);
+}
+.erp-table-top-scrollbar-inner,
+.erp-pinned-table-scrollbar-inner {
+  height: 1px;
+}
+.erp-pinned-table-scrollbar {
+  position: fixed;
+  z-index: 81;
+  overflow-x: auto;
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--color-border);
+}
+.erp-pinned-table-scrollbar[hidden] { display: none !important; }
+.erp-table-top-scrollbar::-webkit-scrollbar,
+.erp-pinned-table-scrollbar::-webkit-scrollbar { height: 12px; }
+.erp-table-top-scrollbar::-webkit-scrollbar-track,
+.erp-pinned-table-scrollbar::-webkit-scrollbar-track { background: #e8eff1; }
+.erp-table-top-scrollbar::-webkit-scrollbar-thumb,
+.erp-pinned-table-scrollbar::-webkit-scrollbar-thumb {
+  background: #5dd8cf;
+  border-radius: 6px;
+  border: 2px solid #e8eff1;
+}
+@media screen and (max-width: 540px) {
+  .erp-pinned-table-scrollbar { display: none !important; }
+  .erp-table-top-scrollbar { display: none !important; }
+}
+@media screen and (orientation: landscape) and (max-height: 540px) and (pointer: coarse) {
+  .erp-pinned-table-scrollbar { display: none !important; }
+  .erp-table-top-scrollbar { display: none !important; }
+}
+@media print {
+  .erp-pinned-table-scrollbar { display: none !important; }
+  .erp-table-top-scrollbar { display: none !important; }
+}
+
 /* The Sales table retains horizontal overflow; its separate header mirror
    appears only once the real heading has scrolled beyond the app top bar. */
 .sm-pinned-sales-header {
