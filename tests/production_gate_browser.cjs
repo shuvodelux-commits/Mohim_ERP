@@ -164,11 +164,11 @@ async function main() {
         paymentRight:row.right,fieldRight:fields.right,totalsTop:totals.top,fieldsBottom:fields.bottom
       };
     });
-    assert.equal(m.customerHeading,'16px');
-    assert.equal(m.customerInputHeight,'40px');
+    assert.equal(m.customerHeading,'15px');
+    assert.equal(m.customerInputHeight,'36px');
     assert.equal(m.discountHeight,'36px');
     assert.equal(m.totalFont,'18px');
-    assert.equal(m.completeHeight,'43px');
+    assert.equal(m.completeHeight,'40px');
     assert.equal(m.paymentColumns,5,JSON.stringify(m));
     assert.equal(m.rowBackground,'rgba(0, 0, 0, 0)');
     assert.equal(m.addBackground,'rgba(0, 0, 0, 0)');
@@ -176,6 +176,27 @@ async function main() {
     assert.ok(m.panelWidth<=611 && m.panelWidth>=580,JSON.stringify(m));
     assert.ok(m.paymentRight<=m.fieldRight+1,JSON.stringify(m));
     assert.ok(m.fieldsBottom<=m.totalsTop+1,JSON.stringify(m));
+  });
+  await check('compact POS checkout uses dense spacing without shrinking interactive fields',async()=>{
+    const m=await page.evaluate(()=>{
+      const css=s=>getComputedStyle(document.querySelector(s));
+      return {
+        cardPaddingTop:css('#page-pos .pos-customer-section').paddingTop,
+        cardPaddingBottom:css('#page-pos .pos-customer-section').paddingBottom,
+        headingMargin:css('#page-pos .pos-customer-section > .pos-section-head').marginBottom,
+        customerInput:css('#posCustomerName').height,
+        discountGap:css('#page-pos .pos-checkout-fields > .totals-row:first-child').marginBottom,
+        paymentRowPadding:css('#posMultiPaymentRows .pos-multi-payment-row').paddingTop,
+        paymentField:css('#posMultiPaymentRows .pos-multi-payment-row input').height,
+        summaryGap:css('#page-pos .pos-multi-totals').rowGap,
+        grandPadding:css('#page-pos .pos-checkout-totals .totals-row.grand').paddingTop,
+        actionHeight:css('#posCompleteBtn').height
+      };
+    });
+    assert.deepEqual(m,{cardPaddingTop:'14px',cardPaddingBottom:'12px',
+      headingMargin:'9px',customerInput:'36px',discountGap:'10px',
+      paymentRowPadding:'5px',paymentField:'36px',summaryGap:'6px',
+      grandPadding:'10px',actionHeight:'40px'});
   });
   await check('narrow desktop sidebar wraps payments to two lines within actual panel width',async()=>{
     await page.setViewportSize({width:1440,height:1000});
@@ -255,7 +276,7 @@ async function main() {
         completeHeight:getComputedStyle(document.getElementById('posCompleteBtn')).height};
     });
     assert.equal(m.columns,3,JSON.stringify(m));
-    assert.equal(m.completeHeight,'43px');
+    assert.equal(m.completeHeight,'40px');
     assert.ok(m.paymentVisible);
     assert.ok(m.rowRight<=m.fieldsRight+1,JSON.stringify(m));
     assert.ok(m.actionsRight<=m.windowWidth+1,JSON.stringify(m));
