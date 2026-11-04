@@ -67,12 +67,15 @@
 
       <div id="posCustomerMoreFields" class="pos-customer-more-fields">
         <div class="pos-customer-extra-field">
-          <label for="posCustomerFatherName">Father Name <span class="bn-hint" style="display:inline;">— বাবার নাম</span></label>
-          <input id="posCustomerFatherName" type="text" placeholder="Optional" autocomplete="off">
+          <label for="posCustomerFatherName" id="posCustomerRelationNameLabel">Father Name — বাবার নাম</label>
+          <div class="pos-customer-relation-entry">
+            <select id="posCustomerRelationType" aria-label="Relationship"><option value="Father">Father</option><option value="Husband">Husband</option></select>
+            <input id="posCustomerFatherName" type="text" placeholder="Enter name" autocomplete="off">
+          </div>
         </div>
         <div class="pos-customer-extra-field">
           <label for="posCustomerAddress">Address <span class="bn-hint" style="display:inline;">— ঠিকানা</span></label>
-          <input id="posCustomerAddress" type="text" placeholder="Optional" autocomplete="off">
+          <input id="posCustomerAddress" type="text" placeholder="Optional address" autocomplete="off">
         </div>
       </div>
       <div class="pos-customer-actions">
@@ -2164,12 +2167,24 @@
     return api;
   }
 
+  function posSetCustomerRelationType_(type) {
+    var selected = type === 'Husband' ? 'Husband' : 'Father';
+    document.getElementById('posCustomerRelationType').value = selected;
+    document.getElementById('posCustomerRelationNameLabel').textContent =
+      selected === 'Husband' ? 'Husband Name — স্বামীর নাম' : 'Father Name — বাবার নাম';
+    posRefreshTabletSelect_(document.getElementById('posCustomerRelationType'));
+  }
+  document.getElementById('posCustomerRelationType').addEventListener('change', function () {
+    posSetCustomerRelationType_(this.value);
+  });
+
   function posClearCustomer_() {
     var nameEl = document.getElementById('posCustomerName');
     nameEl.value = '';
     nameEl.dataset.customerId = '';
     document.getElementById('posCustomerPhone').value = '';
     document.getElementById('posCustomerFatherName').value = '';
+    posSetCustomerRelationType_('Father');
     document.getElementById('posCustomerAddress').value = '';
     posSetCustomerMoreExpanded_(false);
     posUpdateCustomerDueDisplay_(0);
@@ -2200,6 +2215,7 @@
     document.getElementById('posCustomerPhone').value = match.phone;
     document.getElementById('posCustomerAddress').value = match.address || '';
     document.getElementById('posCustomerFatherName').value = match.fatherName || '';
+    posSetCustomerRelationType_(match.relationType);
     posUpdateCustomerDueDisplay_(match.due);
   }
 
@@ -2242,6 +2258,7 @@
     nameEl.dataset.customerId = '';
     posUpdateCustomerDueDisplay_(0);
     document.getElementById('posCustomerFatherName').value = '';
+    posSetCustomerRelationType_('Father');
     document.getElementById('posCustomerAddress').value = '';
     if (changedField === 'name') phoneEl.value = '';
     if (changedField === 'phone') nameEl.value = '';
@@ -2321,6 +2338,7 @@
       customerName: document.getElementById('posCustomerName').value.trim(),
       customerPhone: document.getElementById('posCustomerPhone').value.trim(),
       customerFatherName: document.getElementById('posCustomerFatherName').value.trim(),
+      customerRelationType: document.getElementById('posCustomerRelationType').value,
       customerAddress: document.getElementById('posCustomerAddress').value.trim(),
       items: posState.cart.map(function (line) {
         return { productId: line.productId, name: line.name, unit: line.unit || '', qty: Number(line.qty)||0,
@@ -2426,7 +2444,7 @@
         serialSelections:Array.isArray(item.serialSelections)?item.serialSelections:[],warrantyData:item.warrantyData||null,unavailable:!product};
     });
     document.getElementById('posCustomerName').value=draft.customerName||''; document.getElementById('posCustomerName').dataset.customerId=draft.customerId||'';
-    document.getElementById('posCustomerPhone').value=draft.customerPhone||''; document.getElementById('posCustomerFatherName').value=draft.customerFatherName||''; document.getElementById('posCustomerAddress').value=draft.customerAddress||'';
+    document.getElementById('posCustomerPhone').value=draft.customerPhone||''; document.getElementById('posCustomerFatherName').value=draft.customerFatherName||''; posSetCustomerRelationType_(draft.customerRelationType); document.getElementById('posCustomerAddress').value=draft.customerAddress||'';
     document.getElementById('posDiscount').value=Number(draft.discount)>0?draft.discount:'';
     var payment=draft.payment||{}; document.getElementById('posAmountReceived').value=payment.amountReceived||''; document.getElementById('posPaymentMethod').value=payment.paymentMethod||'Cash';
     document.getElementById('posBankAccountRow').style.display=paymentMethodNeedsAccount_(payment.paymentMethod)?'':'none'; fillBankAccountSelect_(document.getElementById('posBankAccount'),posState.bankAccounts,payment.paymentMethod||'Cash'); document.getElementById('posBankAccount').value=payment.bankAccountId||'';
@@ -2534,6 +2552,7 @@
       customerName: custName,
       customerPhone: custPhone,
       customerFatherName: document.getElementById('posCustomerFatherName').value.trim(),
+      customerRelationType: document.getElementById('posCustomerRelationType').value,
       customerAddress: document.getElementById('posCustomerAddress').value.trim(),
       items: posState.cart.map(function (l) {
         var item = { productId: l.productId, name: l.name, qty: l.qty, unitPrice: l.unitPrice, priceMode: l.priceMode || 'manual', shortageResolution: l.shortageResolution || 'negative',
@@ -2780,6 +2799,7 @@
     document.getElementById('posCustomerPhone').value = source.customerPhone || '';
     document.getElementById('posCustomerFatherName').value =
       source.customerFatherName || (custMatch ? (custMatch.fatherName || '') : '');
+    posSetCustomerRelationType_(source.customerRelationType || (custMatch && custMatch.relationType));
     document.getElementById('posCustomerAddress').value = source.customerAddress || '';
     document.getElementById('posDiscount').value = Number(source.discount) > 0 ? source.discount : '';
     document.getElementById('posAmountReceived').value =
@@ -2951,7 +2971,8 @@ function posLoadUpdateInvoice_(inv, reason, mode) {
     document.getElementById('posCustomerName').dataset.customerId = inv.customerId || '';
     document.getElementById('posCustomerPhone').value = inv.customerPhone || '';
     document.getElementById('posCustomerAddress').value = inv.customerAddress || '';
-    document.getElementById('posCustomerFatherName').value = custMatch ? (custMatch.fatherName || '') : '';
+    document.getElementById('posCustomerFatherName').value = inv.customerFatherName || (custMatch ? (custMatch.fatherName || '') : '');
+    posSetCustomerRelationType_(inv.customerRelationType || (custMatch && custMatch.relationType));
     document.getElementById('posDiscount').value = Number(inv.discount) > 0 ? inv.discount : '';
     document.getElementById('posAmountReceived').value = inv.paidAmount > 0 ? inv.paidAmount : '';
     document.getElementById('posPaymentMethod').value = inv.paymentMethod || 'Cash';

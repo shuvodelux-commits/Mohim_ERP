@@ -23,10 +23,10 @@ test('restoring draft or editing invoice never collapses optional customer field
   assert.match(pos,/customerAddress: document\.getElementById\('posCustomerAddress'\)\.value\.trim\(\)/);
 });
 
-test('compact two-column optional controls and narrow phone stacking follow approved design',()=>{
+test('optional relation row and full-width address remain stacked at every breakpoint',()=>{
   const style=css.split('/* POS customer optional fields: always visible, cart stable */')[1]||'';
   assert.ok(style.length>200);
-  assert.match(style,/\.pos-customer-more-fields\s*\{[^}]*display:grid;[^}]*grid-template-columns:repeat\(2,\s*minmax\(0,\s*1fr\)\);/s);
+  assert.match(style,/\.pos-customer-more-fields\s*\{[^}]*display:grid;[^}]*grid-template-columns:minmax\(0,\s*1fr\);/s);
   assert.match(style,/\.pos-customer-more-fields input\s*\{[^}]*height:36px;/s);
   assert.match(style,/@media\s*\(max-width:\s*540px\)[\s\S]*?\.pos-customer-more-fields\s*\{[^}]*grid-template-columns:1fr;/);
 });

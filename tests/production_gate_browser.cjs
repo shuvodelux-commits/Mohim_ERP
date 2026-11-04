@@ -41,6 +41,138 @@ async function main() {
   await check('POS invoice uses exact returned identity/customer',async()=>{assert.match(await page.textContent('#invoicePaper'),/INV-000017/);assert.match(await page.textContent('#invoicePaper'),/মহিউদ্দিন/);});
   await check('POS posts exactly once',async()=>{const calls=await page.evaluate(()=>__rpcCalls.filter(c=>c.name==='completeSale'));assert.equal(calls.length,1);assert.equal(calls[0].args[1].items[0].productId,'PROD-000001');});
   await check('POS browser errors',()=>assert.deepEqual(errors,[]));await page.close();
+  // Relationship type is a user-facing select; exercise the real change
+  // event and the actual payload used by Save Draft / Complete Sale.
+  ({page,errors}=await boot(browser));await route(page,'posv2');
+  await check('POS Father/Husband switch updates label and draft payload without clearing name',async()=>{
+    const state=await page.evaluate(()=>{
+      const type=document.getElementById('posCustomerRelationType');
+      const name=document.getElementById('posCustomerFatherName');
+      name.value='Rahim';
+      type.value='Husband';type.dispatchEvent(new Event('change',{bubbles:true}));
+      const husbandLabel=document.getElementById('posCustomerRelationNameLabel').textContent;
+      const payload=posBuildDraftPayload_();
+      type.value='Father';type.dispatchEvent(new Event('change',{bubbles:true}));
+      return {husbandLabel,relationType:payload.customerRelationType,
+        draftName:payload.customerFatherName,
+        nameAfterSwitch:name.value,
+        fatherLabel:document.getElementById('posCustomerRelationNameLabel').textContent};
+    });
+    assert.equal(state.husbandLabel,'Husband Name — স্বামীর নাম');
+    assert.equal(state.relationType,'Husband');
+    assert.equal(state.draftName,'Rahim');
+    assert.equal(state.nameAfterSwitch,'Rahim');
+    assert.equal(state.fatherLabel,'Father Name — বাবার নাম');
+  });
+  await check('POS relationship row stays inline with full-width address beneath on desktop tablet phone',async()=>{
+    for (const width of [1440,768,375]) {
+      await page.setViewportSize({width,height:900});
+      if(width<=540) await page.evaluate(()=>posV2SelectTab_('customer'));
+      const layout=await page.evaluate(()=>{
+        const shell=document.getElementById('posCustomerMoreFields');
+        const type=document.getElementById('posCustomerRelationType');
+        const name=document.getElementById('posCustomerFatherName');
+        const address=document.getElementById('posCustomerAddress');
+        const group=shell.querySelector('.pos-customer-relation-entry');
+        const first=shell.querySelector('.pos-customer-extra-field');
+        const second=first.nextElementSibling;
+        const t=(type._touchSelectTrigger||type).getBoundingClientRect();
+        const n=name.getBoundingClientRect(),a=address.getBoundingClientRect();
+        const g=group.getBoundingClientRect(),s=shell.getBoundingClientRect();
+        const f=first.getBoundingClientRect(),b=second.getBoundingClientRect();
+        return {columns:getComputedStyle(shell).gridTemplateColumns.trim().split(/\s+/).length,
+          sameRow:Math.abs(t.top-n.top)<=2,
+          fullRelation:Math.abs(f.width-s.width)<=2,
+          below:b.top>=f.bottom,
+          fullAddress:Math.abs(a.width-s.width)<=3,
+          addressFits:a.right<=s.right+2,
+          selectorWidth:t.width,nameWidth:n.width,
+          groupFits:g.right<=s.right+2};
+      });
+      assert.equal(layout.columns,1,JSON.stringify({width,layout}));
+      assert.equal(layout.sameRow,true,JSON.stringify({width,layout}));
+      assert.equal(layout.fullRelation,true,JSON.stringify({width,layout}));
+      assert.equal(layout.below,true,JSON.stringify({width,layout}));
+      assert.equal(layout.fullAddress,true,JSON.stringify({width,layout}));
+      assert.equal(layout.addressFits,true,JSON.stringify({width,layout}));
+      assert.ok(layout.selectorWidth>=100&&layout.nameWidth>=80,JSON.stringify({width,layout}));
+      assert.equal(layout.groupFits,true,JSON.stringify({width,layout}));
+    }
+    await page.setViewportSize({width:1440,height:1000});
+  });
+  await check('legacy draft reopens as Father, new draft restores Husband',async()=>{
+    const state=await page.evaluate(()=>{
+      const seed={draftId:'D-REL',draftNo:'DRAFT-REL',version:1,items:[],payment:{paymentMethod:'Cash'},customerName:'Test',customerPhone:'017',customerFatherName:'Karim',customerRelationType:'Husband',customerAddress:'Dhaka'};
+      posRestoreDraft_(seed);
+      const spouse=document.getElementById('posCustomerRelationType').value;
+      posRestoreDraft_(Object.assign({},seed,{draftId:'D-LEGACY',customerRelationType:''}));
+      const legacy=document.getElementById('posCustomerRelationType').value;
+      return {spouse,legacy};
+    });
+    assert.deepEqual(state,{spouse:'Husband',legacy:'Father'});
+  });
+  await route(page,'customers');
+  await check('Add and Edit Customer relation select retains Husband and sends relationType',async()=>{
+    await page.locator('#custAddBtn').click();
+    for(const width of [1440,375]) {
+      await page.setViewportSize({width,height:900});
+      const geometry=await page.evaluate(()=>{
+        const name=document.getElementById('custFatherName');
+        const type=document.getElementById('custRelationType');
+        const addr=document.getElementById('custAddress');
+        const relation=document.querySelector('#custModal .cust-relation-entry');
+        const first=relation.parentElement.getBoundingClientRect();
+        const addressRow=addr.parentElement.getBoundingClientRect();
+        const select=(type._touchSelectTrigger||type).getBoundingClientRect();
+        const input=name.getBoundingClientRect();
+        const a=addr.getBoundingClientRect();
+        return {sameLine:Math.abs(select.top-input.top)<=2,
+          below:addressRow.top>=first.bottom,
+          fullWidth:Math.abs(addressRow.width-first.width)<=2,
+          inputFits:input.right<=first.right+2,
+          addressFits:a.right<=addressRow.right+2,
+          selectorWidth:select.width,nameWidth:input.width};
+      });
+      assert.equal(geometry.sameLine,true,JSON.stringify({width,geometry}));
+      assert.equal(geometry.below,true,JSON.stringify({width,geometry}));
+      assert.equal(geometry.fullWidth,true,JSON.stringify({width,geometry}));
+      assert.equal(geometry.inputFits,true,JSON.stringify({width,geometry}));
+      assert.equal(geometry.addressFits,true,JSON.stringify({width,geometry}));
+      assert.ok(geometry.selectorWidth>=100&&geometry.nameWidth>=80,JSON.stringify({width,geometry}));
+    }
+    await page.setViewportSize({width:1440,height:1000});
+    const before=await page.evaluate(()=>{
+      const type=document.getElementById('custRelationType');
+      const name=document.getElementById('custFatherName');
+      name.value='Spouse Test';
+      type.value='Husband';type.dispatchEvent(new Event('change',{bubbles:true}));
+      return {label:document.getElementById('custRelationNameLabel').textContent,value:type.value,name:name.value};
+    });
+    assert.deepEqual(before,{label:'Husband Name — স্বামীর নাম',value:'Husband',name:'Spouse Test'});
+    await page.evaluate(()=>{
+      window.__relationCaptured=[];
+      const rpc=window.serverCall;
+      window.serverCall=function(name,...args){
+        if(name==='addCustomerChecked'){window.__relationCaptured.push(args[args.length-1]);return Promise.resolve({id:'C-REL'});}
+        return rpc.apply(this,[name,...args]);
+      };
+    });
+    await page.fill('#custName','Test Spouse');
+    await page.fill('#custPhone','01712345678');
+    await page.locator('#custSaveBtn').click();
+    await page.waitForFunction(()=>Array.isArray(window.__relationCaptured)&&window.__relationCaptured.length>0);
+    const payload=await page.evaluate(()=>window.__relationCaptured[0]);
+    assert.equal(payload.relationType,'Husband');
+    assert.equal(payload.fatherName,'Spouse Test');
+    await page.evaluate(()=>{
+      custState.customers=[{'Customer ID':'C-EDIT','Customer Name':'Test','Father Name':'Bashir','Relation Type':'Husband','Phone':'01799999999','Address':'X','Notes':'','Opening Balance':0}];
+      custOpenEdit_('C-EDIT');
+    });
+    const restored=await page.evaluate(()=>({type:document.getElementById('custRelationType').value,label:document.getElementById('custRelationNameLabel').textContent,name:document.getElementById('custFatherName').value}));
+    assert.deepEqual(restored,{type:'Husband',label:'Husband Name — স্বামীর নাম',name:'Bashir'});
+  });
+  await page.close();
+
   // The split-payment feature stays off in real Settings: exercise UI only
   // with mock browser state and never call a transactional Apps Script RPC.
   ({page,errors}=await boot(browser,{width:768,height:1024}));
@@ -259,7 +391,7 @@ async function main() {
     assert.equal(m.addressVisible,true,JSON.stringify(m));
     assert.equal(m.fixedCartTop,true,JSON.stringify(m));
     assert.equal(m.anchoredToSearch,true,JSON.stringify(m));
-    assert.equal(m.columns,2,JSON.stringify(m));
+    assert.equal(m.columns,1,JSON.stringify(m));
   });
   await check('phone Payment tab keeps checkout accessible and compact without clipping',async()=>{
     await page.setViewportSize({width:375,height:812});

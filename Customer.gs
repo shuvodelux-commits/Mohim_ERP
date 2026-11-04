@@ -90,7 +90,12 @@ function getCustomersBootstrap(token) {
  * instead of silently splitting the ledger. If no match exists, quick-create
  * keeps the existing POS behavior. Not permission-gated — see file header.
  */
-function resolveOrCreateCustomer_(name, phone, address, fatherName, preferredCustomerId) {
+// Legacy customers have no type; their saved value remains Father by default.
+function normalizeCustomerRelationType_(value) {
+  return String(value || '').trim() === 'Husband' ? 'Husband' : 'Father';
+}
+
+function resolveOrCreateCustomer_(name, phone, address, fatherName, preferredCustomerId, relationType) {
   const cleanPhone = normalizePhoneDisplay_(phone);
   const preferredId = sanitizeInput_(preferredCustomerId);
   const customers = getAllRows_("CUSTOMERS");
@@ -141,6 +146,7 @@ function resolveOrCreateCustomer_(name, phone, address, fatherName, preferredCus
     phone: cleanPhone,
     address: sanitizeInput_(address),
     fatherName: sanitizeInput_(fatherName),
+    relationType: normalizeCustomerRelationType_(relationType),
     openingBalance: 0,
   });
   if (!created.success) throw new Error(created.message);
@@ -184,6 +190,7 @@ function addCustomer_(payload) {
       "Customer ID": id,
       "Customer Name": name,
       "Father Name": sanitizeInput_(payload.fatherName),
+      "Relation Type": normalizeCustomerRelationType_(payload.relationType),
       Phone: phone,
       Address: sanitizeInput_(payload.address),
       "Opening Balance": opening,
@@ -246,6 +253,9 @@ function updateCustomer(token, customerId, payload) {
     const normalFields = {
       "Customer Name": name,
       "Father Name": sanitizeInput_(payload.fatherName),
+      "Relation Type": Object.prototype.hasOwnProperty.call(payload, 'relationType')
+        ? normalizeCustomerRelationType_(payload.relationType)
+        : normalizeCustomerRelationType_(customer["Relation Type"]),
       Phone: normalizePhoneDisplay_(payload.phone),
       Address: sanitizeInput_(payload.address),
       Notes: sanitizeInput_(payload.notes),

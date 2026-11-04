@@ -4,6 +4,7 @@ const {test} = require('node:test');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
+const relationHelper = fs.readFileSync(path.join(__dirname,'..','Customer.gs'),'utf8').match(/function normalizeCustomerRelationType_\(value\)\s*\{[^}]*\}/)[0];
 
 function workbook(motorStock = 8) {
   let serial = 0;
@@ -77,6 +78,7 @@ function workbook(motorStock = 8) {
     economicReturnLineAmount_:r=>Number(r['Line Total'])||0,
     salesReturnCashRefundAvailable_:()=>30000
   });
+  vm.runInContext(relationHelper,ctx,{filename:'Customer.gs'});
   for(const file of ['Bundles.gs','StockLots.gs','Sales.gs','SalesReturn.gs']){
     vm.runInContext(fs.readFileSync(path.join(__dirname,'..',file),'utf8'),ctx,{filename:file});
   }

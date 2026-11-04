@@ -144,6 +144,7 @@ function validateSalesDraftPayload_(payload) {
     customerName: cleanDraftText_(payload.customerName),
     customerPhone: cleanDraftText_(payload.customerPhone),
     customerFatherName: cleanDraftText_(payload.customerFatherName),
+    customerRelationType: normalizeCustomerRelationType_(payload.customerRelationType),
     customerAddress: cleanDraftText_(payload.customerAddress),
     items: cleanItems, itemsJson: itemsJson, payment: payment, paymentJson: paymentJson,
     notes: cleanDraftText_(payload.notes), subtotal: roundMoney_(subtotal), discount: roundMoney_(discount), grandTotal: roundMoney_(grandTotal)
@@ -157,7 +158,7 @@ function parseSalesDraftRow_(row) {
   return {
     draftId: row['Draft ID'], draftNo: row['Draft No'], draftDate: safeDateOnly_(row['Draft Date']),
     customerId: row['Customer ID'] || '', customerName: row['Customer Name'] || '', customerPhone: row['Customer Phone'] || '',
-    customerFatherName: row['Customer Father Name'] || '', customerAddress: row['Customer Address'] || '',
+    customerFatherName: row['Customer Father Name'] || '', customerRelationType: normalizeCustomerRelationType_(row['Customer Relation Type']), customerAddress: row['Customer Address'] || '',
     items: items, payment: payment, notes: row['Notes'] || '', subtotal: Number(row['Subtotal']) || 0,
     discount: Number(row['Discount']) || 0, grandTotal: Number(row['Grand Total']) || 0,
     createdById: row['Created By ID'] || '', createdByName: row['Created By Name'] || '', createdAt: row['Created At'] || '',
@@ -185,7 +186,7 @@ function saveSalesDraft(token, payload) {
     const row = {
       'Draft ID': generateId_('SALES_DRAFTS'), 'Draft No': generateDraftInvoiceNo_(), 'Draft Date': formatDate_(now),
       'Customer ID': clean.customerId, 'Customer Name': clean.customerName, 'Customer Phone': clean.customerPhone,
-      'Customer Father Name': clean.customerFatherName, 'Customer Address': clean.customerAddress,
+      'Customer Father Name': clean.customerFatherName, 'Customer Relation Type': clean.customerRelationType, 'Customer Address': clean.customerAddress,
       'Items JSON': clean.itemsJson, 'Payment JSON': clean.paymentJson, 'Notes': clean.notes,
       'Subtotal': clean.subtotal, 'Discount': clean.discount, 'Grand Total': clean.grandTotal,
       'Created By ID': user['User ID'], 'Created By Name': actorName_(user), 'Created At': now,
@@ -226,9 +227,13 @@ function updateSalesDraft(token, draftId, expectedVersion, payload) {
     requireSalesDraftAccess_(user,row,'edit');
     if (Number(row['Version']) !== Number(expectedVersion)) throw new Error('This draft was changed by another user. Reload the latest version.');
     const clean=validateSalesDraftPayload_(payload||{}), now=new Date(), next=Number(row['Version'])+1;
+    // Stale tabs without the new selector must not reset a saved Husband draft.
+    if (!Object.prototype.hasOwnProperty.call(payload, 'customerRelationType')) {
+      clean.customerRelationType = normalizeCustomerRelationType_(row['Customer Relation Type']);
+    }
     updateRowFields_('SALES_DRAFTS',row._rowIndex,{
       'Customer ID':clean.customerId,'Customer Name':clean.customerName,'Customer Phone':clean.customerPhone,'Customer Father Name':clean.customerFatherName,
-      'Customer Address':clean.customerAddress,'Items JSON':clean.itemsJson,'Payment JSON':clean.paymentJson,'Notes':clean.notes,
+      'Customer Relation Type':clean.customerRelationType,'Customer Address':clean.customerAddress,'Items JSON':clean.itemsJson,'Payment JSON':clean.paymentJson,'Notes':clean.notes,
       'Subtotal':clean.subtotal,'Discount':clean.discount,'Grand Total':clean.grandTotal,'Updated By ID':user['User ID'],'Updated By Name':actorName_(user),'Updated At':now,'Version':next
     });
     const updated=findFirstRow_('SALES_DRAFTS','Draft ID',id); appendSalesDraftAudit_('UPDATED',updated,user,'','');
@@ -340,7 +345,7 @@ function buildSalesDraftPreviewPayload_(row) {
     date: safeDateOnly_(row['Draft Date']),
     time: '', dueDate: '',
     customerId: row['Customer ID'] || '', customerName: row['Customer Name'] || '', customerPhone: row['Customer Phone'] || '',
-    customerFatherName: row['Customer Father Name'] || '', customerAddress: row['Customer Address'] || '',
+    customerFatherName: row['Customer Father Name'] || '', customerRelationType: normalizeCustomerRelationType_(row['Customer Relation Type']), customerAddress: row['Customer Address'] || '',
     items: parsed.items || [], subtotal: Number(row['Subtotal']) || 0, discount: Number(row['Discount']) || 0, grandTotal: grand,
     paidAmount: provisionalPaid, originalPaidAmount: provisionalPaid,
     dueAmount: Math.max(0, grand - provisionalPaid), paymentType: 'Draft', paymentStatus: 'Draft',

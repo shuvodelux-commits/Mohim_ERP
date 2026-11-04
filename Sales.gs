@@ -142,7 +142,7 @@ function getPosBootstrap(token) {
       canViewCurrentInvoiceProfit: canViewInvoiceProfit_(actingUser),
       multiPaymentEnabled: String(settings['POS Multi Payment Enabled'] || '').toLowerCase() === 'true',
       customers: customers.map(function (c) {
-        return { id: c['Customer ID'], name: c['Customer Name'], phone: c['Phone'], address: c['Address'],fatherName:c['Father Name'] || '', due: Number(c['Current Due']) || 0 };
+        return { id: c['Customer ID'], name: c['Customer Name'], phone: c['Phone'], address: c['Address'],fatherName:c['Father Name'] || '', relationType:normalizeCustomerRelationType_(c['Relation Type']), due: Number(c['Current Due']) || 0 };
       }),
       // Vendor/Consignment Sourcing's per-line shortage chooser. 'vendors'
       // (active only) feeds the dropdown, 'vendorsAll' (incl. Inactive)
@@ -578,6 +578,7 @@ function completeSale(token, payload) {
     let customerPhone = sanitizeInput_(payload.customerPhone);
     let customerAddress = sanitizeInput_(payload.customerAddress);
     let customerFatherName = sanitizeInput_(payload.customerFatherName);
+    let customerRelationType = normalizeCustomerRelationType_(payload.customerRelationType);
 
     // resolveOrCreateCustomer_ rejects this name outright. Catching it here
     // keeps the write phase free of anything that can refuse the sale.
@@ -636,10 +637,13 @@ function completeSale(token, payload) {
           customerName = sanitizeInput_(selectedCustomer['Customer Name']) || customerName;
           customerPhone = normalizePhoneDisplay_(selectedCustomer['Phone']) || customerPhone;
           customerAddress = sanitizeInput_(selectedCustomer['Address']);
-          customerFatherName = sanitizeInput_(selectedCustomer['Father Name']);
+          if (!customerFatherName) {
+             customerFatherName = sanitizeInput_(selectedCustomer['Father Name']);
+             customerRelationType = normalizeCustomerRelationType_(selectedCustomer['Relation Type']);
+           }
         }
       }
-      customerId = resolveOrCreateCustomer_(customerName, customerPhone, customerAddress, customerFatherName, customerId);
+      customerId = resolveOrCreateCustomer_(customerName, customerPhone, customerAddress, customerFatherName, customerId, customerRelationType);
     }
 
     const invoiceId = multiPayment ? reservedInvoiceId : generateId_('SALES');
@@ -648,6 +652,7 @@ function completeSale(token, payload) {
       'Invoice ID': invoiceId, 'Date': dateStr, 'Time': Utilities.formatDate(now, Session.getScriptTimeZone(), 'HH:mm:ss'),
       'Customer ID': customerId, 'Customer Name': customerName, 'Customer Phone': customerPhone,
       'Customer Address': customerAddress,
+      'Customer Relation Name': customerFatherName, 'Customer Relation Type': customerRelationType,
       'Subtotal': subtotal, 'Discount': discount, 'Grand Total': grandTotal,
       'Paid Amount': paidAmount, 'Due Amount': dueAmount, 'Payment Type': paymentType,
       'Payment Status': paymentStatus, 'Created By': actorName_(actingUser),

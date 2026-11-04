@@ -2307,7 +2307,7 @@
   /** Name always shows (defaulting to "খুচরা ক্রেতা" for walk-ins); father/mobile/address only when present. */
   function buildInvCustomer_(inv) {
     var meta = [];
-    if (inv.customerFatherName) meta.push('<span>পিতা: ' + escapeHtml(inv.customerFatherName) + '</span>');
+    if (inv.customerFatherName) meta.push('<span>' + (inv.customerRelationType === 'Husband' ? 'স্বামী' : 'পিতা') + ': ' + escapeHtml(inv.customerFatherName) + '</span>');
     if (inv.customerPhone) meta.push('<span>' + BN.phone + ': ' + toBn_(escapeHtml(inv.customerPhone)) + '</span>');
     if (inv.customerAddress) meta.push('<span>' + BN.address + ': ' + escapeHtml(inv.customerAddress) + '</span>');
     return '<div class="inv-customer">' +
@@ -2789,7 +2789,7 @@
     rows.push({ rule: true, thin: true });
 
     kvBn('নামঃ', inv.customerName || BN.walkIn, 12);
-    if (inv.customerFatherName) kvBn('পিতা', inv.customerFatherName, 11);
+    if (inv.customerFatherName) kvBn(inv.customerRelationType === 'Husband' ? 'স্বামী' : 'পিতা', inv.customerFatherName, 11);
     if (inv.customerPhone) kvBn(BN.phone, toBn_(inv.customerPhone), 11);
     if (inv.customerAddress) kvBn(BN.address, inv.customerAddress, 11);
     rows.push({ rule: true });
