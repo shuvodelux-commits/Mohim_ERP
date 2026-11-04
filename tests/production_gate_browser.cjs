@@ -84,6 +84,7 @@ async function main() {
       return {
         pageScroll:content.scrollTop,innerScroll:wrap.scrollTop,
         contentTop:content.getBoundingClientRect().top,
+        railHeight:document.getElementById('smTopScroll').getBoundingClientRect().height,
         originalHeaderBottom:actual.getBoundingClientRect().bottom,
         pinnedTop:top,heading:overlayHead?.textContent||'',
         headerCells:overlayHead?.querySelectorAll('th').length,
@@ -93,7 +94,7 @@ async function main() {
     assert.ok(geometry.pageScroll>=400);
     assert.equal(geometry.innerScroll,0);
     assert.ok(geometry.originalHeaderBottom<geometry.contentTop);
-    assert.ok(Math.abs(geometry.pinnedTop-geometry.contentTop)<=2);
+    assert.ok(Math.abs(geometry.pinnedTop-geometry.contentTop-geometry.railHeight)<=2);
     assert.match(geometry.heading,/Invoice/);
     assert.match(geometry.heading,/Actions/);
     assert.equal(geometry.headerCells,geometry.originalCells);
@@ -383,6 +384,7 @@ async function main() {
       return {pageScroll:content.scrollTop,innerScroll:wrap.scrollTop,
         contentTop:content.getBoundingClientRect().top,
         pinnedTop:pin.getBoundingClientRect().top,
+        railHeight:document.getElementById('prodTopScroll').getBoundingClientRect().height,
         realHeaderBottom:wrap.querySelector('thead').getBoundingClientRect().bottom,
         headerCount:pin.querySelectorAll('th').length,
         originalCount:wrap.querySelectorAll('thead th').length};
@@ -390,7 +392,7 @@ async function main() {
     assert.ok(geometry.pageScroll>250);
     assert.equal(geometry.innerScroll,0);
     assert.ok(geometry.realHeaderBottom<geometry.contentTop);
-    assert.ok(Math.abs(geometry.contentTop-geometry.pinnedTop)<=2);
+    assert.ok(Math.abs(geometry.contentTop+geometry.railHeight-geometry.pinnedTop)<=2);
     assert.equal(geometry.headerCount,geometry.originalCount);
   });
   await check('Products sticky top track stays above the mirrored heading and scrolls both ways',async()=>{
