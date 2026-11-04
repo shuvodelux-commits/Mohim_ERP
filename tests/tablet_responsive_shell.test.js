@@ -4,8 +4,8 @@ const root=path.resolve(__dirname,'..'),read=n=>fs.readFileSync(path.join(root,n
 const css=read('style.html'),js=read('javascript.html'),pos=read('pos.html');let pass=0,fail=0;
 function test(n,fn){try{fn();pass++;console.log('PASS',n)}catch(e){fail++;console.error('FAIL',n);console.error(e.stack||e)}}
 function mediaBlock(source,query){const start=source.indexOf('@media '+query+' {');assert.notStrictEqual(start,-1,'missing '+query);let i=source.indexOf('{',start),d=0;for(;i<source.length;i++){if(source[i]==='{')d++;else if(source[i]==='}'&&--d===0)return source.slice(start,i+1)}throw new Error('unclosed '+query)}
-test('non-phone widths use fixed desktop shell with collapsed rail clearance',()=>{
- const d=mediaBlock(css,'(min-width: 541px)');assert.match(d,/\.sidebar\s*\{[\s\S]*position:\s*fixed/);assert.match(d,/\.main\s*\{[^}]*margin-left:\s*var\(--sidebar-collapsed-width\)/);assert.match(d,/\.topbar\s*\{[^}]*left:\s*var\(--sidebar-collapsed-width\)/);assert.match(css,/@media\s*\(min-width:\s*500px\)\s*and\s*\(max-width:\s*1023px\)/);
+test('non-phone widths use fixed sidebar but normal-flow sticky topbar with no duplicate content offset',()=>{
+ const d=mediaBlock(css,'(min-width: 541px)');assert.match(d,/\.sidebar\s*\{[\s\S]*position:\s*fixed/);assert.match(d,/\.main\s*\{[^}]*margin-left:\s*var\(--sidebar-collapsed-width\)/);assert.match(d,/\.topbar\s*\{[^}]*position:\s*sticky/);assert.match(d,/\.content\s*\{[^}]*margin-top:\s*0/);assert.match(css,/@media\s*\(min-width:\s*500px\)\s*and\s*\(max-width:\s*1023px\)/);
 });
 test('phone app-shell UI uses 540px boundary',()=>{assert.match(css,/@media\s*\(max-width:\s*540px\)/);assert.doesNotMatch(css,/@media\s*\(max-width:\s*640px\)/);assert.match(js,/max-width:\s*540px/);assert.doesNotMatch(js,/max-width:\s*640px/)});
 test('isPhoneViewport recognizes short coarse landscape phones',()=>{assert.match(js,/function\s+isPhoneViewport_\s*\(/);assert.match(js,/orientation:\s*landscape/);assert.match(js,/max-height:\s*540px/);assert.match(js,/pointer:\s*coarse/);assert.match(pos,/isPhoneViewport_\(\)/)});

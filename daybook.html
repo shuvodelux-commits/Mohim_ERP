@@ -18,7 +18,7 @@
 
 <div class="card" style="padding:0;">
   <div class="table-scroll">
-    <table>
+    <table class="erp-action-table">
       <thead>
         <tr>
           <th>Time</th><th>Date</th><th>Reference</th><th>Module</th><th>Type</th>
@@ -28,7 +28,8 @@
           <th class="num">Bank In<br><span class="bn-hint" style="display:inline;">জমা</span></th>
           <th class="num">Bank Out<br><span class="bn-hint" style="display:inline;">খরচ</span></th>
           <th class="num">Cash Balance</th>
-          <th>By</th><th>Status</th><th></th>
+          <th>By</th><th>Status</th>
+          <th class="erp-sticky-action-col" scope="col">Actions</th>
         </tr>
       </thead>
       <tbody id="dbTableBody"></tbody>
@@ -137,12 +138,10 @@
         '<td class="num">' + (r.runningCashBalance === null || r.runningCashBalance === undefined ? '\u2014' : formatMoney(r.runningCashBalance)) + '</td>' +
         '<td>' + escapeHtml(r.createdBy || '') + '</td>' +
         '<td>' + statusBadge + '</td>' +
-        '<td style="white-space:nowrap;">' +
-          '<button class="btn" data-act="view" data-idx="' + idx + '">View</button>' +
-          (r.deleteModule && !r.isDeleted
-            ? ' <button class="btn btn-danger" data-act="del" data-idx="' + idx + '">Delete</button>'
-            : '') +
-        '</td>';
+        '<td class="erp-sticky-action-col">' + rowActionTriggerHtml_(
+          'data-act="menu" data-idx="' + idx + '"',
+          'Actions for transaction ' + String(r.referenceNo || idx)
+        ) + '</td>';
       if (r.isDeleted) tr.className = 'row-deleted';
       body.appendChild(tr);
     });
@@ -158,6 +157,18 @@
     if (!btn) return;
    var row = dbState.transactions[Number(btn.dataset.idx)];
     if (!row) return;
+    if (btn.dataset.act === 'menu') {
+      var items = [{ action: 'view', label: 'View' }];
+      if (row.deleteModule && !row.isDeleted) {
+        items.push({ divider: true });
+        items.push({ action: 'delete', label: 'Delete', danger: true });
+      }
+      openRowActionMenu_(btn, items, function (action) {
+        if (action === 'view') dbOpenView_(row);
+        if (action === 'delete') dbDelete_(row);
+      });
+      return;
+    }
     if (btn.dataset.act === 'del') { dbDelete_(row); return; }
     dbOpenView_(row);
   });

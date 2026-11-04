@@ -1342,11 +1342,12 @@
   .login-footnote { font-size: 12px; color: var(--color-text-muted); text-align: center; margin-top: 16px; }
 
 
-  /* ---------------- Desktop fixed application shell ----------------
-     The sidebar and topbar remain fixed while the module content scrolls.
-     This prevents long tables from moving the navigation/refresh controls
-     out of view. Phones keep the existing mobile behavior below; tablets use the desktop rail. */
+  /* ---------------- Desktop/tablet application shell ----------------
+     The rail stays fixed, but the topbar is in normal flex flow and sticky.
+     The content owns the scrolling area below it without a second top-margin
+     offset or an extra viewport-height block. Mobile retains its own layout. */
   @media (min-width: 541px) {
+    :root { --topbar-height: 56px; }
     #app { min-height: 100vh; }
     .sidebar {
       position: fixed;
@@ -1362,20 +1363,21 @@
     }
     .main {
       margin-left: var(--sidebar-collapsed-width);
-      min-height: 100vh;
-      height: 100vh;
+      min-height: 100dvh;
+      height: 100dvh;
     }
     .topbar {
-      position: fixed;
-      left: var(--sidebar-collapsed-width);
-      right: 0;
+      position: sticky;
+      left: auto;
+      right: auto;
       top: 0;
       z-index: 90;
     }
     .content {
-      height: 100vh;
+      flex: 1;
+      height: auto;
       min-height: 0;
-      margin-top: var(--topbar-height);
+      margin-top: 0;
       overflow-y: auto;
       overflow-x: auto;
     }
@@ -1781,7 +1783,7 @@
     .mobile-return-cart-table tbody tr { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px 8px; padding: 14px; }
     .mobile-return-cart-table tbody td { min-width: 0; }
     .mobile-return-cart-table .return-product-cell { grid-column: 1 / -1; display: block; text-align: left; font-size: 15px; line-height: 1.35; }
-    .mobile-return-cart-table tbody td:nth-child(2),
+    .mobile-return-cart-table tbody td:first-child,
     .mobile-return-cart-table tbody td:nth-child(3),
     .mobile-return-cart-table tbody td:nth-child(4),
     .mobile-return-cart-table tbody td:nth-child(5),
@@ -3375,4 +3377,112 @@
   #page-financePersonLedger .fpl-period span {flex:1 1 46%;}
 }
 
+</style>
+
+<style>
+/* Tablet/desktop right-pinned row actions, matching HisabIQ Audit Ledger. */
+.erp-action-table { border-collapse: separate; border-spacing: 0; }
+.erp-sticky-action-col {
+  position: sticky;
+  right: 0;
+  width: 58px;
+  min-width: 58px;
+  max-width: 58px;
+  padding: 4px 6px;
+  text-align: center;
+  background: var(--color-surface);
+  border-left: 0;
+  box-shadow: none;
+  z-index: 3;
+}
+.table-scroll > table > thead > tr > th.erp-sticky-action-col {
+  position: sticky; right: 0; z-index: 9;
+  background: var(--color-surface);
+  box-shadow: none;
+}
+.erp-action-table tbody tr:hover td.erp-sticky-action-col { background: var(--color-bg); }
+.erp-row-action-trigger {
+  appearance: none; width: 36px; height: 36px; min-height: 36px !important;
+  border: 1px solid transparent; border-radius: 6px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; color: var(--color-text-muted);
+  cursor: pointer; vertical-align: middle;
+}
+.erp-row-action-trigger:hover, .erp-row-action-trigger[aria-expanded="true"] {
+  color: var(--color-primary-dark); background: var(--color-primary-light);
+}
+.erp-row-action-trigger:focus-visible {
+  outline: 2px solid var(--color-primary); outline-offset: 1px;
+}
+.erp-row-action-trigger:disabled { opacity: .38; cursor: not-allowed; }
+.action-menu-item {
+  display: flex; align-items: center; gap: 10px;
+  min-height: 38px; font-size: 13px; font-weight: 500;
+}
+.action-menu-icon { flex: none; width: 17px; height: 17px; }
+.action-menu-label { flex: 1; min-width: 0; }
+.action-menu-item:disabled { opacity: .48; cursor: not-allowed; }
+.action-menu-item:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+@media screen and (min-width: 541px) and (max-width: 1024px) {
+  .erp-row-action-trigger { width: 40px; height: 40px; min-height: 40px !important; }
+}
+@media screen and (max-width: 540px), (orientation: landscape) and (max-height: 540px) and (pointer: coarse) {
+  .mobile-card-table.erp-action-table tbody td.erp-sticky-action-col {
+    position: static; z-index: auto; box-shadow: none; border-left: 0;
+    grid-column: 1 / -1 !important; order: 9;
+    display: flex; justify-content: flex-end !important; width: 100%;
+    padding-top: 7px; padding-bottom: 0;
+    background: transparent;
+  }
+  .mobile-card-table.erp-action-table tbody td.erp-sticky-action-col:empty { display: none; }
+  .mobile-card-table.erp-action-table tbody td.erp-sticky-action-col::before { display: none; }
+  .mobile-card-table.erp-action-table tbody td:first-child {
+    order: -1; grid-column: 1 / -1;
+    align-items: center; padding-bottom: 5px; border-bottom: 1px solid var(--color-border);
+    font-size: 14px; font-weight: 700; text-align: left;
+  }
+  .mobile-card-table.erp-action-table tbody td:first-child::before { display: none; }
+  #smTableScroll .mobile-card-table.erp-action-table tbody td:first-child { grid-column: 1 / -1; }
+}
+@media screen and (min-width: 541px) {
+  /* Approved Sales UI: compact filters and room for more actual invoice rows. */
+  #content:has(#page-sales:not([hidden])) { padding: 14px 16px; }
+  #content:has(#page-sales:not([hidden])) > #subNav { margin-bottom: 10px; }
+  #content:has(#page-sales:not([hidden])) > #subNav .tab-btn {
+    min-height: 46px; padding: 7px 12px;
+  }
+  #page-sales > .toolbar {
+    display: grid;
+    grid-template-columns: minmax(190px,2fr) minmax(130px,.8fr) minmax(130px,.8fr) minmax(145px,.95fr) minmax(170px,1fr) auto;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  #page-sales > .toolbar > .toolbar-spacer { display: none; }
+  #page-sales > .toolbar :is(input,select) {
+    width: 100%; max-width: none !important; min-width: 0;
+    height: 38px; min-height: 38px; font-size: 13px;
+  }
+  #page-sales > .toolbar > #smRefreshBtn {
+    min-height: 38px; padding: 7px 12px; white-space: nowrap;
+  }
+  #page-sales > .card { box-shadow: none; }
+  #page-sales #smTableScroll {
+    max-height: clamp(260px, calc(100dvh - var(--topbar-height) - 170px), 1200px);
+  }
+  #page-sales #smTableScroll th { padding: 9px 12px; }
+  #page-sales #smTableScroll td { padding: 8px 12px; line-height: 1.35; }
+  /* Never let compact body-cell padding expand the 58px pinned action cell. */
+  #page-sales #smTableScroll th.erp-sticky-action-col,
+  #page-sales #smTableScroll td.erp-sticky-action-col { padding: 4px 2px; }
+}
+@media screen and (min-width: 541px) and (max-width: 1120px) {
+  #page-sales > .toolbar {
+    grid-template-columns: minmax(180px, 1.8fr) repeat(2, minmax(130px,1fr));
+  }
+}
+@media print {
+  .erp-sticky-action-col { position: static !important; box-shadow: none !important; }
+  .erp-row-action-trigger { display: none !important; }
+}
 </style>

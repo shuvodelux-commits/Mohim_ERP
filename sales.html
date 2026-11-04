@@ -20,19 +20,19 @@
     <option value="Fully Returned">Fully Returned</option>
   </select>
   <div class="toolbar-spacer"></div>
-  <button class="btn" id="smRefreshBtn">Refresh</button>
+  <button class="btn" id="smRefreshBtn"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-.6 3M20 5v6h-6"/></svg><span>Refresh</span></button>
 </div>
 
 <div class="card" style="padding: 0">
   <div
     id="smTopScroll"
     aria-label="Sales table horizontal scroll"
-    style="display:none;overflow-x:auto;overflow-y:hidden;height:18px;border-bottom:1px solid var(--color-border);background:var(--color-surface);"
+    style="display:none;overflow-x:auto;overflow-y:hidden;height:12px;background:transparent;scrollbar-width:thin;"
   >
     <div id="smTopScrollInner" style="height:1px;"></div>
   </div>
   <div class="table-scroll" id="smTableScroll">
-    <table class="mobile-card-table">
+    <table class="mobile-card-table erp-action-table">
       <thead>
         <tr>
           <th>Invoice</th>
@@ -45,7 +45,7 @@
           <th class="num">Returned</th>
           <th class="num" id="smProfitHeader" style="display:none;">Profit</th>
           <th>Status</th>
-          <th>Action</th>
+          <th class="erp-sticky-action-col" scope="col">Actions</th>
         </tr>
       </thead>
       <tbody id="smTableBody"></tbody>
@@ -307,7 +307,12 @@
             "</span>"
           : "") +
         "</td>" +
-        '<td style="white-space:nowrap;"><button class="btn" data-act="menu" data-id="' + s.invoiceId + '" aria-haspopup="menu" aria-expanded="false"' + (s.duplicateInvoiceId ? ' disabled title="Duplicate invoice ID must be repaired before actions can continue"' : '') + '>Actions &#9662;</button></td>';
+        '<td class="erp-sticky-action-col">' + rowActionTriggerHtml_(
+          'data-act="menu" data-id="' + escapeHtml(s.invoiceId) + '"',
+          'Actions for invoice ' + s.invoiceId,
+          !!s.duplicateInvoiceId,
+          s.duplicateInvoiceId ? 'Duplicate invoice ID must be repaired before actions can continue' : ''
+        ) + '</td>';
       body.appendChild(tr);
     });
     document.getElementById("smEmpty").hidden = rows.length > 0;
