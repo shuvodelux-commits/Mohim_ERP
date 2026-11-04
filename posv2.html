@@ -881,7 +881,9 @@
   body.pos-v2-active #page-pos #posMultiChangeRow {color:var(--pos-v2-success);}
   body.pos-v2-active #page-pos #posMultiPaymentError {font-size:11px;padding:3px 0;}
 
-  @media (max-width: 700px) {
+  /* Tablet checkout is split into two columns: wrap each payment row inside
+     its own column, not merely when the whole viewport is phone-sized. */
+  @media (max-width: 1023px) {
     body.pos-v2-active #page-pos .pos-multi-payment-row {
       grid-template-columns:minmax(0,1fr) minmax(0,1fr) 88px;
       grid-template-rows:auto auto;

@@ -66,9 +66,6 @@ async function main() {
       .evaluate(el=>getComputedStyle(el).height);
     assert.equal(h,'36px');
   });
-  await page.evaluate(()=>{
-    window.__firstPaymentAmount=document.querySelector('#posMultiPaymentRows [data-payment-row="pm-1"] .pos-multi-amount');
-  });
   await page.click('#posAddPaymentRowBtn');
   await check('adding a payment focuses its method without changing Cash row',async()=>{
     assert.equal(await page.locator('#posMultiPaymentRows [data-payment-row]').count(),2);
@@ -77,6 +74,9 @@ async function main() {
       return document.activeElement===select || document.activeElement===select._touchSelectTrigger;
     });
     assert.equal(f,true);
+  });
+  await page.evaluate(()=>{
+    window.__firstPaymentAmount=document.querySelector('#posMultiPaymentRows [data-payment-row="pm-1"] .pos-multi-amount');
   });
   await page.locator('#posMultiPaymentRows [data-payment-row="pm-2"] .pos-multi-method + .touch-select-trigger').click();
   await page.locator('#touchSelectMenuGlobal [data-touch-option-index]').filter({hasText:'Mobile Banking'}).click();
@@ -114,6 +114,17 @@ async function main() {
     assert.equal(v.focus,true);
     assert.match(v.paid,/50/);
     assert.match(v.due,/0/);
+  });
+  await check('POS split row controls never overlap tablet totals',async()=>{
+    const geo=await page.evaluate(()=>{
+      const row=document.querySelector('#posMultiPaymentRows [data-payment-row="pm-2"]');
+      const rm=row.querySelector('.pos-multi-remove').getBoundingClientRect();
+      const totals=document.querySelector('#page-pos .pos-checkout-totals').getBoundingClientRect();
+      const fields=document.querySelector('#page-pos .pos-checkout-fields').getBoundingClientRect();
+      return {removeRight:rm.right,totalsLeft:totals.left,fieldsRight:fields.right,rowRight:row.getBoundingClientRect().right};
+    });
+    assert.ok(geo.removeRight<=geo.totalsLeft+1,JSON.stringify(geo));
+    assert.ok(geo.rowRight<=geo.fieldsRight+1,JSON.stringify(geo));
   });
   await page.locator('#posMultiPaymentRows [data-payment-row="pm-2"] [data-payment-action="remove"]').click();
   await check('remove retains one Cash row, disables its trash action and posts nothing',async()=>{

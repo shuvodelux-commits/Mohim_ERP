@@ -42,7 +42,7 @@ test('row heights and typography remain consistent with compact POS inputs and m
   assert.match(css,/\.pos-multi-payment-row select,[\s\S]*?\.pos-multi-payment-row input\s*\{[^}]*height:36px;min-height:36px;[^}]*font-size:13px;/);
   assert.match(css,/\.pos-multi-payment-row \.btn\s*\{[^}]*min-height:36px;height:36px;/);
   assert.match(css,/\.pos-multi-payment-row \.pos-multi-remove\s*\{[^}]*color:var\(--pos-v2-danger\);/);
-  assert.match(css,/@media \(max-width: 700px\)/);
+  assert.match(css,/@media \(max-width: 1023px\)/);
 });
 test('feature flag and strict accounting engine still exist unchanged',()=>{
   assert.match(pos,/function posMultiPaymentTerms_\(/);
