@@ -549,6 +549,9 @@
     var tableScroll = document.getElementById('prodTableScroll');
     var page = document.getElementById('page-products');
     if (!top || !inner || !tableScroll || !page) return;
+    // Keep the sticky rail flush with the top of #content despite its padding.
+    var content = document.getElementById('content');
+    top.style.top = -(parseFloat(window.getComputedStyle(content).paddingTop) || 0) + 'px';
 
     var isCardView = window.matchMedia(
       '(max-width: 540px), (orientation: landscape) and (max-height: 540px) and (pointer: coarse)'
