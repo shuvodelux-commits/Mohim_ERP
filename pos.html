@@ -123,7 +123,7 @@
             <div id="posMultiPaymentRows" class="pos-multi-payment-rows"></div>
             <div class="field-error" id="posMultiPaymentError" role="alert" hidden style="display:none;"></div>
             <div class="pos-multi-totals">
-              <div class="totals-row"><span>Total Received</span><strong id="posMultiPaidAmount">৳0.00</strong></div>
+              <div class="totals-row"><span>Paid Now <span class="bn-hint">— জমা</span></span><strong id="posMultiPaidAmount">৳0.00</strong></div>
               <div class="totals-row"><span>Due / বাকি</span><strong id="posMultiDueAmount">৳0.00</strong></div>
               <div class="totals-row" id="posMultiChangeRow" hidden style="display:none;"><span>Cash Change</span><strong id="posMultiChangeAmount">৳0.00</strong></div>
             </div>
@@ -1642,6 +1642,7 @@
     posState.paymentRows.push({id:id,method:cashExists?'Bank':'Cash',accountId:'',amount:''});
     posRenderMultiPaymentRows_();
     posRecalcTotals_();
+    posFocusMultiPaymentField_(id, 'method');
   });
   document.getElementById('posMultiPaymentRows').addEventListener('input', function (event) {
     if (event.target.dataset.paymentField !== 'amount') return;
@@ -1660,7 +1661,12 @@
     row[field] = event.target.value;
     if (field === 'method') {
       row.accountId = '';
-      posRenderMultiPaymentRows_();
+      // Preserve unrelated amount inputs and keyboard focus.
+      var accountHost = wrapper.querySelector('.pos-multi-account');
+      var label = 'Payment ' + (posState.paymentRows.indexOf(row) + 1);
+      accountHost.innerHTML = posMultiPaymentAccountHtml_(row, label);
+      posEnhanceTabletSelects_();
+      posFocusMultiPaymentField_(row.id, row.method === 'Cash' ? 'amount' : 'accountId');
     }
     posRecalcTotals_();
   });
@@ -1811,6 +1817,34 @@
   }
 
 
+  function posMultiPaymentAccountHtml_(row, label) {
+    if (row.method === 'Cash') {
+      return '<span class="pos-multi-cash-label">Cash drawer</span>';
+    }
+    var options = '<option value="">Select account...</option>' +
+      (posState.bankAccounts || []).filter(function (a) { return a.type === row.method; }).map(function (a) {
+        return '<option value="' + escapeHtml(a.id) + '"' +
+          (row.accountId === a.id ? ' selected' : '') + '>' + escapeHtml(a.name) + '</option>';
+      }).join('');
+    return '<select data-payment-field="accountId" aria-label="' +
+      escapeHtml(label) + ' account">' + options + '</select>';
+  }
+
+  function posFocusMultiPaymentField_(id, field) {
+    var container = document.getElementById('posMultiPaymentRows');
+    if (!container) return;
+    var rows = container.querySelectorAll('[data-payment-row]');
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].dataset.paymentRow !== id) continue;
+      var input = rows[i].querySelector('[data-payment-field="' + field + '"]');
+      if (!input) return;
+      var target = input._touchSelectTrigger || input;
+      target.focus();
+      if (field === 'amount' && typeof input.select === 'function') input.select();
+      return;
+    }
+  }
+
   function posRenderMultiPaymentRows_() {
     var target = document.getElementById('posMultiPaymentRows');
     if (!target || !posMultiPaymentEnabledForSale_()) return;
@@ -1819,20 +1853,14 @@
       var methodOptions = ['Cash', 'Bank', 'Mobile Banking'].map(function (m) {
         return '<option value="' + m + '"' + (r.method === m ? ' selected' : '') + '>' + m + '</option>';
       }).join('');
-      var accountOptions = '<option value="">Select account...</option>' +
-        (posState.bankAccounts || []).filter(function (a) { return a.type === r.method; }).map(function (a) {
-          return '<option value="' + escapeHtml(a.id) + '"' + (r.accountId === a.id ? ' selected' : '') + '>' + escapeHtml(a.name) + '</option>';
-        }).join('');
-      var accountControl = r.method === 'Cash'
-        ? '<span class="pos-multi-cash-label">Cash drawer</span>'
-        : '<select data-payment-field="accountId" aria-label="' + label + ' account">' + accountOptions + '</select>';
+      var accountControl = posMultiPaymentAccountHtml_(r, label);
       return '<div class="pos-multi-payment-row" data-payment-row="' + escapeHtml(r.id) + '">' +
         '<select class="pos-multi-method" data-payment-field="method" aria-label="' + label + ' method">' + methodOptions + '</select>' +
         '<div class="pos-multi-account">' + accountControl + '</div>' +
-        '<input class="pos-multi-amount" type="text" inputmode="decimal" autocomplete="off" data-payment-field="amount" aria-label="' + label + ' amount" placeholder="৳ Amount" value="' + escapeHtml(r.amount) + '">' +
-        '<button type="button" class="btn btn-sm pos-multi-remaining" data-payment-action="remaining" aria-label="Fill remaining in ' + label + '">Remaining</button>' +
-        '<button type="button" class="btn btn-sm pos-multi-remove" data-payment-action="remove" aria-label="Remove ' + label + '"' +
-        (posState.paymentRows.length < 2 ? ' disabled' : '') + '>&times;</button></div>';
+        '<input class="pos-multi-amount" type="text" inputmode="decimal" autocomplete="off" data-payment-field="amount" aria-label="' + label + ' amount" aria-describedby="posMultiPaymentError" placeholder="৳ Amount" value="' + escapeHtml(r.amount) + '">' +
+        '<button type="button" class="btn btn-sm pos-multi-remaining" data-payment-action="remaining" aria-label="Fill due in ' + label + '" title="Fill the unpaid invoice balance">Fill Due</button>' +
+        '<button type="button" class="btn btn-sm pos-multi-remove" data-payment-action="remove" aria-label="Remove ' + label + '" title="Remove ' + label + '"' +
+        (posState.paymentRows.length < 2 ? ' disabled' : '') + '><svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2m-11 0 1 15h12l1-15M10 11v6M14 11v6"/></svg></button></div>';
     }).join('');
     posEnhanceTabletSelects_();
   }
@@ -1868,7 +1896,8 @@
     if (!el) return;
     var row = posState.paymentRows.filter(function (r) { return r.id === el.dataset.paymentRow; })[0];
     if (!row) return;
-    if (button.dataset.paymentAction === 'remove') {
+    var removing = button.dataset.paymentAction === 'remove';
+    if (removing) {
       if (posState.paymentRows.length <= 1) return;
       posState.paymentRows = posState.paymentRows.filter(function (r) { return r.id !== row.id; });
     } else {
@@ -1880,6 +1909,7 @@
     }
     posRenderMultiPaymentRows_();
     posRecalcTotals_();
+    if (!removing) posFocusMultiPaymentField_(row.id, 'amount');
   }
 
   var posProfitRequestSequence_ = 0;

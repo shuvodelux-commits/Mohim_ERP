@@ -837,7 +837,7 @@
   /* Compact multi-payment rows; never alter the existing single-payment UI. */
   body.pos-v2-active #page-pos #posMultiPaymentFields[hidden] { display:none !important; }
   body.pos-v2-active #page-pos .pos-multi-heading {
-    display:flex;align-items:center;justify-content:space-between;gap:8px;margin:3px 0 7px;font-size:12px;
+    display:flex;align-items:center;justify-content:space-between;gap:8px;margin:4px 0 8px;font-size:14px;
   }
   body.pos-v2-active #page-pos .pos-multi-heading .bn-hint {font-size:10px;font-weight:400;}
   body.pos-v2-active #page-pos .pos-multi-payment-rows {display:grid;gap:5px;}
@@ -851,7 +851,7 @@
   body.pos-v2-active #page-pos .pos-multi-payment-row select,
   body.pos-v2-active #page-pos .pos-multi-payment-row input {
     width:100%;max-width:none;min-width:0;height:36px;min-height:36px;
-    padding:4px 7px;font-size:12px;background:var(--pos-v2-surface);
+    padding:4px 8px;font-size:13px;background:var(--pos-v2-surface);
   }
   body.pos-v2-active #page-pos .pos-multi-account {min-width:0;}
   body.pos-v2-active #page-pos .pos-multi-cash-label {
@@ -859,12 +859,20 @@
     font-size:11px;color:var(--pos-v2-muted);
   }
   body.pos-v2-active #page-pos .pos-multi-payment-row .btn {
-    min-height:34px;height:34px;padding:3px 7px;font-size:11px;white-space:nowrap;
+    min-height:36px;height:36px;padding:3px 8px;font-size:12px;white-space:nowrap;
   }
   body.pos-v2-active #page-pos .pos-multi-payment-row .pos-multi-remove {
-    width:34px;padding:0;font-size:18px;line-height:1;
+    width:34px;padding:0;display:flex;align-items:center;justify-content:center;color:var(--pos-v2-danger);
   }
   body.pos-v2-active #page-pos .pos-multi-payment-row .pos-multi-remove:disabled {opacity:.35;}
+  body.pos-v2-active #page-pos .pos-multi-payment-row .pos-multi-remove:not(:disabled):hover {
+    background:rgba(180,35,24,.08);
+    border-color:rgba(180,35,24,.3);
+  }
+  body.pos-v2-active #page-pos .pos-multi-payment-row :is(select,input,button):focus-visible {
+    outline:2px solid var(--pos-v2-primary);
+    outline-offset:1px;
+  }
   body.pos-v2-active #page-pos .pos-multi-totals {
     display:grid;gap:1px;margin-top:5px;padding-top:5px;border-top:1px solid var(--pos-v2-border);
   }

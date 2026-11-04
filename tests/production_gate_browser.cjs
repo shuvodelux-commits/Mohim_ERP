@@ -41,6 +41,85 @@ async function main() {
   await check('POS invoice uses exact returned identity/customer',async()=>{assert.match(await page.textContent('#invoicePaper'),/INV-000017/);assert.match(await page.textContent('#invoicePaper'),/মহিউদ্দিন/);});
   await check('POS posts exactly once',async()=>{const calls=await page.evaluate(()=>__rpcCalls.filter(c=>c.name==='completeSale'));assert.equal(calls.length,1);assert.equal(calls[0].args[1].items[0].productId,'PROD-000001');});
   await check('POS browser errors',()=>assert.deepEqual(errors,[]));await page.close();
+  // The split-payment feature stays off in real Settings: exercise UI only
+  // with mock browser state and never call a transactional Apps Script RPC.
+  ({page,errors}=await boot(browser,{width:768,height:1024}));
+  await route(page,'posv2');
+  await page.waitForFunction(()=>posState.products.length>0);
+  await page.fill('#posSearch','4 inch Test Pipe');
+  await page.press('#posSearch','Enter');
+  await page.evaluate(()=>{
+    posState.multiPaymentEnabled=true;
+    posState.paymentModeLegacy=false;
+    posState.bankAccounts=[
+      {id:'B1',name:'Demo Bank',type:'Bank'},
+      {id:'M1',name:'Demo Mobile',type:'Mobile Banking'}
+    ];
+    posApplyPaymentMode_();
+  });
+  await check('POS split controls are opt-in and use compact, readable payment rows',async()=>{
+    assert.equal(await page.locator('#posMultiPaymentFields').isVisible(),true);
+    assert.equal(await page.locator('#posMultiPaymentRows [data-payment-row]').count(),1);
+    assert.match(await page.locator('#posMultiPaymentFields').innerText(),/Paid Now/);
+    assert.equal(await page.locator('#posMultiPaymentRows .pos-multi-remove svg').count(),1);
+    const h=await page.locator('#posMultiPaymentRows .pos-multi-amount').first()
+      .evaluate(el=>getComputedStyle(el).height);
+    assert.equal(h,'36px');
+  });
+  await page.evaluate(()=>{
+    window.__firstPaymentAmount=document.querySelector('#posMultiPaymentRows [data-payment-row="pm-1"] .pos-multi-amount');
+  });
+  await page.click('#posAddPaymentRowBtn');
+  await check('adding a payment focuses its method without changing Cash row',async()=>{
+    assert.equal(await page.locator('#posMultiPaymentRows [data-payment-row]').count(),2);
+    const f=await page.evaluate(()=>{
+      const select=document.querySelector('#posMultiPaymentRows [data-payment-row="pm-2"] .pos-multi-method');
+      return document.activeElement===select || document.activeElement===select._touchSelectTrigger;
+    });
+    assert.equal(f,true);
+  });
+  await page.locator('#posMultiPaymentRows [data-payment-row="pm-2"] .pos-multi-method').selectOption('Mobile Banking');
+  await check('changing method updates only its account, preserving the other amount DOM and focus',async()=>{
+    const v=await page.evaluate(()=>{
+      const first=document.querySelector('#posMultiPaymentRows [data-payment-row="pm-1"] .pos-multi-amount');
+      const second=document.querySelector('#posMultiPaymentRows [data-payment-row="pm-2"] [data-payment-field="accountId"]');
+      return {sameNode:first===window.__firstPaymentAmount,
+        accountExists:!!second,
+        accountFocused:document.activeElement===second || document.activeElement===second._touchSelectTrigger};
+    });
+    assert.deepEqual(v,{sameNode:true,accountExists:true,accountFocused:true});
+  });
+  await page.locator('#posMultiPaymentRows [data-payment-row="pm-2"] [data-payment-field="accountId"]').selectOption('M1');
+  await page.fill('#posMultiPaymentRows [data-payment-row="pm-1"] .pos-multi-amount','20');
+  await page.fill('#posMultiPaymentRows [data-payment-row="pm-2"] .pos-multi-amount','5');
+  await check('split checkout keeps applied paid and due separate before Fill Due',async()=>{
+    assert.match(await page.locator('#posMultiPaidAmount').innerText(),/25/);
+    assert.match(await page.locator('#posMultiDueAmount').innerText(),/25/);
+  });
+  await page.locator('#posMultiPaymentRows [data-payment-row="pm-2"] [data-payment-action="remaining"]').click();
+  await check('Fill Due preserves Cash amount and restores amount focus',async()=>{
+    const v=await page.evaluate(()=>{
+      const one=document.querySelector('#posMultiPaymentRows [data-payment-row="pm-1"] .pos-multi-amount');
+      const two=document.querySelector('#posMultiPaymentRows [data-payment-row="pm-2"] .pos-multi-amount');
+      return {one:one.value,two:two.value,focus:document.activeElement===two,paid:document.getElementById('posMultiPaidAmount').textContent,due:document.getElementById('posMultiDueAmount').textContent};
+    });
+    assert.equal(v.one,'20');
+    assert.equal(v.two,'30.00');
+    assert.equal(v.focus,true);
+    assert.match(v.paid,/50/);
+    assert.match(v.due,/0/);
+  });
+  await page.locator('#posMultiPaymentRows [data-payment-row="pm-2"] [data-payment-action="remove"]').click();
+  await check('remove retains one Cash row, disables its trash action and posts nothing',async()=>{
+    assert.equal(await page.locator('#posMultiPaymentRows [data-payment-row]').count(),1);
+    assert.equal(await page.locator('#posMultiPaymentRows .pos-multi-remove').isDisabled(),true);
+    assert.equal(await page.locator('#posMultiPaymentRows [data-payment-row="pm-1"] .pos-multi-amount').inputValue(),'20');
+    const calls=await page.evaluate(()=>__rpcCalls.filter(c=>c.name==='completeSale'));
+    assert.equal(calls.length,0);
+    assert.deepEqual(errors,[]);
+  });
+  await page.close();
+
   ({page,errors}=await boot(browser));await route(page,'posv2');
   await page.fill('#posCustomerPhone','01712345678');await page.press('#posCustomerPhone','Escape');await page.click('#posHistoryBtn');
   await check('phone history blocks duplicate ID',async()=>{const button=page.locator('#posHistoryBody button[data-id="INV-000005"]');await button.waitFor();assert.equal(await button.isDisabled(),true);});
