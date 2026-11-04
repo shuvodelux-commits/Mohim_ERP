@@ -329,6 +329,24 @@ async function main() {
     assert.ok(m.rowRight<=m.contentRight+1,'filter row must not exceed the viewport');
     assert.equal(m.actionPosition,'sticky');
   });
+  await check('Sales reference table metrics for Products parity',async()=>{
+    await page.setViewportSize({width:768,height:1024});
+    await page.evaluate(()=>{document.getElementById('content').scrollTop=500;smSyncTopScrollbar_();});
+    await page.waitForFunction(()=>!document.getElementById('smPinnedSalesHeader').hidden);
+    salesTableVisualMetrics=await page.evaluate(()=>{
+      const style=el=>{const c=getComputedStyle(el);return {
+        fontSize:c.fontSize,fontWeight:c.fontWeight,lineHeight:c.lineHeight,
+        paddingTop:c.paddingTop,paddingBottom:c.paddingBottom,
+        paddingLeft:c.paddingLeft,paddingRight:c.paddingRight,
+        textTransform:c.textTransform,letterSpacing:c.letterSpacing};};
+      const wrap=document.getElementById('smTableScroll');
+      const button=getComputedStyle(wrap.querySelector('tbody tr .erp-row-action-trigger'));
+      return {th:style(wrap.querySelector('thead th')),td:style(wrap.querySelector('tbody td')),
+        pinned:style(document.querySelector('#smPinnedSalesHeader th')),
+        action:{width:button.width,height:button.height,minHeight:button.minHeight}};
+    });
+    assert.equal(salesTableVisualMetrics.th.fontSize,'12px');
+  });
   await check('clicking a Sales customer opens the paid-invoice-aware Customer detail modal',async()=>{
     await page.evaluate(()=>{
       window.__mockOverrides.getCustomerDetail={
@@ -355,24 +373,6 @@ async function main() {
     const calls=await page.evaluate(()=>__rpcCalls.filter(c=>c.name==='getCustomerDetail'));
     assert.equal(calls.at(-1).args[1],'C2');
     await page.locator('#custDetailModal .modal-close').first().click();
-  });
-  await check('Sales reference table metrics for Products parity',async()=>{
-    await page.setViewportSize({width:768,height:1024});
-    await page.evaluate(()=>{document.getElementById('content').scrollTop=500;smSyncTopScrollbar_();});
-    await page.waitForFunction(()=>!document.getElementById('smPinnedSalesHeader').hidden);
-    salesTableVisualMetrics=await page.evaluate(()=>{
-      const style=el=>{const c=getComputedStyle(el);return {
-        fontSize:c.fontSize,fontWeight:c.fontWeight,lineHeight:c.lineHeight,
-        paddingTop:c.paddingTop,paddingBottom:c.paddingBottom,
-        paddingLeft:c.paddingLeft,paddingRight:c.paddingRight,
-        textTransform:c.textTransform,letterSpacing:c.letterSpacing};};
-      const wrap=document.getElementById('smTableScroll');
-      const button=getComputedStyle(wrap.querySelector('tbody tr .erp-row-action-trigger'));
-      return {th:style(wrap.querySelector('thead th')),td:style(wrap.querySelector('tbody td')),
-        pinned:style(document.querySelector('#smPinnedSalesHeader th')),
-        action:{width:button.width,height:button.height,minHeight:button.minHeight}};
-    });
-    assert.equal(salesTableVisualMetrics.th.fontSize,'12px');
   });
   await check('sales browser errors',()=>assert.deepEqual(errors,[]));await page.close();
   ({page,errors}=await boot(browser,{width:1280,height:900}));
