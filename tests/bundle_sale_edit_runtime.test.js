@@ -3,6 +3,7 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
+const relationHelper = fs.readFileSync(path.join(__dirname,'..','Customer.gs'),'utf8').match(/function normalizeCustomerRelationType_\(value\)\s*\{[^}]*\}/)[0];
 const vm=require('node:vm');
 
 // Invoice.gs now uses the shared read-only payment kernel for legacy and split invoices.
@@ -108,6 +109,7 @@ function workbook(withStandalone) {
     customerInvoiceSettlementSnapshot_:()=>null,
     Utilities:{formatDate:()=>'12:00'},Session:{getScriptTimeZone:()=>'Asia/Dhaka'}
   });
+  vm.runInContext(relationHelper,ctx,{filename:'Customer.gs'});
   vm.runInContext(scripts,ctx);
   function edit(qty,price=15000) {
     const items=[{productId:'kit',name:'Tubewell Set',qty,unitPrice:price,bundleRevision:1}];

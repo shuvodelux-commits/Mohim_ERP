@@ -41,6 +41,75 @@ async function main() {
   await check('POS invoice uses exact returned identity/customer',async()=>{assert.match(await page.textContent('#invoicePaper'),/INV-000017/);assert.match(await page.textContent('#invoicePaper'),/মহিউদ্দিন/);});
   await check('POS posts exactly once',async()=>{const calls=await page.evaluate(()=>__rpcCalls.filter(c=>c.name==='completeSale'));assert.equal(calls.length,1);assert.equal(calls[0].args[1].items[0].productId,'PROD-000001');});
   await check('POS browser errors',()=>assert.deepEqual(errors,[]));await page.close();
+  // Relationship type is a user-facing select; exercise the real change
+  // event and the actual payload used by Save Draft / Complete Sale.
+  ({page,errors}=await boot(browser));await route(page,'posv2');
+  await check('POS Father/Husband switch updates label and draft payload without clearing name',async()=>{
+    const state=await page.evaluate(()=>{
+      const type=document.getElementById('posCustomerRelationType');
+      const name=document.getElementById('posCustomerFatherName');
+      name.value='Rahim';
+      type.value='Husband';type.dispatchEvent(new Event('change',{bubbles:true}));
+      const husbandLabel=document.getElementById('posCustomerRelationNameLabel').textContent;
+      const payload=posBuildDraftPayload_();
+      type.value='Father';type.dispatchEvent(new Event('change',{bubbles:true}));
+      return {husbandLabel,relationType:payload.customerRelationType,
+        draftName:payload.customerFatherName,
+        nameAfterSwitch:name.value,
+        fatherLabel:document.getElementById('posCustomerRelationNameLabel').textContent};
+    });
+    assert.equal(state.husbandLabel,'Husband Name — স্বামীর নাম');
+    assert.equal(state.relationType,'Husband');
+    assert.equal(state.draftName,'Rahim');
+    assert.equal(state.nameAfterSwitch,'Rahim');
+    assert.equal(state.fatherLabel,'Father Name — বাবার নাম');
+  });
+  await check('POS legacy draft reopens as Father, new draft restores Husband',async()=>{
+    const state=await page.evaluate(()=>{
+      const seed={draftId:'D-REL',draftNo:'DRAFT-REL',version:1,items:[],payment:{paymentMethod:'Cash'},customerName:'Test',customerPhone:'017',customerFatherName:'Karim',customerRelationType:'Husband',customerAddress:'Dhaka'};
+      posRestoreDraft_(seed);
+      const spouse=document.getElementById('posCustomerRelationType').value;
+      posRestoreDraft_(Object.assign({},seed,{draftId:'D-LEGACY',customerRelationType:''}));
+      const legacy=document.getElementById('posCustomerRelationType').value;
+      return {spouse,legacy};
+    });
+    assert.deepEqual(state,{spouse:'Husband',legacy:'Father'});
+  });
+  await route(page,'customers');
+  await check('Add and Edit Customer relation select retains Husband and sends relationType',async()=>{
+    await page.locator('#custAddBtn').click();
+    const before=await page.evaluate(()=>{
+      const type=document.getElementById('custRelationType');
+      const name=document.getElementById('custFatherName');
+      name.value='Spouse Test';
+      type.value='Husband';type.dispatchEvent(new Event('change',{bubbles:true}));
+      return {label:document.getElementById('custRelationNameLabel').textContent,value:type.value,name:name.value};
+    });
+    assert.deepEqual(before,{label:'Husband Name — স্বামীর নাম',value:'Husband',name:'Spouse Test'});
+    await page.evaluate(()=>{
+      window.__relationCaptured=[];
+      const rpc=window.serverCall;
+      window.serverCall=function(name,...args){
+        if(name==='addCustomerChecked'){window.__relationCaptured.push(args[args.length-1]);return Promise.resolve({id:'C-REL'});}
+        return rpc.apply(this,[name,...args]);
+      };
+    });
+    await page.fill('#custName','Test Spouse');
+    await page.fill('#custPhone','01712345678');
+    await page.locator('#custSaveBtn').click();
+    await page.waitForFunction(()=>Array.isArray(window.__relationCaptured)&&window.__relationCaptured.length>0);
+    const payload=await page.evaluate(()=>window.__relationCaptured[0]);
+    assert.equal(payload.relationType,'Husband');
+    assert.equal(payload.fatherName,'Spouse Test');
+    await page.evaluate(()=>{
+      custState.customers=[{'Customer ID':'C-EDIT','Customer Name':'Test','Father Name':'Bashir','Relation Type':'Husband','Phone':'01799999999','Address':'X','Notes':'','Opening Balance':0}];
+      custOpenEdit_('C-EDIT');
+    });
+    const restored=await page.evaluate(()=>({type:document.getElementById('custRelationType').value,label:document.getElementById('custRelationNameLabel').textContent,name:document.getElementById('custFatherName').value}));
+    assert.deepEqual(restored,{type:'Husband',label:'Husband Name — স্বামীর নাম',name:'Bashir'});
+  });
+  await page.close();
+
   // The split-payment feature stays off in real Settings: exercise UI only
   // with mock browser state and never call a transactional Apps Script RPC.
   ({page,errors}=await boot(browser,{width:768,height:1024}));

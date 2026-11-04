@@ -884,14 +884,15 @@ function updateSaleInternal_(token, invoiceId, payload, options) {
           canonicalPhone,
           sanitizeInput_(payload.customerAddress),
           sanitizeInput_(payload.customerFatherName),
-          sanitizeInput_(payload.customerId)
+          sanitizeInput_(payload.customerId),
+          normalizeCustomerRelationType_(payload.customerRelationType)
         );
         if (selectedCustomer) {
           customerNameForSale = sanitizeInput_(selectedCustomer['Customer Name']) || nameInput;
           customerPhoneForSale = canonicalPhone;
         }
       } else {
-        newCustomerId = resolveOrCreateCustomer_(nameInput, phoneInput, sanitizeInput_(payload.customerAddress), sanitizeInput_(payload.customerFatherName), '');
+        newCustomerId = resolveOrCreateCustomer_(nameInput, phoneInput, sanitizeInput_(payload.customerAddress), sanitizeInput_(payload.customerFatherName), '', normalizeCustomerRelationType_(payload.customerRelationType));
       }
     }
 
@@ -1012,6 +1013,10 @@ function updateSaleInternal_(token, invoiceId, payload, options) {
       'Backdated Reason': sale['Backdated Reason'] || '',
       'Customer ID': newCustomerId, 'Customer Name': customerNameForSale, 'Customer Phone': customerPhoneForSale,
       'Customer Address': sanitizeInput_(payload.customerAddress),
+      'Customer Relation Name': Object.prototype.hasOwnProperty.call(payload, 'customerFatherName')
+        ? sanitizeInput_(payload.customerFatherName) : (sale['Customer Relation Name'] || ''),
+      'Customer Relation Type': Object.prototype.hasOwnProperty.call(payload, 'customerRelationType')
+        ? normalizeCustomerRelationType_(payload.customerRelationType) : (sale['Customer Relation Type'] || ''),
       'Subtotal': subtotal, 'Discount': discount, 'Grand Total': grandTotal,
       'Paid Amount': paidAmount, 'Due Amount': dueAmount, 'Payment Type': paymentType,
       'Payment Status': paymentStatus,

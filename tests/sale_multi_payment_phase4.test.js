@@ -4,6 +4,7 @@ const assert=require('node:assert/strict');
 const vm=require('node:vm');
 const fs=require('node:fs');
 const path=require('node:path');
+const relationHelper = fs.readFileSync(path.join(__dirname,'..','Customer.gs'),'utf8').match(/function normalizeCustomerRelationType_\(value\)\s*\{[^}]*\}/)[0];
 const read=name=>fs.readFileSync(path.join(__dirname,'..',name),'utf8');
 const plain=x=>JSON.parse(JSON.stringify(x));
 const accounts=[
@@ -24,6 +25,7 @@ function draftKernel(enabled=true) {
     getSettingsMap_:()=>({'POS Multi Payment Enabled':enabled?'true':'false'}),
     getAllRows_:()=>accounts
   });
+  vm.runInContext(relationHelper,ctx,{filename:'Customer.gs'});
   vm.runInContext(read('SalePayments.gs'),ctx);
   vm.runInContext(source.slice(source.indexOf('function cleanDraftText_('),source.indexOf('function parseSalesDraftRow_(')),ctx);
   return ctx;
@@ -57,6 +59,7 @@ function invoiceKernel() {
     safeDateOnly_:x=>x,safeTimeOnly_:x=>x,computeInvoiceDueDate_:()=>'',buildInvoiceShopPayload_:()=>({}),
     customerInvoiceSettlementSnapshot_:()=>({paidAmount:110,dueAmount:0,customerCreditUsed:10,paymentStatus:'Paid',paymentType:'Cash'})
   });
+  vm.runInContext(relationHelper,ctx,{filename:'Customer.gs'});
   vm.runInContext(read('SalePayments.gs'),ctx);
   const source=read('Invoice.gs');
   vm.runInContext(source.slice(source.indexOf('function buildInvoicePayload_('),source.indexOf('function resolveInvoiceLogoDataUri_(')),ctx);

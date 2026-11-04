@@ -3,6 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const relationHelper = fs.readFileSync(path.join(__dirname,'..','Customer.gs'),'utf8').match(/function normalizeCustomerRelationType_\(value\)\s*\{[^}]*\}/)[0];
 const vm = require('node:vm');
 const crypto = require('node:crypto');
 
@@ -85,6 +86,7 @@ function harness(enabled = true, failAt = '') {
     logError_:()=>{}
   });
   vm.runInContext(read('SalePayments.gs'),context,{filename:'SalePayments.gs'});
+  vm.runInContext(relationHelper,context,{filename:'Customer.gs'});
   vm.runInContext(read('Sales.gs'),context,{filename:'Sales.gs'});
   return {context,tables,writes,writeLog,rows};
 }

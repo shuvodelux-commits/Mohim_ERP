@@ -1,3 +1,8 @@
+<style>
+  #custModal .cust-relation-entry { display:flex; align-items:center; gap:6px; min-width:0; }
+  #custModal .cust-relation-entry select { flex:0 0 100px; min-width:0; height:36px; }
+  #custModal .cust-relation-entry input { flex:1 1 auto; min-width:0; height:36px; }
+</style>
 <div class="toolbar">
   <input class="search-input" id="custSearch" type="text" placeholder="Search by name or phone...">
   <div class="toolbar-spacer"></div>
@@ -21,7 +26,7 @@
     <div class="modal-body">
       <div class="form-grid">
         <div class="full"><label>Customer Name *</label><input id="custName" type="text"></div>
-        <div><label>Father Name</label><input id="custFatherName" type="text"></div>
+        <div><label for="custFatherName" id="custRelationNameLabel">Father Name — বাবার নাম</label><div class="cust-relation-entry"><select id="custRelationType" aria-label="Relationship"><option value="Father">Father</option><option value="Husband">Husband</option></select><input id="custFatherName" type="text"></div></div>
         <div><label>Phone *</label><input id="custPhone" type="text"></div>
         <div><label>Opening Balance (Due / Credit)</label><input id="custOpening" type="number" step="0.01" value="0"><div class="bn-hint">Positive = due, negative = customer credit</div></div>
         <div class="full" id="custOpeningReasonRow" style="display:none;"><label>Opening Balance Change Reason *</label><input id="custOpeningBalanceReason" type="text" placeholder="Why is the opening balance being corrected?"></div>
@@ -191,11 +196,23 @@
 
   document.getElementById('custSearch').addEventListener('input', custRender);
 
+  function custSetRelationType_(type) {
+    var relation = type === 'Husband' ? 'Husband' : 'Father';
+    document.getElementById('custRelationType').value = relation;
+    document.getElementById('custRelationNameLabel').textContent =
+      relation === 'Husband' ? 'Husband Name — স্বামীর নাম' : 'Father Name — বাবার নাম';
+    if (typeof refreshTouchSelect_ === 'function') refreshTouchSelect_(document.getElementById('custRelationType'));
+  }
+  document.getElementById('custRelationType').addEventListener('change', function () {
+    custSetRelationType_(this.value);
+  });
+
   function custOpenAdd_(onSaved) {
     custState.editingId = null;
     custState.addSuccessCallback = typeof onSaved === 'function' ? onSaved : null;
     document.getElementById('custModalTitle').textContent = 'Add Customer';
     ['custName', 'custFatherName', 'custPhone', 'custAddress', 'custNotes'].forEach(function (id) { document.getElementById(id).value = ''; });
+    custSetRelationType_('Father');
     document.getElementById('custOpening').value = 0;
     custConfigureOpeningBalance_(false, 0);
     document.getElementById('custFormError').style.display = 'none';
@@ -219,6 +236,7 @@
     document.getElementById('custModalTitle').textContent = 'Edit Customer';
     document.getElementById('custName').value = customer['Customer Name'];
     document.getElementById('custFatherName').value = customer['Father Name'] || '';
+    custSetRelationType_(customer['Relation Type']);
     document.getElementById('custPhone').value = customer['Phone'];
     document.getElementById('custAddress').value = customer['Address'];
     document.getElementById('custNotes').value = customer['Notes'];
@@ -270,6 +288,7 @@
     var payload = {
       name: document.getElementById('custName').value.trim(),
       fatherName: document.getElementById('custFatherName').value.trim(),
+      relationType: document.getElementById('custRelationType').value,
       phone: document.getElementById('custPhone').value.trim(),
       address: document.getElementById('custAddress').value.trim(),
       notes: document.getElementById('custNotes').value.trim(),

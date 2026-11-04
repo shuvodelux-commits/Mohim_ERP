@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const relationHelper = fs.readFileSync(path.join(__dirname,'..','Customer.gs'),'utf8').match(/function normalizeCustomerRelationType_\(value\)\s*\{[^}]*\}/)[0];
 const vm = require('vm');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
@@ -55,6 +56,7 @@ function resolverHarness(customers) {
   for (const name of ['sanitizeInput_', 'normalizePhoneDisplay_', 'normalizePhoneSearch_', 'phoneNumbersEqual_']) {
     vm.runInContext(fnSource(utils, name), ctx, { filename: 'Utils.gs' });
   }
+  vm.runInContext(relationHelper, ctx, { filename: 'Customer.gs' });
   vm.runInContext(fnSource(customer, 'resolveOrCreateCustomer_'), ctx, { filename: 'Customer.gs' });
   return { ctx, created };
 }
@@ -130,6 +132,7 @@ test('normal customer creation still rejects the same canonical phone in Bangla 
   for (const name of ['normalizePhoneDisplay_', 'normalizePhoneSearch_', 'phoneNumbersEqual_']) {
     vm.runInContext(fnSource(utils, name), ctx, { filename: 'Utils.gs' });
   }
+  vm.runInContext(relationHelper, ctx, { filename: 'Customer.gs' });
   vm.runInContext(fnSource(customer, 'addCustomer_'), ctx, { filename: 'Customer.gs' });
   const result = ctx.addCustomer_({ name: 'Ripon Sarkar', phone: '০১৭৫৪৫৫১৪৪৯', openingBalance: 0 });
   assert.equal(result.success, false);

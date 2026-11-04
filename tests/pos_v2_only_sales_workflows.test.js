@@ -27,9 +27,13 @@ function functionSource(source, name) {
   const start = source.indexOf('function ' + name + '(');
   assert.notStrictEqual(start, -1, 'missing function ' + name);
   const brace = source.indexOf('{', start);
-  let depth = 0, quote = null, escape = false;
+  let depth = 0, quote = null, escape = false, line = false, block = false;
   for (let i = brace; i < source.length; i++) {
-    const ch = source[i];
+    const ch = source[i], next = source[i + 1];
+    if (line) { if (ch === '\n') line = false; continue; }
+    if (block) { if (ch === '*' && next === '/') { block = false; i++; } continue; }
+    if (!quote && ch === '/' && next === '/') { line = true; i++; continue; }
+    if (!quote && ch === '/' && next === '*') { block = true; i++; continue; }
     if (quote) {
       if (escape) { escape = false; continue; }
       if (ch === '\\') { escape = true; continue; }

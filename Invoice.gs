@@ -78,12 +78,18 @@ function buildInvoicePayload_(invoiceId) {
   const paymentTermsDays = Number(settings['Invoice Payment Terms Days']) || 0;
   const dueDate = computeInvoiceDueDate_(saleDate, paymentTermsDays);
 
-  // Father's name only exists on tracked (due-carrying) Customers, not on
-  // the Sale row itself — walk-ins print without it, which is expected.
-  let customerFatherName = '';
-  if (sale['Customer ID']) {
+  // New invoices snapshot the chosen relationship (including cash sales).
+  // Legacy invoices have no snapshot; fall back to their tracked Customer.
+  const hasRelationSnapshot = !!String(sale['Customer Relation Type'] || '').trim();
+  let customerRelationType = normalizeCustomerRelationType_(sale['Customer Relation Type']);
+  let customerFatherName = hasRelationSnapshot ? (sale['Customer Relation Name'] || '') : '';
+  if (!hasRelationSnapshot && sale['Customer ID']) {
     const customer = getAllRows_('CUSTOMERS').filter(function (c) { return c['Customer ID'] === sale['Customer ID']; })[0];
-    if (customer) customerFatherName = customer['Father Name'] || '';
+    if (customer) {
+      customerFatherName = customer['Father Name'] || '';
+      // Legacy invoices historically printed this stored value as Father.
+      // Do not relabel an old invoice when the customer master later changes.
+    }
   }
 
   // Original checkout allocation is immutable invoice history. Later due
@@ -106,6 +112,7 @@ function buildInvoicePayload_(invoiceId) {
     customerName: sale['Customer Name'], customerPhone: sale['Customer Phone'],
     customerAddress: sale['Customer Address'], customerId: sale['Customer ID'],
     customerFatherName: customerFatherName,
+    customerRelationType: customerRelationType,
     items: items.map(function (i) {
       return {
         productId: i['Product ID'], name: i['Product Name'], qty: i['Quantity'],

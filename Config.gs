@@ -273,6 +273,8 @@ const CONFIG = {
       "Source Draft ID",
       // Blank for legacy rows. New multi-payment posting writes version 1.
       "Payment Detail Version",
+      // Customer relationship is a sale-time snapshot, including cash sales.
+      "Customer Relation Name", "Customer Relation Type",
 
       // ---- Soft delete (Delete System). Additive: getSheetHeaders_ appends
       // these to the live sheet on first touch, and every existing row just
@@ -299,7 +301,8 @@ const CONFIG = {
       "Draft ID", "Draft No", "Draft Date", "Customer ID", "Customer Name", "Customer Phone",
       "Customer Father Name", "Customer Address", "Items JSON", "Payment JSON", "Notes",
       "Subtotal", "Discount", "Grand Total", "Created By ID", "Created By Name", "Created At",
-      "Updated By ID", "Updated By Name", "Updated At", "Version"
+      "Updated By ID", "Updated By Name", "Updated At", "Version",
+      "Customer Relation Type"
     ],
     SALES_DRAFT_AUDIT: [
       "Audit ID", "Timestamp", "Action", "Draft ID", "Draft No", "Version", "Actor ID", "Actor Name",
@@ -334,7 +337,8 @@ const CONFIG = {
       "Is Deleted",
       "Deleted By",
       "Deleted At",
-      "Delete Reason"
+      "Delete Reason",
+      "Relation Type"
     ],
     CUSTOMER_LEDGER: [
       "Ledger ID",
