@@ -195,6 +195,51 @@ async function main() {
     assert.ok(m.amountTop>=m.methodBottom,JSON.stringify(m));
     assert.ok(m.rowRight<=m.fieldsRight+1,JSON.stringify(m));
   });
+  await check('POS optional customer fields are visible and customer height never shifts cart',async()=>{
+    await page.setViewportSize({width:1440,height:900});
+    const m=await page.evaluate(()=>{
+      const page=document.querySelector('#page-pos');
+      const cart=page.querySelector('.pos-cart-section');
+      const search=page.querySelector('.pos-product-card');
+      const details=document.getElementById('posCustomerMoreFields');
+      const dad=document.getElementById('posCustomerFatherName');
+      const address=document.getElementById('posCustomerAddress');
+      const top0=cart.getBoundingClientRect().top;
+      const searchBottom=search.getBoundingClientRect().bottom;
+      const toggler=document.getElementById('posCustomerMoreToggle');
+      posSetCustomerMoreExpanded_(false);
+      dad.value='Test Father';
+      address.value='Test Address';
+      const due=document.getElementById('posCustomerDueRow');
+      due.hidden=false;
+      document.getElementById('posCustomerDueValue').textContent='৳4,500';
+      // Simulate optional content and customer validation adding extra height:
+      // desktop cart must remain anchored below the search toolbar.
+      details.style.paddingBottom='95px';
+      const top1=cart.getBoundingClientRect().top;
+      const result={
+        togglerAbsent:!toggler,
+        alwaysVisible:!details.hidden && getComputedStyle(details).display!=='none',
+        fatherVisible:dad.getBoundingClientRect().height>0,
+        addressVisible:address.getBoundingClientRect().height>0,
+        fixedCartTop:Math.abs(top0-top1)<=1,
+        anchoredToSearch:Math.abs(top1-searchBottom-8)<=2,
+        columns:getComputedStyle(details).gridTemplateColumns.trim().split(/\s+/).length,
+        delta:top1-top0
+      };
+      details.style.paddingBottom='';
+      due.hidden=true;
+      dad.value=''; address.value='';
+      return result;
+    });
+    assert.equal(m.togglerAbsent,true,JSON.stringify(m));
+    assert.equal(m.alwaysVisible,true,JSON.stringify(m));
+    assert.equal(m.fatherVisible,true,JSON.stringify(m));
+    assert.equal(m.addressVisible,true,JSON.stringify(m));
+    assert.equal(m.fixedCartTop,true,JSON.stringify(m));
+    assert.equal(m.anchoredToSearch,true,JSON.stringify(m));
+    assert.equal(m.columns,2,JSON.stringify(m));
+  });
   await check('phone Payment tab keeps checkout accessible and compact without clipping',async()=>{
     await page.setViewportSize({width:375,height:812});
     await page.evaluate(()=>posV2SelectTab_('payment'));

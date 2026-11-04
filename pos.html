@@ -65,15 +65,18 @@
         <span>Outstanding Due <span class="bn-hint" style="display:inline;">— আগের বাকি</span></span><span class="v" id="posCustomerDueValue"></span>
       </div>
 
-      <div class="pos-customer-actions">
-        <button type="button" class="btn" id="posCustomerMoreToggle">+ Father Name / Address</button>
-        <button type="button" class="btn" id="posHistoryBtn">Sales History</button>
+      <div id="posCustomerMoreFields" class="pos-customer-more-fields">
+        <div class="pos-customer-extra-field">
+          <label for="posCustomerFatherName">Father Name <span class="bn-hint" style="display:inline;">— বাবার নাম</span></label>
+          <input id="posCustomerFatherName" type="text" placeholder="Optional" autocomplete="off">
+        </div>
+        <div class="pos-customer-extra-field">
+          <label for="posCustomerAddress">Address <span class="bn-hint" style="display:inline;">— ঠিকানা</span></label>
+          <input id="posCustomerAddress" type="text" placeholder="Optional" autocomplete="off">
+        </div>
       </div>
-      <div id="posCustomerMoreFields" hidden class="pos-customer-more-fields">
-        <label>Father Name <span class="bn-hint" style="display:inline;">— বাবার নাম</span></label>
-        <input id="posCustomerFatherName" type="text" placeholder="Optional">
-        <label>Address <span class="bn-hint" style="display:inline;">— ঠিকানা</span></label>
-        <input id="posCustomerAddress" type="text" placeholder="Optional, but useful for returns later">
+      <div class="pos-customer-actions">
+        <button type="button" class="btn" id="posHistoryBtn">Sales History</button>
       </div>
 
       <div id="posUpdateBanner" class="session-banner is-closed" hidden>
@@ -256,7 +259,7 @@
       fillBankAccountSelect_(document.getElementById('posBankAccount'), posState.bankAccounts, document.getElementById('posPaymentMethod').value);
       posEnhanceTabletSelects_();
       posRefreshTabletSelect_(document.getElementById('posBankAccount'));
-      posSetCustomerMoreExpanded_(false); // keep optional Father Name / Address collapsed until the user expands it
+      posSetCustomerMoreExpanded_(false); // optional Father Name / Address always visible
       posLoadRecentDrafts_();
     }).catch(function (err) { showToast(err.message, 'error'); });
   }
@@ -2993,8 +2996,9 @@ function posExitUpdateMode_() {
 }
 
 function posSetCustomerMoreExpanded_(expanded) {
-  document.getElementById('posCustomerMoreFields').hidden = !expanded;
-  document.getElementById('posCustomerMoreToggle').textContent = expanded ? '− Father Name / Address' : '+ Father Name / Address';
+  // Keep the optional fields available for new sales, drafts and invoice edits.
+  // The argument remains for compatibility with earlier callers.
+  document.getElementById('posCustomerMoreFields').hidden = false;
 }
 
 function posUpdateCustomerDueDisplay_(due) {
@@ -3008,11 +3012,6 @@ function posUpdateCustomerDueDisplay_(due) {
     row.hidden = true;
   }
 }
-
-document.getElementById('posCustomerMoreToggle').addEventListener('click', function () {
-  var fields = document.getElementById('posCustomerMoreFields');
-  posSetCustomerMoreExpanded_(fields.hidden); // hidden===true means currently collapsed, so this toggles correctly
-});
 
 document.getElementById('posCancelUpdateBtn').addEventListener('click', function () {
   posExitUpdateMode_();
