@@ -26,8 +26,11 @@
 <div class="card" style="padding: 0">
   <div
     id="smTopScroll"
+    class="erp-table-top-scroll"
+    tabindex="0"
+    role="region"
     aria-label="Sales table horizontal scroll"
-    style="display:none;overflow-x:auto;overflow-y:hidden;height:12px;background:transparent;scrollbar-width:thin;"
+    style="display:none;height:12px;"
   >
     <div id="smTopScrollInner" style="height:1px;"></div>
   </div>
@@ -323,6 +326,11 @@
   var smTopScrollSyncing_ = false;
   var smPinnedSalesHeader_ = null;
 
+  function smTopScrollHeight_() {
+    var top = document.getElementById('smTopScroll');
+    return top && top.style.display !== 'none' ? top.getBoundingClientRect().height : 0;
+  }
+
   function smEnsurePinnedHeader_() {
     if (smPinnedSalesHeader_) return smPinnedSalesHeader_;
     var pinned = document.createElement('div');
@@ -353,13 +361,14 @@
     var tableRect = tableScroll.getBoundingClientRect();
     var contentRect = content.getBoundingClientRect();
     var headerRect = originalHeader.getBoundingClientRect();
-    var shouldPin = headerRect.bottom <= contentRect.top + 1 &&
-      tableRect.bottom > contentRect.top + headerRect.height;
+    var railHeight = smTopScrollHeight_();
+    var shouldPin = headerRect.bottom <= contentRect.top + railHeight + 1 &&
+      tableRect.bottom > contentRect.top + railHeight + headerRect.height;
     pinned.hidden = !shouldPin;
     if (!shouldPin) return;
     var width = Math.round(tableScroll.clientWidth);
     var tableWidth = Math.round(realTable.getBoundingClientRect().width);
-    pinned.style.top = Math.round(contentRect.top) + 'px';
+    pinned.style.top = Math.round(contentRect.top + railHeight) + 'px';
     pinned.style.left = Math.round(tableRect.left) + 'px';
     pinned.style.width = width + 'px';
     pinned.style.height = Math.ceil(headerRect.height) + 'px';
@@ -393,12 +402,17 @@
     var inner = document.getElementById("smTopScrollInner");
     var tableScroll = document.getElementById("smTableScroll");
     if (!top || !inner || !tableScroll) return;
-    smSyncPinnedHeader_(true);
-
-    var hasOverflow = tableScroll.scrollWidth - tableScroll.clientWidth > 1;
+    var salesPage = document.getElementById('page-sales');
+    // Sticky offsets are relative to the content scrollport's padding edge.
+    // Compensate for padding so the rail sits at the topbar, not over the header.
+    var content = document.getElementById('content');
+    top.style.top = -(parseFloat(window.getComputedStyle(content).paddingTop) || 0) + 'px';
+    var hasOverflow = !!salesPage && !salesPage.hidden &&
+      tableScroll.scrollWidth - tableScroll.clientWidth > 1;
     top.style.display = hasOverflow ? "block" : "none";
     if (!hasOverflow) {
       top.scrollLeft = 0;
+      smSyncPinnedHeader_(true);
       return;
     }
 
@@ -406,9 +420,9 @@
     if (!smTopScrollSyncing_) {
       smTopScrollSyncing_ = true;
       top.scrollLeft = tableScroll.scrollLeft;
-      smSyncPinnedHeader_();
       smTopScrollSyncing_ = false;
     }
+    smSyncPinnedHeader_(true);
   }
 
   function smWireTopScrollbar_() {
@@ -429,13 +443,14 @@
       if (smTopScrollSyncing_) return;
       smTopScrollSyncing_ = true;
       top.scrollLeft = tableScroll.scrollLeft;
+      smSyncPinnedHeader_();
       smTopScrollSyncing_ = false;
     }, { passive: true });
 
     document.getElementById('content').addEventListener('scroll', function () {
       smSyncPinnedHeader_();
     }, { passive: true });
-    new MutationObserver(function () { smSyncPinnedHeader_(); })
+    new MutationObserver(function () { smSyncTopScrollbar_(); })
       .observe(document.getElementById('page-sales'), { attributes: true, attributeFilter: ['hidden'] });
     window.addEventListener("resize", smSyncTopScrollbar_);
     if (window.ResizeObserver) {

@@ -15,6 +15,10 @@
 </div>
 
 <div class="card" style="padding:0;">
+  <div id="prodTopScroll" class="erp-table-top-scroll" role="region"
+       aria-label="Products table horizontal scroll" tabindex="0" style="display:none;">
+    <div id="prodTopScrollInner"></div>
+  </div>
   <div class="table-scroll" id="prodTableScroll">
     <table id="prodTable" class="mobile-card-table erp-action-table">
       <thead>
@@ -463,6 +467,12 @@
   }
 
   var prodPinnedHeader_ = null;
+  var prodTopScrollSyncing_ = false;
+
+  function prodTopScrollHeight_() {
+    var top = document.getElementById('prodTopScroll');
+    return top && top.style.display !== 'none' ? top.getBoundingClientRect().height : 0;
+  }
 
   function prodEnsurePinnedHeader_() {
     if (prodPinnedHeader_) return prodPinnedHeader_;
@@ -497,13 +507,14 @@
     var tableRect = tableScroll.getBoundingClientRect();
     var contentRect = content.getBoundingClientRect();
     var headerRect = originalHeader.getBoundingClientRect();
-    var shouldPin = headerRect.bottom <= contentRect.top + 1 &&
-      tableRect.bottom > contentRect.top + headerRect.height;
+    var railHeight = prodTopScrollHeight_();
+    var shouldPin = headerRect.bottom <= contentRect.top + railHeight + 1 &&
+      tableRect.bottom > contentRect.top + railHeight + headerRect.height;
     pinned.hidden = !shouldPin;
     if (!shouldPin) return;
     var width = Math.round(tableScroll.clientWidth);
     var tableWidth = Math.round(realTable.getBoundingClientRect().width);
-    pinned.style.top = Math.round(contentRect.top) + 'px';
+    pinned.style.top = Math.round(contentRect.top + railHeight) + 'px';
     pinned.style.left = Math.round(tableRect.left) + 'px';
     pinned.style.width = width + 'px';
     pinned.style.height = Math.ceil(headerRect.height) + 'px';
@@ -532,18 +543,65 @@
     pinned.scrollLeft = tableScroll.scrollLeft;
   }
 
+  function prodSyncTopScrollbar_() {
+    var top = document.getElementById('prodTopScroll');
+    var inner = document.getElementById('prodTopScrollInner');
+    var tableScroll = document.getElementById('prodTableScroll');
+    var page = document.getElementById('page-products');
+    if (!top || !inner || !tableScroll || !page) return;
+    // Keep the sticky rail flush with the top of #content despite its padding.
+    var content = document.getElementById('content');
+    top.style.top = -(parseFloat(window.getComputedStyle(content).paddingTop) || 0) + 'px';
+
+    var isCardView = window.matchMedia(
+      '(max-width: 540px), (orientation: landscape) and (max-height: 540px) and (pointer: coarse)'
+    ).matches;
+    var hasOverflow = !page.hidden && !isCardView &&
+      tableScroll.scrollWidth - tableScroll.clientWidth > 1;
+    top.style.display = hasOverflow ? 'block' : 'none';
+    if (!hasOverflow) {
+      top.scrollLeft = 0;
+      prodSyncPinnedHeader_(true);
+      return;
+    }
+    inner.style.width = tableScroll.scrollWidth + 'px';
+    if (!prodTopScrollSyncing_) {
+      prodTopScrollSyncing_ = true;
+      top.scrollLeft = tableScroll.scrollLeft;
+      prodTopScrollSyncing_ = false;
+    }
+    prodSyncPinnedHeader_(true);
+  }
+
   function prodWirePinnedHeader_() {
     var wrap = document.getElementById('prodTableScroll');
+    var top = document.getElementById('prodTopScroll');
     var page = document.getElementById('page-products');
     var content = document.getElementById('content');
+
+    top.addEventListener('scroll', function () {
+      if (prodTopScrollSyncing_) return;
+      prodTopScrollSyncing_ = true;
+      wrap.scrollLeft = top.scrollLeft;
+      prodSyncPinnedHeader_();
+      prodTopScrollSyncing_ = false;
+    }, { passive: true });
+    wrap.addEventListener('scroll', function () {
+      if (!prodTopScrollSyncing_) {
+        prodTopScrollSyncing_ = true;
+        top.scrollLeft = wrap.scrollLeft;
+        prodTopScrollSyncing_ = false;
+      }
+      prodSyncPinnedHeader_();
+    }, { passive: true });
     content.addEventListener('scroll', function () { prodSyncPinnedHeader_(); }, { passive: true });
-    wrap.addEventListener('scroll', function () { prodSyncPinnedHeader_(); }, { passive: true });
-    new MutationObserver(function () { prodSyncPinnedHeader_(); })
+    new MutationObserver(function () { prodSyncTopScrollbar_(); })
       .observe(page, { attributes: true, attributeFilter: ['hidden'] });
-    window.addEventListener('resize', function () { prodSyncPinnedHeader_(true); });
+    window.addEventListener('resize', function () { prodSyncTopScrollbar_(); });
     if (window.ResizeObserver) {
-      new ResizeObserver(function () { prodSyncPinnedHeader_(true); }).observe(wrap);
+      new ResizeObserver(function () { prodSyncTopScrollbar_(); }).observe(wrap);
     }
+    prodSyncTopScrollbar_();
   }
   prodWirePinnedHeader_();
 
@@ -622,7 +680,7 @@
     document.getElementById('prodEmptyState').hidden = rows.length > 0;
     prodSyncSearchClear_();
     prodUpdateSortHeaders_();
-    if (window.requestAnimationFrame) requestAnimationFrame(function () { prodSyncPinnedHeader_(true); });
+    if (window.requestAnimationFrame) requestAnimationFrame(function () { prodSyncTopScrollbar_(); });
   }
 
   var prodSearchInput_ = document.getElementById('prodSearch');

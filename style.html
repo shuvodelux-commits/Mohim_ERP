@@ -3496,6 +3496,56 @@
     grid-template-columns: minmax(180px, 1.8fr) repeat(2, minmax(130px,1fr));
   }
 }
+/* Sales / Products sticky horizontal top scrollbars. The native tracks remain
+   draggable/clickable while the vertical page scroll moves long tables. */
+#smTopScroll,
+#prodTopScroll {
+  box-sizing: border-box;
+  width: 100%;
+  height: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: #eef3f5;
+  scrollbar-width: thin;
+  scrollbar-color: #6adacc #e8eff1;
+}
+#smTopScrollInner,
+#prodTopScrollInner {
+  height: 1px;
+  pointer-events: none;
+}
+#smTopScroll::-webkit-scrollbar,
+#prodTopScroll::-webkit-scrollbar { height: 10px; }
+#smTopScroll::-webkit-scrollbar-track,
+#prodTopScroll::-webkit-scrollbar-track { background: #e8eff1; }
+#smTopScroll::-webkit-scrollbar-thumb,
+#prodTopScroll::-webkit-scrollbar-thumb {
+  background: #6adacc;
+  border: 1px solid #e8eff1;
+  border-radius: 999px;
+}
+#smTopScroll:focus-visible,
+#prodTopScroll:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+@media screen and (min-width: 541px) {
+  #page-sales #smTopScroll,
+  #page-products #prodTopScroll {
+    position: sticky;
+    top: 0;
+    z-index: 81;
+  }
+}
+@media screen and (max-width: 540px), (orientation: landscape) and (max-height: 540px) and (pointer: coarse) {
+  #smTopScroll,
+  #prodTopScroll { display: none !important; }
+}
+@media print {
+  #smTopScroll,
+  #prodTopScroll { display: none !important; }
+}
+
 /* The Sales table retains horizontal overflow; its separate header mirror
    appears only once the real heading has scrolled beyond the app top bar. */
 .sm-pinned-sales-header {
