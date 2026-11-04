@@ -64,7 +64,43 @@ async function main() {
     assert.equal(state.nameAfterSwitch,'Rahim');
     assert.equal(state.fatherLabel,'Father Name — বাবার নাম');
   });
-  await check('POS legacy draft reopens as Father, new draft restores Husband',async()=>{
+  await check('POS relationship row stays inline with full-width address beneath on desktop tablet phone',async()=>{
+    for (const width of [1440,768,375]) {
+      await page.setViewportSize({width,height:900});
+      if(width<=540) await page.evaluate(()=>posV2SelectTab_('customer'));
+      const layout=await page.evaluate(()=>{
+        const shell=document.getElementById('posCustomerMoreFields');
+        const type=document.getElementById('posCustomerRelationType');
+        const name=document.getElementById('posCustomerFatherName');
+        const address=document.getElementById('posCustomerAddress');
+        const group=shell.querySelector('.pos-customer-relation-entry');
+        const first=shell.querySelector('.pos-customer-extra-field');
+        const second=first.nextElementSibling;
+        const t=(type._touchSelectTrigger||type).getBoundingClientRect();
+        const n=name.getBoundingClientRect(),a=address.getBoundingClientRect();
+        const g=group.getBoundingClientRect(),s=shell.getBoundingClientRect();
+        const f=first.getBoundingClientRect(),b=second.getBoundingClientRect();
+        return {columns:getComputedStyle(shell).gridTemplateColumns.trim().split(/\s+/).length,
+          sameRow:Math.abs(t.top-n.top)<=2,
+          fullRelation:Math.abs(f.width-s.width)<=2,
+          below:b.top>=f.bottom,
+          fullAddress:Math.abs(a.width-s.width)<=3,
+          addressFits:a.right<=s.right+2,
+          selectorWidth:t.width,nameWidth:n.width,
+          groupFits:g.right<=s.right+2};
+      });
+      assert.equal(layout.columns,1,JSON.stringify({width,layout}));
+      assert.equal(layout.sameRow,true,JSON.stringify({width,layout}));
+      assert.equal(layout.fullRelation,true,JSON.stringify({width,layout}));
+      assert.equal(layout.below,true,JSON.stringify({width,layout}));
+      assert.equal(layout.fullAddress,true,JSON.stringify({width,layout}));
+      assert.equal(layout.addressFits,true,JSON.stringify({width,layout}));
+      assert.ok(layout.selectorWidth>=100&&layout.nameWidth>=80,JSON.stringify({width,layout}));
+      assert.equal(layout.groupFits,true,JSON.stringify({width,layout}));
+    }
+    await page.setViewportSize({width:1440,height:1000});
+  });
+  await check('legacy draft reopens as Father, new draft restores Husband',async()=>{
     const state=await page.evaluate(()=>{
       const seed={draftId:'D-REL',draftNo:'DRAFT-REL',version:1,items:[],payment:{paymentMethod:'Cash'},customerName:'Test',customerPhone:'017',customerFatherName:'Karim',customerRelationType:'Husband',customerAddress:'Dhaka'};
       posRestoreDraft_(seed);
@@ -78,6 +114,33 @@ async function main() {
   await route(page,'customers');
   await check('Add and Edit Customer relation select retains Husband and sends relationType',async()=>{
     await page.locator('#custAddBtn').click();
+    for(const width of [1440,375]) {
+      await page.setViewportSize({width,height:900});
+      const geometry=await page.evaluate(()=>{
+        const name=document.getElementById('custFatherName');
+        const type=document.getElementById('custRelationType');
+        const addr=document.getElementById('custAddress');
+        const relation=document.querySelector('#custModal .cust-relation-entry');
+        const first=relation.parentElement.getBoundingClientRect();
+        const addressRow=addr.parentElement.getBoundingClientRect();
+        const select=(type._touchSelectTrigger||type).getBoundingClientRect();
+        const input=name.getBoundingClientRect();
+        const a=addr.getBoundingClientRect();
+        return {sameLine:Math.abs(select.top-input.top)<=2,
+          below:addressRow.top>=first.bottom,
+          fullWidth:Math.abs(addressRow.width-first.width)<=2,
+          inputFits:input.right<=first.right+2,
+          addressFits:a.right<=addressRow.right+2,
+          selectorWidth:select.width,nameWidth:input.width};
+      });
+      assert.equal(geometry.sameLine,true,JSON.stringify({width,geometry}));
+      assert.equal(geometry.below,true,JSON.stringify({width,geometry}));
+      assert.equal(geometry.fullWidth,true,JSON.stringify({width,geometry}));
+      assert.equal(geometry.inputFits,true,JSON.stringify({width,geometry}));
+      assert.equal(geometry.addressFits,true,JSON.stringify({width,geometry}));
+      assert.ok(geometry.selectorWidth>=100&&geometry.nameWidth>=80,JSON.stringify({width,geometry}));
+    }
+    await page.setViewportSize({width:1440,height:1000});
     const before=await page.evaluate(()=>{
       const type=document.getElementById('custRelationType');
       const name=document.getElementById('custFatherName');
@@ -328,7 +391,7 @@ async function main() {
     assert.equal(m.addressVisible,true,JSON.stringify(m));
     assert.equal(m.fixedCartTop,true,JSON.stringify(m));
     assert.equal(m.anchoredToSearch,true,JSON.stringify(m));
-    assert.equal(m.columns,2,JSON.stringify(m));
+    assert.equal(m.columns,1,JSON.stringify(m));
   });
   await check('phone Payment tab keeps checkout accessible and compact without clipping',async()=>{
     await page.setViewportSize({width:375,height:812});
