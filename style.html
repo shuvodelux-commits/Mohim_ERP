@@ -3643,10 +3643,13 @@
 .prod-pinned-header th {
   position: relative;
   top: auto;
-  padding: 9px 12px;
+  padding: 7px 8px;
   box-sizing: border-box;
   background: var(--color-surface);
   font-weight: 600;
+}
+@media screen and (min-width: 541px) and (max-width: 1100px) {
+  .prod-pinned-header th { padding: 6px 7px; }
 }
 .prod-pinned-header th.erp-sticky-action-col {
   position: sticky;
