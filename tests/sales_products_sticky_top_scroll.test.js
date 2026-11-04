@@ -25,7 +25,7 @@ test('Products exposes one matching top track and keeps it synchronized in both 
   assert.match(products, /function prodSyncTopScrollbar_\(\)/);
   assert.match(products, /tableScroll\.scrollWidth - tableScroll\.clientWidth > 1/);
   assert.match(products, /top\.style\.display\s*=\s*hasOverflow\s*\?\s*["']block["']\s*:\s*["']none["']/);
-  assert.match(products, /tableScroll\.scrollLeft\s*=\s*top\.scrollLeft/);
+  assert.match(products, /wrap\.scrollLeft\s*=\s*top\.scrollLeft/);
   assert.match(products, /top\.scrollLeft\s*=\s*tableScroll\.scrollLeft/);
   assert.match(products, /prodSyncTopScrollbar_\(\)/);
   assert.match(products, /prodWirePinnedHeader_\(\)/);
@@ -59,4 +59,10 @@ test('Both tables remeasure top scrollbar after rendering and resize', () => {
   assert.match(sales, /window\.addEventListener\(["']resize["'],\s*smSyncTopScrollbar_\)/);
   assert.match(products, /requestAnimationFrame\(function \(\) \{ prodSyncTopScrollbar_\(\); \}\)/);
   assert.match(products, /window\.addEventListener\('resize',\s*function \(\) \{ prodSyncTopScrollbar_\(\); \}\)/);
+});
+
+test('Sticky rails compensate the actual #content padding so they never intercept heading clicks', () => {
+  assert.match(sales, /top\.style\.top\s*=\s*-\(parseFloat\(window\.getComputedStyle\(content\)\.paddingTop\)\s*\|\|\s*0\)\s*\+\s*'px'/);
+  assert.match(products, /top\.style\.top\s*=\s*-\(parseFloat\(window\.getComputedStyle\(content\)\.paddingTop\)\s*\|\|\s*0\)\s*\+\s*'px'/);
+  assert.match(sales, /height:12px/);
 });
