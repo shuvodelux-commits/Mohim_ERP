@@ -3477,8 +3477,13 @@
     min-height: 38px; padding: 7px 12px; white-space: nowrap;
   }
   #page-sales > .card { box-shadow: none; }
+  /* Sales uses the normal page scroll (no second, height-limited row viewport).
+     Keep horizontal overflow local to the table and right-pinned row actions. */
   #page-sales #smTableScroll {
-    max-height: clamp(260px, calc(100dvh - var(--topbar-height) - 170px), 1200px);
+    max-height: none !important;
+    overflow-y: hidden;
+    overflow-x: auto;
+    overscroll-behavior-y: auto;
   }
   #page-sales #smTableScroll th { padding: 9px 12px; }
   #page-sales #smTableScroll td { padding: 8px 12px; line-height: 1.35; }
@@ -3490,6 +3495,46 @@
   #page-sales > .toolbar {
     grid-template-columns: minmax(180px, 1.8fr) repeat(2, minmax(130px,1fr));
   }
+}
+/* The Sales table retains horizontal overflow; its separate header mirror
+   appears only once the real heading has scrolled beyond the app top bar. */
+.sm-pinned-sales-header {
+  position: fixed;
+  z-index: 80;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+.sm-pinned-sales-header[hidden] { display: none !important; }
+.sm-pinned-sales-header::-webkit-scrollbar { display: none; }
+.sm-pinned-sales-header table {
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  margin: 0;
+  background: var(--color-surface);
+}
+.sm-pinned-sales-header th {
+  position: relative; top: auto;
+  padding: 9px 12px;
+  box-sizing: border-box;
+  background: var(--color-surface);
+  font-weight: 600;
+}
+.sm-pinned-sales-header th.erp-sticky-action-col {
+  position: sticky; right: 0; z-index: 2;
+  width: 58px; min-width: 58px;
+  padding: 4px 2px;
+  background: var(--color-surface);
+  border-left: 0; box-shadow: none;
+}
+@media screen and (max-width: 540px), (orientation: landscape) and (max-height: 540px) and (pointer: coarse) {
+  .sm-pinned-sales-header { display: none !important; }
+}
+@media print {
+  .sm-pinned-sales-header { display: none !important; }
 }
 @media print {
   .erp-sticky-action-col { position: static !important; box-shadow: none !important; }
