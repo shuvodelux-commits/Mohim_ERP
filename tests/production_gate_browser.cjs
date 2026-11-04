@@ -111,12 +111,18 @@ async function main() {
       return {scroll:content.scrollTop,innerScroll:wrap.scrollTop,
         pinTop:pinned.getBoundingClientRect().top,
         contentTop:content.getBoundingClientRect().top,
-        cap:getComputedStyle(wrap).maxHeight};
+        cap:getComputedStyle(wrap).maxHeight,
+        railTop:document.getElementById('smTopScroll').getBoundingClientRect().top,
+        railHeight:document.getElementById('smTopScroll').getBoundingClientRect().height,
+        railPosition:getComputedStyle(document.getElementById('smTopScroll')).position};
     });
     assert.ok(tablet.scroll>100);
     assert.equal(tablet.innerScroll,0);
     assert.equal(tablet.cap,'none');
-    assert.ok(Math.abs(tablet.pinTop-tablet.contentTop)<=2);
+    assert.equal(tablet.railPosition,'sticky');
+    assert.ok(tablet.railHeight>=10,JSON.stringify(tablet));
+    assert.ok(Math.abs(tablet.railTop-tablet.contentTop)<=2,JSON.stringify(tablet));
+    assert.ok(Math.abs(tablet.pinTop-tablet.contentTop-tablet.railHeight)<=2,JSON.stringify(tablet));
     await page.setViewportSize({width:390,height:844});
     await page.waitForTimeout(60);
     const mobile=await page.evaluate(()=>{
@@ -129,6 +135,32 @@ async function main() {
     assert.equal(mobile.maxHeight,'none');
     assert.equal(mobile.headerDisplay,'none');
     assert.equal(mobile.pinnedDisplay,'none');
+  });
+  await check('Sales sticky top scrollbar moves the table both ways while keeping pinned header aligned',async()=>{
+    await page.setViewportSize({width:768,height:1024});
+    await page.evaluate(()=>{
+      document.getElementById('content').scrollTop=500;
+      smSyncTopScrollbar_();
+      const rail=document.getElementById('smTopScroll');
+      if(rail.scrollWidth<=rail.clientWidth+20)throw Error('Sales fixture must overflow horizontally');
+      rail.scrollLeft=Math.round((rail.scrollWidth-rail.clientWidth)/2);
+      rail.dispatchEvent(new Event('scroll'));
+    });
+    await page.waitForFunction(()=>{
+      const table=document.getElementById('smTableScroll'), rail=document.getElementById('smTopScroll');
+      return table.scrollLeft>20 && Math.abs(table.scrollLeft-rail.scrollLeft)<=2;
+    });
+    const first=await page.evaluate(()=>{
+      const table=document.getElementById('smTableScroll'), pin=document.getElementById('smPinnedSalesHeader');
+      return {table:table.scrollLeft, pin:pin.scrollLeft};
+    });
+    assert.ok(Math.abs(first.table-first.pin)<=2,JSON.stringify(first));
+    await page.evaluate(()=>{
+      const table=document.getElementById('smTableScroll');
+      table.scrollLeft=0;
+      table.dispatchEvent(new Event('scroll'));
+    });
+    await page.waitForFunction(()=>document.getElementById('smTopScroll').scrollLeft===0);
   });
   await check('tablet keeps Sales Actions pinned right across horizontal scrolling',async()=>{
     await page.setViewportSize({width:768,height:1024});
@@ -360,6 +392,50 @@ async function main() {
     assert.ok(geometry.realHeaderBottom<geometry.contentTop);
     assert.ok(Math.abs(geometry.contentTop-geometry.pinnedTop)<=2);
     assert.equal(geometry.headerCount,geometry.originalCount);
+  });
+  await check('Products sticky top track stays above the mirrored heading and scrolls both ways',async()=>{
+    await page.setViewportSize({width:768,height:1024});
+    await page.evaluate(()=>{
+      document.getElementById('content').scrollTop=500;
+      prodSyncTopScrollbar_();
+    });
+    await page.waitForFunction(()=>!document.getElementById('prodPinnedHeader').hidden);
+    const geo=await page.evaluate(()=>{
+      const content=document.getElementById('content');
+      const table=document.getElementById('prodTableScroll');
+      const pin=document.getElementById('prodPinnedHeader');
+      const rail=document.getElementById('prodTopScroll');
+      return {contentTop:content.getBoundingClientRect().top,
+        barTop:rail.getBoundingClientRect().top,barHeight:rail.getBoundingClientRect().height,
+        barPosition:getComputedStyle(rail).position,
+        pinTop:pin.getBoundingClientRect().top,
+        overflow:rail.scrollWidth-rail.clientWidth};
+    });
+    assert.equal(geo.barPosition,'sticky');
+    assert.ok(geo.overflow>20,JSON.stringify(geo));
+    assert.ok(geo.barHeight>=10,JSON.stringify(geo));
+    assert.ok(Math.abs(geo.barTop-geo.contentTop)<=2,JSON.stringify(geo));
+    assert.ok(Math.abs(geo.pinTop-geo.contentTop-geo.barHeight)<=2,JSON.stringify(geo));
+    await page.evaluate(()=>{
+      const rail=document.getElementById('prodTopScroll');
+      rail.scrollLeft=Math.round((rail.scrollWidth-rail.clientWidth)/2);
+      rail.dispatchEvent(new Event('scroll'));
+    });
+    await page.waitForFunction(()=>{
+      const table=document.getElementById('prodTableScroll'),rail=document.getElementById('prodTopScroll');
+      return table.scrollLeft>20 && Math.abs(table.scrollLeft-rail.scrollLeft)<=2;
+    });
+    const after=await page.evaluate(()=>({
+      table:document.getElementById('prodTableScroll').scrollLeft,
+      pinned:document.getElementById('prodPinnedHeader').scrollLeft
+    }));
+    assert.ok(Math.abs(after.table-after.pinned)<=2,JSON.stringify(after));
+    await page.evaluate(()=>{
+      const table=document.getElementById('prodTableScroll');
+      table.scrollLeft=0;
+      table.dispatchEvent(new Event('scroll'));
+    });
+    await page.waitForFunction(()=>document.getElementById('prodTopScroll').scrollLeft===0);
   });
   await check('Products pinned heading synchronizes horizontally and preserves rightmost Actions',async()=>{
     await page.setViewportSize({width:768,height:1024});
