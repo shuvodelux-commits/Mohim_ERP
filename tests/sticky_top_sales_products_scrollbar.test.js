@@ -28,7 +28,7 @@ test('Products has normal and fixed sliders, focusable, above fixed heading',()=
 test('Products fixed, inline and table scrolls synchronize both ways',()=>{
   assert.match(products,/tableScroll\.scrollLeft\s*=\s*pinnedBar\.scrollLeft/);
   assert.match(products,/pinnedBar\.scrollLeft\s*=\s*tableScroll\.scrollLeft/);
-  assert.match(products,/tableScroll\.scrollLeft\s*=\s*top\.scrollLeft/);
+  assert.match(products,/wrap\.scrollLeft\s*=\s*top\.scrollLeft/);
   assert.match(products,/top\.scrollLeft\s*=\s*tableScroll\.scrollLeft/);
   assert.match(products,/pinnedBar\.hidden\s*=\s*!\(shouldPin\s*&&\s*hasOverflow\)/);
 });
