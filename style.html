@@ -142,7 +142,21 @@
     padding: 0 20px; background: var(--color-surface);
     border-bottom: 1px solid var(--color-border);
   }
-  .topbar-title { font-size: 18px; font-weight: 700; }
+  /* Compact, module-only header shared by every ERP route. */
+  .topbar-title {
+    display: flex; flex-direction: column; justify-content: center;
+    flex: 0 1 auto; min-width: 0;
+    font-size: 16px; font-weight: 650; line-height: 1.18;
+  }
+  .topbar-module-name {
+    display: block; min-width: 0; max-width: 100%;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .topbar-title .bn-hint {
+    display: block; font-size: 11px; font-weight: 400;
+    line-height: 1.25; color: var(--color-text-muted);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
   .topbar-date {
     position: relative; margin-left: auto; flex-shrink: 0;
     font-size: 13px; color: var(--color-text-muted); white-space: nowrap;
@@ -1539,8 +1553,15 @@
       color: #fff; background: linear-gradient(135deg, #0d5bd7, #0b67e8);
       border-bottom: 0; box-shadow: 0 2px 10px rgba(13,91,215,.18);
     }
-    .topbar-title { flex: 1; min-width: 0; font-size: 16px; color: #fff; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-    .topbar-title .bn-hint { display: none; }
+    .topbar-title {
+      flex: 1 1 auto; min-width: 0; font-size: 15px;
+      color: #fff; overflow: hidden;
+    }
+    .topbar-title .bn-hint {
+      display: block; font-size: 10px; line-height: 1.15;
+      color: rgba(255,255,255,.8);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
     .topbar-date { display: block; margin-left: 0; color: #fff; }
     .topbar-date-toggle { min-height: 34px; padding: 0 2px; color: #fff; font-size: 9px; background: transparent; }
     .topbar-date-toggle:hover, .topbar-date-toggle:focus-visible, .topbar-date.is-open .topbar-date-toggle { background: rgba(255,255,255,.12); }

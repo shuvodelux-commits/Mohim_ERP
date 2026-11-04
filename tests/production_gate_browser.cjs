@@ -10,6 +10,11 @@ const bridge=source.match(/mock_js=f'''([\s\S]*?)'''/)[1]
 const html=fs.readFileSync('index.html','utf8').replace('<body>','<body>'+bridge)
   .replace(/<\?!=\s*include\('([^']+)'\);\s*\?>/g,(_,name)=>fs.readFileSync(name+'.html','utf8'));
 const pages=vm.runInNewContext(source.match(/PAGES = (\[[^\n]+\])/)[1]);
+// Real NAV_ITEMS is the authoritative module-title source. The browser
+// fixture's minimal navigation omits many Bangla helpers.
+const uiSource=fs.readFileSync('UI.gs','utf8');
+const realNav=vm.runInNewContext(uiSource.match(/const NAV_ITEMS = (\[[\s\S]*?\n\]);/)[1]);
+
 let pass=0,fail=0;
 async function check(name,fn) {try {await fn();pass++;console.log('PASS',name);}catch(e){fail++;console.error('FAIL',name,e.stack);}}
 async function boot(browser,viewport={width:1440,height:1000}) {
@@ -28,6 +33,58 @@ async function main() {
  try {
   let {page,errors}=await boot(browser);
   for(const key of pages) await check('route '+key,async()=>{const before=errors.length;await route(page,key);await page.waitForTimeout(200);assert.equal(errors.length,before,errors.join('\n'));});
+  // Exercise every current route against the real production navigation.
+  await page.evaluate(items=>{navItems_=items;},realNav);
+  for(const key of pages) await check('module-only topbar '+key,async()=>{
+    await route(page,key);
+    const group=realNav.find(g=>g.key===key||(g.children||[]).some(c=>c.key===key));
+    assert.ok(group,'missing top-level NAV_ITEMS group for '+key);
+    const observed=await page.evaluate(()=>({
+      name:document.querySelector('#pageTitle .topbar-module-name')?.textContent||'',
+      bn:document.querySelector('#pageTitle .bn-hint')?.textContent||'',
+      full:document.getElementById('pageTitle').textContent
+    }));
+    assert.equal(observed.name,group.label,'current module for '+key);
+    assert.equal(observed.bn,group.bn||'','Bangla helper for '+key);
+    assert.equal(observed.full.indexOf('›'),-1,'unexpected breadcrumb in '+key);
+    if((group.children||[]).length>1) {
+      const selected=await page.locator('#subNav .tab-btn.active').count();
+      assert.equal(selected,1,'active child tab still present on '+key);
+    }
+  });
+  await check('compact topbar fits desktop tablet and phone without hiding navigation controls',async()=>{
+    for(const width of [1440,768,375]){
+      await page.setViewportSize({width,height:900});
+      for(const key of ['posv2','sales','customerLedger','financeLedger','settings','purchase']){
+        await route(page,key);
+        const shape=await page.evaluate(()=>{
+          const top=document.querySelector('.topbar');
+          const title=document.getElementById('pageTitle');
+          const name=title.querySelector('.topbar-module-name');
+          const helper=title.querySelector('.bn-hint');
+          const tr=title.getBoundingClientRect(),nr=name.getBoundingClientRect(),bar=top.getBoundingClientRect();
+          const controls=['menuToggle','topbarDateToggle','cashSessionToggleBtn','calcToggleBtn','refreshBtn']
+            .map(id=>document.getElementById(id))
+            .filter(el=>!!el&&getComputedStyle(el).display!=='none'&&el.getBoundingClientRect().width>0);
+          const extents=controls.map(el=>({id:el.id,left:el.getBoundingClientRect().left,
+            right:el.getBoundingClientRect().right}));
+          const style=getComputedStyle(title),hint=helper&&getComputedStyle(helper);
+          return {height:bar.height,titleLeft:tr.left,titleRight:tr.right,titleWidth:tr.width,
+            titleTop:tr.top,titleBottom:tr.bottom,nameWidth:nr.width,viewport:innerWidth,
+            font:style.fontSize,hintFont:hint?.fontSize,hintVisible:!!helper&&hint.display!=='none',
+            helperText:helper?.textContent||'',extents};
+        });
+        assert.equal(shape.height,56,JSON.stringify({width,key,shape}));
+        assert.equal(shape.font,width===375?'15px':'16px',JSON.stringify({width,key,shape}));
+        assert.equal(shape.hintFont,width===375?'10px':'11px',JSON.stringify({width,key,shape}));
+        assert.equal(shape.hintVisible,true,JSON.stringify({width,key,shape}));
+        assert.ok(shape.titleWidth>=36,JSON.stringify({width,key,shape}));
+        assert.ok(shape.titleLeft>=-1&&shape.titleRight<=width+1,JSON.stringify({width,key,shape}));
+        assert.ok(shape.titleTop>=-1&&shape.titleBottom<=shape.height+1,JSON.stringify({width,key,shape}));
+        assert.ok(shape.extents.every(x=>x.left>=-1&&x.right<=width+1),JSON.stringify({width,key,shape}));
+      }
+    }
+  });
   await page.close();
   ({page,errors}=await boot(browser)); await route(page,'posv2');
   await page.fill('#posSearch','4 inch Test Pipe');
