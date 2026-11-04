@@ -547,8 +547,7 @@
   }
   prodWirePinnedHeader_();
 
-  // Display-only normalizations; product settings retain their stored Unit value.
-  // Display-only labels; stored units and stock arithmetic remain unchanged.
+  // Display-only unit labels; stored units and stock arithmetic stay unchanged.
   function prodUnitLabel_(unit) {
     var raw = String(unit || '').trim();
     var displayNames = {
