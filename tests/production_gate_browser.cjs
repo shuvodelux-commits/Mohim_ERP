@@ -221,6 +221,33 @@ async function main() {
     assert.ok(m.rowRight<=m.contentRight+1,'filter row must not exceed the viewport');
     assert.equal(m.actionPosition,'sticky');
   });
+  await check('clicking a Sales customer opens the paid-invoice-aware Customer detail modal',async()=>{
+    await page.evaluate(()=>{
+      window.__mockOverrides.getCustomerDetail={
+        customer:{'Customer ID':'C2','Customer Name':'মহিউদ্দিন','Phone':'01712345678','Current Due':0},
+        ledger:[
+          {'Ledger ID':'SOURCE|customer|INV-000017','Date':'2026-09-05','Type':'Sale',
+            'Reference':'INV-000017',Debit:50,Credit:50,Balance:0,_invoiceProjection:true},
+          {'Ledger ID':'CL-22','Date':'2026-09-01','Type':'Payment','Reference':'PAYMENT',
+            Debit:'',Credit:20,Balance:0,'Payment Amount':20,'Discount Amount':0}
+        ]
+      };
+    });
+    await page.locator('#smTableBody button[data-customer-profile-id="C2"]').first().click();
+    await page.locator('#custDetailModal').waitFor({state:'visible'});
+    const detail=page.locator('#custLedgerBody');
+    const text=await detail.innerText();
+    assert.match(text,/INV-000017/);
+    assert.match(text,/Paid at Checkout/);
+    assert.match(text,/Invoice Total/);
+    assert.equal(await detail.locator('tr').count(),2);
+    assert.equal(await detail.locator('button[data-act="menuLed"]').count(),1,
+      'only real payment rows retain Edit/Delete actions');
+    assert.equal(await page.locator('#custDetailDue').innerText(),'৳0');
+    const calls=await page.evaluate(()=>__rpcCalls.filter(c=>c.name==='getCustomerDetail'));
+    assert.equal(calls.at(-1).args[1],'C2');
+    await page.locator('#custDetailModal .modal-close').first().click();
+  });
   await check('sales browser errors',()=>assert.deepEqual(errors,[]));await page.close();
   ({page,errors}=await boot(browser));await route(page,'returns');await page.fill('#rtSearchInput','INV-000005');await page.click('#rtFindBtn');
   await check('return blocks duplicate invoice load',async()=>{const b=page.locator('#rtSearchResults button[data-id="INV-000005"]');await b.waitFor();assert.equal(await b.isDisabled(),true);assert.equal(await page.evaluate(()=>__rpcCalls.filter(c=>c.name==='getInvoiceForReturn').length),0);});
