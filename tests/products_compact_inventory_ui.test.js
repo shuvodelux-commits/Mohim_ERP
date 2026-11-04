@@ -133,3 +133,9 @@ test('Products preserve phone cards, filters, sorting and conditional pinned hea
   assert.match(html, /document\.getElementById\('prodBrandFilter'\)\.addEventListener\('change', prodRender\)/);
   assert.match(css, /@media screen and \(max-width:\s*540px\)[^{]*\{/);
 });
+
+test('Mirrored Products heading uses the same padding as the real heading on tablets', () => {
+  assert.match(css, /#page-products #prodTable th,\s*#page-products #prodTable td\s*\{[^}]*padding:\s*7px 8px;/s);
+  assert.match(css, /\.prod-pinned-header th\s*\{[^}]*padding:\s*7px 8px;/s);
+  assert.match(css, /@media screen and \(min-width:\s*541px\) and \(max-width:\s*1100px\)\s*\{\s*\.prod-pinned-header th\s*\{\s*padding:\s*6px 7px;/s);
+});
