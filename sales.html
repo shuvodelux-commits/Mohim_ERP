@@ -26,6 +26,8 @@
 <div class="card" style="padding: 0">
   <div
     id="smTopScroll"
+    class="erp-table-top-scrollbar"
+    tabindex="0"
     aria-label="Sales table horizontal scroll"
     style="display:none;overflow-x:auto;overflow-y:hidden;height:12px;background:transparent;scrollbar-width:thin;"
   >
@@ -322,6 +324,7 @@
 
   var smTopScrollSyncing_ = false;
   var smPinnedSalesHeader_ = null;
+  var smPinnedTopScroll_ = null;
 
   function smEnsurePinnedHeader_() {
     if (smPinnedSalesHeader_) return smPinnedSalesHeader_;
@@ -337,29 +340,66 @@
     return pinned;
   }
 
+  function smEnsurePinnedTopScrollbar_() {
+    if (smPinnedTopScroll_) return smPinnedTopScroll_;
+    var pinnedBar = document.createElement('div');
+    pinnedBar.id = 'smPinnedTopScroll';
+    pinnedBar.className = 'erp-pinned-table-scrollbar';
+    pinnedBar.hidden = true;
+    pinnedBar.tabIndex = 0;
+    pinnedBar.setAttribute('aria-label', 'Scroll Sales table horizontally');
+    var inner = document.createElement('div');
+    inner.className = 'erp-pinned-table-scrollbar-inner';
+    pinnedBar.appendChild(inner);
+    document.body.appendChild(pinnedBar);
+    pinnedBar.addEventListener('scroll', function () {
+      var tableScroll = document.getElementById('smTableScroll');
+      if (!tableScroll || smTopScrollSyncing_) return;
+      smTopScrollSyncing_ = true;
+      tableScroll.scrollLeft = pinnedBar.scrollLeft;
+      document.getElementById('smTopScroll').scrollLeft = pinnedBar.scrollLeft;
+      if (smPinnedSalesHeader_) smPinnedSalesHeader_.scrollLeft = pinnedBar.scrollLeft;
+      smTopScrollSyncing_ = false;
+    }, { passive: true });
+    smPinnedTopScroll_ = pinnedBar;
+    return pinnedBar;
+  }
+
   function smSyncPinnedHeader_(refreshColumns) {
     var pinned = smEnsurePinnedHeader_();
+    var pinnedBar = smEnsurePinnedTopScrollbar_();
     var salesPage = document.getElementById('page-sales');
     var content = document.getElementById('content');
     var tableScroll = document.getElementById('smTableScroll');
     if (!salesPage || salesPage.hidden || !content || !tableScroll ||
         window.matchMedia('(max-width: 540px), (orientation: landscape) and (max-height: 540px) and (pointer: coarse)').matches) {
       pinned.hidden = true;
+      pinnedBar.hidden = true;
       return;
     }
     var realTable = tableScroll.querySelector('table');
     var originalHeader = realTable && realTable.querySelector('thead');
-    if (!originalHeader) { pinned.hidden = true; return; }
+    if (!originalHeader) { pinned.hidden = true; pinnedBar.hidden = true; return; }
     var tableRect = tableScroll.getBoundingClientRect();
     var contentRect = content.getBoundingClientRect();
     var headerRect = originalHeader.getBoundingClientRect();
+    var hasOverflow = tableScroll.scrollWidth - tableScroll.clientWidth > 1;
     var shouldPin = headerRect.bottom <= contentRect.top + 1 &&
-      tableRect.bottom > contentRect.top + headerRect.height;
+      tableRect.bottom > contentRect.top + headerRect.height + (hasOverflow ? 14 : 0);
     pinned.hidden = !shouldPin;
+    pinnedBar.hidden = !(shouldPin && hasOverflow);
     if (!shouldPin) return;
     var width = Math.round(tableScroll.clientWidth);
     var tableWidth = Math.round(realTable.getBoundingClientRect().width);
-    pinned.style.top = Math.round(contentRect.top) + 'px';
+    var barHeight = pinnedBar.hidden ? 0 : pinnedBar.offsetHeight;
+    if (!pinnedBar.hidden) {
+      pinnedBar.style.top = Math.round(contentRect.top) + 'px';
+      pinnedBar.style.left = Math.round(tableRect.left) + 'px';
+      pinnedBar.style.width = width + 'px';
+      pinnedBar.firstElementChild.style.width = tableScroll.scrollWidth + 'px';
+      pinnedBar.scrollLeft = tableScroll.scrollLeft;
+    }
+    pinned.style.top = Math.round(contentRect.top + barHeight) + 'px';
     pinned.style.left = Math.round(tableRect.left) + 'px';
     pinned.style.width = width + 'px';
     pinned.style.height = Math.ceil(headerRect.height) + 'px';
@@ -429,6 +469,7 @@
       if (smTopScrollSyncing_) return;
       smTopScrollSyncing_ = true;
       top.scrollLeft = tableScroll.scrollLeft;
+      smSyncPinnedHeader_();
       smTopScrollSyncing_ = false;
     }, { passive: true });
 

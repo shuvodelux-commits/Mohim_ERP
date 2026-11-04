@@ -85,7 +85,8 @@ async function main() {
         pageScroll:content.scrollTop,innerScroll:wrap.scrollTop,
         contentTop:content.getBoundingClientRect().top,
         originalHeaderBottom:actual.getBoundingClientRect().bottom,
-        pinnedTop:top,heading:overlayHead?.textContent||'',
+        pinnedTop:top,barHeight:document.getElementById('smPinnedTopScroll')?.hidden ? 0 : document.getElementById('smPinnedTopScroll').offsetHeight,
+        heading:overlayHead?.textContent||'',
         headerCells:overlayHead?.querySelectorAll('th').length,
         originalCells:actual.querySelectorAll('th').length
       };
@@ -93,7 +94,7 @@ async function main() {
     assert.ok(geometry.pageScroll>=400);
     assert.equal(geometry.innerScroll,0);
     assert.ok(geometry.originalHeaderBottom<geometry.contentTop);
-    assert.ok(Math.abs(geometry.pinnedTop-geometry.contentTop)<=2);
+    assert.ok(Math.abs(geometry.pinnedTop-geometry.contentTop-geometry.barHeight)<=2);
     assert.match(geometry.heading,/Invoice/);
     assert.match(geometry.heading,/Actions/);
     assert.equal(geometry.headerCells,geometry.originalCells);
@@ -110,13 +111,14 @@ async function main() {
       const pinned=document.getElementById('smPinnedSalesHeader');
       return {scroll:content.scrollTop,innerScroll:wrap.scrollTop,
         pinTop:pinned.getBoundingClientRect().top,
+        barHeight:document.getElementById('smPinnedTopScroll')?.hidden ? 0 : document.getElementById('smPinnedTopScroll').offsetHeight,
         contentTop:content.getBoundingClientRect().top,
         cap:getComputedStyle(wrap).maxHeight};
     });
     assert.ok(tablet.scroll>100);
     assert.equal(tablet.innerScroll,0);
     assert.equal(tablet.cap,'none');
-    assert.ok(Math.abs(tablet.pinTop-tablet.contentTop)<=2);
+    assert.ok(Math.abs(tablet.pinTop-tablet.contentTop-tablet.barHeight)<=2);
     await page.setViewportSize({width:390,height:844});
     await page.waitForTimeout(60);
     const mobile=await page.evaluate(()=>{
@@ -192,6 +194,46 @@ async function main() {
     assert.equal(geometry.duplicateIdCount,1,'cloned headings must never duplicate DOM IDs');
     assert.ok(geometry.columnAlignment.every(c=>c.dx<=3 && c.dw<=3),
       'pinned header columns must align with corresponding invoice cells: '+JSON.stringify(geometry.columnAlignment));
+  });
+  await check('Sales pinned top slider is visible, clickable and synchronized both directions',async()=>{
+    await page.setViewportSize({width:768,height:1024});
+    await page.evaluate(()=>{
+      document.getElementById('content').scrollTop=500;
+      document.getElementById('smTableScroll').scrollLeft=0;
+      smSyncTopScrollbar_();
+    });
+    await page.waitForFunction(()=>{
+      const b=document.getElementById('smPinnedTopScroll');
+      return b && !b.hidden && b.scrollWidth>b.clientWidth+10;
+    });
+    const m=await page.evaluate(()=>{
+      const tableScroll=document.getElementById('smTableScroll');
+      const pinned=document.getElementById('smPinnedSalesHeader');
+      const pinnedBar=document.getElementById('smPinnedTopScroll');
+      const originalBar=document.getElementById('smTopScroll');
+      const content=document.getElementById('content');
+      const initial={barTop:pinnedBar.getBoundingClientRect().top,
+        headerTop:pinned.getBoundingClientRect().top,
+        contentTop:content.getBoundingClientRect().top,barHeight:pinnedBar.offsetHeight,
+        tabIndex:pinnedBar.tabIndex,barWidth:pinnedBar.scrollWidth,viewWidth:pinnedBar.clientWidth};
+      pinnedBar.scrollLeft=100;
+      pinnedBar.dispatchEvent(new Event('scroll'));
+      const afterThumb={table:tableScroll.scrollLeft,normal:originalBar.scrollLeft,header:pinned.scrollLeft};
+      tableScroll.scrollLeft=0;
+      tableScroll.dispatchEvent(new Event('scroll'));
+      const afterTable={bar:pinnedBar.scrollLeft,normal:originalBar.scrollLeft,header:pinned.scrollLeft};
+      return {initial,afterThumb,afterTable};
+    });
+    assert.ok(m.initial.barWidth-m.initial.viewWidth>100);
+    assert.equal(m.initial.tabIndex,0);
+    assert.ok(Math.abs(m.initial.barTop-m.initial.contentTop)<=2);
+    assert.ok(Math.abs(m.initial.headerTop-m.initial.barTop-m.initial.barHeight)<=2);
+    assert.ok(Math.abs(m.afterThumb.table-100)<=1,JSON.stringify(m));
+    assert.ok(Math.abs(m.afterThumb.normal-100)<=1);
+    assert.ok(Math.abs(m.afterThumb.header-100)<=1);
+    assert.ok(Math.abs(m.afterTable.bar)<=1);
+    assert.ok(Math.abs(m.afterTable.normal)<=1);
+    assert.ok(Math.abs(m.afterTable.header)<=1);
   });
   await check('Sales row three-dot actions show icons and preserve keyboard/menu semantics',async()=>{
     await page.evaluate(()=>{
@@ -351,6 +393,7 @@ async function main() {
       return {pageScroll:content.scrollTop,innerScroll:wrap.scrollTop,
         contentTop:content.getBoundingClientRect().top,
         pinnedTop:pin.getBoundingClientRect().top,
+        barHeight:document.getElementById('prodPinnedTopScroll')?.hidden ? 0 : document.getElementById('prodPinnedTopScroll').offsetHeight,
         realHeaderBottom:wrap.querySelector('thead').getBoundingClientRect().bottom,
         headerCount:pin.querySelectorAll('th').length,
         originalCount:wrap.querySelectorAll('thead th').length};
@@ -358,7 +401,7 @@ async function main() {
     assert.ok(geometry.pageScroll>250);
     assert.equal(geometry.innerScroll,0);
     assert.ok(geometry.realHeaderBottom<geometry.contentTop);
-    assert.ok(Math.abs(geometry.contentTop-geometry.pinnedTop)<=2);
+    assert.ok(Math.abs(geometry.contentTop+geometry.barHeight-geometry.pinnedTop)<=2);
     assert.equal(geometry.headerCount,geometry.originalCount);
   });
   await check('Products pinned heading synchronizes horizontally and preserves rightmost Actions',async()=>{
@@ -393,6 +436,46 @@ async function main() {
     assert.equal(geo.order,true);
     assert.ok(geo.columnErrors.every(x=>x.dLeft<=3 && x.dWidth<=3),JSON.stringify(geo.columnErrors));
     assert.match(geo.buttonName,/Actions for product/);
+  });
+  await check('Products inline and pinned top scrollbars stay aligned with tablet header',async()=>{
+    await page.setViewportSize({width:768,height:1024});
+    await page.evaluate(()=>{
+      document.getElementById('content').scrollTop=500;
+      document.getElementById('prodTableScroll').scrollLeft=0;
+      prodSyncTopScrollbar_();
+    });
+    await page.waitForFunction(()=>{
+      const b=document.getElementById('prodPinnedTopScroll');
+      return b && !b.hidden && b.scrollWidth>b.clientWidth+10;
+    });
+    const m=await page.evaluate(()=>{
+      const tableScroll=document.getElementById('prodTableScroll');
+      const pinned=document.getElementById('prodPinnedHeader');
+      const pinnedBar=document.getElementById('prodPinnedTopScroll');
+      const originalBar=document.getElementById('prodTopScroll');
+      const content=document.getElementById('content');
+      const initial={barTop:pinnedBar.getBoundingClientRect().top,
+        headerTop:pinned.getBoundingClientRect().top,contentTop:content.getBoundingClientRect().top,
+        barHeight:pinnedBar.offsetHeight,tabIndex:pinnedBar.tabIndex,
+        barWidth:pinnedBar.scrollWidth,viewWidth:pinnedBar.clientWidth};
+      pinnedBar.scrollLeft=60;
+      pinnedBar.dispatchEvent(new Event('scroll'));
+      const afterThumb={table:tableScroll.scrollLeft,normal:originalBar.scrollLeft,header:pinned.scrollLeft};
+      tableScroll.scrollLeft=0;
+      tableScroll.dispatchEvent(new Event('scroll'));
+      const afterTable={bar:pinnedBar.scrollLeft,normal:originalBar.scrollLeft,header:pinned.scrollLeft};
+      return {initial,afterThumb,afterTable};
+    });
+    assert.ok(m.initial.barWidth-m.initial.viewWidth>60);
+    assert.equal(m.initial.tabIndex,0);
+    assert.ok(Math.abs(m.initial.barTop-m.initial.contentTop)<=2);
+    assert.ok(Math.abs(m.initial.headerTop-m.initial.barTop-m.initial.barHeight)<=2);
+    assert.ok(Math.abs(m.afterThumb.table-60)<=1,JSON.stringify(m));
+    assert.ok(Math.abs(m.afterThumb.normal-60)<=1);
+    assert.ok(Math.abs(m.afterThumb.header-60)<=1);
+    assert.ok(Math.abs(m.afterTable.bar)<=1);
+    assert.ok(Math.abs(m.afterTable.normal)<=1);
+    assert.ok(Math.abs(m.afterTable.header)<=1);
   });
   await check('Products sticky heading sorting uses existing product sort and item actions',async()=>{
     const sort=page.locator('#prodPinnedHeader button[data-sort-key="sellingPrice"]');

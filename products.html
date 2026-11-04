@@ -15,6 +15,9 @@
 </div>
 
 <div class="card" style="padding:0;">
+  <div id="prodTopScroll" class="erp-table-top-scrollbar" style="display:none;" tabindex="0" aria-label="Products table horizontal scroll">
+    <div id="prodTopScrollInner" class="erp-table-top-scrollbar-inner"></div>
+  </div>
   <div class="table-scroll" id="prodTableScroll">
     <table id="prodTable" class="mobile-card-table erp-action-table">
       <thead>
@@ -463,6 +466,8 @@
   }
 
   var prodPinnedHeader_ = null;
+  var prodPinnedTopScroll_ = null;
+  var prodTopScrollSyncing_ = false;
 
   function prodEnsurePinnedHeader_() {
     if (prodPinnedHeader_) return prodPinnedHeader_;
@@ -482,14 +487,41 @@
     return pinned;
   }
 
+  function prodEnsurePinnedTopScrollbar_() {
+    if (prodPinnedTopScroll_) return prodPinnedTopScroll_;
+    var pinnedBar = document.createElement('div');
+    pinnedBar.id = 'prodPinnedTopScroll';
+    pinnedBar.className = 'erp-pinned-table-scrollbar';
+    pinnedBar.hidden = true;
+    pinnedBar.tabIndex = 0;
+    pinnedBar.setAttribute('aria-label', 'Scroll Products table horizontally');
+    var inner = document.createElement('div');
+    inner.className = 'erp-pinned-table-scrollbar-inner';
+    pinnedBar.appendChild(inner);
+    document.body.appendChild(pinnedBar);
+    pinnedBar.addEventListener('scroll', function () {
+      var tableScroll = document.getElementById('prodTableScroll');
+      if (!tableScroll || prodTopScrollSyncing_) return;
+      prodTopScrollSyncing_ = true;
+      tableScroll.scrollLeft = pinnedBar.scrollLeft;
+      document.getElementById('prodTopScroll').scrollLeft = pinnedBar.scrollLeft;
+      if (prodPinnedHeader_) prodPinnedHeader_.scrollLeft = pinnedBar.scrollLeft;
+      prodTopScrollSyncing_ = false;
+    }, { passive: true });
+    prodPinnedTopScroll_ = pinnedBar;
+    return pinnedBar;
+  }
+
   function prodSyncPinnedHeader_(refreshColumns) {
     var pinned = prodEnsurePinnedHeader_();
+    var pinnedBar = prodEnsurePinnedTopScrollbar_();
     var prodPage = document.getElementById('page-products');
     var content = document.getElementById('content');
     var tableScroll = document.getElementById('prodTableScroll');
     if (!prodPage || prodPage.hidden || !content || !tableScroll ||
         window.matchMedia('(max-width: 540px), (orientation: landscape) and (max-height: 540px) and (pointer: coarse)').matches) {
       pinned.hidden = true;
+      pinnedBar.hidden = true;
       return;
     }
     var realTable = document.getElementById('prodTable');
@@ -497,13 +529,23 @@
     var tableRect = tableScroll.getBoundingClientRect();
     var contentRect = content.getBoundingClientRect();
     var headerRect = originalHeader.getBoundingClientRect();
+    var hasOverflow = tableScroll.scrollWidth - tableScroll.clientWidth > 1;
     var shouldPin = headerRect.bottom <= contentRect.top + 1 &&
-      tableRect.bottom > contentRect.top + headerRect.height;
+      tableRect.bottom > contentRect.top + headerRect.height + (hasOverflow ? 14 : 0);
     pinned.hidden = !shouldPin;
+    pinnedBar.hidden = !(shouldPin && hasOverflow);
     if (!shouldPin) return;
     var width = Math.round(tableScroll.clientWidth);
     var tableWidth = Math.round(realTable.getBoundingClientRect().width);
-    pinned.style.top = Math.round(contentRect.top) + 'px';
+    var barHeight = pinnedBar.hidden ? 0 : pinnedBar.offsetHeight;
+    if (!pinnedBar.hidden) {
+      pinnedBar.style.top = Math.round(contentRect.top) + 'px';
+      pinnedBar.style.left = Math.round(tableRect.left) + 'px';
+      pinnedBar.style.width = width + 'px';
+      pinnedBar.firstElementChild.style.width = tableScroll.scrollWidth + 'px';
+      pinnedBar.scrollLeft = tableScroll.scrollLeft;
+    }
+    pinned.style.top = Math.round(contentRect.top + barHeight) + 'px';
     pinned.style.left = Math.round(tableRect.left) + 'px';
     pinned.style.width = width + 'px';
     pinned.style.height = Math.ceil(headerRect.height) + 'px';
@@ -532,18 +574,50 @@
     pinned.scrollLeft = tableScroll.scrollLeft;
   }
 
+  function prodSyncTopScrollbar_() {
+    var top = document.getElementById('prodTopScroll');
+    var inner = document.getElementById('prodTopScrollInner');
+    var tableScroll = document.getElementById('prodTableScroll');
+    var page = document.getElementById('page-products');
+    if (!top || !inner || !tableScroll || !page) return;
+    var isPhone = window.matchMedia('(max-width: 540px), (orientation: landscape) and (max-height: 540px) and (pointer: coarse)').matches;
+    var hasOverflow = !page.hidden && !isPhone && tableScroll.scrollWidth - tableScroll.clientWidth > 1;
+    top.style.display = hasOverflow ? 'block' : 'none';
+    inner.style.width = tableScroll.scrollWidth + 'px';
+    top.scrollLeft = tableScroll.scrollLeft;
+    prodSyncPinnedHeader_(true);
+  }
+
   function prodWirePinnedHeader_() {
     var wrap = document.getElementById('prodTableScroll');
+    var top = document.getElementById('prodTopScroll');
     var page = document.getElementById('page-products');
     var content = document.getElementById('content');
+    top.addEventListener('scroll', function () {
+      if (prodTopScrollSyncing_) return;
+      prodTopScrollSyncing_ = true;
+      wrap.scrollLeft = top.scrollLeft;
+      if (prodPinnedTopScroll_) prodPinnedTopScroll_.scrollLeft = top.scrollLeft;
+      if (prodPinnedHeader_) prodPinnedHeader_.scrollLeft = top.scrollLeft;
+      prodTopScrollSyncing_ = false;
+    }, { passive: true });
     content.addEventListener('scroll', function () { prodSyncPinnedHeader_(); }, { passive: true });
-    wrap.addEventListener('scroll', function () { prodSyncPinnedHeader_(); }, { passive: true });
-    new MutationObserver(function () { prodSyncPinnedHeader_(); })
+    wrap.addEventListener('scroll', function () {
+      if (!prodTopScrollSyncing_) {
+        prodTopScrollSyncing_ = true;
+        top.scrollLeft = wrap.scrollLeft;
+        if (prodPinnedTopScroll_) prodPinnedTopScroll_.scrollLeft = wrap.scrollLeft;
+        prodTopScrollSyncing_ = false;
+      }
+      prodSyncPinnedHeader_();
+    }, { passive: true });
+    new MutationObserver(function () { prodSyncTopScrollbar_(); })
       .observe(page, { attributes: true, attributeFilter: ['hidden'] });
-    window.addEventListener('resize', function () { prodSyncPinnedHeader_(true); });
+    window.addEventListener('resize', prodSyncTopScrollbar_);
     if (window.ResizeObserver) {
-      new ResizeObserver(function () { prodSyncPinnedHeader_(true); }).observe(wrap);
+      new ResizeObserver(prodSyncTopScrollbar_).observe(wrap);
     }
+    prodSyncTopScrollbar_();
   }
   prodWirePinnedHeader_();
 
@@ -622,7 +696,7 @@
     document.getElementById('prodEmptyState').hidden = rows.length > 0;
     prodSyncSearchClear_();
     prodUpdateSortHeaders_();
-    if (window.requestAnimationFrame) requestAnimationFrame(function () { prodSyncPinnedHeader_(true); });
+    if (window.requestAnimationFrame) requestAnimationFrame(function () { prodSyncTopScrollbar_(); });
   }
 
   var prodSearchInput_ = document.getElementById('prodSearch');
