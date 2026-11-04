@@ -3472,6 +3472,9 @@
   }
   #page-sales #smTableScroll th { padding: 9px 12px; }
   #page-sales #smTableScroll td { padding: 8px 12px; line-height: 1.35; }
+  /* Never let compact body-cell padding expand the 58px pinned action cell. */
+  #page-sales #smTableScroll th.erp-sticky-action-col,
+  #page-sales #smTableScroll td.erp-sticky-action-col { padding: 4px 2px; }
 }
 @media screen and (min-width: 541px) and (max-width: 1120px) {
   #page-sales > .toolbar {

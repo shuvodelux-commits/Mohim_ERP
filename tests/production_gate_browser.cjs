@@ -115,6 +115,8 @@ async function main() {
       const r=td.getBoundingClientRect();
       return {overflow:scroll.scrollWidth>scroll.clientWidth+10,
         scrollAmount:scroll.scrollLeft,before:before,after:r.right,containerRight:sr.right,
+        scrollportRight:sr.left+scroll.clientLeft+scroll.clientWidth,
+        scrollbarWidth:scroll.offsetWidth-scroll.clientWidth,
         position:getComputedStyle(td).position,head:getComputedStyle(th).position,
         lastHeader:th===scroll.querySelector('thead tr').lastElementChild,
         lastRowCell:td===scroll.querySelector('tbody tr').lastElementChild};
@@ -123,8 +125,13 @@ async function main() {
     assert.ok(position.scrollAmount>10,'test must actually scroll horizontally');
     assert.equal(position.position,'sticky');assert.equal(position.head,'sticky');
     assert.equal(position.lastHeader,true);assert.equal(position.lastRowCell,true);
-    assert.ok(Math.abs(position.before-position.after)<=2,'right action column does not move with horizontal scroll');
-    assert.ok(position.after<=position.containerRight+1 && position.after>position.containerRight-90,'right action stays visible');
+    // The native vertical scrollbar consumes part of the scrollport, so the
+    // pinned cell may settle inward by its width when horizontal scrolling
+    // starts. It must never travel away with the other table columns.
+    assert.ok(Math.abs(position.before-position.after)<=position.scrollbarWidth+2,
+      'right action moves beyond scrollbar gutter: '+JSON.stringify(position));
+    assert.ok(Math.abs(position.after-position.scrollportRight)<=2,
+      'right action must stay against usable scrollport right edge: '+JSON.stringify(position));
   });
   await check('Sales row three-dot actions show icons and preserve keyboard/menu semantics',async()=>{
     const button=page.locator('#smTableBody button[data-id="INV-000017"]').first();
