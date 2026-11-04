@@ -52,54 +52,83 @@ async function main() {
   await check('sales marks both duplicate rows',async()=>assert.equal(await page.locator('#smTableBody .badge-danger',{hasText:'Duplicate ID'}).count(),2));
   await check('sales disables all duplicate actions',async()=>{for(const b of await page.locator('#smTableBody button[data-id="INV-000005"]').all())assert.equal(await b.isDisabled(),true);});
   await check('sales allows unique actions',async()=>assert.equal(await page.locator('#smTableBody button[data-id="INV-000017"]').isDisabled(),false));
-  await check('sales sticky header remains visible while desktop table rows scroll',async()=>{
-    const geometry=await page.evaluate(()=>{
-      const container=document.getElementById('smTableScroll');
-      const body=container.querySelector('tbody');
+  await check('Sales uses one continuous vertical page scroller and pins table header beneath topbar',async()=>{
+    await page.setViewportSize({width:1280,height:900});
+    await page.evaluate(()=>{
+      const wrap=document.getElementById('smTableScroll');
+      const body=wrap.querySelector('tbody');
       const source=body.querySelector('tr');
-      if(!source) throw new Error('Sales fixture row missing');
-      for(let i=0;i<60;i++) body.appendChild(source.cloneNode(true));
-      const th=container.querySelector('thead th');
-      const before=th.getBoundingClientRect().top;
-      const rowBefore=source.getBoundingClientRect().top;
-      container.scrollTop=300;
+      if(!source)throw Error('fixture sale row missing');
+      for(let i=0;i<60;i++)body.appendChild(source.cloneNode(true));
+      const content=document.getElementById('content');
+      content.scrollTop=0;
+      smSyncTopScrollbar_();
+    });
+    const initial=await page.evaluate(()=>({
+      pinned:document.getElementById('smPinnedSalesHeader')?.hidden,
+      nestedMaxHeight:getComputedStyle(document.getElementById('smTableScroll')).maxHeight,
+      nestedOverflow:getComputedStyle(document.getElementById('smTableScroll')).overflowY
+    }));
+    assert.equal(initial.pinned,true);
+    assert.equal(initial.nestedMaxHeight,'none');
+    assert.notEqual(initial.nestedOverflow,'auto');
+    await page.evaluate(()=>document.getElementById('content').scrollTop=420);
+    await page.waitForFunction(()=>!document.getElementById('smPinnedSalesHeader').hidden);
+    const geometry=await page.evaluate(()=>{
+      const content=document.getElementById('content');
+      const wrap=document.getElementById('smTableScroll');
+      const pinned=document.getElementById('smPinnedSalesHeader');
+      const actual=wrap.querySelector('thead');
+      const overlayHead=pinned.querySelector('thead');
+      const top=pinned.getBoundingClientRect().top;
       return {
-        position:getComputedStyle(th).position,
-        background:getComputedStyle(th).backgroundColor,
-        overflowX:getComputedStyle(container).overflowX,
-        canScroll:container.scrollHeight>container.clientHeight+200,
-        scrollTop:container.scrollTop,
-        headerShift:Math.abs(th.getBoundingClientRect().top-before),
-        rowShift:rowBefore-source.getBoundingClientRect().top
+        pageScroll:content.scrollTop,innerScroll:wrap.scrollTop,
+        contentTop:content.getBoundingClientRect().top,
+        originalHeaderBottom:actual.getBoundingClientRect().bottom,
+        pinnedTop:top,heading:overlayHead?.textContent||'',
+        headerCells:overlayHead?.querySelectorAll('th').length,
+        originalCells:actual.querySelectorAll('th').length
       };
     });
-    assert.equal(geometry.position,'sticky');
-    assert.notEqual(geometry.background,'rgba(0, 0, 0, 0)');
-    assert.equal(geometry.overflowX,'auto');
-    assert.ok(geometry.canScroll,'long sales list needs its own vertical scroll');
-    assert.ok(geometry.scrollTop>=200);
-    assert.ok(geometry.headerShift<=2,'header must remain fixed inside table scroll');
-    assert.ok(geometry.rowShift>=200,'body rows must actually scroll');
+    assert.ok(geometry.pageScroll>=400);
+    assert.equal(geometry.innerScroll,0);
+    assert.ok(geometry.originalHeaderBottom<geometry.contentTop);
+    assert.ok(Math.abs(geometry.pinnedTop-geometry.contentTop)<=2);
+    assert.match(geometry.heading,/Invoice/);
+    assert.match(geometry.heading,/Actions/);
+    assert.equal(geometry.headerCells,geometry.originalCells);
+    await page.evaluate(()=>document.getElementById('content').scrollTop=0);
+    await page.waitForFunction(()=>document.getElementById('smPinnedSalesHeader').hidden);
   });
-  await check('sales sticky header also works on tablet and mobile cards keep field labels',async()=>{
+  await check('Sales pinned header works at tablet width without a bottom-limited row viewport',async()=>{
     await page.setViewportSize({width:768,height:1024});
+    await page.evaluate(()=>document.getElementById('content').scrollTop=500);
+    await page.waitForFunction(()=>!document.getElementById('smPinnedSalesHeader').hidden);
     const tablet=await page.evaluate(()=>{
+      const content=document.getElementById('content');
       const wrap=document.getElementById('smTableScroll');
-      wrap.scrollTop=260;
-      const head=wrap.querySelector('thead th');
-      return {position:getComputedStyle(head).position,scroll:wrap.scrollTop,cap:getComputedStyle(wrap).maxHeight};
+      const pinned=document.getElementById('smPinnedSalesHeader');
+      return {scroll:content.scrollTop,innerScroll:wrap.scrollTop,
+        pinTop:pinned.getBoundingClientRect().top,
+        contentTop:content.getBoundingClientRect().top,
+        cap:getComputedStyle(wrap).maxHeight};
     });
-    assert.equal(tablet.position,'sticky');
     assert.ok(tablet.scroll>100);
-    assert.notEqual(tablet.cap,'none');
+    assert.equal(tablet.innerScroll,0);
+    assert.equal(tablet.cap,'none');
+    assert.ok(Math.abs(tablet.pinTop-tablet.contentTop)<=2);
     await page.setViewportSize({width:390,height:844});
+    await page.waitForTimeout(60);
     const mobile=await page.evaluate(()=>{
       const wrap=document.getElementById('smTableScroll');
-      return {maxHeight:getComputedStyle(wrap).maxHeight,headerDisplay:getComputedStyle(wrap.querySelector('thead')).display,
-        labels:getComputedStyle(wrap.querySelector('tbody tr td')).getPropertyValue('display')};
+      const pinned=document.getElementById('smPinnedSalesHeader');
+      return {maxHeight:getComputedStyle(wrap).maxHeight,
+        headerDisplay:getComputedStyle(wrap.querySelector('thead')).display,
+        pinnedDisplay:getComputedStyle(pinned).display};
     });
-    assert.equal(mobile.maxHeight,'none','mobile record cards should not have nested table height limit');
+    assert.equal(mobile.maxHeight,'none');
     assert.equal(mobile.headerDisplay,'none');
+    assert.equal(mobile.pinnedDisplay,'none');
   });
   await check('tablet keeps Sales Actions pinned right across horizontal scrolling',async()=>{
     await page.setViewportSize({width:768,height:1024});
@@ -133,13 +162,49 @@ async function main() {
     assert.ok(Math.abs(position.after-position.scrollportRight)<=2,
       'right action must stay against usable scrollport right edge: '+JSON.stringify(position));
   });
+  await check('pinned Sales header follows horizontal scroll while Actions stay on the right',async()=>{
+    await page.setViewportSize({width:768,height:1024});
+    await page.evaluate(()=>{
+      document.getElementById('content').scrollTop=500;
+      smSyncPinnedHeader_(true);
+    });
+    await page.waitForFunction(()=>!document.getElementById('smPinnedSalesHeader').hidden);
+    const geometry=await page.evaluate(()=>{
+      const wrap=document.getElementById('smTableScroll');
+      wrap.scrollLeft=wrap.scrollWidth;
+      smSyncPinnedHeader_();
+      const pinned=document.getElementById('smPinnedSalesHeader');
+      const last=pinned.querySelector('th.erp-sticky-action-col');
+      return {realScroll:wrap.scrollLeft,mirroredScroll:pinned.scrollLeft,
+        pinnedRight:pinned.getBoundingClientRect().right,
+        actionRight:last.getBoundingClientRect().right,
+        columnAlignment:Array.from(wrap.querySelectorAll('thead th')).map((cell,i)=>{
+          const clone=pinned.querySelectorAll('thead th')[i];
+          return {label:cell.textContent.trim(),
+            dx:Math.abs(cell.getBoundingClientRect().left-clone.getBoundingClientRect().left),
+            dw:Math.abs(cell.getBoundingClientRect().width-clone.getBoundingClientRect().width)};
+        }).filter(c=>c.label!=='Profit'),
+        duplicateIdCount:document.querySelectorAll('#smProfitHeader').length};
+    });
+    assert.ok(geometry.realScroll>10);
+    assert.ok(Math.abs(geometry.mirroredScroll-geometry.realScroll)<=1);
+    assert.ok(Math.abs(geometry.actionRight-geometry.pinnedRight)<=15);
+    assert.equal(geometry.duplicateIdCount,1,'cloned headings must never duplicate DOM IDs');
+    assert.ok(geometry.columnAlignment.every(c=>c.dx<=3 && c.dw<=3),
+      'pinned header columns must align with corresponding invoice cells: '+JSON.stringify(geometry.columnAlignment));
+  });
   await check('Sales row three-dot actions show icons and preserve keyboard/menu semantics',async()=>{
+    await page.evaluate(()=>{
+      document.getElementById('content').scrollTop=0;
+      document.getElementById('smTableScroll').scrollLeft=0;
+      smSyncPinnedHeader_();
+    });
     const button=page.locator('#smTableBody button[data-id="INV-000017"]').first();
     await button.click();
     const menu=page.locator('#rowActionMenuGlobal');
     await menu.waitFor({state:'visible'});
     const labels=await menu.locator('button[data-row-action]').allTextContents();
-    assert.ok(labels.includes('View'));assert.ok(labels.includes('Duplicate'));
+    assert.ok(labels.includes('View'),JSON.stringify(labels));assert.ok(labels.includes('Duplicate'),JSON.stringify(labels));
     assert.ok(labels.includes('Delete'));
     assert.equal(await menu.locator('button[data-row-action] .action-menu-icon').count(),labels.length);
     assert.ok(await menu.locator('button[data-row-action="delete"]').evaluate(el=>el.classList.contains('danger')));

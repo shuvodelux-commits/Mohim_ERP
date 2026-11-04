@@ -29,7 +29,7 @@ test('pinned actions remain opaque and right-aligned without a shadow or edge di
 test('Sales filters use compact grid instead of flex wrapping at common desktop widths',()=>{
   assert.match(css,/#page-sales\s*>\s*\.toolbar\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:/s);
   assert.match(css,/#page-sales\s*>\s*\.toolbar[^}]*gap:\s*8px/s);
-  assert.match(css,/#page-sales[^}]*#smTableScroll\s*\{[^}]*max-height:/s);
+  assert.match(css,/#page-sales[^}]*#smTableScroll\s*\{[^}]*max-height:\s*none/s);
 });
 test('Sales top horizontal scrollbar is compact and not divided from the header by a second rule',()=>{
   assert.match(sales,/id="smTopScroll"/);

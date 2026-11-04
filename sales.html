@@ -321,12 +321,79 @@
   }
 
   var smTopScrollSyncing_ = false;
+  var smPinnedSalesHeader_ = null;
+
+  function smEnsurePinnedHeader_() {
+    if (smPinnedSalesHeader_) return smPinnedSalesHeader_;
+    var pinned = document.createElement('div');
+    pinned.id = 'smPinnedSalesHeader';
+    pinned.className = 'sm-pinned-sales-header';
+    pinned.hidden = true;
+    pinned.setAttribute('aria-hidden', 'true');
+    // Put the mirror outside the horizontal overflow wrapper, so it can
+    // follow the main page scroller without creating a second vertical scroll.
+    document.body.appendChild(pinned);
+    smPinnedSalesHeader_ = pinned;
+    return pinned;
+  }
+
+  function smSyncPinnedHeader_(refreshColumns) {
+    var pinned = smEnsurePinnedHeader_();
+    var salesPage = document.getElementById('page-sales');
+    var content = document.getElementById('content');
+    var tableScroll = document.getElementById('smTableScroll');
+    if (!salesPage || salesPage.hidden || !content || !tableScroll ||
+        window.matchMedia('(max-width: 540px), (orientation: landscape) and (max-height: 540px) and (pointer: coarse)').matches) {
+      pinned.hidden = true;
+      return;
+    }
+    var realTable = tableScroll.querySelector('table');
+    var originalHeader = realTable && realTable.querySelector('thead');
+    if (!originalHeader) { pinned.hidden = true; return; }
+    var tableRect = tableScroll.getBoundingClientRect();
+    var contentRect = content.getBoundingClientRect();
+    var headerRect = originalHeader.getBoundingClientRect();
+    var shouldPin = headerRect.bottom <= contentRect.top + 1 &&
+      tableRect.bottom > contentRect.top + headerRect.height;
+    pinned.hidden = !shouldPin;
+    if (!shouldPin) return;
+    var width = Math.round(tableScroll.clientWidth);
+    var tableWidth = Math.round(realTable.getBoundingClientRect().width);
+    pinned.style.top = Math.round(contentRect.top) + 'px';
+    pinned.style.left = Math.round(tableRect.left) + 'px';
+    pinned.style.width = width + 'px';
+    pinned.style.height = Math.ceil(headerRect.height) + 'px';
+    if (refreshColumns || !pinned.firstElementChild ||
+        Number(pinned.dataset.tableWidth) !== tableWidth) {
+      var mirror = document.createElement('table');
+      mirror.className = 'erp-action-table';
+      mirror.style.width = tableWidth + 'px';
+      mirror.style.minWidth = tableWidth + 'px';
+      var clonedHead = originalHeader.cloneNode(true);
+      clonedHead.querySelectorAll('[id]').forEach(function (node) {
+        node.removeAttribute('id');
+      });
+      var originalCells = originalHeader.querySelectorAll('th');
+      var mirroredCells = clonedHead.querySelectorAll('th');
+      originalCells.forEach(function (cell, index) {
+        var w = cell.getBoundingClientRect().width;
+        mirroredCells[index].style.width = w + 'px';
+        mirroredCells[index].style.minWidth = w + 'px';
+        mirroredCells[index].style.maxWidth = w + 'px';
+      });
+      mirror.appendChild(clonedHead);
+      pinned.replaceChildren(mirror);
+      pinned.dataset.tableWidth = String(tableWidth);
+    }
+    pinned.scrollLeft = tableScroll.scrollLeft;
+  }
 
   function smSyncTopScrollbar_() {
     var top = document.getElementById("smTopScroll");
     var inner = document.getElementById("smTopScrollInner");
     var tableScroll = document.getElementById("smTableScroll");
     if (!top || !inner || !tableScroll) return;
+    smSyncPinnedHeader_(true);
 
     var hasOverflow = tableScroll.scrollWidth - tableScroll.clientWidth > 1;
     top.style.display = hasOverflow ? "block" : "none";
@@ -339,6 +406,7 @@
     if (!smTopScrollSyncing_) {
       smTopScrollSyncing_ = true;
       top.scrollLeft = tableScroll.scrollLeft;
+      smSyncPinnedHeader_();
       smTopScrollSyncing_ = false;
     }
   }
@@ -353,6 +421,7 @@
       if (smTopScrollSyncing_) return;
       smTopScrollSyncing_ = true;
       tableScroll.scrollLeft = top.scrollLeft;
+      smSyncPinnedHeader_();
       smTopScrollSyncing_ = false;
     }, { passive: true });
 
@@ -363,6 +432,11 @@
       smTopScrollSyncing_ = false;
     }, { passive: true });
 
+    document.getElementById('content').addEventListener('scroll', function () {
+      smSyncPinnedHeader_();
+    }, { passive: true });
+    new MutationObserver(function () { smSyncPinnedHeader_(); })
+      .observe(document.getElementById('page-sales'), { attributes: true, attributeFilter: ['hidden'] });
     window.addEventListener("resize", smSyncTopScrollbar_);
     if (window.ResizeObserver) {
       new ResizeObserver(smSyncTopScrollbar_).observe(tableScroll);
