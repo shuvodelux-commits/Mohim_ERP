@@ -67,7 +67,8 @@ test('Product column displays only name, no brand, unit, bundle badge, or unpric
   assert.equal(visibleText(columns[3]), '৳130');
   assert.match(columns[4], /80\s*<span[^>]*>pcs<\/span>/);
   assert.doesNotMatch(columns[4], /prod-cell-sub|<div[^>]*>min 30/);
-  assert.match(columns[4], /title="[^"]*30 pcs"/);
+  assert.match(columns[4], /title="[^"]*30 pcs/);
+  assert.match(columns[4], /Unpriced lots: 2/);
   assert.equal(visibleText(columns[5]), '৳9600');
   assert.equal(visibleText(columns[6]), 'Active');
   assert.match(columns[7], /data-act="menu"/);
