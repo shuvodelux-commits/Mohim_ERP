@@ -21,7 +21,7 @@ function test(name, fn) {
 }
 
 test('Sales table exposes a labeled Action header', () => {
-  assert.match(sales, /<th class="erp-sticky-action-col"[^>]*>[\s\S]*?Actions<\/span>/);
+  assert.match(sales, /<th class="erp-sticky-action-col"[^>]*>[\s\S]*?Actions<\/th>/);
 });
 
 test('Sales table has a dedicated top horizontal scrollbar', () => {

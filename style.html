@@ -1342,11 +1342,12 @@
   .login-footnote { font-size: 12px; color: var(--color-text-muted); text-align: center; margin-top: 16px; }
 
 
-  /* ---------------- Desktop fixed application shell ----------------
-     The sidebar and topbar remain fixed while the module content scrolls.
-     This prevents long tables from moving the navigation/refresh controls
-     out of view. Phones keep the existing mobile behavior below; tablets use the desktop rail. */
+  /* ---------------- Desktop/tablet application shell ----------------
+     The rail stays fixed, but the topbar is in normal flex flow and sticky.
+     The content owns the scrolling area below it without a second top-margin
+     offset or an extra viewport-height block. Mobile retains its own layout. */
   @media (min-width: 541px) {
+    :root { --topbar-height: 56px; }
     #app { min-height: 100vh; }
     .sidebar {
       position: fixed;
@@ -1362,20 +1363,21 @@
     }
     .main {
       margin-left: var(--sidebar-collapsed-width);
-      min-height: 100vh;
-      height: 100vh;
+      min-height: 100dvh;
+      height: 100dvh;
     }
     .topbar {
-      position: fixed;
-      left: var(--sidebar-collapsed-width);
-      right: 0;
+      position: sticky;
+      left: auto;
+      right: auto;
       top: 0;
       z-index: 90;
     }
     .content {
-      height: 100vh;
+      flex: 1;
+      height: auto;
       min-height: 0;
-      margin-top: var(--topbar-height);
+      margin-top: 0;
       overflow-y: auto;
       overflow-x: auto;
     }
@@ -3389,14 +3391,14 @@
   padding: 4px 6px;
   text-align: center;
   background: var(--color-surface);
-  border-left: 1px solid var(--color-border);
-  box-shadow: -3px 0 6px rgba(15,23,42,.045);
+  border-left: 0;
+  box-shadow: none;
   z-index: 3;
 }
 .table-scroll > table > thead > tr > th.erp-sticky-action-col {
   position: sticky; right: 0; z-index: 9;
   background: var(--color-surface);
-  box-shadow: inset 0 -1px 0 var(--color-border), -3px 0 6px rgba(15,23,42,.045);
+  box-shadow: none;
 }
 .erp-action-table tbody tr:hover td.erp-sticky-action-col { background: var(--color-bg); }
 .erp-row-action-trigger {
@@ -3413,12 +3415,6 @@
   outline: 2px solid var(--color-primary); outline-offset: 1px;
 }
 .erp-row-action-trigger:disabled { opacity: .38; cursor: not-allowed; }
-.erp-action-header-dots { font-size: 18px; letter-spacing: 2px; line-height: 1; }
-.erp-action-visually-hidden {
-  position: absolute; width: 1px; height: 1px; padding: 0;
-  margin: -1px; overflow: hidden; clip: rect(0,0,0,0);
-  white-space: nowrap; border: 0;
-}
 .action-menu-item {
   display: flex; align-items: center; gap: 10px;
   min-height: 38px; font-size: 13px; font-weight: 500;
@@ -3447,6 +3443,40 @@
   }
   .mobile-card-table.erp-action-table tbody td:first-child::before { display: none; }
   #smTableScroll .mobile-card-table.erp-action-table tbody td:first-child { grid-column: 1 / -1; }
+}
+@media screen and (min-width: 541px) {
+  /* Approved Sales UI: compact filters and room for more actual invoice rows. */
+  #content:has(#page-sales:not([hidden])) { padding: 14px 16px; }
+  #content:has(#page-sales:not([hidden])) > #subNav { margin-bottom: 10px; }
+  #content:has(#page-sales:not([hidden])) > #subNav .tab-btn {
+    min-height: 46px; padding: 7px 12px;
+  }
+  #page-sales > .toolbar {
+    display: grid;
+    grid-template-columns: minmax(190px,2fr) minmax(130px,.8fr) minmax(130px,.8fr) minmax(145px,.95fr) minmax(170px,1fr) auto;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  #page-sales > .toolbar > .toolbar-spacer { display: none; }
+  #page-sales > .toolbar :is(input,select) {
+    width: 100%; max-width: none !important; min-width: 0;
+    height: 38px; min-height: 38px; font-size: 13px;
+  }
+  #page-sales > .toolbar > #smRefreshBtn {
+    min-height: 38px; padding: 7px 12px; white-space: nowrap;
+  }
+  #page-sales > .card { box-shadow: none; }
+  #page-sales #smTableScroll {
+    max-height: clamp(260px, calc(100dvh - var(--topbar-height) - 170px), 1200px);
+  }
+  #page-sales #smTableScroll th { padding: 9px 12px; }
+  #page-sales #smTableScroll td { padding: 8px 12px; line-height: 1.35; }
+}
+@media screen and (min-width: 541px) and (max-width: 1120px) {
+  #page-sales > .toolbar {
+    grid-template-columns: minmax(180px, 1.8fr) repeat(2, minmax(130px,1fr));
+  }
 }
 @media print {
   .erp-sticky-action-col { position: static !important; box-shadow: none !important; }

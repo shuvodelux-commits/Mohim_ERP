@@ -12,7 +12,7 @@ test('renderer sorts sidebarOrder and inserts dividers between visible groups',(
  assert.match(js,/function\s+sidebarItemsInOrder_\s*\(/);assert.match(js,/sidebarOrder/);assert.match(js,/item\.sidebarGroup/);assert.match(js,/className\s*=\s*['"]nav-divider['"]/);assert.match(js,/nav\.appendChild\(divider\)/);
 });
 test('desktop shell uses 68px rail with overlay expansion',()=>{
- assert.match(css,/--sidebar-collapsed-width:\s*68px/);assert.match(css,/\.main\s*\{[^}]*margin-left:\s*var\(--sidebar-collapsed-width\)/);assert.match(css,/\.topbar\s*\{[^}]*left:\s*var\(--sidebar-collapsed-width\)/);
+ assert.match(css,/--sidebar-collapsed-width:\s*68px/);assert.match(css,/\.main\s*\{[^}]*margin-left:\s*var\(--sidebar-collapsed-width\)/);assert.match(css,/\.topbar\s*\{[^}]*position:\s*sticky;[^}]*left:\s*auto;/);
  assert.match(css,/#app:not\(\.sidebar-collapsed\)\s+\.sidebar\s*\{[^}]*width:\s*min\(var\(--sidebar-width\),\s*78vw\)/);assert.match(css,/#app:not\(\.sidebar-collapsed\)\s+\.sidebar-backdrop\s*\{\s*display:\s*block/);
 });
 test('collapsed rail hides labels, centers icons and keeps native tooltips',()=>{

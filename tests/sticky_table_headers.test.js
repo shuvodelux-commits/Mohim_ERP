@@ -14,7 +14,7 @@ test('sales list preserves scroll wrapper, 11 labeled columns and existing horiz
     assert.match(sales,new RegExp('<th[^>]*>\\s*'+heading+'\\s*<\\/th>'));
   }
   assert.match(sales,/smTopScrollSyncing_/);
-  assert.match(sales,/<th class="erp-sticky-action-col"[^>]*>[\s\S]*?Actions<\/span>/);
+  assert.match(sales,/<th class="erp-sticky-action-col"[^>]*>[\s\S]*?Actions<\/th>/);
 });
 
 test('all scroll-wrapped table heading cells stick to the bounded scroll container',()=>{

@@ -158,6 +158,62 @@ async function main() {
     assert.ok(Number(g.invoiceOrder)<Number(g.actionOrder));
     assert.match(g.actionName,/Actions for invoice/);
   });
+  await check('approved Sales desktop shell is sticky in normal flow with compact one-row filters',async()=>{
+    await page.setViewportSize({width:1280,height:900});
+    const m=await page.evaluate(()=>{
+      const bar=document.querySelector('.topbar');
+      const content=document.getElementById('content');
+      const filters=document.querySelector('#page-sales > .toolbar');
+      const action=document.querySelector('#smTableScroll tbody td.erp-sticky-action-col');
+      const header=document.querySelector('#smTableScroll thead th.erp-sticky-action-col');
+      const table=document.getElementById('smTableScroll');
+      return {
+        barPosition:getComputedStyle(bar).position,
+        topOffset:Math.abs(content.getBoundingClientRect().top-bar.getBoundingClientRect().bottom),
+        contentMargin:getComputedStyle(content).marginTop,
+        filtersDisplay:getComputedStyle(filters).display,
+        filtersHeight:filters.getBoundingClientRect().height,
+        actionBorder:getComputedStyle(action).borderLeftWidth,
+        actionShadow:getComputedStyle(action).boxShadow,
+        headerShadow:getComputedStyle(header).boxShadow,
+        headerText:header.textContent.trim(),
+        stickyRight:getComputedStyle(action).right,
+        tableHeight:table.clientHeight,
+        tableMaxHeight:getComputedStyle(table).maxHeight
+      };
+    });
+    assert.equal(m.barPosition,'sticky');
+    assert.ok(m.topOffset<=2,'content must directly follow top bar without fixed-offset gap');
+    assert.equal(m.contentMargin,'0px');
+    assert.equal(m.filtersDisplay,'grid');
+    assert.ok(m.filtersHeight<=54,'desktop filters should occupy one compact row');
+    assert.equal(m.actionBorder,'0px');
+    assert.equal(m.actionShadow,'none');
+    assert.equal(m.headerShadow,'none');
+    assert.equal(m.headerText,'Actions');
+    assert.equal(m.stickyRight,'0px');
+    assert.ok(m.tableHeight>250,'table stays a readable scroll area');
+  });
+  await check('approved Sales tablet filters wrap compactly without clipping or fixed topbar',async()=>{
+    await page.setViewportSize({width:768,height:1024});
+    const m=await page.evaluate(()=>{
+      const filters=document.querySelector('#page-sales > .toolbar');
+      const wrap=document.getElementById('smTableScroll');
+      const row=filters.getBoundingClientRect(), content=document.getElementById('content');
+      return {
+        topbar:getComputedStyle(document.querySelector('.topbar')).position,
+        grid:getComputedStyle(filters).display,
+        height:row.height,
+        contentRight:content.getBoundingClientRect().right,
+        rowRight:row.right,
+        actionPosition:getComputedStyle(wrap.querySelector('td.erp-sticky-action-col')).position
+      };
+    });
+    assert.equal(m.topbar,'sticky');assert.equal(m.grid,'grid');
+    assert.ok(m.height<=106,'tablet filters should require at most two compact rows');
+    assert.ok(m.rowRight<=m.contentRight+1,'filter row must not exceed the viewport');
+    assert.equal(m.actionPosition,'sticky');
+  });
   await check('sales browser errors',()=>assert.deepEqual(errors,[]));await page.close();
   ({page,errors}=await boot(browser));await route(page,'returns');await page.fill('#rtSearchInput','INV-000005');await page.click('#rtFindBtn');
   await check('return blocks duplicate invoice load',async()=>{const b=page.locator('#rtSearchResults button[data-id="INV-000005"]');await b.waitFor();assert.equal(await b.isDisabled(),true);assert.equal(await page.evaluate(()=>__rpcCalls.filter(c=>c.name==='getInvoiceForReturn').length),0);});

@@ -20,14 +20,14 @@
     <option value="Fully Returned">Fully Returned</option>
   </select>
   <div class="toolbar-spacer"></div>
-  <button class="btn" id="smRefreshBtn">Refresh</button>
+  <button class="btn" id="smRefreshBtn"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-.6 3M20 5v6h-6"/></svg><span>Refresh</span></button>
 </div>
 
 <div class="card" style="padding: 0">
   <div
     id="smTopScroll"
     aria-label="Sales table horizontal scroll"
-    style="display:none;overflow-x:auto;overflow-y:hidden;height:18px;border-bottom:1px solid var(--color-border);background:var(--color-surface);"
+    style="display:none;overflow-x:auto;overflow-y:hidden;height:12px;background:transparent;scrollbar-width:thin;"
   >
     <div id="smTopScrollInner" style="height:1px;"></div>
   </div>
@@ -45,7 +45,7 @@
           <th class="num">Returned</th>
           <th class="num" id="smProfitHeader" style="display:none;">Profit</th>
           <th>Status</th>
-          <th class="erp-sticky-action-col" scope="col"><span class="erp-action-visually-hidden">Actions</span><span class="erp-action-header-dots" aria-hidden="true">···</span></th>
+          <th class="erp-sticky-action-col" scope="col">Actions</th>
         </tr>
       </thead>
       <tbody id="smTableBody"></tbody>
