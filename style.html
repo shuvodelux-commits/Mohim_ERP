@@ -3536,53 +3536,72 @@
 @media print {
   .sm-pinned-sales-header { display: none !important; }
 }
-/* Compact Products inventory cells: units live with quantities/prices, not product names. */
+/* Products inventory: name-only rows, inline units, and one-line tablet cells. */
 #page-products #prodTable th,
 #page-products #prodTable td {
-  padding: 9px 10px;
+  padding: 7px 8px;
 }
 #page-products #prodTable td {
   vertical-align: middle;
 }
 #page-products #prodTable td.num {
-  white-space: nowrap;
   font-variant-numeric: normal;
 }
 #page-products .prod-item-name {
   color: var(--color-text);
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
-  line-height: 1.3;
-}
-#page-products .prod-item-meta {
-  margin-top: 3px;
-  color: var(--color-text-muted);
-  font-size: 11px;
-  font-weight: 400;
   line-height: 1.3;
 }
 #page-products .prod-cell-main,
 #page-products .prod-price-main {
   color: var(--color-text);
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   line-height: 1.3;
 }
-#page-products .prod-cell-unit,
-#page-products .prod-price-unit {
+#page-products .prod-cell-unit {
   color: var(--color-text-muted);
   font-size: 12px;
   font-weight: 400;
 }
-#page-products .prod-cell-sub {
-  margin-top: 3px;
-  color: var(--color-text-muted);
-  font-size: 11px;
-  font-weight: 400;
-  line-height: 1.25;
-}
 #page-products .prod-stock-low {
   color: var(--color-warning);
+}
+#page-products .prod-stock-out {
+  color: var(--color-danger);
+}
+/* Tablet and desktop rows stay one line; the table scrolls horizontally. */
+@media screen and (min-width: 541px) {
+  #page-products #prodTable {
+    min-width: 960px;
+    table-layout: auto;
+  }
+  #page-products #prodTable th,
+  #page-products #prodTable td {
+    white-space: nowrap;
+  }
+  #page-products #prodTable td:first-child {
+    max-width: 340px;
+  }
+  #page-products #prodTable .prod-item-name {
+    display: block;
+    max-width: 320px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+@media screen and (min-width: 541px) and (max-width: 1100px) {
+  #page-products #prodTable { min-width: 880px; }
+  #page-products #prodTable th,
+  #page-products #prodTable td {
+    padding: 6px 7px;
+    font-size: 12px;
+  }
+  #page-products .prod-item-name,
+  #page-products .prod-cell-main,
+  #page-products .prod-price-main { font-size: 12.5px; }
 }
 @media screen and (max-width: 540px), (orientation: landscape) and (max-height: 540px) and (pointer: coarse) {
   #page-products #prodTable tbody td { padding: 2px 0; white-space: normal; }
