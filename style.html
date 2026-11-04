@@ -3536,6 +3536,59 @@
 @media print {
   .sm-pinned-sales-header { display: none !important; }
 }
+/* Compact Products inventory cells: units live with quantities/prices, not product names. */
+#page-products #prodTable th,
+#page-products #prodTable td {
+  padding: 9px 10px;
+}
+#page-products #prodTable td {
+  vertical-align: middle;
+}
+#page-products #prodTable td.num {
+  white-space: nowrap;
+  font-variant-numeric: normal;
+}
+#page-products .prod-item-name {
+  color: var(--color-text);
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+#page-products .prod-item-meta {
+  margin-top: 3px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.3;
+}
+#page-products .prod-cell-main,
+#page-products .prod-price-main {
+  color: var(--color-text);
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+#page-products .prod-cell-unit,
+#page-products .prod-price-unit {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+#page-products .prod-cell-sub {
+  margin-top: 3px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.25;
+}
+#page-products .prod-stock-low {
+  color: var(--color-warning);
+}
+@media screen and (max-width: 540px), (orientation: landscape) and (max-height: 540px) and (pointer: coarse) {
+  #page-products #prodTable tbody td { padding: 2px 0; white-space: normal; }
+  #page-products #prodTable tbody td:first-child { padding-bottom: 5px; }
+}
+
 /* Products follows the Sales continuous page scroll: horizontal overflow
    stays local and the visible pinned header appears only as needed. */
 @media screen and (min-width: 541px) {
