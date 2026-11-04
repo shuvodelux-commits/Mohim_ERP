@@ -26,8 +26,8 @@ test('recent drafts stay integrated with product search',()=>{
   assert.match(css,/#page-pos\s+\.pos-recent-drafts\s*\{[^}]*border-left:\s*1px solid/);
 });
 test('customer controls remain compact and bilingual',()=>{
-  assert.match(pos,/id="posCustomerName"[^>]*placeholder="Enter customer name — কাস্টমারের নাম"[^>]*aria-label="Customer Name — কাস্টমারের নাম"/);
-  assert.match(pos,/id="posCustomerPhone"[^>]*placeholder="Enter phone number — ফোন নম্বর"[^>]*aria-label="Phone Number — ফোন নম্বর"/);
+  assert.match(pos,/id="posCustomerName"[^>]*placeholder="Customer name — কাস্টমারের নাম"[^>]*aria-label="Customer Name — কাস্টমারের নাম"/);
+  assert.match(pos,/id="posCustomerPhone"[^>]*placeholder="Phone number — ফোন নম্বর"[^>]*aria-label="Phone Number — ফোন নম্বর"/);
   assert.match(css,/#page-pos\s+\.pos-customer-section\s*>\s*label\s*\{\s*display:\s*none/);
   assert.match(css,/#page-pos\s+\.pos-customer-actions\s+\.btn\s*\{[^}]*min-height:\s*34px/);
 });

@@ -50,7 +50,8 @@ test('POS cart phone row preserves Qty Unit Price Total Remove order', () => {
 
 test('POS customer controls use compact mockup action row', () => {
   assert.match(pos, /class="pos-customer-actions"/);
-  assert.match(pos, /id="posCustomerMoreToggle"/);
+  assert.doesNotMatch(pos, /id="posCustomerMoreToggle"/);
+  assert.match(pos, /id="posCustomerMoreFields" class="pos-customer-more-fields"/);
   assert.match(pos, /id="posHistoryBtn"/);
   assert.match(css, /\.pos-customer-actions[\s\S]*grid-template-columns:\s*1fr\s+1fr/);
 });

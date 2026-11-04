@@ -41,6 +41,229 @@ async function main() {
   await check('POS invoice uses exact returned identity/customer',async()=>{assert.match(await page.textContent('#invoicePaper'),/INV-000017/);assert.match(await page.textContent('#invoicePaper'),/মহিউদ্দিন/);});
   await check('POS posts exactly once',async()=>{const calls=await page.evaluate(()=>__rpcCalls.filter(c=>c.name==='completeSale'));assert.equal(calls.length,1);assert.equal(calls[0].args[1].items[0].productId,'PROD-000001');});
   await check('POS browser errors',()=>assert.deepEqual(errors,[]));await page.close();
+  // The split-payment feature stays off in real Settings: exercise UI only
+  // with mock browser state and never call a transactional Apps Script RPC.
+  ({page,errors}=await boot(browser,{width:768,height:1024}));
+  await route(page,'posv2');
+  await page.waitForFunction(()=>posState.products.length>0);
+  await page.fill('#posSearch','4 inch Test Pipe');
+  await page.press('#posSearch','Enter');
+  await page.evaluate(()=>{
+    posState.multiPaymentEnabled=true;
+    posState.paymentModeLegacy=false;
+    posState.bankAccounts=[
+      {id:'B1',name:'Demo Bank',type:'Bank'},
+      {id:'M1',name:'Demo Mobile',type:'Mobile Banking'}
+    ];
+    posApplyPaymentMode_();
+  });
+  await check('POS split controls are opt-in and use compact, readable payment rows',async()=>{
+    assert.equal(await page.locator('#posMultiPaymentFields').isVisible(),true);
+    assert.equal(await page.locator('#posMultiPaymentRows [data-payment-row]').count(),1);
+    assert.match(await page.locator('#posMultiPaymentFields').innerText(),/Paid Now/);
+    assert.equal(await page.locator('#posMultiPaymentRows .pos-multi-remove svg').count(),1);
+    const h=await page.locator('#posMultiPaymentRows .pos-multi-amount').first()
+      .evaluate(el=>getComputedStyle(el).height);
+    assert.equal(h,'36px');
+  });
+  await page.click('#posAddPaymentRowBtn');
+  await check('adding a payment focuses its method without changing Cash row',async()=>{
+    assert.equal(await page.locator('#posMultiPaymentRows [data-payment-row]').count(),2);
+    const f=await page.evaluate(()=>{
+      const select=document.querySelector('#posMultiPaymentRows [data-payment-row="pm-2"] .pos-multi-method');
+      return document.activeElement===select || document.activeElement===select._touchSelectTrigger;
+    });
+    assert.equal(f,true);
+  });
+  await page.evaluate(()=>{
+    window.__firstPaymentAmount=document.querySelector('#posMultiPaymentRows [data-payment-row="pm-1"] .pos-multi-amount');
+  });
+  await page.locator('#posMultiPaymentRows [data-payment-row="pm-2"] .pos-multi-method + .touch-select-trigger').click();
+  await page.locator('#touchSelectMenuGlobal [data-touch-option-index]').filter({hasText:'Mobile Banking'}).click();
+  await page.waitForFunction(()=>{
+    const a=document.querySelector('#posMultiPaymentRows [data-payment-row="pm-2"] [data-payment-field="accountId"]');
+    return a && (document.activeElement===a || document.activeElement===a._touchSelectTrigger);
+  });
+  await check('changing method updates only its account, preserving the other amount DOM and focus',async()=>{
+    const v=await page.evaluate(()=>{
+      const first=document.querySelector('#posMultiPaymentRows [data-payment-row="pm-1"] .pos-multi-amount');
+      const second=document.querySelector('#posMultiPaymentRows [data-payment-row="pm-2"] [data-payment-field="accountId"]');
+      return {sameNode:first===window.__firstPaymentAmount,
+        accountExists:!!second,
+        accountFocused:document.activeElement===second || document.activeElement===second._touchSelectTrigger};
+    });
+    assert.deepEqual(v,{sameNode:true,accountExists:true,accountFocused:true});
+  });
+  await page.locator('#posMultiPaymentRows [data-payment-row="pm-2"] .pos-multi-account .touch-select-trigger').click();
+  await page.locator('#touchSelectMenuGlobal [data-touch-option-index]').filter({hasText:'Demo Mobile'}).click();
+  await page.fill('#posMultiPaymentRows [data-payment-row="pm-1"] .pos-multi-amount','20');
+  await page.fill('#posMultiPaymentRows [data-payment-row="pm-2"] .pos-multi-amount','5');
+  await check('split checkout keeps applied paid and due separate before Fill Due',async()=>{
+    assert.match(await page.locator('#posMultiPaidAmount').innerText(),/25/);
+    assert.match(await page.locator('#posMultiDueAmount').innerText(),/25/);
+  });
+  await page.locator('#posMultiPaymentRows [data-payment-row="pm-2"] [data-payment-action="remaining"]').click();
+  await check('Fill Due preserves Cash amount and restores amount focus',async()=>{
+    const v=await page.evaluate(()=>{
+      const one=document.querySelector('#posMultiPaymentRows [data-payment-row="pm-1"] .pos-multi-amount');
+      const two=document.querySelector('#posMultiPaymentRows [data-payment-row="pm-2"] .pos-multi-amount');
+      return {one:one.value,two:two.value,focus:document.activeElement===two,paid:document.getElementById('posMultiPaidAmount').textContent,due:document.getElementById('posMultiDueAmount').textContent};
+    });
+    assert.equal(v.one,'20');
+    assert.equal(v.two,'30.00');
+    assert.equal(v.focus,true);
+    assert.match(v.paid,/50/);
+    assert.match(v.due,/0/);
+  });
+  await check('POS split row controls never overlap tablet totals',async()=>{
+    const geo=await page.evaluate(()=>{
+      const row=document.querySelector('#posMultiPaymentRows [data-payment-row="pm-2"]');
+      const rm=row.querySelector('.pos-multi-remove').getBoundingClientRect();
+      const totals=document.querySelector('#page-pos .pos-checkout-totals').getBoundingClientRect();
+      const fields=document.querySelector('#page-pos .pos-checkout-fields').getBoundingClientRect();
+      return {removeRight:rm.right,fieldsRight:fields.right,rowRight:row.getBoundingClientRect().right,
+        rowBottom:row.getBoundingClientRect().bottom,totalsTop:totals.top};
+    });
+    assert.ok(geo.rowBottom<=geo.totalsTop+1,JSON.stringify(geo));
+    assert.ok(geo.removeRight<=geo.fieldsRight+1,JSON.stringify(geo));
+    assert.ok(geo.rowRight<=geo.fieldsRight+1,JSON.stringify(geo));
+  });
+  await page.locator('#posMultiPaymentRows [data-payment-row="pm-2"] [data-payment-action="remove"]').click();
+  await check('remove retains one Cash row, disables its trash action and posts nothing',async()=>{
+    assert.equal(await page.locator('#posMultiPaymentRows [data-payment-row]').count(),1);
+    assert.equal(await page.locator('#posMultiPaymentRows .pos-multi-remove').isDisabled(),true);
+    assert.equal(await page.locator('#posMultiPaymentRows [data-payment-row="pm-1"] .pos-multi-amount').inputValue(),'20');
+    const calls=await page.evaluate(()=>__rpcCalls.filter(c=>c.name==='completeSale'));
+    assert.equal(calls.length,0);
+    assert.deepEqual(errors,[]);
+  });
+  // Approved CSS reference: test rendered geometry at multiple actual
+  // payment container widths, not only at particular viewport breakpoints.
+  await page.click('#posAddPaymentRowBtn');
+  await check('approved minimal checkout at 610px card uses flat five-column rows and stacked summary',async()=>{
+    await page.setViewportSize({width:900,height:1000});
+    await page.evaluate(()=>{
+      document.querySelector('#page-pos .pos-customer-section').style.maxWidth='610px';
+    });
+    const m=await page.evaluate(()=>{
+      const style=selector=>getComputedStyle(document.querySelector(selector));
+      const rect=selector=>document.querySelector(selector).getBoundingClientRect();
+      const row=rect('#posMultiPaymentRows .pos-multi-payment-row');
+      const fields=rect('#page-pos .pos-checkout-fields'),totals=rect('#page-pos .pos-checkout-totals');
+      return {
+        customerHeading:style('#page-pos .pos-customer-section .pos-section-head h3').fontSize,
+        customerInputHeight:style('#posCustomerName').height,
+        discountHeight:style('#posDiscount').height,
+        totalFont:style('#page-pos .pos-checkout-totals .totals-row.grand').fontSize,
+        completeHeight:style('#posCompleteBtn').height,
+        paymentColumns:style('#posMultiPaymentRows .pos-multi-payment-row').gridTemplateColumns.trim().split(/\s+/).length,
+        rowBackground:style('#posMultiPaymentRows .pos-multi-payment-row').backgroundColor,
+        addBackground:style('#posAddPaymentRowBtn').backgroundColor,
+        addBorder:style('#posAddPaymentRowBtn').borderTopWidth,
+        panelWidth:rect('#page-pos .pos-customer-section').width,
+        paymentRight:row.right,fieldRight:fields.right,totalsTop:totals.top,fieldsBottom:fields.bottom
+      };
+    });
+    assert.equal(m.customerHeading,'16px');
+    assert.equal(m.customerInputHeight,'40px');
+    assert.equal(m.discountHeight,'36px');
+    assert.equal(m.totalFont,'18px');
+    assert.equal(m.completeHeight,'43px');
+    assert.equal(m.paymentColumns,5,JSON.stringify(m));
+    assert.equal(m.rowBackground,'rgba(0, 0, 0, 0)');
+    assert.equal(m.addBackground,'rgba(0, 0, 0, 0)');
+    assert.equal(m.addBorder,'0px');
+    assert.ok(m.panelWidth<=611 && m.panelWidth>=580,JSON.stringify(m));
+    assert.ok(m.paymentRight<=m.fieldRight+1,JSON.stringify(m));
+    assert.ok(m.fieldsBottom<=m.totalsTop+1,JSON.stringify(m));
+  });
+  await check('narrow desktop sidebar wraps payments to two lines within actual panel width',async()=>{
+    await page.setViewportSize({width:1440,height:1000});
+    await page.evaluate(()=>{
+      document.querySelector('#page-pos .pos-customer-section').style.maxWidth='';
+    });
+    const m=await page.evaluate(()=>{
+      const row=document.querySelector('#posMultiPaymentRows .pos-multi-payment-row');
+      const rect=row.getBoundingClientRect();
+      const method=row.querySelector('.pos-multi-method').getBoundingClientRect();
+      const amount=row.querySelector('.pos-multi-amount').getBoundingClientRect();
+      const fields=document.querySelector('#page-pos .pos-checkout-fields').getBoundingClientRect();
+      return {columns:getComputedStyle(row).gridTemplateColumns.trim().split(/\s+/).length,
+        amountTop:amount.top,methodBottom:method.bottom,rowRight:rect.right,fieldsRight:fields.right};
+    });
+    assert.equal(m.columns,3,JSON.stringify(m));
+    assert.ok(m.amountTop>=m.methodBottom,JSON.stringify(m));
+    assert.ok(m.rowRight<=m.fieldsRight+1,JSON.stringify(m));
+  });
+  await check('POS optional customer fields are visible and customer height never shifts cart',async()=>{
+    await page.setViewportSize({width:1440,height:900});
+    const m=await page.evaluate(()=>{
+      const page=document.querySelector('#page-pos');
+      const cart=page.querySelector('.pos-cart-section');
+      const search=page.querySelector('.pos-product-card');
+      const details=document.getElementById('posCustomerMoreFields');
+      const dad=document.getElementById('posCustomerFatherName');
+      const address=document.getElementById('posCustomerAddress');
+      const top0=cart.getBoundingClientRect().top;
+      const searchBottom=search.getBoundingClientRect().bottom;
+      const toggler=document.getElementById('posCustomerMoreToggle');
+      posSetCustomerMoreExpanded_(false);
+      dad.value='Test Father';
+      address.value='Test Address';
+      const due=document.getElementById('posCustomerDueRow');
+      due.hidden=false;
+      document.getElementById('posCustomerDueValue').textContent='৳4,500';
+      // Simulate optional content and customer validation adding extra height:
+      // desktop cart must remain anchored below the search toolbar.
+      details.style.paddingBottom='95px';
+      const top1=cart.getBoundingClientRect().top;
+      const result={
+        togglerAbsent:!toggler,
+        alwaysVisible:!details.hidden && getComputedStyle(details).display!=='none',
+        fatherVisible:dad.getBoundingClientRect().height>0,
+        addressVisible:address.getBoundingClientRect().height>0,
+        fixedCartTop:Math.abs(top0-top1)<=1,
+        anchoredToSearch:Math.abs(top1-searchBottom-8)<=2,
+        columns:getComputedStyle(details).gridTemplateColumns.trim().split(/\s+/).length,
+        delta:top1-top0
+      };
+      details.style.paddingBottom='';
+      due.hidden=true;
+      dad.value=''; address.value='';
+      return result;
+    });
+    assert.equal(m.togglerAbsent,true,JSON.stringify(m));
+    assert.equal(m.alwaysVisible,true,JSON.stringify(m));
+    assert.equal(m.fatherVisible,true,JSON.stringify(m));
+    assert.equal(m.addressVisible,true,JSON.stringify(m));
+    assert.equal(m.fixedCartTop,true,JSON.stringify(m));
+    assert.equal(m.anchoredToSearch,true,JSON.stringify(m));
+    assert.equal(m.columns,2,JSON.stringify(m));
+  });
+  await check('phone Payment tab keeps checkout accessible and compact without clipping',async()=>{
+    await page.setViewportSize({width:375,height:812});
+    await page.evaluate(()=>posV2SelectTab_('payment'));
+    await page.locator('#posMultiPaymentRows').waitFor({state:'visible'});
+    const m=await page.evaluate(()=>{
+      const row=document.querySelector('#posMultiPaymentRows .pos-multi-payment-row');
+      const r=row.getBoundingClientRect();
+      const fields=document.querySelector('#page-pos .pos-checkout-fields').getBoundingClientRect();
+      const buttons=document.querySelector('#page-pos .pos-checkout-actions').getBoundingClientRect();
+      return {columns:getComputedStyle(row).gridTemplateColumns.trim().split(/\s+/).length,
+        rowRight:r.right,fieldsRight:fields.right,actionsRight:buttons.right,windowWidth:innerWidth,
+        paymentVisible:!!r.width && !!r.height,
+        completeHeight:getComputedStyle(document.getElementById('posCompleteBtn')).height};
+    });
+    assert.equal(m.columns,3,JSON.stringify(m));
+    assert.equal(m.completeHeight,'43px');
+    assert.ok(m.paymentVisible);
+    assert.ok(m.rowRight<=m.fieldsRight+1,JSON.stringify(m));
+    assert.ok(m.actionsRight<=m.windowWidth+1,JSON.stringify(m));
+    assert.deepEqual(errors,[]);
+    assert.equal((await page.evaluate(()=>__rpcCalls.filter(c=>c.name==='completeSale'))).length,0);
+  });
+  await page.close();
+
   ({page,errors}=await boot(browser));await route(page,'posv2');
   await page.fill('#posCustomerPhone','01712345678');await page.press('#posCustomerPhone','Escape');await page.click('#posHistoryBtn');
   await check('phone history blocks duplicate ID',async()=>{const button=page.locator('#posHistoryBody button[data-id="INV-000005"]');await button.waitFor();assert.equal(await button.isDisabled(),true);});

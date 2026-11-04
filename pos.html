@@ -46,7 +46,7 @@
           <circle cx="11" cy="11" r="8"></circle>
           <path d="m21 21-4.35-4.35"></path>
         </svg>
-        <input id="posCustomerName" type="text" data-search-clear="on" list="posCustomerList" placeholder="Enter customer name — কাস্টমারের নাম" aria-label="Customer Name — কাস্টমারের নাম" autocomplete="off" required>
+        <input id="posCustomerName" type="text" data-search-clear="on" list="posCustomerList" placeholder="Customer name — কাস্টমারের নাম" aria-label="Customer Name — কাস্টমারের নাম" autocomplete="off" required>
         <div id="posCustomerNameResults" class="counter-combo-results" hidden></div>
       </div>
       <datalist id="posCustomerList"></datalist>
@@ -56,7 +56,7 @@
         <svg class="pos-customer-input-icon" data-pos-icon="phone" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
           <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.69 2.8a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.33 1.84.56 2.8.69A2 2 0 0 1 22 16.92z"></path>
         </svg>
-        <input id="posCustomerPhone" type="text" data-search-clear="on" list="posCustomerPhoneList" placeholder="Enter phone number — ফোন নম্বর" aria-label="Phone Number — ফোন নম্বর" autocomplete="off" required>
+        <input id="posCustomerPhone" type="text" data-search-clear="on" list="posCustomerPhoneList" placeholder="Phone number — ফোন নম্বর" aria-label="Phone Number — ফোন নম্বর" autocomplete="off" required>
         <div id="posCustomerPhoneResults" class="counter-combo-results" hidden></div>
       </div>
       <datalist id="posCustomerPhoneList"></datalist>
@@ -65,15 +65,18 @@
         <span>Outstanding Due <span class="bn-hint" style="display:inline;">— আগের বাকি</span></span><span class="v" id="posCustomerDueValue"></span>
       </div>
 
-      <div class="pos-customer-actions">
-        <button type="button" class="btn" id="posCustomerMoreToggle">+ Father Name / Address</button>
-        <button type="button" class="btn" id="posHistoryBtn">Sales History</button>
+      <div id="posCustomerMoreFields" class="pos-customer-more-fields">
+        <div class="pos-customer-extra-field">
+          <label for="posCustomerFatherName">Father Name <span class="bn-hint" style="display:inline;">— বাবার নাম</span></label>
+          <input id="posCustomerFatherName" type="text" placeholder="Optional" autocomplete="off">
+        </div>
+        <div class="pos-customer-extra-field">
+          <label for="posCustomerAddress">Address <span class="bn-hint" style="display:inline;">— ঠিকানা</span></label>
+          <input id="posCustomerAddress" type="text" placeholder="Optional" autocomplete="off">
+        </div>
       </div>
-      <div id="posCustomerMoreFields" hidden class="pos-customer-more-fields">
-        <label>Father Name <span class="bn-hint" style="display:inline;">— বাবার নাম</span></label>
-        <input id="posCustomerFatherName" type="text" placeholder="Optional">
-        <label>Address <span class="bn-hint" style="display:inline;">— ঠিকানা</span></label>
-        <input id="posCustomerAddress" type="text" placeholder="Optional, but useful for returns later">
+      <div class="pos-customer-actions">
+        <button type="button" class="btn" id="posHistoryBtn">Sales History</button>
       </div>
 
       <div id="posUpdateBanner" class="session-banner is-closed" hidden>
@@ -119,11 +122,11 @@
           </div>
           <!-- New split-payment workflow is server-flagged OFF until release. -->
           <div id="posMultiPaymentFields" hidden style="display:none;">
-            <div class="pos-multi-heading"><strong>Payments <span class="bn-hint">— পেমেন্ট</span></strong><button type="button" class="btn btn-sm" id="posAddPaymentRowBtn">+ Add Payment</button></div>
+            <div class="pos-multi-heading"><span class="pos-multi-title">Payments <span class="pos-multi-subtitle">পেমেন্ট</span></span><button type="button" class="btn btn-sm" id="posAddPaymentRowBtn">+ Add payment</button></div>
             <div id="posMultiPaymentRows" class="pos-multi-payment-rows"></div>
             <div class="field-error" id="posMultiPaymentError" role="alert" hidden style="display:none;"></div>
             <div class="pos-multi-totals">
-              <div class="totals-row"><span>Total Received</span><strong id="posMultiPaidAmount">৳0.00</strong></div>
+              <div class="totals-row"><span>Paid Now <span class="bn-hint">/ জমা</span></span><strong id="posMultiPaidAmount">৳0.00</strong></div>
               <div class="totals-row"><span>Due / বাকি</span><strong id="posMultiDueAmount">৳0.00</strong></div>
               <div class="totals-row" id="posMultiChangeRow" hidden style="display:none;"><span>Cash Change</span><strong id="posMultiChangeAmount">৳0.00</strong></div>
             </div>
@@ -256,7 +259,7 @@
       fillBankAccountSelect_(document.getElementById('posBankAccount'), posState.bankAccounts, document.getElementById('posPaymentMethod').value);
       posEnhanceTabletSelects_();
       posRefreshTabletSelect_(document.getElementById('posBankAccount'));
-      posSetCustomerMoreExpanded_(false); // keep optional Father Name / Address collapsed until the user expands it
+      posSetCustomerMoreExpanded_(false); // optional Father Name / Address always visible
       posLoadRecentDrafts_();
     }).catch(function (err) { showToast(err.message, 'error'); });
   }
@@ -1642,6 +1645,7 @@
     posState.paymentRows.push({id:id,method:cashExists?'Bank':'Cash',accountId:'',amount:''});
     posRenderMultiPaymentRows_();
     posRecalcTotals_();
+    posFocusMultiPaymentField_(id, 'method');
   });
   document.getElementById('posMultiPaymentRows').addEventListener('input', function (event) {
     if (event.target.dataset.paymentField !== 'amount') return;
@@ -1660,7 +1664,15 @@
     row[field] = event.target.value;
     if (field === 'method') {
       row.accountId = '';
-      posRenderMultiPaymentRows_();
+      // Preserve unrelated amount inputs and keyboard focus.
+      var accountHost = wrapper.querySelector('.pos-multi-account');
+      var label = 'Payment ' + (posState.paymentRows.indexOf(row) + 1);
+      accountHost.innerHTML = posMultiPaymentAccountHtml_(row, label);
+      posEnhanceTabletSelects_();
+      // Touch-select closes and restores focus after dispatching change.
+      // Run the account/amount focus after that close to avoid a focus race.
+      var focusField = row.method === 'Cash' ? 'amount' : 'accountId';
+      Promise.resolve().then(function () { posFocusMultiPaymentField_(row.id, focusField); });
     }
     posRecalcTotals_();
   });
@@ -1811,6 +1823,34 @@
   }
 
 
+  function posMultiPaymentAccountHtml_(row, label) {
+    if (row.method === 'Cash') {
+      return '<span class="pos-multi-cash-label">Cash drawer</span>';
+    }
+    var options = '<option value="">Select account...</option>' +
+      (posState.bankAccounts || []).filter(function (a) { return a.type === row.method; }).map(function (a) {
+        return '<option value="' + escapeHtml(a.id) + '"' +
+          (row.accountId === a.id ? ' selected' : '') + '>' + escapeHtml(a.name) + '</option>';
+      }).join('');
+    return '<select data-payment-field="accountId" aria-label="' +
+      escapeHtml(label) + ' account">' + options + '</select>';
+  }
+
+  function posFocusMultiPaymentField_(id, field) {
+    var container = document.getElementById('posMultiPaymentRows');
+    if (!container) return;
+    var rows = container.querySelectorAll('[data-payment-row]');
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].dataset.paymentRow !== id) continue;
+      var input = rows[i].querySelector('[data-payment-field="' + field + '"]');
+      if (!input) return;
+      var target = input._touchSelectTrigger || input;
+      target.focus();
+      if (field === 'amount' && typeof input.select === 'function') input.select();
+      return;
+    }
+  }
+
   function posRenderMultiPaymentRows_() {
     var target = document.getElementById('posMultiPaymentRows');
     if (!target || !posMultiPaymentEnabledForSale_()) return;
@@ -1819,20 +1859,14 @@
       var methodOptions = ['Cash', 'Bank', 'Mobile Banking'].map(function (m) {
         return '<option value="' + m + '"' + (r.method === m ? ' selected' : '') + '>' + m + '</option>';
       }).join('');
-      var accountOptions = '<option value="">Select account...</option>' +
-        (posState.bankAccounts || []).filter(function (a) { return a.type === r.method; }).map(function (a) {
-          return '<option value="' + escapeHtml(a.id) + '"' + (r.accountId === a.id ? ' selected' : '') + '>' + escapeHtml(a.name) + '</option>';
-        }).join('');
-      var accountControl = r.method === 'Cash'
-        ? '<span class="pos-multi-cash-label">Cash drawer</span>'
-        : '<select data-payment-field="accountId" aria-label="' + label + ' account">' + accountOptions + '</select>';
+      var accountControl = posMultiPaymentAccountHtml_(r, label);
       return '<div class="pos-multi-payment-row" data-payment-row="' + escapeHtml(r.id) + '">' +
         '<select class="pos-multi-method" data-payment-field="method" aria-label="' + label + ' method">' + methodOptions + '</select>' +
         '<div class="pos-multi-account">' + accountControl + '</div>' +
-        '<input class="pos-multi-amount" type="text" inputmode="decimal" autocomplete="off" data-payment-field="amount" aria-label="' + label + ' amount" placeholder="৳ Amount" value="' + escapeHtml(r.amount) + '">' +
-        '<button type="button" class="btn btn-sm pos-multi-remaining" data-payment-action="remaining" aria-label="Fill remaining in ' + label + '">Remaining</button>' +
-        '<button type="button" class="btn btn-sm pos-multi-remove" data-payment-action="remove" aria-label="Remove ' + label + '"' +
-        (posState.paymentRows.length < 2 ? ' disabled' : '') + '>&times;</button></div>';
+        '<input class="pos-multi-amount" type="text" inputmode="decimal" autocomplete="off" data-payment-field="amount" aria-label="' + label + ' amount" aria-describedby="posMultiPaymentError" placeholder="৳ Amount" value="' + escapeHtml(r.amount) + '">' +
+        '<button type="button" class="btn btn-sm pos-multi-remaining" data-payment-action="remaining" aria-label="Fill due in ' + label + '" title="Fill the unpaid invoice balance">Fill Due</button>' +
+        '<button type="button" class="btn btn-sm pos-multi-remove" data-payment-action="remove" aria-label="Remove ' + label + '" title="Remove ' + label + '"' +
+        (posState.paymentRows.length < 2 ? ' disabled' : '') + '><svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2m-11 0 1 15h12l1-15M10 11v6M14 11v6"/></svg></button></div>';
     }).join('');
     posEnhanceTabletSelects_();
   }
@@ -1868,7 +1902,8 @@
     if (!el) return;
     var row = posState.paymentRows.filter(function (r) { return r.id === el.dataset.paymentRow; })[0];
     if (!row) return;
-    if (button.dataset.paymentAction === 'remove') {
+    var removing = button.dataset.paymentAction === 'remove';
+    if (removing) {
       if (posState.paymentRows.length <= 1) return;
       posState.paymentRows = posState.paymentRows.filter(function (r) { return r.id !== row.id; });
     } else {
@@ -1880,6 +1915,7 @@
     }
     posRenderMultiPaymentRows_();
     posRecalcTotals_();
+    if (!removing) posFocusMultiPaymentField_(row.id, 'amount');
   }
 
   var posProfitRequestSequence_ = 0;
@@ -2960,8 +2996,9 @@ function posExitUpdateMode_() {
 }
 
 function posSetCustomerMoreExpanded_(expanded) {
-  document.getElementById('posCustomerMoreFields').hidden = !expanded;
-  document.getElementById('posCustomerMoreToggle').textContent = expanded ? '− Father Name / Address' : '+ Father Name / Address';
+  // Keep the optional fields available for new sales, drafts and invoice edits.
+  // The argument remains for compatibility with earlier callers.
+  document.getElementById('posCustomerMoreFields').hidden = false;
 }
 
 function posUpdateCustomerDueDisplay_(due) {
@@ -2975,11 +3012,6 @@ function posUpdateCustomerDueDisplay_(due) {
     row.hidden = true;
   }
 }
-
-document.getElementById('posCustomerMoreToggle').addEventListener('click', function () {
-  var fields = document.getElementById('posCustomerMoreFields');
-  posSetCustomerMoreExpanded_(fields.hidden); // hidden===true means currently collapsed, so this toggles correctly
-});
 
 document.getElementById('posCancelUpdateBtn').addEventListener('click', function () {
   posExitUpdateMode_();

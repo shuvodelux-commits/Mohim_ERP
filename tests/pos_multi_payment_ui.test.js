@@ -118,5 +118,5 @@ test('POS V2 multi-payment rows keep full-width compact inputs and a phone/table
   const css=read('posv2.html');
   assert.match(css,/\.pos-multi-payment-row\s*\{/);
   assert.match(css,/\.pos-multi-payment-row (?:select|input)/);
-  assert.match(css,/@media\s*\(max-width:\s*700px\)[\s\S]*?\.pos-multi-payment-row/);
+  assert.match(css,/@media\s*\(max-width:\s*1023px\)[\s\S]*?\.pos-multi-payment-row/);
 });
