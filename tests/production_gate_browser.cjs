@@ -78,7 +78,12 @@ async function main() {
     });
     assert.equal(f,true);
   });
-  await page.locator('#posMultiPaymentRows [data-payment-row="pm-2"] .pos-multi-method').selectOption('Mobile Banking');
+  await page.locator('#posMultiPaymentRows [data-payment-row="pm-2"] .pos-multi-method + .touch-select-trigger').click();
+  await page.locator('#touchSelectMenuGlobal [data-touch-option-index]').filter({hasText:'Mobile Banking'}).click();
+  await page.waitForFunction(()=>{
+    const a=document.querySelector('#posMultiPaymentRows [data-payment-row="pm-2"] [data-payment-field="accountId"]');
+    return a && (document.activeElement===a || document.activeElement===a._touchSelectTrigger);
+  });
   await check('changing method updates only its account, preserving the other amount DOM and focus',async()=>{
     const v=await page.evaluate(()=>{
       const first=document.querySelector('#posMultiPaymentRows [data-payment-row="pm-1"] .pos-multi-amount');
@@ -89,7 +94,8 @@ async function main() {
     });
     assert.deepEqual(v,{sameNode:true,accountExists:true,accountFocused:true});
   });
-  await page.locator('#posMultiPaymentRows [data-payment-row="pm-2"] [data-payment-field="accountId"]').selectOption('M1');
+  await page.locator('#posMultiPaymentRows [data-payment-row="pm-2"] .pos-multi-account .touch-select-trigger').click();
+  await page.locator('#touchSelectMenuGlobal [data-touch-option-index]').filter({hasText:'Demo Mobile'}).click();
   await page.fill('#posMultiPaymentRows [data-payment-row="pm-1"] .pos-multi-amount','20');
   await page.fill('#posMultiPaymentRows [data-payment-row="pm-2"] .pos-multi-amount','5');
   await check('split checkout keeps applied paid and due separate before Fill Due',async()=>{

@@ -1666,7 +1666,10 @@
       var label = 'Payment ' + (posState.paymentRows.indexOf(row) + 1);
       accountHost.innerHTML = posMultiPaymentAccountHtml_(row, label);
       posEnhanceTabletSelects_();
-      posFocusMultiPaymentField_(row.id, row.method === 'Cash' ? 'amount' : 'accountId');
+      // Touch-select closes and restores focus after dispatching change.
+      // Run the account/amount focus after that close to avoid a focus race.
+      var focusField = row.method === 'Cash' ? 'amount' : 'accountId';
+      Promise.resolve().then(function () { posFocusMultiPaymentField_(row.id, focusField); });
     }
     posRecalcTotals_();
   });
