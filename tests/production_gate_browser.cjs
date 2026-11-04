@@ -23,6 +23,7 @@ async function boot(browser,viewport={width:1440,height:1000}) {
 }
 async function route(page,key) {await page.evaluate(k=>goToPage(k),key);const runtimeKey=key==='posv2'?'pos':key;await page.locator('#page-'+runtimeKey).waitFor({state:'visible'});}
 async function main() {
+ let salesTableVisualMetrics;
  const browser=await pw.chromium.launch({headless:true,...(process.env.SHER_CHROMIUM?{executablePath:process.env.SHER_CHROMIUM}:{}),args:['--no-sandbox']});
  try {
   let {page,errors}=await boot(browser);
@@ -328,6 +329,24 @@ async function main() {
     assert.ok(m.rowRight<=m.contentRight+1,'filter row must not exceed the viewport');
     assert.equal(m.actionPosition,'sticky');
   });
+  await check('Sales reference table metrics for Products parity',async()=>{
+    await page.setViewportSize({width:768,height:1024});
+    await page.evaluate(()=>{document.getElementById('content').scrollTop=500;smSyncTopScrollbar_();});
+    await page.waitForFunction(()=>!document.getElementById('smPinnedSalesHeader').hidden);
+    salesTableVisualMetrics=await page.evaluate(()=>{
+      const style=el=>{const c=getComputedStyle(el);return {
+        fontSize:c.fontSize,fontWeight:c.fontWeight,lineHeight:c.lineHeight,
+        paddingTop:c.paddingTop,paddingBottom:c.paddingBottom,
+        paddingLeft:c.paddingLeft,paddingRight:c.paddingRight,
+        textTransform:c.textTransform,letterSpacing:c.letterSpacing};};
+      const wrap=document.getElementById('smTableScroll');
+      const button=getComputedStyle(wrap.querySelector('tbody tr .erp-row-action-trigger'));
+      return {th:style(wrap.querySelector('thead th')),td:style(wrap.querySelector('tbody td')),
+        pinned:style(document.querySelector('#smPinnedSalesHeader th')),
+        action:{width:button.width,height:button.height,minHeight:button.minHeight}};
+    });
+    assert.equal(salesTableVisualMetrics.th.fontSize,'12px');
+  });
   await check('clicking a Sales customer opens the paid-invoice-aware Customer detail modal',async()=>{
     await page.evaluate(()=>{
       window.__mockOverrides.getCustomerDetail={
@@ -477,6 +496,34 @@ async function main() {
     assert.ok(Math.abs(m.afterTable.normal)<=1);
     assert.ok(Math.abs(m.afterTable.header)<=1);
   });
+  await check('Products tablet typography and pinned headings match Sales exactly',async()=>{
+    await page.setViewportSize({width:768,height:1024});
+    await page.evaluate(()=>{document.getElementById('content').scrollTop=500;prodSyncTopScrollbar_();});
+    await page.waitForFunction(()=>!document.getElementById('prodPinnedHeader').hidden);
+    const metrics=await page.evaluate(()=>{
+      const style=el=>{const c=getComputedStyle(el);return {
+        fontSize:c.fontSize,fontWeight:c.fontWeight,lineHeight:c.lineHeight,
+        paddingTop:c.paddingTop,paddingBottom:c.paddingBottom,
+        paddingLeft:c.paddingLeft,paddingRight:c.paddingRight,
+        textTransform:c.textTransform,letterSpacing:c.letterSpacing};};
+      const wrap=document.getElementById('prodTableScroll');
+      const button=getComputedStyle(wrap.querySelector('tbody tr .erp-row-action-trigger'));
+      const name=getComputedStyle(wrap.querySelector('tbody .prod-item-name'));
+      const price=getComputedStyle(wrap.querySelector('tbody .prod-price-main'));
+      return {th:style(wrap.querySelector('thead th')),td:style(wrap.querySelector('tbody td')),
+        pinned:style(document.querySelector('#prodPinnedHeader th')),
+        action:{width:button.width,height:button.height,minHeight:button.minHeight},
+        name:{size:name.fontSize,weight:name.fontWeight},price:{size:price.fontSize,weight:price.fontWeight}};
+    });
+    assert.deepEqual(metrics.th,salesTableVisualMetrics.th);
+    assert.deepEqual(metrics.td,salesTableVisualMetrics.td);
+    assert.deepEqual(metrics.pinned,salesTableVisualMetrics.pinned);
+    assert.deepEqual(metrics.action,salesTableVisualMetrics.action);
+    assert.equal(metrics.name.size,salesTableVisualMetrics.td.fontSize);
+    assert.equal(metrics.name.weight,salesTableVisualMetrics.td.fontWeight);
+    assert.equal(metrics.price.size,salesTableVisualMetrics.td.fontSize);
+    assert.equal(metrics.price.weight,salesTableVisualMetrics.td.fontWeight);
+  });
   await check('Products sticky heading sorting uses existing product sort and item actions',async()=>{
     const sort=page.locator('#prodPinnedHeader button[data-sort-key="sellingPrice"]');
     await sort.click();
@@ -490,10 +537,17 @@ async function main() {
     });
     const trigger=page.locator('#prodTableBody button[data-act="menu"]').first();
     await trigger.click();
-    assert.equal(await page.locator('#prodActionMenu').isVisible(),true);
-    assert.ok(await page.locator('#prodActionMenu [data-menu-act="edit"]').count());
-    assert.ok(await page.locator('#prodActionMenu [data-menu-act="stock"]').count());
+    const menu=page.locator('#rowActionMenuGlobal');
+    await menu.waitFor({state:'visible'});
+    const labels=await menu.locator('button[data-row-action]').allTextContents();
+    assert.deepEqual(labels,['Edit','Adjust Stock','View Lots','Deactivate','Delete']);
+    assert.equal(await menu.locator('button[data-row-action] .action-menu-icon').count(),labels.length);
+    assert.equal(await menu.locator('button[data-row-action="delete"].danger').count(),1);
+    await page.keyboard.press('ArrowDown');
+    assert.equal(await page.evaluate(()=>document.activeElement?.dataset?.rowAction),'stock');
     await page.keyboard.press('Escape');
+    assert.equal(await menu.isVisible(),false);
+    assert.equal(await trigger.evaluate(el=>el===document.activeElement),true);
   });
   await check('Products phone cards and other module never show mirrored header',async()=>{
     await page.setViewportSize({width:390,height:844});
