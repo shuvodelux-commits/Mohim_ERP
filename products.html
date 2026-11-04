@@ -15,8 +15,8 @@
 </div>
 
 <div class="card" style="padding:0;">
-  <div class="table-scroll">
-    <table id="prodTable" class="mobile-card-table">
+  <div class="table-scroll" id="prodTableScroll">
+    <table id="prodTable" class="mobile-card-table erp-action-table">
       <thead>
         <tr>
           <th aria-sort="none"><button type="button" class="prod-sort-button" data-sort-key="name">Product <span class="prod-sort-indicator" aria-hidden="true">↕</span></button></th>
@@ -26,7 +26,7 @@
           <th class="num prod-sort-th" aria-sort="none"><button type="button" class="prod-sort-button" data-sort-key="stockQty">Stock Qty <span class="prod-sort-indicator" aria-hidden="true">↕</span></button></th>
           <th class="num prod-sort-th" aria-sort="none"><button type="button" class="prod-sort-button" data-sort-key="stockValue">Stock Value <span class="prod-sort-indicator" aria-hidden="true">↕</span></button></th>
           <th aria-sort="none"><button type="button" class="prod-sort-button" data-sort-key="status">Status <span class="prod-sort-indicator" aria-hidden="true">↕</span></button></th>
-          <th>Actions</th>
+          <th class="erp-sticky-action-col" scope="col">Actions</th>
         </tr>
       </thead>
       <tbody id="prodTableBody"></tbody>
@@ -462,6 +462,91 @@
     prodRender();
   }
 
+  var prodPinnedHeader_ = null;
+
+  function prodEnsurePinnedHeader_() {
+    if (prodPinnedHeader_) return prodPinnedHeader_;
+    var pinned = document.createElement('div');
+    pinned.id = 'prodPinnedHeader';
+    pinned.className = 'prod-pinned-header';
+    pinned.hidden = true;
+    pinned.setAttribute('role', 'group');
+    pinned.setAttribute('aria-label', 'Product table column headings');
+    document.body.appendChild(pinned);
+    // The copied Sort buttons remain usable while the real heading is offscreen.
+    pinned.addEventListener('click', function (e) {
+      var sortButton = e.target.closest('.prod-sort-button[data-sort-key]');
+      if (sortButton) prodSortKey_(sortButton.dataset.sortKey);
+    });
+    prodPinnedHeader_ = pinned;
+    return pinned;
+  }
+
+  function prodSyncPinnedHeader_(refreshColumns) {
+    var pinned = prodEnsurePinnedHeader_();
+    var prodPage = document.getElementById('page-products');
+    var content = document.getElementById('content');
+    var tableScroll = document.getElementById('prodTableScroll');
+    if (!prodPage || prodPage.hidden || !content || !tableScroll ||
+        window.matchMedia('(max-width: 540px), (orientation: landscape) and (max-height: 540px) and (pointer: coarse)').matches) {
+      pinned.hidden = true;
+      return;
+    }
+    var realTable = document.getElementById('prodTable');
+    var originalHeader = realTable.querySelector('thead');
+    var tableRect = tableScroll.getBoundingClientRect();
+    var contentRect = content.getBoundingClientRect();
+    var headerRect = originalHeader.getBoundingClientRect();
+    var shouldPin = headerRect.bottom <= contentRect.top + 1 &&
+      tableRect.bottom > contentRect.top + headerRect.height;
+    pinned.hidden = !shouldPin;
+    if (!shouldPin) return;
+    var width = Math.round(tableScroll.clientWidth);
+    var tableWidth = Math.round(realTable.getBoundingClientRect().width);
+    pinned.style.top = Math.round(contentRect.top) + 'px';
+    pinned.style.left = Math.round(tableRect.left) + 'px';
+    pinned.style.width = width + 'px';
+    pinned.style.height = Math.ceil(headerRect.height) + 'px';
+    if (refreshColumns || !pinned.firstElementChild ||
+        Number(pinned.dataset.tableWidth) !== tableWidth) {
+      var mirror = document.createElement('table');
+      mirror.className = 'erp-action-table';
+      mirror.style.width = tableWidth + 'px';
+      mirror.style.minWidth = tableWidth + 'px';
+      var clonedHead = originalHeader.cloneNode(true);
+      clonedHead.querySelectorAll('[id]').forEach(function (node) {
+        node.removeAttribute('id');
+      });
+      var originalCells = originalHeader.querySelectorAll('th');
+      var mirroredCells = clonedHead.querySelectorAll('th');
+      originalCells.forEach(function (cell, index) {
+        var w = cell.getBoundingClientRect().width;
+        mirroredCells[index].style.width = w + 'px';
+        mirroredCells[index].style.minWidth = w + 'px';
+        mirroredCells[index].style.maxWidth = w + 'px';
+      });
+      mirror.appendChild(clonedHead);
+      pinned.replaceChildren(mirror);
+      pinned.dataset.tableWidth = String(tableWidth);
+    }
+    pinned.scrollLeft = tableScroll.scrollLeft;
+  }
+
+  function prodWirePinnedHeader_() {
+    var wrap = document.getElementById('prodTableScroll');
+    var page = document.getElementById('page-products');
+    var content = document.getElementById('content');
+    content.addEventListener('scroll', function () { prodSyncPinnedHeader_(); }, { passive: true });
+    wrap.addEventListener('scroll', function () { prodSyncPinnedHeader_(); }, { passive: true });
+    new MutationObserver(function () { prodSyncPinnedHeader_(); })
+      .observe(page, { attributes: true, attributeFilter: ['hidden'] });
+    window.addEventListener('resize', function () { prodSyncPinnedHeader_(true); });
+    if (window.ResizeObserver) {
+      new ResizeObserver(function () { prodSyncPinnedHeader_(true); }).observe(wrap);
+    }
+  }
+  prodWirePinnedHeader_();
+
   function prodRender() {
     prodCloseActionMenu_();
     var q = document.getElementById('prodSearch').value || '';
@@ -496,8 +581,11 @@
         '<td class="num">' + stockCell + '</td>' +
         '<td class="num">' + (isBundle ? '—' : formatMoney(p['Stock Value'])) + '</td>' +
         '<td>' + statusBadge + '</td>' +
-        '<td style="white-space:nowrap;">' +
-          '<button class="btn" data-act="menu" data-id="' + p['Product ID'] + '" aria-haspopup="menu" aria-expanded="false">Actions &#9662;</button>' +
+        '<td class="erp-sticky-action-col">' +
+          rowActionTriggerHtml_(
+            'data-act="menu" data-id="' + escapeHtml(p['Product ID']) + '"',
+            'Actions for product ' + String(p['Product Name'] || '')
+          ) +
         '</td>';
       body.appendChild(tr);
     });
@@ -505,6 +593,7 @@
     document.getElementById('prodEmptyState').hidden = rows.length > 0;
     prodSyncSearchClear_();
     prodUpdateSortHeaders_();
+    if (window.requestAnimationFrame) requestAnimationFrame(function () { prodSyncPinnedHeader_(true); });
   }
 
   var prodSearchInput_ = document.getElementById('prodSearch');

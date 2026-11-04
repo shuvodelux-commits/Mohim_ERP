@@ -314,6 +314,118 @@ async function main() {
     await page.locator('#custDetailModal .modal-close').first().click();
   });
   await check('sales browser errors',()=>assert.deepEqual(errors,[]));await page.close();
+  ({page,errors}=await boot(browser,{width:1280,height:900}));
+  await page.evaluate(()=>{
+    const products=Array.from({length:58},(_,i)=>({
+      'Product ID':'TEST-PROD-'+String(i+1).padStart(3,'0'),
+      'Product Name':'Pipe sample '+String(i+1).padStart(3,'0'),
+      'Category':'Pipe','Brand':'RFL','Unit':'pcs','Product Type':'Standard',
+      'Purchase Price':100,'Selling Price':120,'Current Stock':40+i,
+      'Minimum Stock':5,'Stock Value':4000+(i*100),'Status':'Active'
+    }));
+    window.__mockOverrides.getProductsBootstrap={products,categories:[{name:'Pipe'}],units:[{name:'pcs'}],lowStockThreshold:5};
+  });
+  await route(page,'products');
+  await page.locator('#prodTableBody tr').first().waitFor();
+  await check('Products rows scroll with page and conditional heading pins under topbar',async()=>{
+    const start=await page.evaluate(()=>{
+      const content=document.getElementById('content');
+      content.scrollTop=0;
+      prodSyncPinnedHeader_(true);
+      const wrap=document.getElementById('prodTableScroll');
+      return {initialHidden:document.getElementById('prodPinnedHeader').hidden,
+        maxHeight:getComputedStyle(wrap).maxHeight,
+        overflowY:getComputedStyle(wrap).overflowY,
+        totalRows:document.querySelectorAll('#prodTableBody tr').length};
+    });
+    assert.equal(start.initialHidden,true);
+    assert.equal(start.maxHeight,'none');
+    assert.notEqual(start.overflowY,'auto');
+    assert.equal(start.totalRows,58);
+    await page.evaluate(()=>document.getElementById('content').scrollTop=500);
+    await page.waitForFunction(()=>!document.getElementById('prodPinnedHeader').hidden);
+    const geometry=await page.evaluate(()=>{
+      const wrap=document.getElementById('prodTableScroll');
+      const content=document.getElementById('content');
+      const pin=document.getElementById('prodPinnedHeader');
+      return {pageScroll:content.scrollTop,innerScroll:wrap.scrollTop,
+        contentTop:content.getBoundingClientRect().top,
+        pinnedTop:pin.getBoundingClientRect().top,
+        realHeaderBottom:wrap.querySelector('thead').getBoundingClientRect().bottom,
+        headerCount:pin.querySelectorAll('th').length,
+        originalCount:wrap.querySelectorAll('thead th').length};
+    });
+    assert.ok(geometry.pageScroll>250);
+    assert.equal(geometry.innerScroll,0);
+    assert.ok(geometry.realHeaderBottom<geometry.contentTop);
+    assert.ok(Math.abs(geometry.contentTop-geometry.pinnedTop)<=2);
+    assert.equal(geometry.headerCount,geometry.originalCount);
+  });
+  await check('Products pinned heading synchronizes horizontally and preserves rightmost Actions',async()=>{
+    await page.setViewportSize({width:768,height:1024});
+    await page.evaluate(()=>{
+      document.getElementById('content').scrollTop=500;
+      document.getElementById('prodTableScroll').scrollLeft=0;
+      prodSyncPinnedHeader_(true);
+    });
+    await page.waitForFunction(()=>!document.getElementById('prodPinnedHeader').hidden);
+    const geo=await page.evaluate(()=>{
+      const wrap=document.getElementById('prodTableScroll');
+      wrap.scrollLeft=wrap.scrollWidth;
+      prodSyncPinnedHeader_();
+      const pin=document.getElementById('prodPinnedHeader');
+      const action=pin.querySelector('th.erp-sticky-action-col');
+      return {
+        realScroll:wrap.scrollLeft,pinnedScroll:pin.scrollLeft,
+        rightDiff:Math.abs(action.getBoundingClientRect().right-pin.getBoundingClientRect().right),
+        order:action===pin.querySelector('tr').lastElementChild,
+        columnErrors:Array.from(wrap.querySelectorAll('thead th')).map((real,i)=>{
+          const clone=pin.querySelectorAll('thead th')[i];
+          return {dLeft:Math.abs(real.getBoundingClientRect().left-clone.getBoundingClientRect().left),
+            dWidth:Math.abs(real.getBoundingClientRect().width-clone.getBoundingClientRect().width)};
+        }),
+        buttonName:wrap.querySelector('td.erp-sticky-action-col button')?.getAttribute('aria-label')||''
+      };
+    });
+    assert.ok(geo.realScroll>10);
+    assert.ok(Math.abs(geo.pinnedScroll-geo.realScroll)<=1);
+    assert.ok(geo.rightDiff<=15);
+    assert.equal(geo.order,true);
+    assert.ok(geo.columnErrors.every(x=>x.dLeft<=3 && x.dWidth<=3),JSON.stringify(geo.columnErrors));
+    assert.match(geo.buttonName,/Actions for product/);
+  });
+  await check('Products sticky heading sorting uses existing product sort and item actions',async()=>{
+    const sort=page.locator('#prodPinnedHeader button[data-sort-key="sellingPrice"]');
+    await sort.click();
+    await page.waitForFunction(()=>prodState.sortKey==='sellingPrice' && prodState.sortDir==='asc');
+    assert.equal(await page.locator('#prodTable thead th[aria-sort="ascending"]').count(),1);
+    assert.equal(await page.locator('#prodTableBody tr').count(),58);
+    await page.evaluate(()=>{
+      document.getElementById('content').scrollTop=0;
+      document.getElementById('prodTableScroll').scrollLeft=0;
+      prodSyncPinnedHeader_();
+    });
+    const trigger=page.locator('#prodTableBody button[data-act="menu"]').first();
+    await trigger.click();
+    assert.equal(await page.locator('#prodActionMenu').isVisible(),true);
+    assert.ok(await page.locator('#prodActionMenu [data-menu-act="edit"]').count());
+    assert.ok(await page.locator('#prodActionMenu [data-menu-act="stock"]').count());
+    await page.keyboard.press('Escape');
+  });
+  await check('Products phone cards and other module never show mirrored header',async()=>{
+    await page.setViewportSize({width:390,height:844});
+    const mobile=await page.evaluate(()=>{
+      prodSyncPinnedHeader_();
+      const wrap=document.getElementById('prodTableScroll');
+      const pin=document.getElementById('prodPinnedHeader');
+      return {display:getComputedStyle(pin).display,heading:getComputedStyle(wrap.querySelector('thead')).display};
+    });
+    assert.equal(mobile.display,'none');
+    assert.equal(mobile.heading,'none');
+    await route(page,'sales');
+    assert.equal(await page.locator('#prodPinnedHeader').isVisible(),false);
+  });
+  await check('products browser errors',()=>assert.deepEqual(errors,[]));await page.close();
   ({page,errors}=await boot(browser));await route(page,'returns');await page.fill('#rtSearchInput','INV-000005');await page.click('#rtFindBtn');
   await check('return blocks duplicate invoice load',async()=>{const b=page.locator('#rtSearchResults button[data-id="INV-000005"]');await b.waitFor();assert.equal(await b.isDisabled(),true);assert.equal(await page.evaluate(()=>__rpcCalls.filter(c=>c.name==='getInvoiceForReturn').length),0);});
   await check('return browser errors',()=>assert.deepEqual(errors,[]));await page.close();
