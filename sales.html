@@ -30,7 +30,7 @@
     tabindex="0"
     role="region"
     aria-label="Sales table horizontal scroll"
-    style="display:none;"
+    style="display:none;height:12px;"
   >
     <div id="smTopScrollInner" style="height:1px;"></div>
   </div>
@@ -403,6 +403,10 @@
     var tableScroll = document.getElementById("smTableScroll");
     if (!top || !inner || !tableScroll) return;
     var salesPage = document.getElementById('page-sales');
+    // Sticky offsets are relative to the content scrollport's padding edge.
+    // Compensate for padding so the rail sits at the topbar, not over the header.
+    var content = document.getElementById('content');
+    top.style.top = -(parseFloat(window.getComputedStyle(content).paddingTop) || 0) + 'px';
     var hasOverflow = !!salesPage && !salesPage.hidden &&
       tableScroll.scrollWidth - tableScroll.clientWidth > 1;
     top.style.display = hasOverflow ? "block" : "none";
