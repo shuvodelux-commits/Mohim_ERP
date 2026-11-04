@@ -161,10 +161,15 @@ test('product rows render one Actions trigger instead of five inline action butt
   assert.doesNotMatch(render, />Stock<\/button>/);
   assert.doesNotMatch(render, />Lots<\/button>/);
   assert.doesNotMatch(render, />Delete<\/button>/);
-  assert.match(html, /id=["']prodActionMenu["']/);
+  // Products now uses the Sales/global icon menu; no isolated text-only popup.
+  assert.doesNotMatch(html, /id=["']prodActionMenu["']/);
+  assert.match(html, /openRowActionMenu_\(trigger, items/);
   assert.match(html, /prodOpenActionMenu_/);
-  assert.match(html, /Escape/);
-  assert.match(html, /getBoundingClientRect/);
+  const shared = read('javascript.html');
+  assert.match(shared, /function openRowActionMenu_\(/);
+  assert.match(shared, /function closeRowActionMenu_\(/);
+  assert.match(shared, /Escape/);
+  assert.match(shared, /getBoundingClientRect/);
 });
 
 test('product rerender closes any detached action menu', () => {
