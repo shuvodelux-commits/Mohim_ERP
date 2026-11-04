@@ -328,14 +328,21 @@
         var paymentAmount = (l['Payment Amount'] === '' || l['Payment Amount'] == null) ? (Number(l['Credit']) || 0) : (Number(l['Payment Amount']) || 0);
         var discountAmount = Number(l['Discount Amount']) || 0;
         var creditHtml = l['Credit'] ? formatMoney(l['Credit']) : '';
+        if (l._invoiceProjection && Number(l['Credit']) > 0) {
+          creditHtml += '<div class="cust-ledger-checkout-note">Paid at Checkout</div>';
+        }
         if (isPayment && discountAmount > 0) creditHtml += '<div style="font-size:11px;color:var(--color-text-muted);">Payment ' + formatMoney(paymentAmount) + ' + Discount ' + formatMoney(discountAmount) + '</div>';
+        var debitHtml = l['Debit'] ? formatMoney(l['Debit']) : '';
+        if (l._invoiceProjection && Number(l['Debit']) > 0) {
+          debitHtml += '<div class="cust-ledger-checkout-note">Invoice Total</div>';
+        }
         var tr = document.createElement('tr');
         tr.innerHTML =
           '<td>' + escapeHtml(formatDateShort_(l['Date'])) + '</td>' +
           '<td>' + escapeHtml(l['Type']) + '</td>' +
           '<td>' + escapeHtml(l['Reference'] || '') + '</td>' +
           '<td class="num ledger-txn--decrease">' + creditHtml + '</td>' +
-          '<td class="num ledger-txn--increase">' + (l['Debit'] ? formatMoney(l['Debit']) : '') + '</td>' +
+          '<td class="num ledger-txn--increase">' + debitHtml + '</td>' +
           '<td class="num ' + partyLedgerBalanceTone_(l['Balance']) + '">' + formatMoney(l['Balance']) + '</td>' +
           '<td style="white-space:nowrap;">' +
           (isPayment

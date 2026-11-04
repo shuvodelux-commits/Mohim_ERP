@@ -287,12 +287,25 @@ function getCustomerDetail(token, customerId) {
     })[0];
     if (!customer) return fail_("Customer not found.");
     assertCustomerSalesIntegrity_(customerId);
-    const ledger = recalculateLedgerBalancesForDisplay_(
-      getAllRows_("CUSTOMER_LEDGER").filter(function (l) {
-        return l["Customer ID"] === customerId && !isDeleted_(l);
-      }),
-      "",
-    );
+    // The original Customer detail modal read only CUSTOMER_LEDGER and missed
+    // fully paid, explicitly linked Sales (completeSale records only Due
+    // Amount there). Use the same read-only, reconciled invoice projection as
+    // the dedicated Customer Ledger. This never posts another ledger entry.
+    const storedByRowIndex = {};
+    getAllRows_("CUSTOMER_LEDGER").forEach(function (row) {
+      if (String(row["Customer ID"] || "") !== String(customerId) || isDeleted_(row)) return;
+      storedByRowIndex[String(row._rowIndex)] = row;
+    });
+    const displayAscending = partyLedgerBuildDisplayIndex_("customer", customerId, false);
+    const ledger = displayAscending.map(function (entry) {
+      // The index is intentionally narrow. Preserve raw payment metadata for
+      // the existing Edit Payment dialog, but never borrow raw fields for an
+      // invoice projection (which is a synthetic display-only row).
+      const original = entry._synthetic ? {} : (storedByRowIndex[String(entry._rowIndex)] || {});
+      const view = Object.assign({}, original, entry);
+      view["Balance"] = entry._displayBalance;
+      return view;
+    }).reverse();
     return ok_({ customer: customer, ledger: ledger });
   } catch (err) {
     logError_("getCustomerDetail", err);
