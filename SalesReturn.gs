@@ -1196,3 +1196,178 @@ function prepareSalesReturnChange_(token, returnId, requested, mode) {
     needsStockChange:needsStockChange,mode:mode,reason:editReason,
     version:expectedVersion,newDate:newDate,actingUser:actingUser};
 }
+
+
+/**
+ * Emits the positive portion of a replacement return after exact stock
+ * inverse has already been committed within the same locked journal write.
+ */
+function applyPreparedSalesReturnStockForCorrection_(prepared, returnId, now) {
+  const movementRows=[];
+  (prepared.stockChanges || []).forEach(function(change,index){
+    updateRowFields_('PRODUCTS',change.rowIndex,{'Current Stock':change.newStock,'Updated At':now});
+    const plan=prepared.restorationPlans && prepared.restorationPlans[index];
+    const restored=plan ? applySaleReturnRestorationPlan_(plan,returnId)
+      : restoreStockToLots_(prepared.invoiceId,change.productId,change.name,change.qty,returnId);
+    restored.forEach(function(row){
+      movementRows.push({
+        'Movement ID':generateId_('STOCK_MOVEMENT'),
+        'Date':now,'Product ID':change.productId,'Product Name':change.name,
+        'Type':'Sales Return','Reference':returnId,
+        'Quantity In':row.qty,'Quantity Out':'','Balance Stock':change.newStock,
+        'Lot ID':row.lotId,'Source Sale Product ID':change.sourceSaleProductId,
+        'Source Consumption Link ID':row.sourceConsumptionLinkId || '',
+        'Notes':'Reposted corrected Sales Return'
+      });
+    });
+  });
+  if (movementRows.length) appendRows_('STOCK_MOVEMENT',movementRows);
+}
+
+/**
+ * Journal ownership is keyed to both a Return ID and invoice. Never start
+ * another correction when an earlier transaction is in an ambiguous stage.
+ */
+function salesReturnCorrectionPriorJournal_(token, returnId, operationId, operationType, payload) {
+  const user = requirePermission_(token,'returns',operationType === 'ReturnEdit'?'edit':'view');
+  const actor=String(user['User ID'] || actorName_(user));
+  const hash=salePostingPayloadHash_({operationType:operationType,returnId:returnId,payload:payload});
+  const journals=getAllRows_('SALE_POSTING_JOURNAL');
+  const prior=journals.filter(function(r){return String(r['Operation ID'])===operationId;});
+  if (prior.length>1) throw new Error('Duplicate correction operation ID. Needs Review.');
+  const otherPending=journals.some(function(r){
+    return String(r['Return ID'] || '')===returnId && String(r['Operation ID'])!==operationId &&
+      (r['Operation Type']==='ReturnEdit' || r['Operation Type']==='ReturnDelete') && r.State!=='Committed';
+  });
+  if (otherPending) throw new Error('Earlier correction interrupted. Needs Review.');
+  if (prior.length) {
+    const row=prior[0];
+    if (String(row['Return ID'])!==returnId || row['Operation Type']!==operationType ||
+        String(row.Actor)!==actor || salePostingJournalDecision_(row,hash)!=='replay')
+      throw new Error('Correction operation interrupted or conflicting. Needs Review.');
+    return {actor:actor,hash:hash,prior:row};
+  }
+  return {actor:actor,hash:hash,prior:null};
+}
+
+/** Save an authorized in-place correction while preserving Return ID and batch. */
+function updateSalesReturn(token, payload) {
+  const lock=LockService.getScriptLock();
+  lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
+  let journalIndex=-1, stage='';
+  try {
+    const id=sanitizeInput_(payload && payload.returnId);
+    const operationId=sanitizeInput_(payload && payload.operationId);
+    if (!id || !/^[A-Za-z0-9_-]{12,100}$/.test(operationId))
+      throw new Error('Return ID and stable correction operation ID are required.');
+    const j=salesReturnCorrectionPriorJournal_(token,id,operationId,'ReturnEdit',payload);
+    if (j.prior) {
+      const match=getAllRows_('SALES_RETURN').filter(function(r){return String(r['Return ID'])===id;});
+      if (match.length!==1 || isDeleted_(match[0]) ||
+          j.prior['Last Completed Stage']!==id+'@'+String(Number(match[0]['Edit Version'])||0))
+        throw new Error('Committed correction is no longer the current return revision. Reload.');
+      return ok_({returnId:id,version:Number(match[0]['Edit Version'])||0,
+        totalReturnAmount:Number(match[0]['Total Return Amount'])||0,
+        refundMethod:match[0]['Refund Method']});
+    }
+    const plan=prepareSalesReturnChange_(token,id,payload,'Edit');
+    const prepared=plan.replacement;
+    if (!prepared) throw new Error('Replacement return could not be prepared.');
+    const now=new Date(),newVersion=plan.version+1;
+    const auditReason=plan.reason;
+    appendRow_('SALE_POSTING_JOURNAL',{
+      'Operation ID':operationId,'Operation Type':'ReturnEdit',
+      'Payload Hash':j.hash,'Invoice ID':plan.invoiceId,'Return ID':id,
+      'State':'Writing','Last Completed Stage':'Validated','Actor':j.actor,
+      'Created At':now,'Updated At':now,'Error':''
+    });
+    journalIndex=findRowIndex_('SALE_POSTING_JOURNAL','Operation ID',operationId);
+    if (journalIndex<2) throw new Error('Correction journal reservation missing. Needs Review.');
+    stage='Validated';
+
+    // Undo exactly the old physical and financial postings, never the
+    // original invoice. Price-only edits must not touch inventory at all.
+    if (plan.needsStockChange) {
+      applySalesReturnStockUndo_(plan.stockUndo,operationId,'Edit');
+      stage='Stock reversed';
+      applyPreparedSalesReturnStockForCorrection_(prepared,id,now);
+      stage='Stock reposted';
+    }
+    if (plan.moneyUndo.kind==='Cash') {
+      markMatchingDeleted_('CASH_BOOK',function(row){
+        return row['Reference']===id && row['Type']==='Sales Return';
+      },plan.actingUser,auditReason,now);
+    } else {
+      markMatchingDeleted_('CUSTOMER_LEDGER',function(row){
+        return row['Reference']===id && row['Type']==='Sales Return Credit';
+      },plan.actingUser,auditReason,now);
+    }
+    stage='Old refund reversed';
+    const oldCredit=plan.moneyUndo.kind==='Store Credit' ? plan.moneyUndo.amount : 0;
+    const newCredit=prepared.refundMethod==='Store Credit' ? prepared.totalReturnAmount : 0;
+    const customer=plan.moneyUndo.kind==='Store Credit'
+      ? plan.moneyUndo.customer : prepared.creditCustomer;
+    if (oldCredit || newCredit) {
+      if (!customer || !customer._rowIndex) throw new Error('Store Credit customer evidence missing. Needs Review.');
+      const revisedDue=roundMoney_((Number(customer['Current Due'])||0)+oldCredit-newCredit);
+      updateRowFields_('CUSTOMERS',customer._rowIndex,{'Current Due':revisedDue});
+      if (newCredit) {
+        appendRow_('CUSTOMER_LEDGER',{
+          'Ledger ID':generateId_('CUSTOMER_LEDGER'),'Date':prepared.dateStr,
+          'Customer ID':customer['Customer ID'],'Customer Name':customer['Customer Name'],
+          'Type':'Sales Return Credit','Reference':id,'Debit':'','Credit':newCredit,
+          'Balance':revisedDue,'Notes':'Corrected return '+id,
+          'Created By':actorName_(plan.actingUser),'Created At':now
+        });
+      }
+    }
+    if (prepared.refundMethod==='Cash') {
+      addCashBookEntry_({Type:'Sales Return',Reference:id,
+        Description:'Corrected Cash refund for '+plan.invoiceId,
+        Debit:prepared.totalReturnAmount,Credit:'',PaymentMethod:'Cash',Date:prepared.dateStr});
+    }
+    stage='Refund reposted';
+
+    markMatchingDeleted_('SALES_RETURN_ITEMS',function(row){
+      return String(row['Return ID'])===id;
+    },plan.actingUser,auditReason,now);
+    appendRows_('SALES_RETURN_ITEMS',prepared.validatedItems.map(function(v){
+      return {'Return ID':id,'Invoice ID':plan.invoiceId,'Product ID':v.productId,
+        'Product Name':v.name,'Return Quantity':v.qty,'Return Price':v.price,
+        'Line Total':v.lineTotal,'Pricing Basis':'NetAfterInvoiceDiscount',
+        'Sold Product Type':v.productType || 'Standard'};
+    }));
+    updateRowFields_('SALES_RETURN',plan.original._rowIndex,{
+      'Date':prepared.dateStr,'Refund Method':prepared.refundMethod,
+      'Total Return Amount':prepared.totalReturnAmount,
+      'Reason':prepared.reason,'Notes':prepared.notes,
+      'Updated At':now,'Updated By':actorName_(plan.actingUser),
+      'Edit Reason':auditReason,'Edit Version':newVersion
+    });
+    stage='Return updated';
+    appendRow_('INVOICE_EDIT_LOG',{
+      'Log ID':generateId_('INVOICE_EDIT_LOG'),'Invoice ID':plan.invoiceId,
+      'Return ID':id,'Edit Date':now,'Reason':auditReason,
+      'Before Return Amount':Number(plan.original['Total Return Amount'])||0,
+      'After Return Amount':prepared.totalReturnAmount,
+      'Before Return Items JSON':JSON.stringify(plan.originalItems),
+      'After Return Items JSON':JSON.stringify(prepared.validatedItems),
+      'Edited By':actorName_(plan.actingUser)
+    });
+    updateRowFields_('SALE_POSTING_JOURNAL',journalIndex,{
+      State:'Committed','Last Completed Stage':id+'@'+newVersion,'Updated At':new Date()
+    });
+    stage='Committed';
+    return ok_({returnId:id,version:newVersion,totalReturnAmount:prepared.totalReturnAmount,
+      refundMethod:prepared.refundMethod});
+  } catch(err) {
+    if (journalIndex>=2 && stage!=='Committed') {
+      try {updateRowFields_('SALE_POSTING_JOURNAL',journalIndex,{
+        State:'Needs Review','Last Completed Stage':stage,'Updated At':new Date(),
+        Error:String(err && err.message || err)
+      });} catch(journalError) {logError_('updateSalesReturnJournal',journalError);}
+    }
+    logError_('updateSalesReturn',err);
+    return fail_(err.message);
+  } finally {lock.releaseLock();}
+}
