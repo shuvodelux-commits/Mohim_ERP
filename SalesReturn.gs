@@ -1117,6 +1117,19 @@ function prepareSalesReturnChange_(token, returnId, requested, mode) {
     throw new Error('Unsupported historical refund method. Needs Review.');
   }
   const otherReturnHeaders = activeRows_('SALES_RETURN').filter(function(row){return String(row['Invoice ID']) === invoiceId && String(row['Return ID']) !== id;});
+  if (mode === 'Edit' && String(original['Batch ID'] || '')) {
+    // The batch workflow stores one refund method on its shared summary.
+    // Changing just one child to a different method would misstate that
+    // summary and create an unsupported mixed-method batch. Fail BEFORE
+    // posting any cash, customer credit, stock or journal changes.
+    const siblings = activeRows_('SALES_RETURN').filter(function(row) {
+      return String(row['Batch ID'] || '') === String(original['Batch ID']) &&
+        String(row['Return ID']) !== id;
+    });
+    if (siblings.some(function(row) { return String(row['Refund Method'] || '') !== String(payload.refundMethod || ''); })) {
+      throw new Error('Mixed-method Sales Return batch is not supported. Correct each child using the batch refund method, or resolve sibling returns first.');
+    }
+  }
   const otherReturnIds = {};
   otherReturnHeaders.forEach(function(row){otherReturnIds[String(row['Return ID'])]=true;});
   const otherReturnItems = activeSalesReturnItems_().filter(function(row){return !!otherReturnIds[String(row['Return ID'])];});
