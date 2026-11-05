@@ -1187,12 +1187,16 @@ function planSalesReturnStockUndo_(returnId, context) {
       throw new Error('Missing or ambiguous stock product/lot evidence. Needs Review.');
     const product = productRows[0], lot = lotRows[0];
     const link = String(m['Source Consumption Link ID'] || '');
+    // A fallback restoration creates a NEW lot owned by this Return ID.
+    // Its original consumed lot must be traced through the immutable link,
+    // not mistaken for the newly created restoration lot ID.
+    const isReturnOwnedFallback = String(lot['Purchase ID'] || '') === id;
     const candidates = consumed.filter(function(c){
       return String(c['Invoice ID']) === invoiceId &&
         String(c['Product ID']) === productId &&
-        String(c['Lot ID']) === lotId &&
         String(c['Source Sale Product ID'] || c['Product ID']) === sourceId &&
-        (!link || String(c['Return Consumption Link ID'] || '') === link);
+        (!link || String(c['Return Consumption Link ID'] || '') === link) &&
+        (String(c['Lot ID']) === lotId || (isReturnOwnedFallback && !!link));
     });
     let sourceRow = null;
     if (candidates.length === 1) sourceRow = candidates[0];
