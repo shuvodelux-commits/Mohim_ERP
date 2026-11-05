@@ -83,6 +83,7 @@
       </div>
       <div><label>Return Reason</label><input id="rtReason" type="text" placeholder="Optional"></div>
       <div class="full"><label>Note</label><input id="rtNote" type="text" placeholder="Optional"></div>
+      <div id="rtEditReasonRow" class="full" hidden><label>Reason for Editing *</label><input id="rtEditReason" type="text" placeholder="Why is this completed return being corrected?"></div>
       <div><label>Return Date</label><input id="rtDate" type="date"></div>
       <div id="rtBackdatedReasonRow" class="full" style="display:none;"><label>Reason for Backdating *</label><input id="rtBackdatedReason" type="text" placeholder="Why is this dated in the past?"></div>
     </div>
@@ -104,6 +105,8 @@
     invoice: null,
     currencySymbol: '',
     editingReturnId: null,
+    editVersion: 0,
+    editHeader: null,
     editQtyByProduct: {},
     searchMode: 'invoice',
     searchMatches: [],
@@ -310,7 +313,11 @@
   function rtReset_() {
     rtState.invoice = null;
     rtState.editingReturnId = null;
+    rtState.editVersion = 0;
+    rtState.editHeader = null;
     rtState.editQtyByProduct = {};
+    document.getElementById('rtEditReasonRow').hidden = true;
+    document.getElementById('rtEditReason').value = '';
     rtState.searchMatches = [];
     rtState.customerSearchMatches = [];
     rtState.selectedReturnCustomer = null;
@@ -358,6 +365,38 @@
       document.getElementById('rtInvoiceArea').hidden = false;
       document.getElementById('rtCompleteBtn').textContent = 'Complete Return';
     }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+
+  /** Reuse the existing one-invoice Return Cart for an authorized edit. */
+  function rtOpenExistingReturn_(detail) {
+    rtReset_();
+    rtState.editingReturnId = String(detail.header['Return ID']);
+    rtState.editVersion = Number(detail.version) || 0;
+    rtState.editHeader = detail.header;
+    rtState.invoice = detail.invoice;
+    rtState.batchMode = false;
+    rtState.batchInvoices = [];
+    rtState.editQtyByProduct = {};
+    var existingPrices = {};
+    (detail.items || []).forEach(function (item) {
+      var key = String(item['Product ID']);
+      rtState.editQtyByProduct[key] = (rtState.editQtyByProduct[key] || 0) + Number(item['Return Quantity'] || 0);
+      existingPrices[key] = Number(item['Return Price']) || 0;
+    });
+    (rtState.invoice.items || []).forEach(function (item) {
+      var key = String(item.productId);
+      if (Object.prototype.hasOwnProperty.call(existingPrices, key)) item._returnPrice = existingPrices[key];
+    });
+    document.getElementById('rtRefundMethod').value = detail.header['Refund Method'] || 'Cash';
+    document.getElementById('rtReason').value = detail.header['Reason'] || '';
+    document.getElementById('rtNote').value = detail.header['Notes'] || '';
+    document.getElementById('rtDate').value = String(detail.header['Date'] || '').slice(0, 10);
+    document.getElementById('rtEditReasonRow').hidden = false;
+    document.getElementById('rtSearchCard').hidden = true;
+    document.getElementById('rtInvoiceArea').hidden = false;
+    document.getElementById('rtCompleteBtn').textContent = 'Update Return';
+    rtRenderInvoiceSummary_();
+    rtRenderCart_();
   }
 
   function rtOpenSelectedInvoices_() {
@@ -516,6 +555,9 @@
       return;
     }
     var cashRefundAvailable = Number(rtState.invoice && rtState.invoice.cashRefundAvailable) || 0;
+    if (rtState.editingReturnId && rtState.editHeader && rtState.editHeader['Refund Method'] === 'Cash') {
+      cashRefundAvailable += Number(rtState.editHeader['Total Return Amount']) || 0;
+    }
     var total = rtReturnTotal_();
     cashOption.disabled = cashRefundAvailable <= 0;
     if (cashRefundAvailable <= 0 && refundSelect.value === 'Cash') refundSelect.value = 'Store Credit';
@@ -562,7 +604,8 @@
     errEl.style.display = 'none';
     var rtDate = document.getElementById('rtDate').value || rtToday_();
     var rtBackdatedReason = document.getElementById('rtBackdatedReason').value.trim();
-    if (rtDate < rtToday_() && !rtBackdatedReason) {
+    var originalEditDate = rtState.editHeader ? String(rtState.editHeader['Date'] || '').slice(0, 10) : '';
+    if (rtDate < rtToday_() && !rtBackdatedReason && (!rtState.editingReturnId || rtDate !== originalEditDate)) {
       errEl.textContent = 'A reason is required when dating a return in the past.';
       errEl.style.display = 'block';
       return;
@@ -623,6 +666,66 @@
           rtReset_();
         });
       }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+      return;
+    }
+
+    if (rtState.editingReturnId) {
+      var currentItems = rtState.invoice.items.filter(function (item) {
+        return (Number(item._returnQty) || 0) > 0;
+      }).map(function (item) {
+        return { productId:item.productId,name:item.name,
+          qty:Number(item._returnQty),price:Number(item._returnPrice) || 0 };
+      });
+      var editReason = document.getElementById('rtEditReason').value.trim();
+      if (!currentItems.length || !editReason) {
+        errEl.textContent = !currentItems.length ? 'Enter at least one returned product. Use Delete to remove the whole return.' : 'Reason for editing is required.';
+        errEl.style.display = 'block';
+        return;
+      }
+      var editPayload = {
+        returnId: rtState.editingReturnId,
+        expectedVersion: rtState.editVersion,
+        items: currentItems,
+        refundMethod: document.getElementById('rtRefundMethod').value,
+        reason: document.getElementById('rtReason').value.trim(),
+        notes: document.getElementById('rtNote').value.trim(),
+        date: rtDate,
+        backdatedReason: rtBackdatedReason,
+        editReason: editReason
+      };
+      var editAmount = rtReturnTotal_();
+      var editCashAvailable = (Number(rtState.invoice.cashRefundAvailable) || 0) +
+        (rtState.editHeader && rtState.editHeader['Refund Method'] === 'Cash'
+          ? (Number(rtState.editHeader['Total Return Amount']) || 0) : 0);
+      if (editPayload.refundMethod === 'Cash' && editAmount > editCashAvailable + 0.005) {
+        errEl.textContent = 'Cash refund available: ' + formatMoney(editCashAvailable) + '. Choose Store Credit for any remaining value.';
+        errEl.style.display = 'block';
+        return;
+      }
+      runConfirmedAction({
+        type:'financial',title:'Update Sales Return '+rtState.editingReturnId+'?',
+        message:'This may reverse and repost stock and customer accounting. Original history will remain in the audit log.',
+        details:[
+          {label:'Return ID',value:editPayload.returnId,emphasis:true},
+          {label:'New Return Total',value:formatMoney(editAmount),emphasis:true},
+          {label:'Refund Method',value:editPayload.refundMethod},
+          {label:'Reason for Edit',value:editReason}
+        ],
+        confirmLabel:'Update Return',loadingLabel:'Updating...',
+        trigger:document.getElementById('rtCompleteBtn')
+      },function(){
+        var fingerprint=JSON.stringify(editPayload);
+        if (rtState.returnAttemptFingerprint && rtState.returnAttemptFingerprint !== fingerprint)
+          throw new Error('The previous edit request changed. Reload the return before retrying.');
+        rtState.returnAttemptFingerprint=fingerprint;
+        editPayload.operationId=rtReturnOperationId_();
+        return withLoader(serverCall('updateSalesReturn',authToken,editPayload)).then(function(result){
+          showToast('Return '+result.returnId+' updated — '+formatMoney(result.totalReturnAmount),'success');
+          rtReset_();
+          if (typeof rhLoad === 'function') rhLoad();
+          goToPage('returnHistory');
+        });
+      }).catch(function(err){errEl.textContent=err.message;errEl.style.display='block';});
       return;
     }
 
