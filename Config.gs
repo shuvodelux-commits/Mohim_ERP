@@ -293,7 +293,7 @@ const CONFIG = {
       "Reversed At", "Reversed By", "Reversal Operation ID"
     ],
     SALE_POSTING_JOURNAL: [
-      "Operation ID", "Operation Type", "Payload Hash", "Invoice ID",
+      "Operation ID", "Operation Type", "Payload Hash", "Invoice ID", "Return ID",
       "State", "Last Completed Stage", "Actor", "Created At",
       "Updated At", "Error"
     ],
@@ -650,6 +650,12 @@ const CONFIG = {
       "Reason",
       "Before Grand Total",
       "After Grand Total",
+      "Return ID",
+      "Before Return Amount",
+      "After Return Amount",
+      "Before Return Items JSON",
+      "After Return Items JSON",
+      "Edited By",
     ],
     USERS: [
       "User ID",
