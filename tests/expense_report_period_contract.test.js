@@ -50,8 +50,8 @@ test('date input change re-queries server for inclusive selected period',async()
   p.get('expReportDateFrom').value='2026-10-01';
   p.get('expReportDateTo').value='2026-10-31';
   await p.get('expReportDateTo').dispatch('change');
-  assert.equal(p.calls.length,2);
-  assert.equal(p.calls[1].filters.dateTo,'2026-10-31');
+  assert.equal(p.calls.length,3);
+  assert.equal(p.calls[2].filters.dateTo,'2026-10-31');
   assert.equal(p.get('expRepPeriodTotal').textContent,'৳75');
 });
 
@@ -71,7 +71,7 @@ test('invalid reversed range removes old total without calling server',async()=>
   p.get('expReportDateFrom').value='2026-11-05';
   p.get('expReportDateTo').value='2026-11-02';
   await p.get('expReportRunBtn').dispatch('click');
-  assert.equal(p.calls.length,1);
+  assert.equal(p.calls.length,2);
   assert.equal(p.get('expRepPeriodTotal').textContent,'—');
   assert.equal(p.get('expReportRangeError').hidden,false);
 });
@@ -161,6 +161,7 @@ test('invalid date selected during an in-flight request restores Run button',asy
   await p.get('expReportDateFrom').dispatch('change');
   assert.equal(p.get('expReportRunBtn').disabled,false);
   pending[0]({rows:[],filteredTotal:0});
+  pending[1]({rows:[],filteredTotal:0});
   await first;
   assert.equal(p.get('expReportRunBtn').disabled,false);
 });

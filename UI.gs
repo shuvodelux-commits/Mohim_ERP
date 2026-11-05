@@ -94,15 +94,14 @@ const NAV_ITEMS = [
   { key: 'bank',      label: 'Bank Accounts', icon: 'bank',      bn: 'ব্যাংকের হিসাব', sidebarGroup: 4, sidebarOrder: 100 },
   {
     key: 'expense', label: 'Expenses', icon: 'expense', bn: 'খরচ', sidebarGroup: 4, sidebarOrder: 110,
-    // Flat direct pages — no nested tab strip inside any of them. All
-    // ride on the single 'expense' permission via permKey where the page's
-    // own key doesn't literally match it (same pattern as Sales > Return
-    // History riding on 'returns').
+    // One native tab strip for the approved Expense module; all use the
+    // existing expense view permission and existing authorized write APIs.
     children: [
-      { key: 'expense',            label: 'Add Expense',        bn: 'খরচ লিখুন' },
-      { key: 'expenseList',        label: 'Expense History',    bn: 'খরচের ইতিহাস',  permKey: 'expense' },
-      { key: 'expenseCategories',  label: 'Expense Categories', bn: 'খরচের ধরন',     permKey: 'expense' },
-      { key: 'expenseReports',     label: 'Report',             bn: 'খরচের রিপোর্ট', permKey: 'expense' }
+      { key: 'expenseReports',     label: 'Overview',        bn: 'রিপোর্ট',         permKey: 'expense' },
+      { key: 'expense',            label: 'New Expense',     bn: 'নতুন খরচ' },
+      { key: 'expenseList',        label: 'History',         bn: 'খরচের ইতিহাস',  permKey: 'expense' },
+      { key: 'expenseCategories',  label: 'Categories',      bn: 'খরচের ধরন',     permKey: 'expense' },
+      { key: 'expensePayees',      label: 'Payees',          bn: 'যাকে টাকা দেই', permKey: 'expense' }
     ]
   },
   {

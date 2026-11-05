@@ -1,0 +1,97 @@
+<style>
+/* Approved Expense V1, compact summary cards; native ERP tabs and five responsive screens. */
+#page-expenseReports .exp-module-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
+#page-expenseReports .exp-module-heading h2{font-size:16px;margin:0 0 2px}
+#page-expenseReports .exp-module-heading h2 .bn-hint{display:inline;font-size:11px}
+#page-expenseReports .exp-module-heading p{font-size:11px;color:var(--color-text-muted);margin:0}
+#page-expenseReports .exp-report-overview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-bottom:10px}
+#page-expenseReports .exp-report-overview .stat-card{min-width:0;padding:10px 12px;border:1px solid var(--color-border);border-top:2px solid #8fb1d7;border-radius:6px;background:var(--color-surface);box-shadow:0 1px 2px rgba(15,23,42,.03)}
+#page-expenseReports .exp-report-overview .stat-card:first-child{background:var(--color-surface);border-color:var(--color-border);border-top-color:#cd7970}
+#page-expenseReports .exp-report-overview .stat-card:nth-child(2){border-top-color:#719dcb}
+#page-expenseReports .exp-report-overview .stat-card:nth-child(3){border-top-color:#69a78d}
+#page-expenseReports .exp-report-overview .stat-label{font-size:11px;line-height:1.3;font-weight:650;letter-spacing:0;color:var(--color-text-muted)}
+#page-expenseReports .exp-report-overview .stat-label .bn-hint{font-size:10px;font-weight:400;display:inline}
+#page-expenseReports .exp-report-overview .stat-value,#page-expenseReports .exp-report-overview .stat-card:first-child .stat-value{font-size:23px;font-weight:750;line-height:1.25;letter-spacing:-.4px;margin:4px 0 0;overflow-wrap:anywhere;font-variant-numeric:normal}
+#page-expenseReports .exp-report-overview .stat-card:first-child .stat-value{color:var(--color-danger)}
+#page-expenseReports .exp-kpi-meta{font-size:10px;color:var(--color-text-muted);margin-top:2px}
+#page-expenseReports .exp-card-breakdown{border-top:1px solid var(--color-border);margin-top:7px;padding-top:6px;min-height:26px}
+#page-expenseReports .exp-card-breakdown-head{display:flex;align-items:center;justify-content:space-between;gap:5px;font-size:10px;color:var(--color-text-muted)}
+#page-expenseReports .exp-card-link{border:0;background:transparent;color:var(--color-primary);font:650 10px var(--font-sans);padding:2px;cursor:pointer;white-space:nowrap}
+#page-expenseReports .exp-micro-breakdown{display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px;margin-top:3px;font-size:10px;color:var(--color-text-muted)}
+#page-expenseReports .exp-micro-chip{display:inline-flex;align-items:center;gap:4px}
+#page-expenseReports .exp-micro-chip strong{font-weight:650;color:var(--color-text)}
+#page-expenseReports .exp-micro-dot{width:6px;height:6px;border-radius:50%;background:#86a4c7}
+#page-expenseReports .exp-period-meta{display:flex;align-items:center;justify-content:space-between;font-size:11px}
+#page-expenseReports .exp-period-controls{display:flex;flex-wrap:wrap;align-items:center;gap:7px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:6px;padding:8px 10px;margin:0 0 8px}
+#page-expenseReports .exp-period-controls>strong{font-size:11px;margin-right:3px}
+#page-expenseReports .exp-period-controls>strong .bn-hint{display:inline;font-size:10px}
+#page-expenseReports .exp-period-controls label{font-size:10px;font-weight:600;color:var(--color-text-muted);margin:0}
+#page-expenseReports .exp-period-controls input{height:34px;max-width:145px;font-size:11px}
+#page-expenseReports .exp-period-presets{display:flex;align-items:center;gap:2px;padding:2px;border-radius:5px;background:var(--color-bg);margin-right:auto}
+#page-expenseReports .exp-period-presets button{border:0;border-radius:4px;padding:6px 8px;background:transparent;color:var(--color-text-muted);font-size:11px;font-weight:650;cursor:pointer;white-space:nowrap}
+#page-expenseReports .exp-period-presets button.active{background:var(--color-surface);color:var(--color-primary);box-shadow:var(--shadow-sm)}
+#page-expenseReports .exp-report-secondary-metrics{display:flex;align-items:center;flex-wrap:wrap;gap:8px 18px;margin:5px 0 11px;font-size:11px;color:var(--color-text-muted)}
+#page-expenseReports .exp-report-secondary-metrics strong{color:var(--color-text)}
+#page-expenseReports .exp-report-secondary-metrics .exp-card-link{margin-left:auto}
+#page-expenseReports .exp-report-breakdowns{gap:10px;margin-bottom:10px}
+#page-expenseReports .exp-report-panel h3{padding:10px 12px 7px;font-size:12px}
+#page-expenseReports .exp-report-panel th,#page-expenseReports .exp-report-panel td{padding:7px 9px;font-size:11px}
+#page-expenseReports .exp-report-detail-head{padding:8px 12px}
+#page-expenseReports .exp-report-details .table-scroll{max-height:400px}
+#page-expenseReports .exp-daily-chart{display:flex;align-items:flex-end;gap:7px;min-height:132px;padding:9px 10px 6px;overflow-x:auto;border-bottom:1px solid var(--color-border)}
+#page-expenseReports .exp-chart-day{display:flex;flex:1 0 51px;min-width:51px;max-width:104px;flex-direction:column;align-items:center;gap:3px;color:var(--color-text-muted);font-size:9px}
+#page-expenseReports .exp-chart-track{height:80px;width:100%;display:flex;align-items:flex-end;justify-content:center;background:#f5f7fb;border-radius:3px}
+#page-expenseReports .exp-chart-bar{display:block;width:70%;background:#86a8d7;border-radius:2px 2px 0 0}
+#page-expenseReports .exp-chart-amount{font-size:10px;font-weight:600;color:var(--color-text);white-space:nowrap}
+#page-expenseReports .exp-chart-date{font-size:9px;white-space:nowrap}
+#page-expense>.card{padding:12px}
+#page-expense .form-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:9px 12px}
+#page-expense .form-grid .full{grid-column:1 / -1}
+#page-expense .form-grid>div{min-width:0}
+#page-expense .form-grid label{font-size:11px;line-height:1.35;margin-bottom:4px}
+#page-expense .form-grid .bn-hint{font-size:10px}
+#page-expense .form-grid input,#page-expense .form-grid select{height:36px;min-width:0}
+#page-expenseList .toolbar,#page-expenseCategories .toolbar{gap:7px;flex-wrap:wrap;margin-bottom:9px}
+#page-expenseList .toolbar .search-input{min-width:190px;flex:1 1 200px}
+#page-expenseList .toolbar select,#page-expenseList .toolbar input[type=date]{max-width:160px;min-width:110px}
+#page-expenseList .stat-grid{gap:8px;margin-bottom:10px!important}
+#page-expenseList .stat-grid .stat-card{padding:10px 12px;border-radius:6px}
+#page-expenseList .stat-grid .stat-value{font-size:20px;font-variant-numeric:normal}
+#page-expenseList .table-scroll th,#page-expenseList .table-scroll td,#page-expenseCategories .table-scroll th,#page-expenseCategories .table-scroll td{padding:7px 9px;font-size:11px}
+@media(max-width:1080px){#page-expenseReports .exp-report-overview{grid-template-columns:repeat(2,minmax(0,1fr))}#page-expenseReports .exp-report-overview .stat-card:nth-child(3){grid-column:1 / -1}}
+@media(max-width:760px){#page-expense .form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#page-expenseReports .exp-report-breakdowns{grid-template-columns:1fr}#page-expenseReports .exp-period-presets{margin-right:0}}
+@media(max-width:540px){#page-expenseReports .exp-report-overview{grid-template-columns:1fr;gap:7px}#page-expenseReports .exp-report-overview .stat-card:nth-child(3){grid-column:auto}#page-expenseReports .exp-report-overview .stat-card{padding:10px 12px}#page-expenseReports .exp-period-controls{display:grid;grid-template-columns:auto minmax(0,1fr);gap:7px}#page-expenseReports .exp-period-controls>strong,#page-expenseReports .exp-period-presets{grid-column:1 / -1}#page-expenseReports .exp-period-controls input{max-width:none;width:100%}#page-expenseReports #expReportRunBtn{grid-column:1 / -1}#page-expense .form-grid{grid-template-columns:1fr;gap:8px}#page-expense .form-grid .full{grid-column:1}#page-expenseList .toolbar .search-input{flex-basis:100%}#page-expenseList .toolbar input[type=date],#page-expenseList .toolbar select{max-width:none;flex:1 1 42%}#page-expenseList .stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#page-expenseList .stat-grid .stat-card:first-child{grid-column:1 / -1}}
+
+/* Payees page uses the same compact style as the approved Category manager. */
+#page-expensePayees .exp-payee-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 11px}
+#page-expensePayees .exp-payee-heading h3{font-size:15px;margin:0 0 2px}
+#page-expensePayees .exp-payee-heading .bn-hint{display:inline;font-size:11px}
+#page-expensePayees .exp-payee-heading p{margin:0;color:var(--color-text-muted);font-size:11px}
+#page-expensePayees .exp-payee-filters{display:flex;gap:8px;align-items:center;margin-bottom:9px}
+#page-expensePayees .exp-payee-filters .search-input{flex:1 1 220px;max-width:460px;min-width:155px}
+#page-expensePayees .exp-payee-filters select{max-width:165px}
+#page-expensePayees .exp-payee-list{border-radius:6px}
+#page-expensePayees .exp-payee-list th,#page-expensePayees .exp-payee-list td{padding:8px 9px;font-size:11px}
+#page-expensePayees .exp-payee-actions{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+#page-expensePayees .exp-payee-actions .btn{font-size:10px;min-height:28px;height:28px;padding:3px 7px}
+#page-expensePayees .exp-payee-form{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+#page-expensePayees .exp-payee-form .full{grid-column:1 / -1}
+#page-expensePayees .exp-payee-form .bn-hint{display:inline}
+@media(max-width:540px){
+  #page-expensePayees .exp-payee-filters{flex-wrap:wrap}
+  #page-expensePayees .exp-payee-filters .search-input{flex:1 1 100%;max-width:none}
+  #page-expensePayees .exp-payee-list .table-scroll{overflow:visible;max-height:none}
+  #page-expensePayees .exp-payee-list table,#page-expensePayees .exp-payee-list tbody{display:block;width:100%;min-width:0}
+  #page-expensePayees .exp-payee-list thead{display:none}
+  #page-expensePayees .exp-payee-list tr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 9px;border-bottom:1px solid var(--color-border);padding:10px}
+  #page-expensePayees .exp-payee-list td{border:0;padding:2px 0;min-width:0;overflow-wrap:anywhere}
+  #page-expensePayees .exp-payee-list td:nth-child(1){grid-column:1;grid-row:1}
+  #page-expensePayees .exp-payee-list td:nth-child(4){grid-column:2;grid-row:1;text-align:right}
+  #page-expensePayees .exp-payee-list td:nth-child(2),#page-expensePayees .exp-payee-list td:nth-child(3){grid-column:1 / -1}
+  #page-expensePayees .exp-payee-list td:nth-child(2)::before{content:'Phone: ';color:var(--color-text-muted)}
+  #page-expensePayees .exp-payee-list td:nth-child(3)::before{content:'Notes: ';color:var(--color-text-muted)}
+  #page-expensePayees .exp-payee-list td:nth-child(5){grid-column:1 / -1;padding-top:5px}
+  #page-expensePayees .exp-payee-form{grid-template-columns:1fr}
+  #page-expensePayees .exp-payee-form .full{grid-column:1}
+}
+</style>

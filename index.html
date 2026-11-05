@@ -12,6 +12,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet">
   <?!= include('style'); ?>
+  <?!= include('expenseCompactStyle'); ?>
 </head>
 <body>
   <!--
@@ -229,6 +230,9 @@
         </section>
         <section class="page" id="page-expenseReports" data-page="expenseReports" hidden>
           <?!= include('expenseReport'); ?>
+        </section>
+        <section class="page" id="page-expensePayees" data-page="expensePayees" hidden>
+          <?!= include('expensePayees'); ?>
         </section>
         <section class="page" id="page-finance" data-page="finance" hidden>
           <?!= include('finance'); ?>
