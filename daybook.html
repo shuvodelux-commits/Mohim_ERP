@@ -180,6 +180,13 @@
    * None of the reversal logic is duplicated here.
    */
   function dbDelete_(row) {
+    if (row.module === 'Sales Return') {
+      goToPage('returnHistory');
+      rhLoad().then(function(){
+        rhDeleteById_(row.sourceId);
+      });
+      return;
+    }
     confirmDelete({
       title: 'Delete ' + row.module + ' ' + (row.referenceNo || ''),
       summary: '<p><b>' + escapeHtml(row.transactionType || row.module) + '</b>' +
