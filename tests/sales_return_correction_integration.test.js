@@ -17,7 +17,7 @@ function workbook(){
   SALE_BUNDLE_COMPONENTS:[],VENDOR_SOURCING:[],CASH_SESSIONS:[],INVOICE_EDIT_LOG:[],DELETE_LOG:[]
  };
  const writes=[],ctx=vm.createContext({console,Date,JSON,Math,CONFIG:{LOCK_TIMEOUT_MS:1000}});
- for(const file of ['Utils.gs','CustomerSettlement.gs','StockLots.gs','Bundles.gs','SalesReturn.gs']){
+ for(const file of ['Utils.gs','CashBook.gs','CustomerSettlement.gs','StockLots.gs','Bundles.gs','SalesReturn.gs']){
    vm.runInContext(source(file),ctx,{filename:file});
  }
  let locked=false;const counters={};
@@ -41,7 +41,6 @@ function workbook(){
   markRowDeleted_:(k,i,user,reason)=>ctx.updateRowFields_(k,i,{'Is Deleted':'TRUE','Delete Reason':reason}),
   logDeletion_:(mod,id,invoice,reason)=>ctx.appendRow_('DELETE_LOG',{Module:mod,'Record ID':id,'Invoice No':invoice,Reason:reason}),
   generateId_:k=>{counters[k]=(counters[k]||0)+1;return k+'-'+counters[k];},
-  addCashBookEntry_:entry=>ctx.appendRow_('CASH_BOOK',entry),
   customerInvoiceCashCollected_:()=>500,
   salePostingPayloadHash_:payload=>JSON.stringify(payload),
   salePostingJournalDecision_:(j,hash)=>{if(j['Payload Hash']!==hash)throw Error('Hash mismatch');return j.State==='Committed'?'replay':'review';},
