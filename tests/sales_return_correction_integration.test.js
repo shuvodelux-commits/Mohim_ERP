@@ -394,3 +394,213 @@ test('Stale version and changed operation payload both reject repeated edits wit
  assert.equal(w.writes.length,writes);
  assertAccounting(w,{refund:0,credit:200,due:-200,stock:7,qty:2,version:1,id});
 });
+
+
+const correctionMatrix = [
+ {quantity:1,price:50,total:50,stock:6},
+ {quantity:1,price:100,total:100,stock:6},
+ {quantity:2,price:50,total:100,stock:7},
+ {quantity:2,price:100,total:200,stock:7},
+ {quantity:3,price:50,total:150,stock:8},
+ {quantity:3,price:100,total:300,stock:8}
+];
+for (const originalMethod of ['Cash','Store Credit']) {
+ for (const correctedMethod of ['Cash','Store Credit']) {
+  for (const v of correctionMatrix) {
+   test('refund method/quantity/price/delete matrix: '+originalMethod+' → '+correctedMethod+
+     ', '+v.quantity+' pcs at '+v.price,()=>{
+    const w=workbook(),id=createReturnScenario(w,originalMethod,2,100);
+    const operationId='matrix-'+(originalMethod==='Cash'?'cash':'credit')+'-'+
+      (correctedMethod==='Cash'?'cash':'credit')+'-'+v.quantity+'-'+v.price+'-2026';
+    const result=editReturnScenario(w,id,0,correctedMethod,v.quantity,v.price,operationId);
+    assert.equal(result.success,true,result.message);
+    assertAccounting(w,{
+      refund:correctedMethod==='Cash'?v.total:0,
+      credit:correctedMethod==='Store Credit'?v.total:0,
+      due:correctedMethod==='Store Credit'?-v.total:0,
+      stock:v.stock,qty:v.quantity,version:1,id
+    });
+    const audit=w.rows('INVOICE_EDIT_LOG');
+    assert.equal(audit.length,1,'exactly one edit-audit row');
+    assert.equal(audit[0]['Before Return Amount'],200);
+    assert.equal(audit[0]['After Return Amount'],v.total);
+    const removed=w.ctx.deleteSalesReturn('t',id,'Cancel incorrect return',
+      'matrix-delete-'+operationId,1);
+    assert.equal(removed.success,true,removed.message);
+    assertAccounting(w,{refund:0,credit:0,due:0,stock:5});
+    assert.equal(nonDeleted(w,'SALES_RETURN').length,0,'return deleted in effective history');
+    assert.equal(nonDeleted(w,'SALES_RETURN_ITEMS').length,0,'return children deleted from active totals');
+    assert.equal(w.rows('INVOICE_EDIT_LOG').length,1,'pre-delete edit audit remains');
+    assert.equal(w.rows('DELETE_LOG').length,1,'delete audit logged');
+   });
+  }
+ }
+}
+
+function seedSecondInvoice(w) {
+ w.rows('SALES').push({
+  'Invoice ID':'INV2','Date':'2026-09-10','Created At':'2026-09-10T11:00:00',
+  'Customer ID':'C1','Customer Name':'Buyer','Customer Phone':'01700000000',
+  Subtotal:200,'Grand Total':200,'Paid Amount':200,'Due Amount':0,'Payment Method':'Cash',
+  'Payment Status':'Paid'
+ });
+ w.rows('SALE_ITEMS').push({
+  'Invoice ID':'INV2','Product ID':'P1','Product Name':'Widget',
+  Quantity:2,'Unit Price':100,'Line Total':200
+ });
+ w.rows('STOCK_LOTS').push({
+  'Lot ID':'L2','Product ID':'P1','Product Name':'Widget','Purchase ID':'PO2',
+  'Purchase Price':40,'Original Quantity':2,'Remaining Quantity':0,
+  Status:'Active','Created At':'2026-09-01T09:00:00'
+ });
+ w.rows('SALE_ITEM_LOTS').push({
+  'Invoice ID':'INV2','Product ID':'P1','Lot ID':'L2',
+  Quantity:2,'Source Sale Product ID':'P1','Supplier ID':''
+ });
+}
+test('multi-invoice Cash batch: one child can be deleted without affecting sibling refund, stock or batch total',()=>{
+ const w=workbook();seedSecondInvoice(w);
+ const result=w.ctx.completeReturnBatch('t',{
+   invoiceReturns:[
+    {invoiceId:'INV1',items:[{productId:'P1',qty:1,price:100}]},
+    {invoiceId:'INV2',items:[{productId:'P1',qty:1,price:100}]}
+   ],
+   refundMethod:'Cash',date:'2026-09-21',reason:'Batch customer return'
+ });
+ assert.equal(result.success,true,result.message);
+ assert.equal(result.data.returnIds.length,2);
+ const [first,second]=result.data.returnIds;
+ assert.equal(w.ctx.getCashBalance_(),-200);
+ assert.equal(w.rows('PRODUCTS')[0]['Current Stock'],7);
+ assert.equal(w.rows('STOCK_LOTS')[0]['Remaining Quantity'],1);
+ assert.equal(w.rows('STOCK_LOTS')[1]['Remaining Quantity'],1);
+ const batchId=result.data.batchId;
+ const initial=w.ctx.getReturnBatchDetail('t',batchId);
+ assert.equal(initial.success,true,initial.message);
+ assert.equal(initial.data.children.length,2);
+ assert.equal(initial.data.batchTotal,200);
+ const del=w.ctx.deleteSalesReturn('t',first,'Delete one mistaken batch child','delete-batch-first-child-123',0);
+ assert.equal(del.success,true,del.message);
+ assert.equal(w.ctx.getCashBalance_(),-100);
+ assert.equal(w.rows('PRODUCTS')[0]['Current Stock'],6);
+ assert.equal(w.rows('STOCK_LOTS')[0]['Remaining Quantity'],0);
+ assert.equal(w.rows('STOCK_LOTS')[1]['Remaining Quantity'],1);
+ assert.equal(nonDeleted(w,'SALES_RETURN').length,1);
+ assert.equal(nonDeleted(w,'SALES_RETURN')[0]['Return ID'],second);
+ const after=w.ctx.getReturnBatchDetail('t',batchId);
+ assert.equal(after.success,true,after.message);
+ assert.equal(after.data.children.length,1);
+ assert.equal(after.data.batchTotal,100);
+ assert.equal(after.data.children[0].header['Return ID'],second);
+});
+test('multi-invoice Cash batch must not silently become mixed-method when one child is edited to credit',()=>{
+ const w=workbook();seedSecondInvoice(w);
+ const batch=w.ctx.completeReturnBatch('t',{
+   invoiceReturns:[
+    {invoiceId:'INV1',items:[{productId:'P1',qty:1,price:100}]},
+    {invoiceId:'INV2',items:[{productId:'P1',qty:1,price:100}]}
+   ],
+   refundMethod:'Cash',date:'2026-09-21',reason:'Batch test'
+ });
+ assert.equal(batch.success,true,batch.message);
+ const id=batch.data.returnIds[0],before=w.writes.length;
+ const attempt=w.ctx.updateSalesReturn('t',{
+  returnId:id,expectedVersion:0,operationId:'batch-child-cash-to-credit-123',
+  items:[{productId:'P1',qty:1,price:100}],refundMethod:'Store Credit',
+  date:'2026-09-21',editReason:'Refund method revision'
+ });
+ assert.equal(attempt.success,false,'mixed-method batch requires explicit support or rejection');
+ assert.match(attempt.message,/batch|mixed|refund method/i);
+ assert.equal(w.writes.length,before,'fail before any stock/cash/customer writes');
+ assert.equal(w.ctx.getCashBalance_(),-200);
+ assert.equal(customerCreditTotal(w),0);
+});
+test('editing original quantity after return lot has been sold is rejected, but price-only correction is safe',()=>{
+ const w=workbook(),id=createReturnScenario(w,'Cash',2,100);
+ w.rows('PRODUCTS')[0]['Current Stock']=5;
+ w.rows('STOCK_LOTS')[0]['Remaining Quantity']=0;
+ const writes=w.writes.length;
+ const reject=editReturnScenario(w,id,0,'Store Credit',1,80,'stock-consumed-qty-change-123');
+ assert.equal(reject.success,false);
+ assert.match(reject.message,/stock|lot|consum/i);
+ assert.equal(w.writes.length,writes);
+ const priceOnly=editReturnScenario(w,id,0,'Store Credit',2,80,'stock-consumed-price-only-123');
+ assert.equal(priceOnly.success,true,priceOnly.message);
+ assert.equal(w.rows('PRODUCTS')[0]['Current Stock'],5);
+ assert.equal(w.rows('STOCK_LOTS')[0]['Remaining Quantity'],0);
+ assert.equal(w.ctx.getCashBalance_(),0);
+ assert.equal(w.rows('CUSTOMERS')[0]['Current Due'],-160);
+ const deleteResult=w.ctx.deleteSalesReturn('t',id,'Cannot reverse consumed stock','delete-after-stock-resold-123',1);
+ assert.equal(deleteResult.success,false);
+ assert.match(deleteResult.message,/stock|lot|consum/i);
+});
+test('Cash Book opening asset is restored on Cash → Customer Credit, not just a zero-balance artifact',()=>{
+ const w=workbook();
+ w.rows('CASH_BOOK').push({
+  'Entry ID':'OPEN1','Type':'Historical Opening','Reference':'BASE',
+  'Credit':1500,'Debit':'','Balance':1500
+ });
+ assert.equal(w.ctx.getCashBalance_(),1500);
+ const id=createReturnScenario(w,'Cash',2,100);
+ assert.equal(w.ctx.getCashBalance_(),1300);
+ const edit=editReturnScenario(w,id,0,'Store Credit',2,75,'opening-cash-to-credit-reversal');
+ assert.equal(edit.success,true,edit.message);
+ assert.equal(w.ctx.getCashBalance_(),1500,'cash asset fully restored');
+ assert.equal(w.rows('CUSTOMERS')[0]['Current Due'],-150,'customer now has 150 store credit');
+ assert.equal(customerCreditTotal(w),150);
+ assert.equal(cashRefundTotal(w),0);
+ const removed=w.ctx.deleteSalesReturn('t',id,'Void return','delete-opening-cash-return-123',1);
+ assert.equal(removed.success,true,removed.message);
+ assert.equal(w.ctx.getCashBalance_(),1500);
+ assert.equal(w.rows('CUSTOMERS')[0]['Current Due'],0);
+ assert.equal(w.rows('PRODUCTS')[0]['Current Stock'],5);
+});
+test('closed historical Cash Session denies return edit/delete before writing any business row',()=>{
+ const w=workbook(),id=createReturnScenario(w,'Cash',2,100);
+ vm.runInContext(source('CashSession.gs'),w.ctx,{filename:'CashSession.gs'});
+ w.ctx.requireActiveCashSession_=()=>true; // exercise the historical-session gate specifically
+ w.rows('CASH_SESSIONS').push({
+  'Session ID':'CS1','Opened At':'2026-09-01T00:00:00',
+  'Status':'Closed','Closed At':'2026-10-01T00:00:00'
+ });
+ const previous=w.writes.length;
+ const edit=editReturnScenario(w,id,0,'Store Credit',2,100,'closed-session-edit-123');
+ assert.equal(edit.success,false);
+ assert.match(edit.message,/closed|session|reconciliation/i);
+ const deletion=w.ctx.deleteSalesReturn('t',id,'Correction','closed-session-delete-123',0);
+ assert.equal(deletion.success,false);
+ assert.match(deletion.message,/closed|session|reconciliation/i);
+ assert.equal(w.writes.length,previous);
+ assert.equal(w.ctx.getCashBalance_(),-200);
+});
+test('operator cannot edit above original sold effective price or return beyond original quantity',()=>{
+ const w=workbook(),id=createReturnScenario(w,'Cash',2,100);
+ const previous=w.writes.length;
+ const overPrice=editReturnScenario(w,id,0,'Store Credit',2,110,'over-original-sale-price-123');
+ assert.equal(overPrice.success,false);
+ assert.match(overPrice.message,/price|sold|invoice/i);
+ const overQty=editReturnScenario(w,id,0,'Store Credit',6,100,'over-original-sale-quantity-123');
+ assert.equal(overQty.success,false);
+ assert.match(overQty.message,/available|quantity|sold/i);
+ assert.equal(w.writes.length,previous);
+ assert.equal(w.ctx.getCashBalance_(),-200);
+});
+test('delete permission expiry and edit permission denial are validated before business writes',()=>{
+ const w=workbook(),id=createReturnScenario(w,'Cash',2,100);
+ let edited=false,deleted=false;
+ w.ctx.requirePermission_=(_token,_module,action)=>{
+   if(action==='edit'){edited=true;throw new Error('Permission denied for edit');}
+   return {'User ID':'U1','Full Name':'Operator'};
+ };
+ w.ctx.requireDeletePermission_=()=>{deleted=true;throw new Error('Delete outside allowed window');};
+ const writes=w.writes.length;
+ const attempt=editReturnScenario(w,id,0,'Store Credit',2,100,'unauthorized-credit-edit-123');
+ assert.equal(attempt.success,false);
+ assert.match(attempt.message,/permission/i);
+ const remove=w.ctx.deleteSalesReturn('t',id,'Incorrect','unauthorized-delete-return-123',0);
+ assert.equal(remove.success,false);
+ assert.match(remove.message,/delete|window/i);
+ assert.equal(edited,true);
+ assert.equal(deleted,true);
+ assert.equal(w.writes.length,writes);
+});
