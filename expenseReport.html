@@ -1,12 +1,13 @@
 <!-- ================= Report ================= -->
-<div class="toolbar">
+<div class="toolbar" aria-label="Expense report date range">
   <label style="margin:0 4px 0 0;">From</label>
   <input id="expReportDateFrom" type="date" style="max-width:150px;">
   <label style="margin:0 4px 0 0;">To</label>
   <input id="expReportDateTo" type="date" style="max-width:150px;">
   <div class="toolbar-spacer"></div>
-  <button class="btn" id="expReportRefreshBtn">Refresh</button>
+  <button class="btn btn-primary" id="expReportRunBtn" type="button">Run Report</button>
 </div>
+<div class="field-error" id="expReportRangeError" role="alert" hidden></div>
 
 <div class="stat-grid">
   <div class="stat-card"><div class="stat-label">Today's Expense</div><div class="stat-value" id="expRepToday">--</div></div>
@@ -18,19 +19,34 @@
 <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px,1fr)); gap:16px;">
   <div class="card" style="padding:0;">
     <h3 style="font-size:14px; padding:16px 16px 0;">By Category <span class="bn-hint" style="display:inline;">— খরচের ধরন অনুযায়ী</span></h3>
-    <table><thead><tr><th>Category</th><th class="num">Amount</th></tr></thead><tbody id="expRepByCategoryBody"></tbody></table>
+    <table><thead><tr><th>Category</th><th class="num">Entries</th><th class="num">Amount</th></tr></thead><tbody id="expRepByCategoryBody"></tbody></table>
     <div class="empty-state" id="expRepByCategoryEmpty" hidden>No data for this period.</div>
   </div>
   <div class="card" style="padding:0;">
     <h3 style="font-size:14px; padding:16px 16px 0;">By Payee <span class="bn-hint" style="display:inline;">— কাকে কত খরচ</span></h3>
-    <table><thead><tr><th>Payee</th><th class="num">Amount</th></tr></thead><tbody id="expRepByPayeeBody"></tbody></table>
+    <table><thead><tr><th>Payee</th><th class="num">Entries</th><th class="num">Amount</th></tr></thead><tbody id="expRepByPayeeBody"></tbody></table>
     <div class="empty-state" id="expRepByPayeeEmpty" hidden>No data for this period.</div>
   </div>
   <div class="card" style="padding:0;">
     <h3 style="font-size:14px; padding:16px 16px 0;">By Payment Method <span class="bn-hint" style="display:inline;">— কীভাবে টাকা দেওয়া হয়েছে</span></h3>
-    <table><thead><tr><th>Method</th><th class="num">Amount</th></tr></thead><tbody id="expRepByMethodBody"></tbody></table>
+    <table><thead><tr><th>Method</th><th class="num">Entries</th><th class="num">Amount</th></tr></thead><tbody id="expRepByMethodBody"></tbody></table>
     <div class="empty-state" id="expRepByMethodEmpty" hidden>No data for this period.</div>
   </div>
+</div>
+
+<div class="card" style="padding:0; margin-top:16px;">
+  <div style="display:flex; align-items:center; flex-wrap:wrap; gap:10px; padding:16px 16px 0;">
+    <h3 style="font-size:14px; margin:0;">Expense Details <span class="bn-hint" style="display:inline;">— তারিখ অনুযায়ী খরচের বিবরণ</span></h3>
+    <span id="expRepDetailCount" class="bn-hint" style="margin-left:auto;">--</span>
+    <button class="btn" id="expRepViewAllBtn" type="button">View Full History</button>
+  </div>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Date</th><th>Expense ID</th><th>Category</th><th>Payee</th><th>Description</th><th class="num">Amount</th></tr></thead>
+      <tbody id="expRepDetailBody"></tbody>
+    </table>
+  </div>
+  <div class="empty-state" id="expRepDetailEmpty" hidden>No expenses in the selected date range.</div>
 </div>
 
 <script>
@@ -42,6 +58,21 @@
     return d.getFullYear() + '-' + m + '-' + day;
   }
 
+  function expRepRangeValid_() {
+    var from = document.getElementById('expReportDateFrom').value;
+    var to = document.getElementById('expReportDateTo').value;
+    var error = document.getElementById('expReportRangeError');
+    var invalid = !!(from && to && from > to);
+    error.textContent = invalid ? 'From date must be on or before To date. — শুরুর তারিখ শেষের তারিখের পরে হতে পারবে না।' : '';
+    error.hidden = !invalid;
+    return !invalid;
+  }
+
+  function expRepRun_() {
+    if (!expRepRangeValid_()) return Promise.resolve();
+    return expRepLoad();
+  }
+
   function expRepLoad() {
     return withLoader(serverCall('getExpenseList', authToken)).then(function (list) {
       expRepState.list = list;
@@ -50,6 +81,7 @@
   }
 
   function expRenderReports_() {
+    if (!expRepRangeValid_()) return;
     var active = expRepState.list.filter(function (e) { return e.status !== 'Cancelled'; });
     var today = expRepToday_();
     var thisMonth = today.slice(0, 7);
@@ -70,29 +102,59 @@
 
     expRenderBreakdown_(period, function (e) { return e.category || 'Uncategorized'; }, 'expRepByCategoryBody', 'expRepByCategoryEmpty');
     expRenderBreakdown_(period, function (e) { return e.payeeName || 'Unassigned'; }, 'expRepByPayeeBody', 'expRepByPayeeEmpty');
-    expRenderBreakdown_(period, function (e) { return e.paymentMethod; }, 'expRepByMethodBody', 'expRepByMethodEmpty');
+    expRenderBreakdown_(period, function (e) { return e.paymentMethod || 'Other'; }, 'expRepByMethodBody', 'expRepByMethodEmpty');
+    expRenderDetails_(period);
+  }
+
+  function expRenderDetails_(period) {
+    var latest = period.slice().sort(function (a, b) {
+      var byDate = String(b.date || '').localeCompare(String(a.date || ''));
+      return byDate || String(b.expenseId || '').localeCompare(String(a.expenseId || ''));
+    }).slice(0, 25);
+    var body = document.getElementById('expRepDetailBody');
+    body.innerHTML = '';
+    latest.forEach(function (e) {
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + escapeHtml(e.date || '') + '</td>' +
+        '<td>' + escapeHtml(e.expenseId || '') + '</td>' +
+        '<td>' + escapeHtml(e.category || 'Uncategorized') + '</td>' +
+        '<td>' + escapeHtml(e.payeeName || 'Unassigned') + '</td>' +
+        '<td>' + escapeHtml(e.description || e.notes || e.referenceNo || '—') + '</td>' +
+        '<td class="num">' + formatMoney(Number(e.amount) || 0) + '</td>';
+      body.appendChild(tr);
+    });
+    document.getElementById('expRepDetailCount').textContent = 'Showing ' + latest.length + ' of ' + period.length + ' entries';
+    document.getElementById('expRepDetailEmpty').hidden = period.length > 0;
   }
 
   function expRenderBreakdown_(rows, keyFn, bodyId, emptyId) {
     var totals = {};
     rows.forEach(function (e) {
       var k = keyFn(e);
-      totals[k] = (totals[k] || 0) + e.amount;
+      if (!totals[k]) totals[k] = { amount: 0, count: 0 };
+      totals[k].amount += Number(e.amount) || 0;
+      totals[k].count++;
     });
-    var keys = Object.keys(totals).sort(function (a, b) { return totals[b] - totals[a]; });
+    var keys = Object.keys(totals).sort(function (a, b) { return totals[b].amount - totals[a].amount; });
     var body = document.getElementById(bodyId);
     body.innerHTML = '';
     keys.forEach(function (k) {
       var tr = document.createElement('tr');
-      tr.innerHTML = '<td>' + escapeHtml(k) + '</td><td class="num">' + formatMoney(totals[k]) + '</td>';
+      tr.innerHTML = '<td>' + escapeHtml(k) + '</td><td class="num">' + totals[k].count + '</td><td class="num">' + formatMoney(totals[k].amount) + '</td>';
       body.appendChild(tr);
     });
     document.getElementById(emptyId).hidden = keys.length > 0;
   }
 
-  document.getElementById('expReportRefreshBtn').addEventListener('click', expRepLoad);
+  document.getElementById('expReportRunBtn').addEventListener('click', expRepRun_);
   document.getElementById('expReportDateFrom').addEventListener('change', expRenderReports_);
   document.getElementById('expReportDateTo').addEventListener('change', expRenderReports_);
+  document.getElementById('expRepViewAllBtn').addEventListener('click', function () {
+    document.getElementById('expListDateFrom').value = document.getElementById('expReportDateFrom').value;
+    document.getElementById('expListDateTo').value = document.getElementById('expReportDateTo').value;
+    goToPage('expenseList');
+    if (typeof expListLoad === 'function') expListLoad();
+  });
 
   document.addEventListener('DOMContentLoaded', function () {
     var origGoToPage = goToPage;
