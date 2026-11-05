@@ -604,3 +604,96 @@ test('delete permission expiry and edit permission denial are validated before b
  assert.equal(deleted,true);
  assert.equal(w.writes.length,writes);
 });
+
+
+test('real Cash Session summary restores original drawer cash after Cash → Customer Credit',()=>{
+ const w=workbook();
+ w.rows('CASH_SESSIONS').push({
+   'Session ID':'CS1','Date':'2026-09-20','Opened At':'2026-09-20T00:00:00',
+   'Opening Cash':1500,'Status':'Open','Counted Cash':'','Notes':'Open test drawer'
+ });
+ w.rows('CASH_BOOK').push({
+   'Entry ID':'CB-SESSION-OPEN','Type':'Session Open','Reference':'CS1',
+   'Credit':1500,'Debit':'','Balance':1500,'Date':'2026-09-20',
+   'Created At':'2026-09-20T00:00:00'
+ });
+ const id=createReturnScenario(w,'Cash',2,100);
+ vm.runInContext(source('CashSession.gs'),w.ctx,{filename:'CashSession.gs'});
+ w.ctx.requireActiveCashSession_=()=>true; // leave normal transaction guard mocked; session summary is real
+ const before=w.ctx.getCashSessionSummary('t');
+ assert.equal(before.success,true,before.message);
+ assert.equal(before.data.cashOut,200,'original refund is in this drawer outflow');
+ assert.equal(before.data.expectedCash,1300,'1500 less 200 original refund');
+ assert.equal(w.ctx.getCashBalance_(),1300);
+ const conversion=editReturnScenario(w,id,0,'Store Credit',2,100,'session-cash-to-credit-123');
+ assert.equal(conversion.success,true,conversion.message);
+ const after=w.ctx.getCashSessionSummary('t');
+ assert.equal(after.success,true,after.message);
+ assert.equal(after.data.cashOut,0,'voided cash refund is not counted as session cash out');
+ assert.equal(after.data.expectedCash,1500,'whole cash refund is restored to session');
+ assert.equal(w.ctx.getCashBalance_(),1500);
+ assert.equal(w.rows('CUSTOMERS')[0]['Current Due'],-200);
+ assert.equal(customerCreditTotal(w),200);
+ const done=w.ctx.deleteSalesReturn('t',id,'Cancel refund','session-credit-delete-123',1);
+ assert.equal(done.success,true,done.message);
+ const afterDelete=w.ctx.getCashSessionSummary('t');
+ assert.equal(afterDelete.success,true,afterDelete.message);
+ assert.equal(afterDelete.data.expectedCash,1500);
+ assert.equal(w.rows('CUSTOMERS')[0]['Current Due'],0);
+ assert.equal(w.rows('PRODUCTS')[0]['Current Stock'],5);
+});
+test('partial-write fault during Cash → Credit is journaled Needs Review and cannot double-post on retry',()=>{
+ const w=workbook(),id=createReturnScenario(w,'Cash',2,100);
+ const origUpdate=w.ctx.updateRowFields_;
+ let injected=false;
+ w.ctx.updateRowFields_=(k,index,fields)=>{
+   if(k==='CUSTOMERS' && !injected){injected=true;throw new Error('Injected Sheets customer update failure');}
+   return origUpdate(k,index,fields);
+ };
+ const op='injected-cash-to-credit-123';
+ const first=editReturnScenario(w,id,0,'Store Credit',2,100,op);
+ assert.equal(first.success,false);
+ assert.equal(injected,true);
+ assert.equal(w.rows('SALE_POSTING_JOURNAL').length,1,'journal reservation persists');
+ assert.equal(w.rows('SALE_POSTING_JOURNAL')[0].State,'Needs Review');
+ assert.equal(w.ctx.getCashBalance_(),0,'old Cash refund may already be reversed at interrupted stage');
+ assert.equal(customerCreditTotal(w),0,'failed Customer Credit has not been posted');
+ w.ctx.updateRowFields_=origUpdate;
+ const writes=w.writes.length;
+ const retry=editReturnScenario(w,id,0,'Store Credit',2,100,op);
+ assert.equal(retry.success,false,'retry refuses uncertain partly written state');
+ assert.match(retry.message,/review|interrupted/i);
+ assert.equal(w.writes.length,writes,'retry never repeats refund or customer ledger write');
+ const other=editReturnScenario(w,id,0,'Store Credit',2,100,'different-op-after-uncertain-123');
+ assert.equal(other.success,false);
+ assert.match(other.message,/review|interrupted/i);
+ assert.equal(w.writes.length,writes);
+});
+test('partial-write fault during Return Delete is journaled Needs Review and never double-reverses stock',()=>{
+ const w=workbook(),id=createReturnScenario(w,'Cash',2,100);
+ const origDelete=w.ctx.markMatchingDeleted_;
+ let injected=false;
+ w.ctx.markMatchingDeleted_=(k,predicate,operator,reason,now)=>{
+   if(k==='CASH_BOOK' && !injected){injected=true;throw new Error('Injected Sheets refund reversal failure');}
+   return origDelete(k,predicate,operator,reason,now);
+ };
+ const op='delete-fault-stock-reversed-123';
+ const first=w.ctx.deleteSalesReturn('t',id,'Wrong return',op,0);
+ assert.equal(first.success,false);
+ assert.equal(injected,true);
+ assert.equal(w.rows('SALE_POSTING_JOURNAL').length,1);
+ assert.equal(w.rows('SALE_POSTING_JOURNAL')[0].State,'Needs Review');
+ const postFaultStock=w.rows('PRODUCTS')[0]['Current Stock'];
+ assert.equal(postFaultStock,5,'the stock leg may have posted before the refund failure');
+ assert.equal(w.ctx.getCashBalance_(),-200,'Cash refund leg has not posted yet');
+ w.ctx.markMatchingDeleted_=origDelete;
+ const writes=w.writes.length;
+ const retry=w.ctx.deleteSalesReturn('t',id,'Wrong return',op,0);
+ assert.equal(retry.success,false);
+ assert.match(retry.message,/review|interrupted/i);
+ assert.equal(w.writes.length,writes,'no duplicate stock reversal');
+ const another=w.ctx.deleteSalesReturn('t',id,'Wrong return','another-delete-after-fault-123',0);
+ assert.equal(another.success,false);
+ assert.match(another.message,/review|interrupted/i);
+ assert.equal(w.writes.length,writes);
+});
