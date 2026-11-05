@@ -720,6 +720,8 @@ function completeReturn(token, payload) {
             String(row['Invoice ID']) === requestedInvoiceId && !isDeleted_(row);
         });
         if (posted.length !== 1) throw new Error('Committed refund is missing or ambiguous. Needs Review.');
+        if ((Number(posted[0]['Edit Version']) || 0) > 0)
+          throw new Error('Original refund has been corrected. Reload return history; do not replay the original request.');
         return ok_({returnId:posted[0]['Return ID'],
           totalReturnAmount:Number(posted[0]['Total Return Amount'])||0,
           customerId:posted[0]['Customer ID']||'',newDue:null});
