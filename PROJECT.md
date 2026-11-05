@@ -97,10 +97,9 @@ The current codebase must remain the source of truth for business behavior until
 | `invoiceDesign.html` | Invoice design settings |
 | `bank.html` | Bank accounts/ledger |
 | `expense.html` | Add expense with required Payee selection/quick-add |
-| `expenseList.html` | Expense list |
-| `expenseLedger.html` | Chronological expense ledger with Payee filter and running total |
+| `expenseList.html` | Expense History with server-filtered chronological ledger and running total |
 | `expenseCategory.html` | Expense categories |
-| `expenseReport.html` | Expense report |
+| `expenseReport.html` | Month-to-date default, selected-period total from getExpenseLedger, category/payee/day/payment breakdowns and recent details |
 | `finance.html` | Business finance |
 | `financeLedger.html` | Finance ledger |
 | `daybook.html` | Day Book |
@@ -229,8 +228,9 @@ Important distinction:
 
 - Navigation changes must not silently change permissions.
 - `returns` remains a distinct permission even though its pages are under Sales.
-- Expense child pages, including Expense Ledger, use the `expense` permission.
-- Every new Expense selects a Payee. The Expense row stores Payee ID/Name in its existing `Ledger ID` / `Ledger Name` fields; Expense Ledger can filter by that Payee and Day Book shows it as the party.
+- Expense child pages, including Expense History and Report, use the `expense` permission.
+- Every new Expense selects a Payee. The Expense row stores Payee ID/Name in its existing `Ledger ID` / `Ledger Name` fields; Expense History can filter by that Payee and Day Book shows it as the party.
+- Expense Report is read-only and reuses `getExpenseLedger(token, {dateFrom, dateTo})` / `filteredTotal` for inclusive selected-period accounting. It excludes cancelled rows from metrics, reconciles rows to the authoritative total, and displays a period-first KPI summary, grouped breakdowns and latest 25 source entries.
 - Users/Roles are protected by management/admin rules.
 - `posCost` is a permission with no page. It grants the right to see one
   extra figure (purchase price) inside POS, not access to anywhere. Only
