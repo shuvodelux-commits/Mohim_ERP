@@ -402,7 +402,7 @@ function prepareSalesReturn_(payload, options) {
   const saleGrandTotal = Number(sale['Grand Total']) || 0;
   const bundleSnapshots = getSaleBundleSnapshot_(payload.invoiceId, opts.bundleSnapshotRows || getAllRows_('SALE_BUNDLE_COMPONENTS'));
 
-  const outstandingOwnQty = outstandingSaleOwnStockByProduct_(
+  const outstandingOwnQty = opts.outstandingOwnQtyByProduct || outstandingSaleOwnStockByProduct_(
     payload.invoiceId,
     saleItems,
     returnItemsSoFar,
@@ -509,7 +509,7 @@ function prepareSalesReturn_(payload, options) {
       physicalRestorations.push({productId:v.productId,sourceSaleProductId:v.productId,qty:v.qty});
     }
   });
-  const stockChanges = physicalRestorations.map(function(v) {
+  const stockChanges = (opts.skipPhysicalRestoration ? [] : physicalRestorations).map(function(v) {
     const product = productsById[v.productId];
     if (!product) throw new Error('Original physical component no longer exists: '+v.productId);
     if (!Object.prototype.hasOwnProperty.call(virtualProductStockById,v.productId)) {
@@ -521,7 +521,7 @@ function prepareSalesReturn_(payload, options) {
       sourceSaleProductId:v.sourceSaleProductId,rowIndex:product._rowIndex,newStock:newStock};
   });
   const restorationVirtualState = opts.restorationVirtualState || {};
-  const restorationPlans = physicalRestorations.map(function(v){
+  const restorationPlans = (opts.skipPhysicalRestoration ? [] : physicalRestorations).map(function(v){
     const product = productsById[v.productId];
     return planSaleReturnRestoration_(payload.invoiceId,v.productId,product['Product Name'],v.qty,{
       saleItemLots:opts.consumptionRows,stockLots:opts.stockLots,
@@ -1039,4 +1039,160 @@ function getReturnForEdit(token, returnId) {
     logError_('getReturnForEdit', err);
     return fail_(err.message);
   }
+}
+
+
+/**
+ * Single native Sales Return correction planner. Every rejectable rule runs
+ * before the journal reservation and before the first Sheets business write.
+ * Edit excludes its own historical return from invoice return caps, while
+ * the exact source-lot inverse is planned separately.
+ */
+function prepareSalesReturnChange_(token, returnId, requested, mode) {
+  const payload = requested || {};
+  const id = sanitizeInput_(returnId);
+  if (mode !== 'Edit' && mode !== 'Delete') throw new Error('Unsupported return correction operation.');
+  if (!id) throw new Error('Return ID is required.');
+  const matches = getAllRows_('SALES_RETURN').filter(function(r){ return String(r['Return ID']) === id; });
+  if (matches.length !== 1) throw new Error(matches.length ? 'Duplicate Sales Return ID. Needs Review.' : 'Sales Return not found.');
+  const original = matches[0];
+  if (isDeleted_(original)) throw new Error('This Sales Return was deleted.');
+  const actingUser = mode === 'Delete'
+    ? requireDeletePermission_(token, 'returns', original['Date'])
+    : requirePermission_(token, 'returns', 'edit');
+  requireActiveCashSession_();
+
+  // A correction of an earlier session cannot rewrite a closed drawer.
+  const sessions = getAllRows_('CASH_SESSIONS');
+  if (sessions.length && typeof findSessionForTimestamp_ === 'function') {
+    const historicalSession = findSessionForTimestamp_(sessions, original['Created At']);
+    if (!historicalSession || historicalSession['Status'] !== 'Open')
+      throw new Error('Original return Cash Session is closed. Manual reconciliation required.');
+  }
+  const expectedVersion = Number(original['Edit Version']) || 0;
+  if (payload.expectedVersion !== undefined && Number(payload.expectedVersion) !== expectedVersion)
+    throw new Error('Sales Return changed since it was opened. Reload before correcting.');
+  const editReason = sanitizeInput_(mode === 'Delete' ? payload.reason : payload.editReason);
+  if (!editReason) throw new Error(mode + ' reason is required.');
+  if (payload.operationId !== undefined && !/^[A-Za-z0-9_-]{12,100}$/.test(String(payload.operationId)))
+    throw new Error('Valid immutable return correction operation ID required.');
+  const invoiceId = String(original['Invoice ID']);
+  const sale = findUniqueSalesRow_(invoiceId);
+  if (!sale || isDeleted_(sale)) throw new Error('Source invoice is missing or deleted. Needs Review.');
+  const originalItems = activeSalesReturnItems_().filter(function(i){return String(i['Return ID']) === id;});
+  if (!originalItems.length) throw new Error('Return has no active product lines. Needs Review.');
+  const oldAmount = roundMoney_(Number(original['Total Return Amount']) || 0);
+  const method = String(original['Refund Method'] || '');
+  let moneyUndo;
+  if (method === 'Cash') {
+    const cash = activeRows_('CASH_BOOK').filter(function(row){
+      return String(row['Reference']) === id && row['Type'] === 'Sales Return';
+    });
+    if (cash.length !== 1 || Math.abs((Number(cash[0]['Debit']) || 0) - oldAmount) > 0.005 ||
+        Number(cash[0]['Credit'] || 0) !== 0)
+      throw new Error('Original Cash refund evidence is missing or inconsistent. Needs Review.');
+    moneyUndo = {kind:'Cash',rowIndex:cash[0]._rowIndex,amount:oldAmount};
+  } else if (method === 'Store Credit') {
+    const credits = activeRows_('CUSTOMER_LEDGER').filter(function(row){
+      return String(row['Reference']) === id && row['Type'] === 'Sales Return Credit';
+    });
+    if (credits.length !== 1 || Math.abs((Number(credits[0]['Credit']) || 0) - oldAmount) > 0.005)
+      throw new Error('Original Store Credit evidence is missing or inconsistent. Needs Review.');
+    const credit = credits[0], customerId = String(original['Customer ID'] || '');
+    if (!customerId || String(credit['Customer ID']) !== customerId)
+      throw new Error('Store Credit customer attribution mismatch. Needs Review.');
+    // Until dependent settlement replay is audited, disallow all later
+    // customer transactions instead of silently reassigning used credit.
+    const later = activeRows_('CUSTOMER_LEDGER').some(function(row){
+      return String(row['Customer ID']) === customerId && row._rowIndex > credit._rowIndex;
+    });
+    if (later) throw new Error('Later customer settlement/ledger entries exist; reconcile Store Credit first.');
+    const customerMatches = activeRows_('CUSTOMERS').filter(function(row){return String(row['Customer ID']) === customerId;});
+    if (customerMatches.length !== 1) throw new Error('Store Credit customer missing or ambiguous. Needs Review.');
+    moneyUndo = {kind:'Store Credit',rowIndex:credit._rowIndex,customer:customerMatches[0],
+      customerId:customerId,amount:oldAmount};
+  } else {
+    throw new Error('Unsupported historical refund method. Needs Review.');
+  }
+  const otherReturnHeaders = activeRows_('SALES_RETURN').filter(function(row){return String(row['Invoice ID']) === invoiceId && String(row['Return ID']) !== id;});
+  const otherReturnIds = {};
+  otherReturnHeaders.forEach(function(row){otherReturnIds[String(row['Return ID'])]=true;});
+  const otherReturnItems = activeSalesReturnItems_().filter(function(row){return !!otherReturnIds[String(row['Return ID'])];});
+  let stockUndo = null, replacement = null, needsStockChange = mode === 'Delete', newDate = safeDateOnly_(original['Date']);
+  if (mode === 'Edit') {
+    if (!Array.isArray(payload.items) || !payload.items.length) throw new Error('Return correction requires at least one item.');
+    if (payload.refundMethod !== 'Cash' && payload.refundMethod !== 'Store Credit')
+      throw new Error('Choose a valid return refund method.');
+    const oldQty = {}, newQty = {};
+    originalItems.forEach(function(i){
+      const k = String(i['Product ID']);
+      oldQty[k] = (oldQty[k] || 0) + Number(i['Return Quantity'] || 0);
+    });
+    payload.items.forEach(function(i){
+      const k = String(i.productId);
+      newQty[k] = (newQty[k] || 0) + Number(i.qty || 0);
+    });
+    const keys=Object.keys(oldQty).concat(Object.keys(newQty));
+    needsStockChange = keys.some(function(k){return Math.abs((oldQty[k] || 0)-(newQty[k] || 0)) > 1e-8;});
+    if (payload.date && safeDateOnly_(payload.date) !== newDate) {
+      newDate = resolveEditedTransactionDate_(token,'returns',payload.date,original['Date'],payload.backdatedReason,'Sales Return Edit');
+    }
+    if (payload.refundMethod === 'Store Credit' && !String(sale['Customer ID'] || ''))
+      throw new Error('Editing to Store Credit requires an existing customer account.');
+    const currentProducts = getAllRows_('PRODUCTS');
+    const saleItems = getAllRows_('SALE_ITEMS');
+    const currentConsumptions = getAllRows_('SALE_ITEM_LOTS');
+    const currentLots = getAllRows_('STOCK_LOTS');
+    const vProducts = currentProducts.map(function(r){return Object.assign({},r);});
+    const vConsumptions = currentConsumptions.map(function(r){return Object.assign({},r);});
+    const vLots = currentLots.map(function(r){return Object.assign({},r);});
+    if (needsStockChange) {
+      stockUndo = planSalesReturnStockUndo_(id,{});
+      stockUndo.productDeltas.forEach(function(g){
+        const row=vProducts.filter(function(r){return r._rowIndex===g.rowIndex;})[0];
+        if (row) row['Current Stock']=g.newStock;
+      });
+      stockUndo.lotDeltas.forEach(function(g){
+        const row=vLots.filter(function(r){return r._rowIndex===g.rowIndex;})[0];
+        if (row) row['Remaining Quantity']=g.newRemaining;
+      });
+      stockUndo.saleConsumptionDeltas.forEach(function(g){
+        const row=vConsumptions.filter(function(r){return r._rowIndex===g.rowIndex;})[0];
+        if (row) row['Quantity']=g.newQuantity;
+      });
+    }
+    const productsById={};
+    vProducts.forEach(function(p){productsById[String(p['Product ID'])]=p;});
+    // For price/method-only edits the source lots are not touched. The
+    // previously returned owned quantity must still count as returnable.
+    let availableOwn = null;
+    if (!needsStockChange) {
+      availableOwn = outstandingSaleOwnStockByProduct_(invoiceId,saleItems,otherReturnItems,currentConsumptions,getAllRows_('VENDOR_SOURCING'));
+      Object.keys(oldQty).forEach(function(k){availableOwn[k]=(availableOwn[k]||0)+oldQty[k];});
+    }
+    const collected = typeof customerInvoiceCashCollected_ === 'function'
+      ? customerInvoiceCashCollected_(invoiceId) : Number(sale['Paid Amount']) || 0;
+    const priorCash = otherReturnHeaders.reduce(function(total,row){
+      return total + (row['Refund Method'] === 'Cash' ? Number(row['Total Return Amount']) || 0 : 0);
+    },0);
+    const maxCash = Math.max(0,roundMoney_(collected-priorCash));
+    replacement = prepareSalesReturn_({
+      invoiceId:invoiceId,items:payload.items,refundMethod:payload.refundMethod,
+      reason:payload.reason,notes:payload.notes
+    },{
+      txDate:{dateStr:newDate,isBackdated:newDate!==safeDateOnly_(original['Date']),
+        backdatedDays:0,reason:sanitizeInput_(payload.backdatedReason)},
+      sale:sale,saleItems:saleItems,returnItems:otherReturnItems,
+      products:vProducts,productsById:productsById,consumptionRows:vConsumptions,stockLots:vLots,
+      vendorSourcingRows:getAllRows_('VENDOR_SOURCING'),
+      cashRefundAvailable:maxCash,skipPhysicalRestoration:!needsStockChange,
+      outstandingOwnQtyByProduct:availableOwn
+    });
+  } else {
+    stockUndo = planSalesReturnStockUndo_(id,{});
+  }
+  return {original:original,originalItems:originalItems,invoiceId:invoiceId,sale:sale,
+    moneyUndo:moneyUndo,stockUndo:stockUndo,replacement:replacement,
+    needsStockChange:needsStockChange,mode:mode,reason:editReason,
+    version:expectedVersion,newDate:newDate,actingUser:actingUser};
 }
