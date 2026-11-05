@@ -467,7 +467,8 @@
     rtInitItem_(item);
     var tr = document.createElement('tr');
     var disabled = item._editMaxQty <= 0;
-    var otherReturnedQty = Math.max(0, Number(item.previouslyReturnedQty || 0) - item._returnQty);
+    var otherReturnedQty = Math.max(0, Number(item.previouslyReturnedQty || 0) -
+      Number(rtState.editQtyByProduct[String(item.productId)] || 0));
     var keyAttrs = bi === null ? ' data-i="' + i + '"' : ' data-bi="' + bi + '" data-i="' + i + '"';
     var lineId = bi === null ? ('rtLineTotal' + i) : ('rtLineTotalB' + bi + 'I' + i);
     tr.innerHTML =
