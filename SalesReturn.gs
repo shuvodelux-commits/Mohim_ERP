@@ -988,7 +988,7 @@ function getReturnBatchDetail(token, batchId) {
 function getReturnHistory(token) {
   try {
     requirePermission_(token, 'returns', 'view');
-    const returns = getAllRows_('SALES_RETURN')
+    const returns = activeRows_('SALES_RETURN')
       .sort(function (a, b) { return String(b['Created At']).localeCompare(String(a['Created At'])); });
     return ok_(returns);
   } catch (err) {
@@ -1000,12 +1000,42 @@ function getReturnHistory(token) {
 function getReturnDetail(token, returnId) {
   try {
     requirePermission_(token, 'returns', 'view');
-    const header = getAllRows_('SALES_RETURN').filter(function (r) { return r['Return ID'] === returnId; })[0];
-    if (!header) return fail_('Return not found.');
-    const items = getAllRows_('SALES_RETURN_ITEMS').filter(function (i) { return i['Return ID'] === returnId; });
+    const matches = getAllRows_('SALES_RETURN').filter(function (r) { return String(r['Return ID']) === String(returnId); });
+    if (matches.length > 1) return fail_('Duplicate Return ID: record needs review.');
+    const header = matches[0];
+    if (!header || isDeleted_(header)) return fail_('Return not found.');
+    const items = activeSalesReturnItems_().filter(function (i) { return String(i['Return ID']) === String(returnId); });
     return ok_({ header: header, items: items });
   } catch (err) {
     logError_('getReturnDetail', err);
+    return fail_(err.message);
+  }
+}
+
+
+/** Existing completed Sales Return, isolated for authorized correction. Read-only. */
+function getReturnForEdit(token, returnId) {
+  try {
+    requirePermission_(token, 'returns', 'edit');
+    const id = sanitizeInput_(returnId);
+    if (!id) return fail_('Return ID is required.');
+    const matches = getAllRows_('SALES_RETURN').filter(function (r) { return String(r['Return ID']) === id; });
+    if (matches.length !== 1) return fail_(matches.length ? 'Duplicate Return ID: record needs review.' : 'Return not found.');
+    const header = matches[0];
+    if (isDeleted_(header)) return fail_('This return has been deleted.');
+    const items = activeSalesReturnItems_().filter(function (row) { return String(row['Return ID']) === id; });
+    if (!items.length) return fail_('Return has no active item lines. Needs Review.');
+    const invoiceResult = getInvoiceForReturn(token, String(header['Invoice ID']));
+    if (!invoiceResult || invoiceResult.success !== true) return fail_((invoiceResult && invoiceResult.message) || 'Source invoice unavailable.');
+    return ok_({
+      header: header,
+      items: items,
+      invoice: invoiceResult.data,
+      version: Math.max(0, Number(header['Edit Version']) || 0),
+      editable: true
+    });
+  } catch (err) {
+    logError_('getReturnForEdit', err);
     return fail_(err.message);
   }
 }
