@@ -83,3 +83,48 @@ test('real create -> quantity edit -> delete restores original exact sale and ca
  assert.equal(w.rows('DELETE_LOG').length,1);
  assert.equal(w.rows('SALE_POSTING_JOURNAL').every(x=>x.State==='Committed'),true);
 });
+
+
+test('real Store Credit return edit/delete preserves exact customer due and active ledger',()=>{
+ const w=workbook();
+ const create=w.ctx.completeReturn('t',{invoiceId:'INV1',
+   items:[{productId:'P1',qty:2,price:100}],refundMethod:'Store Credit',date:'2026-09-21'});
+ assert.equal(create.success,true,create.message);
+ const id=create.data.returnId;
+ assert.equal(w.rows('CUSTOMERS')[0]['Current Due'],-200);
+ const edit=w.ctx.updateSalesReturn('t',{
+   returnId:id,expectedVersion:0,operationId:'return-credit-edit-integration-123',
+   items:[{productId:'P1',qty:1,price:100}],refundMethod:'Store Credit',
+   reason:'Incorrect count',notes:'Reviewed',date:'2026-09-21',editReason:'Correction'
+ });
+ assert.equal(edit.success,true,edit.message);
+ assert.equal(w.rows('CUSTOMERS')[0]['Current Due'],-100);
+ assert.equal(w.rows('CUSTOMER_LEDGER').filter(r=>!r['Is Deleted']).reduce((sum,r)=>sum+Number(r.Credit||0),0),100);
+ const del=w.ctx.deleteSalesReturn('t',id,'Wrong transaction','return-credit-delete-integration-123',1);
+ assert.equal(del.success,true,del.message);
+ assert.equal(w.rows('CUSTOMERS')[0]['Current Due'],0);
+ assert.equal(w.rows('CUSTOMER_LEDGER').filter(r=>!r['Is Deleted']).length,0);
+ assert.equal(w.rows('PRODUCTS')[0]['Current Stock'],5);
+});
+test('fallback returned lot with a unique source link can be edited and deleted',()=>{
+ const w=workbook();
+ w.rows('STOCK_LOTS')[0]['Purchase ID']='OVERSOLD';
+ const create=w.ctx.completeReturn('t',{invoiceId:'INV1',
+   items:[{productId:'P1',qty:2,price:100}],refundMethod:'Cash',date:'2026-09-21'});
+ assert.equal(create.success,true,create.message);
+ const id=create.data.returnId;
+ const movements=w.rows('STOCK_MOVEMENT').filter(x=>x.Type==='Sales Return'&&x.Reference===id);
+ assert.equal(movements.length,1);
+ assert.ok(movements[0]['Source Consumption Link ID']);
+ assert.notEqual(movements[0]['Lot ID'],'L1');
+ const change=w.ctx.updateSalesReturn('t',{
+   returnId:id,expectedVersion:0,operationId:'return-fallback-edit-integration-123',
+   items:[{productId:'P1',qty:1,price:100}],refundMethod:'Cash',
+   reason:'Incorrect count',notes:'Reviewed',date:'2026-09-21',editReason:'Correction'
+ });
+ assert.equal(change.success,true,change.message);
+ assert.equal(w.rows('PRODUCTS')[0]['Current Stock'],6);
+ const del=w.ctx.deleteSalesReturn('t',id,'Wrong transaction','return-fallback-delete-integration-123',1);
+ assert.equal(del.success,true,del.message);
+ assert.equal(w.rows('PRODUCTS')[0]['Current Stock'],5);
+});
