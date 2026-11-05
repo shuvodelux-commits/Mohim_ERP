@@ -1256,6 +1256,8 @@ function updateSalesReturn(token, payload) {
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   let journalIndex=-1, stage='';
   try {
+    // Public RPC authorization must precede even the first payload check.
+    requirePermission_(token,'returns','edit');
     const id=sanitizeInput_(payload && payload.returnId);
     const operationId=sanitizeInput_(payload && payload.operationId);
     if (!id || !/^[A-Za-z0-9_-]{12,100}$/.test(operationId))
