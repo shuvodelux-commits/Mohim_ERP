@@ -1373,3 +1373,80 @@ function updateSalesReturn(token, payload) {
     return fail_(err.message);
   } finally {lock.releaseLock();}
 }
+
+
+/** Soft-delete one Sales Return with exact undo, audit and one-way journal. */
+function deleteSalesReturn(token, returnId, reason, operationId, expectedVersion) {
+  const lock=LockService.getScriptLock();
+  lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
+  let journalIndex=-1,stage='';
+  try {
+    // Always authenticate a public RPC before inspecting untrusted input.
+    requirePermission_(token,'returns','view');
+    const id=sanitizeInput_(returnId);
+    const why=sanitizeInput_(reason);
+    if (!id) throw new Error('Return ID is required.');
+    if (!why) throw new Error('Delete reason is required.');
+    const op=sanitizeInput_(operationId) || ('return-delete-'+id);
+    if (!/^[A-Za-z0-9_-]{12,100}$/.test(op)) throw new Error('Invalid deletion operation ID.');
+    const request={returnId:id,reason:why,operationId:op};
+    if (expectedVersion !== undefined && expectedVersion !== null) request.expectedVersion=expectedVersion;
+    const j=salesReturnCorrectionPriorJournal_(token,id,op,'ReturnDelete',request);
+    if (j.prior) {
+      const records=getAllRows_('SALES_RETURN').filter(function(r){return String(r['Return ID'])===id;});
+      if (records.length!==1 || !isDeleted_(records[0]) ||
+          j.prior['Last Completed Stage']!==id+'@deleted')
+        throw new Error('Committed deletion has inconsistent return evidence. Needs Review.');
+      return ok_({returnId:id,deleted:true});
+    }
+    const plan=prepareSalesReturnChange_(token,id,request,'Delete');
+    const now=new Date();
+    appendRow_('SALE_POSTING_JOURNAL',{
+      'Operation ID':op,'Operation Type':'ReturnDelete','Payload Hash':j.hash,
+      'Invoice ID':plan.invoiceId,'Return ID':id,'State':'Writing',
+      'Last Completed Stage':'Validated','Actor':j.actor,
+      'Created At':now,'Updated At':now,'Error':''
+    });
+    journalIndex=findRowIndex_('SALE_POSTING_JOURNAL','Operation ID',op);
+    if (journalIndex<2) throw new Error('Delete journal reservation missing. Needs Review.');
+    stage='Validated';
+    applySalesReturnStockUndo_(plan.stockUndo,op,'Delete');
+    stage='Stock reversed';
+    if (plan.moneyUndo.kind==='Cash') {
+      markMatchingDeleted_('CASH_BOOK',function(row){
+        return row['Reference']===id && row['Type']==='Sales Return';
+      },plan.actingUser,why,now);
+    } else {
+      markMatchingDeleted_('CUSTOMER_LEDGER',function(row){
+        return row['Reference']===id && row['Type']==='Sales Return Credit';
+      },plan.actingUser,why,now);
+      const customer=plan.moneyUndo.customer;
+      updateRowFields_('CUSTOMERS',customer._rowIndex,{
+        'Current Due':roundMoney_((Number(customer['Current Due'])||0)+plan.moneyUndo.amount)
+      });
+    }
+    stage='Refund reversed';
+    markRowDeleted_('SALES_RETURN',plan.original._rowIndex,plan.actingUser,why,now);
+    markMatchingDeleted_('SALES_RETURN_ITEMS',function(row){
+      return String(row['Return ID'])===id;
+    },plan.actingUser,why,now);
+    logDeletion_('returns',id,plan.invoiceId,why,plan.actingUser);
+    stage='Return soft-deleted';
+    updateRowFields_('SALE_POSTING_JOURNAL',journalIndex,{
+      State:'Committed','Last Completed Stage':id+'@deleted','Updated At':new Date()
+    });
+    stage='Committed';
+    return ok_({returnId:id,deleted:true});
+  } catch(err) {
+    if (journalIndex>=2 && stage!=='Committed') {
+      try {
+        updateRowFields_('SALE_POSTING_JOURNAL',journalIndex,{
+          State:'Needs Review','Last Completed Stage':stage,
+          'Updated At':new Date(),Error:String(err && err.message || err)
+        });
+      } catch(journalError) {logError_('deleteSalesReturnJournal',journalError);}
+    }
+    logError_('deleteSalesReturn',err);
+    return fail_(err.message);
+  } finally {lock.releaseLock();}
+}
