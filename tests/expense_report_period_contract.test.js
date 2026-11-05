@@ -149,3 +149,18 @@ test('recent detail table caps at 25 but selected total and entries include all 
   assert.equal(p.get('expRepDetailBody').children.length,25);
   assert.equal(p.get('expRepDetailCount').textContent,'Showing 25 of 30 entries');
 });
+
+
+test('invalid date selected during an in-flight request restores Run button',async()=>{
+  const pending=[];
+  const p=setup(()=>new Promise(resolve=>pending.push(resolve)));
+  const first=p.ctx.expRepLoad();
+  await Promise.resolve();await Promise.resolve();
+  assert.equal(p.get('expReportRunBtn').disabled,true);
+  p.get('expReportDateFrom').value='2026-11-06';
+  await p.get('expReportDateFrom').dispatch('change');
+  assert.equal(p.get('expReportRunBtn').disabled,false);
+  pending[0]({rows:[],filteredTotal:0});
+  await first;
+  assert.equal(p.get('expReportRunBtn').disabled,false);
+});

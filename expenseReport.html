@@ -213,7 +213,10 @@
     var to = document.getElementById('expReportDateTo').value;
     var seq = ++expRepState.requestSeq;
     expRepClear_();
-    if (!expRepRangeValid_(from, to)) return Promise.resolve();
+    if (!expRepRangeValid_(from, to)) {
+      document.getElementById('expReportRunBtn').disabled = false;
+      return Promise.resolve();
+    }
     expRepSetError_('');
     var button = document.getElementById('expReportRunBtn');
     button.disabled = true;
