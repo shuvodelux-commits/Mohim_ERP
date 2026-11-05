@@ -194,7 +194,7 @@ function editReturnScenario(w,id,version,method,quantity,price,operationId) {
 }
 function assertAccounting(w,{refund,credit,due,stock,qty,version,id}) {
  assert.equal(cashRefundTotal(w),refund,'active Cash Book cash refund');
- assert.equal(w.ctx.getCashBalance_(),-refund,'live physical cash balance from CashBook.gs');
+ assert.equal(w.ctx.getCashBalance_(),refund === 0 ? 0 : -refund,'live physical cash balance from CashBook.gs');
  assert.equal(customerCreditTotal(w),credit,'customer ledger credit amount');
  assert.equal(w.rows('CUSTOMERS')[0]['Current Due'],due,'customer current due / available credit');
  assert.equal(w.rows('PRODUCTS')[0]['Current Stock'],stock,'physical product stock');
