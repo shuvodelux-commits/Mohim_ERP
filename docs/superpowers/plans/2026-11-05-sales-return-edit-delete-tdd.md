@@ -81,7 +81,7 @@
 - [ ] **Step 2 RED:** Run `node --test tests/sales_return_correction_planner.test.js`. **Expected:** missing planner and unsafe-case failures.
 - [ ] **Step 3 GREEN:** Build the read-only complete plan; reuse `prepareSalesReturn_` for replacement pricing but give it an effective view excluding current Return ID and a virtual state with original returned stock undone. Assert exact original journal/book evidence before any write. Block later settlement dependency rather than guessing allocation. Require editing at least one line and a nonempty edit reason; deletion requires nonempty delete reason.
 - [ ] **Step 4 VERIFY:** Run `node --test tests/sales_return_correction_planner.test.js tests/sale_multi_payment_phase5.test.js tests/customer_settlement_business_logic.test.js tests/multi_invoice_sales_return_regressions.test.js`. **Expected:** all passing.
-- [ ] **Step 5 COMMIT:** `git add SalesReturn.gs tests/sales_return_correction_planner.test.js CustomerSettlement.gs SalePayments.gs 2>/dev/null || true`; inspect staged diff, commit only changed intended files: `git commit -m "test+feat(returns): validate complete correction before writes"`.
+- [ ] **Step 5 COMMIT:** `git add SalesReturn.gs tests/sales_return_correction_planner.test.js`; stage `CustomerSettlement.gs` or `SalePayments.gs` **only if changed and covered by tests**. Run `git diff --cached --check` (Expected: exit 0), inspect the staged diff, then `git commit -m "test+feat(returns): validate complete correction before writes"`.
 
 ### Task 4: Native journaled edit transaction with audit and fault injection
 
