@@ -722,6 +722,7 @@ function deleteDayBookEntry(token, moduleKey, recordId, reason) {
     switch (String(moduleKey).toLowerCase()) {
       case 'sales':
       case 'sale':            return deleteSalesInvoice(token, recordId, reason);
+      case 'sales return':    return deleteSalesReturn(token, recordId, reason);
       case 'purchase':        return deletePurchase(token, recordId, reason);
       case 'expense':         return deleteExpense(token, recordId, reason);
       case 'bank':            return deleteBankTransaction(token, recordId, reason);
