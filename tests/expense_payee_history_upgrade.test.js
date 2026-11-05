@@ -104,7 +104,7 @@ test('payee management list shows active and inactive but hides deleted masters'
 });
 
 test('Expenses sidebar merges list and ledger into one Expense History page', () => {
-  assert.match(ui, /key:\s*'expenseList',\s*label:\s*'Expense History'/);
+  assert.match(ui, /key:\s*'expenseList',\s*label:\s*'History'/);
   const expenseGroup = ui.match(/key:\s*'expense', label:\s*'Expenses'[\s\S]*?\n\s*\]\n\s*\}/);
   assert(expenseGroup, 'expense nav group missing');
   assert.doesNotMatch(expenseGroup[0], /key:\s*'expenseLedger'/);

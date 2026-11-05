@@ -54,7 +54,7 @@ test('Run Report re-fetches expenses, applies inclusive date range and excludes 
   page.get('expReportDateFrom').value='2026-10-01';
   page.get('expReportDateTo').value='2026-10-02';
   await page.get('expReportRunBtn').listeners.click();
-  assert.equal(page.getCalls(), 1);
+  assert.equal(page.getCalls(), 2);
   assert.equal(page.get('expRepPeriodTotal').textContent, '৳300');
   assert.equal(page.get('expRepPeriodCount').textContent, 2);
 });

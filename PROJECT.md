@@ -99,7 +99,9 @@ The current codebase must remain the source of truth for business behavior until
 | `expense.html` | Add expense with required Payee selection/quick-add |
 | `expenseList.html` | Expense History with server-filtered chronological ledger and running total |
 | `expenseCategory.html` | Expense categories |
-| `expenseReport.html` | Month-to-date default, selected-period total from getExpenseLedger, category/payee/day/payment breakdowns and recent details |
+| `expenseReport.html` | Compact Overview: independent Today/This Month totals, category mini-breakdowns, selected-period getExpenseLedger totals, daily spending bars, date presets, detailed transactions |
+| `expensePayees.html` | Dedicated Payees tab using existing authorized payee management APIs (add, edit, toggle, soft-delete) |
+| `expenseCompactStyle.html` | Scoped responsive CSS for the five Expense pages; included from index.html |
 | `finance.html` | Business finance |
 | `financeLedger.html` | Finance ledger |
 | `daybook.html` | Day Book |

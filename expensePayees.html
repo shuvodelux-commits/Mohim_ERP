@@ -1,0 +1,158 @@
+<!-- Expense Payees: approved compact fifth tab, backed by existing Payee CRUD APIs. -->
+<div class="exp-payee-page">
+  <header class="exp-payee-heading">
+    <div><h3>Expense Payees <span class="bn-hint">— যাকে খরচের টাকা দেওয়া হয়</span></h3>
+      <p>Manage recipients without changing historical expense records.</p></div>
+    <button type="button" class="btn btn-primary" id="exPayAddBtn">+ Add Payee</button>
+  </header>
+  <div class="toolbar exp-payee-filters">
+    <input id="exPaySearch" class="search-input" type="search" placeholder="Search payee or phone…" aria-label="Search expense payees">
+    <select id="exPayStatus" aria-label="Payee status"><option value="">All statuses</option><option value="Active">Active</option><option value="Inactive">Inactive</option></select>
+    <span class="bn-hint" id="exPayCount" aria-live="polite"></span>
+  </div>
+  <div class="card exp-payee-list" style="padding:0">
+    <div class="table-scroll"><table>
+      <thead><tr><th>Payee</th><th>Phone</th><th>Notes</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody id="exPayBody"></tbody>
+    </table></div>
+    <div id="exPayEmpty" class="empty-state" hidden>No payees match your search.</div>
+    <div id="exPayLoadError" class="field-error" role="alert" hidden></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="exPayModal" hidden>
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="exPayModalTitle">Add Expense Payee</h3>
+      <button type="button" class="modal-close" id="exPayCloseBtn" aria-label="Close payee editor">&#10005;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid exp-payee-form">
+        <div><label for="exPayName">Payee Name * <span class="bn-hint">— নাম</span></label><input id="exPayName" type="text" autocomplete="off"></div>
+        <div><label for="exPayPhone">Phone <span class="bn-hint">— মোবাইল</span></label><input id="exPayPhone" type="tel"></div>
+        <div class="full"><label for="exPayNotes">Notes <span class="bn-hint">— মন্তব্য</span></label><input id="exPayNotes" type="text"></div>
+      </div>
+      <div id="exPayFormError" class="field-error" role="alert" hidden></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn" id="exPayCancelBtn">Cancel</button>
+      <button type="button" class="btn btn-primary" id="exPaySaveBtn">Save Payee</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  var exPayState = { rows: [], editingId: null, seq: 0 };
+  function exPayLoad() {
+    var seq = ++exPayState.seq;
+    var error = document.getElementById('exPayLoadError');
+    error.hidden = true; error.textContent = '';
+    return withLoader(serverCall('getExpensePayeesManagement', authToken)).then(function (rows) {
+      if (seq !== exPayState.seq) return;
+      exPayState.rows = Array.isArray(rows) ? rows : [];
+      exPayRender_();
+    }).catch(function (err) {
+      if (seq !== exPayState.seq) return;
+      exPayState.rows = [];
+      exPayRender_();
+      error.textContent = 'Expense payees could not be loaded: ' + (err.message || 'Try again.');
+      error.hidden = false;
+    });
+  }
+  function exPayRender_() {
+    var query = document.getElementById('exPaySearch').value.trim().toLowerCase();
+    var status = document.getElementById('exPayStatus').value;
+    var body = document.getElementById('exPayBody'); body.innerHTML = '';
+    var count = 0;
+    exPayState.rows.forEach(function (payee, index) {
+      if (status && payee.status !== status) return;
+      if (query && (String(payee.name || '') + ' ' + String(payee.phone || '')).toLowerCase().indexOf(query) < 0) return;
+      count++;
+      var tr = document.createElement('tr');
+      var label = payee.status === 'Inactive' ? 'badge-danger' : 'badge-success';
+      tr.innerHTML = '<td><strong>' + escapeHtml(payee.name || '') + '</strong></td>' +
+        '<td>' + escapeHtml(payee.phone || '') + '</td><td>' + escapeHtml(payee.notes || '—') + '</td>' +
+        '<td><span class="badge ' + label + '">' + (payee.status === 'Inactive' ? 'Inactive' : 'Active') + '</span></td>' +
+        '<td class="exp-payee-actions">' +
+          '<button class="btn" type="button" data-payee-row="' + index + '" data-payee-op="edit">Edit</button>' +
+          '<button class="btn" type="button" data-payee-row="' + index + '" data-payee-op="toggle">' + (payee.status === 'Inactive' ? 'Activate' : 'Deactivate') + '</button>' +
+          '<button class="btn" type="button" data-payee-row="' + index + '" data-payee-op="delete">Delete</button>' +
+        '</td>';
+      body.appendChild(tr);
+    });
+    document.getElementById('exPayCount').textContent = count + ' payees';
+    document.getElementById('exPayEmpty').hidden = count > 0;
+  }
+  function exPayOpen_(payee) {
+    exPayState.editingId = payee ? payee.id : null;
+    document.getElementById('exPayName').value = payee ? payee.name || '' : '';
+    document.getElementById('exPayPhone').value = payee ? payee.phone || '' : '';
+    document.getElementById('exPayNotes').value = payee ? payee.notes || '' : '';
+    document.getElementById('exPayModalTitle').textContent = payee ? 'Edit Expense Payee' : 'Add Expense Payee';
+    document.getElementById('exPayFormError').hidden = true;
+    openModal('exPayModal');
+    document.getElementById('exPayName').focus();
+  }
+  function exPaySave_() {
+    var name = document.getElementById('exPayName').value.trim();
+    var error = document.getElementById('exPayFormError');
+    error.hidden = true; error.textContent = '';
+    if (!name) { error.textContent = 'Payee name is required.'; error.hidden = false; return Promise.resolve(); }
+    var payload = {
+      name: name,
+      phone: document.getElementById('exPayPhone').value.trim(),
+      notes: document.getElementById('exPayNotes').value.trim()
+    };
+    var editingId = exPayState.editingId, save = document.getElementById('exPaySaveBtn');
+    save.disabled = true;
+    var call = editingId ? serverCall('updateExpensePayee', authToken, editingId, payload)
+                         : serverCall('addExpensePayee', authToken, payload);
+    return withLoader(call).then(function () {
+      closeModal('exPayModal');
+      showToast(editingId ? 'Payee updated' : 'Payee added', 'success');
+      if (typeof reloadPage_ === 'function') reloadPage_('expense');
+      return exPayLoad();
+    }).catch(function (err) {
+      error.textContent = err.message || 'Could not save payee.'; error.hidden = false;
+    }).finally(function () { save.disabled = false; });
+  }
+  function exPayToggle_(payee) {
+    var next = payee.status === 'Inactive' ? 'Active' : 'Inactive';
+    return withLoader(serverCall('setExpensePayeeStatus', authToken, payee.id, next)).then(function () {
+      showToast(next === 'Active' ? 'Payee activated' : 'Payee deactivated', 'success');
+      if (typeof reloadPage_ === 'function') reloadPage_('expense');
+      return exPayLoad();
+    }).catch(function (err) { showToast(err.message, 'error'); });
+  }
+  function exPayDelete_(payee) {
+    confirmDelete({
+      title: 'Delete expense payee?',
+      summary: '<p><b>' + escapeHtml(payee.name || '') + '</b></p><p>Historical expense records are preserved.</p>',
+      fn: 'deleteExpensePayee', args: [payee.id], reloadPages: ['expense', 'expensePayees'],
+      successMessage: 'Payee deleted; historical expense records preserved.',
+      onDone: function () { exPayLoad(); }
+    });
+  }
+  document.getElementById('exPayAddBtn').addEventListener('click', function () { exPayOpen_(null); });
+  document.getElementById('exPayCloseBtn').addEventListener('click', function () { closeModal('exPayModal'); });
+  document.getElementById('exPayCancelBtn').addEventListener('click', function () { closeModal('exPayModal'); });
+  document.getElementById('exPaySaveBtn').addEventListener('click', exPaySave_);
+  document.getElementById('exPaySearch').addEventListener('input', exPayRender_);
+  document.getElementById('exPayStatus').addEventListener('change', exPayRender_);
+  document.getElementById('exPayBody').addEventListener('click', function (event) {
+    var button = event.target.closest('button[data-payee-op]');
+    if (!button) return;
+    var index = Number(button.dataset.payeeRow), payee = exPayState.rows[index];
+    if (!payee) return;
+    if (button.dataset.payeeOp === 'edit') exPayOpen_(payee);
+    else if (button.dataset.payeeOp === 'toggle') exPayToggle_(payee);
+    else if (button.dataset.payeeOp === 'delete') exPayDelete_(payee);
+  });
+  document.addEventListener('DOMContentLoaded', function () {
+    var oldGoToPage = goToPage;
+    goToPage = function (key) {
+      oldGoToPage(key);
+      if (key === 'expensePayees') exPayLoad();
+    };
+  });
+</script>
