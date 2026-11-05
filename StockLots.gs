@@ -503,7 +503,7 @@ function applySaleReturnRestorationPlan_(plan, fallbackReference) {
     }
     let sourceConsumptionLinkId = draw.consumptionLinkId || '';
     if (draw.saleItemLotRowIndex) {
-      if (!sourceConsumptionLinkId) sourceConsumptionLinkId = generateId_('RETURN_STOCK_LINEAGE');
+      if (!sourceConsumptionLinkId) sourceConsumptionLinkId = generateId_('STOCK_MOVEMENT');
       updateRowFields_('SALE_ITEM_LOTS', draw.saleItemLotRowIndex, {
         'Quantity': draw.saleItemLotQtyAfter,
         'Return Consumption Link ID': sourceConsumptionLinkId
