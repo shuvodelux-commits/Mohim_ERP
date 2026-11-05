@@ -128,3 +128,36 @@ test('fallback returned lot with a unique source link can be edited and deleted'
  assert.equal(del.success,true,del.message);
  assert.equal(w.rows('PRODUCTS')[0]['Current Stock'],5);
 });
+
+
+test('real Cash to Store Credit to Cash method changes never double-post refunds',()=>{
+ const w=workbook();
+ const create=w.ctx.completeReturn('t',{invoiceId:'INV1',
+   items:[{productId:'P1',qty:2,price:100}],refundMethod:'Cash',date:'2026-09-21'});
+ assert.equal(create.success,true,create.message);
+ const id=create.data.returnId;
+ const toCredit=w.ctx.updateSalesReturn('t',{
+   returnId:id,expectedVersion:0,operationId:'return-cash-credit-switch-123',
+   items:[{productId:'P1',qty:1,price:100}],refundMethod:'Store Credit',
+   reason:'Changed refund arrangement',notes:'Credit accepted',date:'2026-09-21',editReason:'Refund method changed'
+ });
+ assert.equal(toCredit.success,true,toCredit.message);
+ assert.equal(w.rows('CUSTOMERS')[0]['Current Due'],-100);
+ assert.equal(w.rows('CASH_BOOK').filter(r=>!r['Is Deleted']).length,0);
+ assert.equal(w.rows('CUSTOMER_LEDGER').filter(r=>!r['Is Deleted']).length,1);
+ const toCash=w.ctx.updateSalesReturn('t',{
+   returnId:id,expectedVersion:1,operationId:'return-credit-cash-switch-123',
+   items:[{productId:'P1',qty:1,price:100}],refundMethod:'Cash',
+   reason:'Changed again',notes:'Cash received',date:'2026-09-21',editReason:'Refund method corrected'
+ });
+ assert.equal(toCash.success,true,toCash.message);
+ assert.equal(w.rows('CUSTOMERS')[0]['Current Due'],0);
+ assert.equal(w.rows('CASH_BOOK').filter(r=>!r['Is Deleted']).reduce((sum,r)=>sum+Number(r.Debit||0),0),100);
+ assert.equal(w.rows('CUSTOMER_LEDGER').filter(r=>!r['Is Deleted']).length,0);
+ const done=w.ctx.deleteSalesReturn('t',id,'Return voided','return-switch-delete-123',2);
+ assert.equal(done.success,true,done.message);
+ assert.equal(w.rows('PRODUCTS')[0]['Current Stock'],5);
+ assert.equal(w.rows('STOCK_LOTS')[0]['Remaining Quantity'],0);
+ assert.equal(w.rows('CASH_BOOK').filter(r=>!r['Is Deleted']).length,0);
+ assert.equal(w.rows('CUSTOMERS')[0]['Current Due'],0);
+});
