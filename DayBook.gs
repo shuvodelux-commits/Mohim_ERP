@@ -55,6 +55,7 @@ const DAY_BOOK_MODULES = [
  */
 const DAY_BOOK_DELETE_MAP = {
   'Sales': 'sales',
+  'Sales Return': 'sales return',
   'Purchase': 'purchase',
   'Expense': 'expense',
   'Bank': 'bank',
