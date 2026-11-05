@@ -562,6 +562,10 @@ const CONFIG = {
       "Batch ID",
       // Stable idempotency key for versioned split-payment invoice refunds.
       "Return Operation ID",
+      "Edit Version",
+      "Updated At",
+      "Updated By",
+      "Edit Reason",
 ],
     SALES_RETURN_ITEMS: [
       "Return ID",
@@ -580,6 +584,8 @@ const CONFIG = {
       // legacy rows are interpreted as pre-discount values by reports.
       "Pricing Basis",
       "Sold Product Type",
+      "Is Deleted",
+      "Deleted At",
     ],
     PURCHASE_RETURN: [
       "Return ID",
