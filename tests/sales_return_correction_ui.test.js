@@ -31,3 +31,13 @@ test('split-payment refund replay after an edit fails closed instead of reportin
  const src=read('SalesReturn.gs');
  assert.match(src,/Committed refund has since been corrected|Original refund has been corrected/);
 });
+
+test('edit shows other returned quantity based on original saved return, not edited input',()=>{
+ const src=read('returns.html');
+ assert.match(src,/previouslyReturnedQty\s*\|\|\s*0\)\s*-\s*Number\(rtState\.editQtyByProduct/);
+});
+test('Day Book return deletion uses refreshed Return History and expected version',()=>{
+ const src=read('daybook.html');
+ assert.match(src,/if \(row\.module === 'Sales Return'\)\s*\{\s*goToPage\('returnHistory'\);/);
+ assert.match(src,/rhLoad\(\)\.then\(function\(\)\{\s*rhDeleteById_\(row\.sourceId\)/);
+});
