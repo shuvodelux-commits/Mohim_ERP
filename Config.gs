@@ -474,6 +474,9 @@ const CONFIG = {
       "Notes",
       "Lot ID",
       "Source Sale Product ID",
+      "Source Consumption Link ID",
+      "Reversed By",
+      "Reversed At",
     ],
     // new HEADERS entries:
     STOCK_LOTS: [
@@ -508,6 +511,7 @@ const CONFIG = {
       // declaring it here makes Database.gs persist it on live sheets.
       "Supplier ID",
       "Source Sale Product ID",
+      "Return Consumption Link ID",
 
     ],
     STOCK_LOT_COST_CORRECTIONS: [
@@ -1065,6 +1069,7 @@ const CONFIG = {
     SUPPLIER_LEDGER: "SLD",
     CASH_BOOK: "CB",
     STOCK_MOVEMENT: "SM",
+    RETURN_STOCK_LINEAGE: "RSL",
     SALES_RETURN: "SRT",
     PURCHASE_RETURN: "PRT",
     CASH_SESSIONS: "CS",
