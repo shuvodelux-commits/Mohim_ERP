@@ -19,6 +19,7 @@ function fixture(overrides={}){
   activeSalesReturnItems_:()=>ctx.getAllRows_('SALES_RETURN_ITEMS').filter(r=>!ctx.isDeleted_(r)),
   isDeleted_:r=>String(r&&r['Is Deleted']||'').toUpperCase()==='TRUE',
   sanitizeInput_:x=>String(x==null?'':x).trim(),
+  safeDateOnly_:x=>String(x||''),
   requirePermission_:()=>({'Full Name':'Operator','User ID':'U1'}),
   requireDeletePermission_:()=>({'Full Name':'Operator','User ID':'U1'}),
   requireActiveCashSession_:()=>true,
