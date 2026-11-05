@@ -202,7 +202,7 @@ function activeReturnChildRows_(headerSheetKey, childSheetKey, idColumn) {
     activeIds[row[idColumn]] = true;
   });
   return getAllRows_(childSheetKey).filter(function (row) {
-    return !!activeIds[row[idColumn]];
+    return !!activeIds[row[idColumn]] && !isDeleted_(row);
   });
 }
 
