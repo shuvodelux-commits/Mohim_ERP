@@ -641,7 +641,8 @@ function commitPreparedSalesReturn_(prepared, options) {
         'Product Name': c.name, 'Type': 'Sales Return', 'Reference': returnId,
         'Quantity In': r.qty, 'Quantity Out': '', 'Balance Stock': c.newStock,
         'Notes': opts.batchId ? ('Batch ' + opts.batchId) : '', 'Lot ID': r.lotId,
-          'Source Sale Product ID': c.sourceSaleProductId
+          'Source Sale Product ID': c.sourceSaleProductId,
+          'Source Consumption Link ID': r.sourceConsumptionLinkId || ''
       });
     });
   });
