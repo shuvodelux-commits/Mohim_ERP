@@ -402,7 +402,7 @@ function prepareSalesReturn_(payload, options) {
   const saleGrandTotal = Number(sale['Grand Total']) || 0;
   const bundleSnapshots = getSaleBundleSnapshot_(payload.invoiceId, opts.bundleSnapshotRows || getAllRows_('SALE_BUNDLE_COMPONENTS'));
 
-  const outstandingOwnQty = outstandingSaleOwnStockByProduct_(
+  const outstandingOwnQty = opts.outstandingOwnQtyByProduct || outstandingSaleOwnStockByProduct_(
     payload.invoiceId,
     saleItems,
     returnItemsSoFar,
@@ -509,7 +509,7 @@ function prepareSalesReturn_(payload, options) {
       physicalRestorations.push({productId:v.productId,sourceSaleProductId:v.productId,qty:v.qty});
     }
   });
-  const stockChanges = physicalRestorations.map(function(v) {
+  const stockChanges = (opts.skipPhysicalRestoration ? [] : physicalRestorations).map(function(v) {
     const product = productsById[v.productId];
     if (!product) throw new Error('Original physical component no longer exists: '+v.productId);
     if (!Object.prototype.hasOwnProperty.call(virtualProductStockById,v.productId)) {
@@ -521,7 +521,7 @@ function prepareSalesReturn_(payload, options) {
       sourceSaleProductId:v.sourceSaleProductId,rowIndex:product._rowIndex,newStock:newStock};
   });
   const restorationVirtualState = opts.restorationVirtualState || {};
-  const restorationPlans = physicalRestorations.map(function(v){
+  const restorationPlans = (opts.skipPhysicalRestoration ? [] : physicalRestorations).map(function(v){
     const product = productsById[v.productId];
     return planSaleReturnRestoration_(payload.invoiceId,v.productId,product['Product Name'],v.qty,{
       saleItemLots:opts.consumptionRows,stockLots:opts.stockLots,
@@ -641,7 +641,8 @@ function commitPreparedSalesReturn_(prepared, options) {
         'Product Name': c.name, 'Type': 'Sales Return', 'Reference': returnId,
         'Quantity In': r.qty, 'Quantity Out': '', 'Balance Stock': c.newStock,
         'Notes': opts.batchId ? ('Batch ' + opts.batchId) : '', 'Lot ID': r.lotId,
-          'Source Sale Product ID': c.sourceSaleProductId
+          'Source Sale Product ID': c.sourceSaleProductId,
+          'Source Consumption Link ID': r.sourceConsumptionLinkId || ''
       });
     });
   });
@@ -719,6 +720,8 @@ function completeReturn(token, payload) {
             String(row['Invoice ID']) === requestedInvoiceId && !isDeleted_(row);
         });
         if (posted.length !== 1) throw new Error('Committed refund is missing or ambiguous. Needs Review.');
+        if ((Number(posted[0]['Edit Version']) || 0) > 0)
+          throw new Error('Original refund has been corrected. Reload return history; do not replay the original request.');
         return ok_({returnId:posted[0]['Return ID'],
           totalReturnAmount:Number(posted[0]['Total Return Amount'])||0,
           customerId:posted[0]['Customer ID']||'',newDue:null});
@@ -988,7 +991,7 @@ function getReturnBatchDetail(token, batchId) {
 function getReturnHistory(token) {
   try {
     requirePermission_(token, 'returns', 'view');
-    const returns = getAllRows_('SALES_RETURN')
+    const returns = activeRows_('SALES_RETURN')
       .sort(function (a, b) { return String(b['Created At']).localeCompare(String(a['Created At'])); });
     return ok_(returns);
   } catch (err) {
@@ -1000,12 +1003,465 @@ function getReturnHistory(token) {
 function getReturnDetail(token, returnId) {
   try {
     requirePermission_(token, 'returns', 'view');
-    const header = getAllRows_('SALES_RETURN').filter(function (r) { return r['Return ID'] === returnId; })[0];
-    if (!header) return fail_('Return not found.');
-    const items = getAllRows_('SALES_RETURN_ITEMS').filter(function (i) { return i['Return ID'] === returnId; });
+    const matches = getAllRows_('SALES_RETURN').filter(function (r) { return String(r['Return ID']) === String(returnId); });
+    if (matches.length > 1) return fail_('Duplicate Return ID: record needs review.');
+    const header = matches[0];
+    if (!header || isDeleted_(header)) return fail_('Return not found.');
+    const items = activeSalesReturnItems_().filter(function (i) { return String(i['Return ID']) === String(returnId); });
     return ok_({ header: header, items: items });
   } catch (err) {
     logError_('getReturnDetail', err);
     return fail_(err.message);
   }
+}
+
+
+/** Existing completed Sales Return, isolated for authorized correction. Read-only. */
+function getReturnForEdit(token, returnId) {
+  try {
+    requirePermission_(token, 'returns', 'edit');
+    const id = sanitizeInput_(returnId);
+    if (!id) return fail_('Return ID is required.');
+    const matches = getAllRows_('SALES_RETURN').filter(function (r) { return String(r['Return ID']) === id; });
+    if (matches.length !== 1) return fail_(matches.length ? 'Duplicate Return ID: record needs review.' : 'Return not found.');
+    const header = matches[0];
+    if (isDeleted_(header)) return fail_('This return has been deleted.');
+    const items = activeSalesReturnItems_().filter(function (row) { return String(row['Return ID']) === id; });
+    if (!items.length) return fail_('Return has no active item lines. Needs Review.');
+    const invoiceResult = getInvoiceForReturn(token, String(header['Invoice ID']));
+    if (!invoiceResult || invoiceResult.success !== true) return fail_((invoiceResult && invoiceResult.message) || 'Source invoice unavailable.');
+    return ok_({
+      header: header,
+      items: items,
+      invoice: invoiceResult.data,
+      version: Math.max(0, Number(header['Edit Version']) || 0),
+      editable: true
+    });
+  } catch (err) {
+    logError_('getReturnForEdit', err);
+    return fail_(err.message);
+  }
+}
+
+
+/**
+ * Single native Sales Return correction planner. Every rejectable rule runs
+ * before the journal reservation and before the first Sheets business write.
+ * Edit excludes its own historical return from invoice return caps, while
+ * the exact source-lot inverse is planned separately.
+ */
+function prepareSalesReturnChange_(token, returnId, requested, mode) {
+  const payload = requested || {};
+  const id = sanitizeInput_(returnId);
+  if (mode !== 'Edit' && mode !== 'Delete') throw new Error('Unsupported return correction operation.');
+  if (!id) throw new Error('Return ID is required.');
+  const matches = getAllRows_('SALES_RETURN').filter(function(r){ return String(r['Return ID']) === id; });
+  if (matches.length !== 1) throw new Error(matches.length ? 'Duplicate Sales Return ID. Needs Review.' : 'Sales Return not found.');
+  const original = matches[0];
+  if (isDeleted_(original)) throw new Error('This Sales Return was deleted.');
+  const actingUser = mode === 'Delete'
+    ? requireDeletePermission_(token, 'returns', original['Date'])
+    : requirePermission_(token, 'returns', 'edit');
+  requireActiveCashSession_();
+
+  // A correction of an earlier session cannot rewrite a closed drawer.
+  const sessions = getAllRows_('CASH_SESSIONS');
+  if (sessions.length && typeof findSessionForTimestamp_ === 'function') {
+    const historicalSession = findSessionForTimestamp_(sessions, original['Created At']);
+    if (!historicalSession || historicalSession['Status'] !== 'Open')
+      throw new Error('Original return Cash Session is closed. Manual reconciliation required.');
+  }
+  const expectedVersion = Number(original['Edit Version']) || 0;
+  if (payload.expectedVersion !== undefined && Number(payload.expectedVersion) !== expectedVersion)
+    throw new Error('Sales Return changed since it was opened. Reload before correcting.');
+  const editReason = sanitizeInput_(mode === 'Delete' ? payload.reason : payload.editReason);
+  if (!editReason) throw new Error(mode + ' reason is required.');
+  if (payload.operationId !== undefined && !/^[A-Za-z0-9_-]{12,100}$/.test(String(payload.operationId)))
+    throw new Error('Valid immutable return correction operation ID required.');
+  const invoiceId = String(original['Invoice ID']);
+  const sale = findUniqueSalesRow_(invoiceId);
+  if (!sale || isDeleted_(sale)) throw new Error('Source invoice is missing or deleted. Needs Review.');
+  const originalItems = activeSalesReturnItems_().filter(function(i){return String(i['Return ID']) === id;});
+  if (!originalItems.length) throw new Error('Return has no active product lines. Needs Review.');
+  const oldAmount = roundMoney_(Number(original['Total Return Amount']) || 0);
+  const method = String(original['Refund Method'] || '');
+  let moneyUndo;
+  if (method === 'Cash') {
+    const cash = activeRows_('CASH_BOOK').filter(function(row){
+      return String(row['Reference']) === id && row['Type'] === 'Sales Return';
+    });
+    if (cash.length !== 1 || Math.abs((Number(cash[0]['Debit']) || 0) - oldAmount) > 0.005 ||
+        Number(cash[0]['Credit'] || 0) !== 0)
+      throw new Error('Original Cash refund evidence is missing or inconsistent. Needs Review.');
+    moneyUndo = {kind:'Cash',rowIndex:cash[0]._rowIndex,amount:oldAmount};
+  } else if (method === 'Store Credit') {
+    const credits = activeRows_('CUSTOMER_LEDGER').filter(function(row){
+      return String(row['Reference']) === id && row['Type'] === 'Sales Return Credit';
+    });
+    if (credits.length !== 1 || Math.abs((Number(credits[0]['Credit']) || 0) - oldAmount) > 0.005)
+      throw new Error('Original Store Credit evidence is missing or inconsistent. Needs Review.');
+    const credit = credits[0], customerId = String(original['Customer ID'] || '');
+    if (!customerId || String(credit['Customer ID']) !== customerId)
+      throw new Error('Store Credit customer attribution mismatch. Needs Review.');
+    // Until dependent settlement replay is audited, disallow all later
+    // customer transactions instead of silently reassigning used credit.
+    const later = activeRows_('CUSTOMER_LEDGER').some(function(row){
+      return String(row['Customer ID']) === customerId && row._rowIndex > credit._rowIndex;
+    });
+    if (later) throw new Error('Later customer settlement/ledger entries exist; reconcile Store Credit first.');
+    const customerMatches = activeRows_('CUSTOMERS').filter(function(row){return String(row['Customer ID']) === customerId;});
+    if (customerMatches.length !== 1) throw new Error('Store Credit customer missing or ambiguous. Needs Review.');
+    moneyUndo = {kind:'Store Credit',rowIndex:credit._rowIndex,customer:customerMatches[0],
+      customerId:customerId,amount:oldAmount};
+  } else {
+    throw new Error('Unsupported historical refund method. Needs Review.');
+  }
+  const otherReturnHeaders = activeRows_('SALES_RETURN').filter(function(row){return String(row['Invoice ID']) === invoiceId && String(row['Return ID']) !== id;});
+  if (mode === 'Edit' && String(original['Batch ID'] || '')) {
+    // The batch workflow stores one refund method on its shared summary.
+    // Changing just one child to a different method would misstate that
+    // summary and create an unsupported mixed-method batch. Fail BEFORE
+    // posting any cash, customer credit, stock or journal changes.
+    const siblings = activeRows_('SALES_RETURN').filter(function(row) {
+      return String(row['Batch ID'] || '') === String(original['Batch ID']) &&
+        String(row['Return ID']) !== id;
+    });
+    if (siblings.some(function(row) { return String(row['Refund Method'] || '') !== String(payload.refundMethod || ''); })) {
+      throw new Error('Mixed-method Sales Return batch is not supported. Correct each child using the batch refund method, or resolve sibling returns first.');
+    }
+  }
+  const otherReturnIds = {};
+  otherReturnHeaders.forEach(function(row){otherReturnIds[String(row['Return ID'])]=true;});
+  const otherReturnItems = activeSalesReturnItems_().filter(function(row){return !!otherReturnIds[String(row['Return ID'])];});
+  let stockUndo = null, replacement = null, needsStockChange = mode === 'Delete', newDate = safeDateOnly_(original['Date']);
+  if (mode === 'Edit') {
+    if (!Array.isArray(payload.items) || !payload.items.length) throw new Error('Return correction requires at least one item.');
+    if (payload.refundMethod !== 'Cash' && payload.refundMethod !== 'Store Credit')
+      throw new Error('Choose a valid return refund method.');
+    const oldQty = {}, newQty = {};
+    originalItems.forEach(function(i){
+      const k = String(i['Product ID']);
+      oldQty[k] = (oldQty[k] || 0) + Number(i['Return Quantity'] || 0);
+    });
+    payload.items.forEach(function(i){
+      const k = String(i.productId);
+      newQty[k] = (newQty[k] || 0) + Number(i.qty || 0);
+    });
+    const keys=Object.keys(oldQty).concat(Object.keys(newQty));
+    needsStockChange = keys.some(function(k){return Math.abs((oldQty[k] || 0)-(newQty[k] || 0)) > 1e-8;});
+    if (payload.date && safeDateOnly_(payload.date) !== newDate) {
+      newDate = resolveEditedTransactionDate_(token,'returns',payload.date,original['Date'],payload.backdatedReason,'Sales Return Edit');
+    }
+    if (payload.refundMethod === 'Store Credit' && !String(sale['Customer ID'] || ''))
+      throw new Error('Editing to Store Credit requires an existing customer account.');
+    const currentProducts = getAllRows_('PRODUCTS');
+    const saleItems = getAllRows_('SALE_ITEMS');
+    const currentConsumptions = getAllRows_('SALE_ITEM_LOTS');
+    const currentLots = getAllRows_('STOCK_LOTS');
+    const vProducts = currentProducts.map(function(r){return Object.assign({},r);});
+    const vConsumptions = currentConsumptions.map(function(r){return Object.assign({},r);});
+    const vLots = currentLots.map(function(r){return Object.assign({},r);});
+    if (needsStockChange) {
+      stockUndo = planSalesReturnStockUndo_(id,{});
+      stockUndo.productDeltas.forEach(function(g){
+        const row=vProducts.filter(function(r){return r._rowIndex===g.rowIndex;})[0];
+        if (row) row['Current Stock']=g.newStock;
+      });
+      stockUndo.lotDeltas.forEach(function(g){
+        const row=vLots.filter(function(r){return r._rowIndex===g.rowIndex;})[0];
+        if (row) row['Remaining Quantity']=g.newRemaining;
+      });
+      stockUndo.saleConsumptionDeltas.forEach(function(g){
+        const row=vConsumptions.filter(function(r){return r._rowIndex===g.rowIndex;})[0];
+        if (row) row['Quantity']=g.newQuantity;
+      });
+    }
+    const productsById={};
+    vProducts.forEach(function(p){productsById[String(p['Product ID'])]=p;});
+    // For price/method-only edits the source lots are not touched. The
+    // previously returned owned quantity must still count as returnable.
+    let availableOwn = null;
+    if (!needsStockChange) {
+      availableOwn = outstandingSaleOwnStockByProduct_(invoiceId,saleItems,otherReturnItems,currentConsumptions,getAllRows_('VENDOR_SOURCING'));
+      Object.keys(oldQty).forEach(function(k){availableOwn[k]=(availableOwn[k]||0)+oldQty[k];});
+    }
+    const collected = typeof customerInvoiceCashCollected_ === 'function'
+      ? customerInvoiceCashCollected_(invoiceId) : Number(sale['Paid Amount']) || 0;
+    const priorCash = otherReturnHeaders.reduce(function(total,row){
+      return total + (row['Refund Method'] === 'Cash' ? Number(row['Total Return Amount']) || 0 : 0);
+    },0);
+    const maxCash = Math.max(0,roundMoney_(collected-priorCash));
+    replacement = prepareSalesReturn_({
+      invoiceId:invoiceId,items:payload.items,refundMethod:payload.refundMethod,
+      reason:payload.reason,notes:payload.notes
+    },{
+      txDate:{dateStr:newDate,isBackdated:newDate!==safeDateOnly_(original['Date']),
+        backdatedDays:0,reason:sanitizeInput_(payload.backdatedReason)},
+      sale:sale,saleItems:saleItems,returnItems:otherReturnItems,
+      products:vProducts,productsById:productsById,consumptionRows:vConsumptions,stockLots:vLots,
+      vendorSourcingRows:getAllRows_('VENDOR_SOURCING'),
+      cashRefundAvailable:maxCash,skipPhysicalRestoration:!needsStockChange,
+      outstandingOwnQtyByProduct:availableOwn
+    });
+  } else {
+    stockUndo = planSalesReturnStockUndo_(id,{});
+  }
+  return {original:original,originalItems:originalItems,invoiceId:invoiceId,sale:sale,
+    moneyUndo:moneyUndo,stockUndo:stockUndo,replacement:replacement,
+    needsStockChange:needsStockChange,mode:mode,reason:editReason,
+    version:expectedVersion,newDate:newDate,actingUser:actingUser};
+}
+
+
+/**
+ * Emits the positive portion of a replacement return after exact stock
+ * inverse has already been committed within the same locked journal write.
+ */
+function applyPreparedSalesReturnStockForCorrection_(prepared, returnId, now) {
+  const movementRows=[];
+  (prepared.stockChanges || []).forEach(function(change,index){
+    updateRowFields_('PRODUCTS',change.rowIndex,{'Current Stock':change.newStock,'Updated At':now});
+    const plan=prepared.restorationPlans && prepared.restorationPlans[index];
+    const restored=plan ? applySaleReturnRestorationPlan_(plan,returnId)
+      : restoreStockToLots_(prepared.invoiceId,change.productId,change.name,change.qty,returnId);
+    restored.forEach(function(row){
+      movementRows.push({
+        'Movement ID':generateId_('STOCK_MOVEMENT'),
+        'Date':now,'Product ID':change.productId,'Product Name':change.name,
+        'Type':'Sales Return','Reference':returnId,
+        'Quantity In':row.qty,'Quantity Out':'','Balance Stock':change.newStock,
+        'Lot ID':row.lotId,'Source Sale Product ID':change.sourceSaleProductId,
+        'Source Consumption Link ID':row.sourceConsumptionLinkId || '',
+        'Notes':'Reposted corrected Sales Return'
+      });
+    });
+  });
+  if (movementRows.length) appendRows_('STOCK_MOVEMENT',movementRows);
+}
+
+/**
+ * Journal ownership is keyed to both a Return ID and invoice. Never start
+ * another correction when an earlier transaction is in an ambiguous stage.
+ */
+function salesReturnCorrectionPriorJournal_(token, returnId, operationId, operationType, payload) {
+  const user = requirePermission_(token,'returns',operationType === 'ReturnEdit'?'edit':'view');
+  const actor=String(user['User ID'] || actorName_(user));
+  const hash=salePostingPayloadHash_({operationType:operationType,returnId:returnId,payload:payload});
+  const journals=getAllRows_('SALE_POSTING_JOURNAL');
+  const prior=journals.filter(function(r){return String(r['Operation ID'])===operationId;});
+  if (prior.length>1) throw new Error('Duplicate correction operation ID. Needs Review.');
+  const otherPending=journals.some(function(r){
+    return String(r['Return ID'] || '')===returnId && String(r['Operation ID'])!==operationId &&
+      (r['Operation Type']==='ReturnEdit' || r['Operation Type']==='ReturnDelete') && r.State!=='Committed';
+  });
+  if (otherPending) throw new Error('Earlier correction interrupted. Needs Review.');
+  if (prior.length) {
+    const row=prior[0];
+    if (String(row['Return ID'])!==returnId || row['Operation Type']!==operationType ||
+        String(row.Actor)!==actor || salePostingJournalDecision_(row,hash)!=='replay')
+      throw new Error('Correction operation interrupted or conflicting. Needs Review.');
+    return {actor:actor,hash:hash,prior:row};
+  }
+  return {actor:actor,hash:hash,prior:null};
+}
+
+/** Save an authorized in-place correction while preserving Return ID and batch. */
+function updateSalesReturn(token, payload) {
+  const lock=LockService.getScriptLock();
+  lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
+  let journalIndex=-1, stage='';
+  try {
+    // Public RPC authorization must precede even the first payload check.
+    requirePermission_(token,'returns','edit');
+    const id=sanitizeInput_(payload && payload.returnId);
+    const operationId=sanitizeInput_(payload && payload.operationId);
+    if (!id || !/^[A-Za-z0-9_-]{12,100}$/.test(operationId))
+      throw new Error('Return ID and stable correction operation ID are required.');
+    const j=salesReturnCorrectionPriorJournal_(token,id,operationId,'ReturnEdit',payload);
+    if (j.prior) {
+      const match=getAllRows_('SALES_RETURN').filter(function(r){return String(r['Return ID'])===id;});
+      if (match.length!==1 || isDeleted_(match[0]) ||
+          j.prior['Last Completed Stage']!==id+'@'+String(Number(match[0]['Edit Version'])||0))
+        throw new Error('Committed correction is no longer the current return revision. Reload.');
+      return ok_({returnId:id,version:Number(match[0]['Edit Version'])||0,
+        totalReturnAmount:Number(match[0]['Total Return Amount'])||0,
+        refundMethod:match[0]['Refund Method']});
+    }
+    const plan=prepareSalesReturnChange_(token,id,payload,'Edit');
+    const prepared=plan.replacement;
+    if (!prepared) throw new Error('Replacement return could not be prepared.');
+    const now=new Date(),newVersion=plan.version+1;
+    const auditReason=plan.reason;
+    appendRow_('SALE_POSTING_JOURNAL',{
+      'Operation ID':operationId,'Operation Type':'ReturnEdit',
+      'Payload Hash':j.hash,'Invoice ID':plan.invoiceId,'Return ID':id,
+      'State':'Writing','Last Completed Stage':'Validated','Actor':j.actor,
+      'Created At':now,'Updated At':now,'Error':''
+    });
+    journalIndex=findRowIndex_('SALE_POSTING_JOURNAL','Operation ID',operationId);
+    if (journalIndex<2) throw new Error('Correction journal reservation missing. Needs Review.');
+    stage='Validated';
+
+    // Undo exactly the old physical and financial postings, never the
+    // original invoice. Price-only edits must not touch inventory at all.
+    if (plan.needsStockChange) {
+      applySalesReturnStockUndo_(plan.stockUndo,operationId,'Edit');
+      stage='Stock reversed';
+      applyPreparedSalesReturnStockForCorrection_(prepared,id,now);
+      stage='Stock reposted';
+    }
+    if (plan.moneyUndo.kind==='Cash') {
+      markMatchingDeleted_('CASH_BOOK',function(row){
+        return row['Reference']===id && row['Type']==='Sales Return';
+      },plan.actingUser,auditReason,now);
+    } else {
+      markMatchingDeleted_('CUSTOMER_LEDGER',function(row){
+        return row['Reference']===id && row['Type']==='Sales Return Credit';
+      },plan.actingUser,auditReason,now);
+    }
+    stage='Old refund reversed';
+    const oldCredit=plan.moneyUndo.kind==='Store Credit' ? plan.moneyUndo.amount : 0;
+    const newCredit=prepared.refundMethod==='Store Credit' ? prepared.totalReturnAmount : 0;
+    const customer=plan.moneyUndo.kind==='Store Credit'
+      ? plan.moneyUndo.customer : prepared.creditCustomer;
+    if (oldCredit || newCredit) {
+      if (!customer || !customer._rowIndex) throw new Error('Store Credit customer evidence missing. Needs Review.');
+      const revisedDue=roundMoney_((Number(customer['Current Due'])||0)+oldCredit-newCredit);
+      updateRowFields_('CUSTOMERS',customer._rowIndex,{'Current Due':revisedDue});
+      if (newCredit) {
+        appendRow_('CUSTOMER_LEDGER',{
+          'Ledger ID':generateId_('CUSTOMER_LEDGER'),'Date':prepared.dateStr,
+          'Customer ID':customer['Customer ID'],'Customer Name':customer['Customer Name'],
+          'Type':'Sales Return Credit','Reference':id,'Debit':'','Credit':newCredit,
+          'Balance':revisedDue,'Notes':'Corrected return '+id,
+          'Created By':actorName_(plan.actingUser),'Created At':now
+        });
+      }
+    }
+    if (prepared.refundMethod==='Cash') {
+      addCashBookEntry_({Type:'Sales Return',Reference:id,
+        Description:'Corrected Cash refund for '+plan.invoiceId,
+        Debit:prepared.totalReturnAmount,Credit:'',PaymentMethod:'Cash',Date:prepared.dateStr});
+    }
+    stage='Refund reposted';
+
+    markMatchingDeleted_('SALES_RETURN_ITEMS',function(row){
+      return String(row['Return ID'])===id;
+    },plan.actingUser,auditReason,now);
+    appendRows_('SALES_RETURN_ITEMS',prepared.validatedItems.map(function(v){
+      return {'Return ID':id,'Invoice ID':plan.invoiceId,'Product ID':v.productId,
+        'Product Name':v.name,'Return Quantity':v.qty,'Return Price':v.price,
+        'Line Total':v.lineTotal,'Pricing Basis':'NetAfterInvoiceDiscount',
+        'Sold Product Type':v.productType || 'Standard'};
+    }));
+    updateRowFields_('SALES_RETURN',plan.original._rowIndex,{
+      'Date':prepared.dateStr,'Refund Method':prepared.refundMethod,
+      'Total Return Amount':prepared.totalReturnAmount,
+      'Reason':prepared.reason,'Notes':prepared.notes,
+      'Updated At':now,'Updated By':actorName_(plan.actingUser),
+      'Edit Reason':auditReason,'Edit Version':newVersion
+    });
+    stage='Return updated';
+    appendRow_('INVOICE_EDIT_LOG',{
+      'Log ID':generateId_('INVOICE_EDIT_LOG'),'Invoice ID':plan.invoiceId,
+      'Return ID':id,'Edit Date':now,'Reason':auditReason,
+      'Before Return Amount':Number(plan.original['Total Return Amount'])||0,
+      'After Return Amount':prepared.totalReturnAmount,
+      'Before Return Items JSON':JSON.stringify(plan.originalItems),
+      'After Return Items JSON':JSON.stringify(prepared.validatedItems),
+      'Edited By':actorName_(plan.actingUser)
+    });
+    updateRowFields_('SALE_POSTING_JOURNAL',journalIndex,{
+      State:'Committed','Last Completed Stage':id+'@'+newVersion,'Updated At':new Date()
+    });
+    stage='Committed';
+    return ok_({returnId:id,version:newVersion,totalReturnAmount:prepared.totalReturnAmount,
+      refundMethod:prepared.refundMethod});
+  } catch(err) {
+    if (journalIndex>=2 && stage!=='Committed') {
+      try {updateRowFields_('SALE_POSTING_JOURNAL',journalIndex,{
+        State:'Needs Review','Last Completed Stage':stage,'Updated At':new Date(),
+        Error:String(err && err.message || err)
+      });} catch(journalError) {logError_('updateSalesReturnJournal',journalError);}
+    }
+    logError_('updateSalesReturn',err);
+    return fail_(err.message);
+  } finally {lock.releaseLock();}
+}
+
+
+/** Soft-delete one Sales Return with exact undo, audit and one-way journal. */
+function deleteSalesReturn(token, returnId, reason, operationId, expectedVersion) {
+  const lock=LockService.getScriptLock();
+  lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
+  let journalIndex=-1,stage='';
+  try {
+    // Always authenticate a public RPC before inspecting untrusted input.
+    requirePermission_(token,'returns','view');
+    const id=sanitizeInput_(returnId);
+    const why=sanitizeInput_(reason);
+    if (!id) throw new Error('Return ID is required.');
+    if (!why) throw new Error('Delete reason is required.');
+    const op=sanitizeInput_(operationId) || ('return-delete-'+id);
+    if (!/^[A-Za-z0-9_-]{12,100}$/.test(op)) throw new Error('Invalid deletion operation ID.');
+    const request={returnId:id,reason:why,operationId:op};
+    if (expectedVersion !== undefined && expectedVersion !== null) request.expectedVersion=expectedVersion;
+    const j=salesReturnCorrectionPriorJournal_(token,id,op,'ReturnDelete',request);
+    if (j.prior) {
+      const records=getAllRows_('SALES_RETURN').filter(function(r){return String(r['Return ID'])===id;});
+      if (records.length!==1 || !isDeleted_(records[0]) ||
+          j.prior['Last Completed Stage']!==id+'@deleted')
+        throw new Error('Committed deletion has inconsistent return evidence. Needs Review.');
+      return ok_({returnId:id,deleted:true});
+    }
+    const plan=prepareSalesReturnChange_(token,id,request,'Delete');
+    const now=new Date();
+    appendRow_('SALE_POSTING_JOURNAL',{
+      'Operation ID':op,'Operation Type':'ReturnDelete','Payload Hash':j.hash,
+      'Invoice ID':plan.invoiceId,'Return ID':id,'State':'Writing',
+      'Last Completed Stage':'Validated','Actor':j.actor,
+      'Created At':now,'Updated At':now,'Error':''
+    });
+    journalIndex=findRowIndex_('SALE_POSTING_JOURNAL','Operation ID',op);
+    if (journalIndex<2) throw new Error('Delete journal reservation missing. Needs Review.');
+    stage='Validated';
+    applySalesReturnStockUndo_(plan.stockUndo,op,'Delete');
+    stage='Stock reversed';
+    if (plan.moneyUndo.kind==='Cash') {
+      markMatchingDeleted_('CASH_BOOK',function(row){
+        return row['Reference']===id && row['Type']==='Sales Return';
+      },plan.actingUser,why,now);
+    } else {
+      markMatchingDeleted_('CUSTOMER_LEDGER',function(row){
+        return row['Reference']===id && row['Type']==='Sales Return Credit';
+      },plan.actingUser,why,now);
+      const customer=plan.moneyUndo.customer;
+      updateRowFields_('CUSTOMERS',customer._rowIndex,{
+        'Current Due':roundMoney_((Number(customer['Current Due'])||0)+plan.moneyUndo.amount)
+      });
+    }
+    stage='Refund reversed';
+    markRowDeleted_('SALES_RETURN',plan.original._rowIndex,plan.actingUser,why,now);
+    markMatchingDeleted_('SALES_RETURN_ITEMS',function(row){
+      return String(row['Return ID'])===id;
+    },plan.actingUser,why,now);
+    logDeletion_('returns',id,plan.invoiceId,why,plan.actingUser);
+    stage='Return soft-deleted';
+    updateRowFields_('SALE_POSTING_JOURNAL',journalIndex,{
+      State:'Committed','Last Completed Stage':id+'@deleted','Updated At':new Date()
+    });
+    stage='Committed';
+    return ok_({returnId:id,deleted:true});
+  } catch(err) {
+    if (journalIndex>=2 && stage!=='Committed') {
+      try {
+        updateRowFields_('SALE_POSTING_JOURNAL',journalIndex,{
+          State:'Needs Review','Last Completed Stage':stage,
+          'Updated At':new Date(),Error:String(err && err.message || err)
+        });
+      } catch(journalError) {logError_('deleteSalesReturnJournal',journalError);}
+    }
+    logError_('deleteSalesReturn',err);
+    return fail_(err.message);
+  } finally {lock.releaseLock();}
 }

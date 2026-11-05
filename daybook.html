@@ -180,6 +180,13 @@
    * None of the reversal logic is duplicated here.
    */
   function dbDelete_(row) {
+    if (row.module === 'Sales Return') {
+      goToPage('returnHistory');
+      rhLoad().then(function(){
+        rhDeleteById_(row.sourceId);
+      });
+      return;
+    }
     confirmDelete({
       title: 'Delete ' + row.module + ' ' + (row.referenceNo || ''),
       summary: '<p><b>' + escapeHtml(row.transactionType || row.module) + '</b>' +
@@ -199,6 +206,10 @@
   }
 
   function dbCanEdit_(row) {
+    if (row.module === 'Sales Return') {
+      if (!dbWithinEditableWindow_(row.date)) return { possible: true, allowed: false, reason: 'Outside the editable window (Settings → Day Book Editable Days).' };
+      return { possible: true, allowed: true, reason: '' };
+    }
     if (row.module === 'Sales') {
       if (!dbWithinEditableWindow_(row.date)) return { possible: true, allowed: false, reason: 'Outside the editable window (Settings \u2192 Day Book Editable Days).' };
       return { possible: true, allowed: true, reason: '' };
@@ -250,6 +261,8 @@
         posLoadUpdateInvoice_(inv, reason);
         showToast('Loaded into POS for update \u2014 adjust and save', 'success');
       }).catch(function (err) { showToast(err.message, 'error'); });
+    } else if (row.module === 'Sales Return') {
+      rhOpenEditById_(row.sourceId);
     } else if (row.module === 'Expense') {
       goToPage('expenseList');
       expOpenEdit_(row.sourceId);

@@ -156,6 +156,43 @@
     }).catch(function (err) { showToast(err.message, 'error'); });
   }
 
+  /** Load the original return into the existing one-invoice Return Cart. */
+  function rhOpenEditById_(returnId) {
+    return withLoader(serverCall('getReturnForEdit',authToken,returnId)).then(function(detail) {
+      goToPage('returns');
+      rtOpenExistingReturn_(detail);
+    }).catch(function(err){showToast(err.message,'error');});
+  }
+
+  /** Native server reversal only. A batch child is corrected on its own. */
+  function rhDeleteById_(returnId) {
+    var record=rhState.returns.filter(function(row){return String(row['Return ID'])===String(returnId);})[0];
+    if (!record) {showToast('Return not found. Refresh history.','error');return;}
+    return runConfirmedAction({
+      type:'danger',title:'Delete Sales Return '+returnId+'?',
+      message:'The original return will be soft-deleted; its Cash/Store Credit refund and exact returned stock will be reversed only if accounting checks pass.',
+      details:[
+        {label:'Return',value:returnId,emphasis:true},
+        {label:'Invoice',value:record['Invoice ID']},
+        {label:'Refund',value:formatMoney(record['Total Return Amount']),emphasis:true},
+        {label:'Method',value:record['Refund Method']}
+      ],
+      reason:{required:true,visible:true,label:'Delete Reason *',
+        placeholder:'Why is this return incorrect?',maxLength:200},
+      confirmLabel:'Delete Return',loadingLabel:'Reversing...',
+      trigger:document.activeElement
+    },function(reason){
+      var op='return-delete-'+String(returnId);
+      return withLoader(serverCall('deleteSalesReturn',authToken,returnId,reason,op,
+        Number(record['Edit Version'])||0)).then(function(result){
+        showToast('Return '+result.returnId+' deleted and reversed.','success');
+        rhLoad();
+        if (typeof reloadPage_==='function') reloadPage_('daybook');
+        return result;
+      });
+    }).catch(function(err){showToast(err.message,'error');});
+  }
+
   document.getElementById('rhTableBody').addEventListener('click', function (e) {
     var btn = e.target.closest('button[data-act="menuReturn"]');
     if (!btn) return;
@@ -163,9 +200,17 @@
     var batchId = btn.dataset.batch || '';
     var actions = [{ action: 'view', label: 'View' }];
     if (batchId) actions.push({ action: 'viewBatch', label: 'View Batch' });
+    if (typeof hasActionPermission_ !== 'function' || hasActionPermission_('returns','edit')) {
+      actions.push({ action: 'edit', label: 'Edit' });
+    }
+    var deletionGrant = allowedModules === null || (userPermissions && userPermissions.returns &&
+      userPermissions.returns.delete && userPermissions.returns.delete !== 'disabled');
+    if (deletionGrant) actions.push({ action: 'delete', label: 'Delete', danger: true });
     openRowActionMenu_(btn, actions, function (action) {
       if (action === 'view') rhOpenDetailById_(id);
       if (action === 'viewBatch') rhOpenBatchById_(batchId);
+      if (action === 'edit') rhOpenEditById_(id);
+      if (action === 'delete') rhDeleteById_(id);
     });
   });
 

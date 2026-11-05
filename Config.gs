@@ -293,7 +293,7 @@ const CONFIG = {
       "Reversed At", "Reversed By", "Reversal Operation ID"
     ],
     SALE_POSTING_JOURNAL: [
-      "Operation ID", "Operation Type", "Payload Hash", "Invoice ID",
+      "Operation ID", "Operation Type", "Payload Hash", "Invoice ID", "Return ID",
       "State", "Last Completed Stage", "Actor", "Created At",
       "Updated At", "Error"
     ],
@@ -474,6 +474,9 @@ const CONFIG = {
       "Notes",
       "Lot ID",
       "Source Sale Product ID",
+      "Source Consumption Link ID",
+      "Reversed By",
+      "Reversed At",
     ],
     // new HEADERS entries:
     STOCK_LOTS: [
@@ -508,6 +511,7 @@ const CONFIG = {
       // declaring it here makes Database.gs persist it on live sheets.
       "Supplier ID",
       "Source Sale Product ID",
+      "Return Consumption Link ID",
 
     ],
     STOCK_LOT_COST_CORRECTIONS: [
@@ -562,6 +566,10 @@ const CONFIG = {
       "Batch ID",
       // Stable idempotency key for versioned split-payment invoice refunds.
       "Return Operation ID",
+      "Edit Version",
+      "Updated At",
+      "Updated By",
+      "Edit Reason",
 ],
     SALES_RETURN_ITEMS: [
       "Return ID",
@@ -580,6 +588,8 @@ const CONFIG = {
       // legacy rows are interpreted as pre-discount values by reports.
       "Pricing Basis",
       "Sold Product Type",
+      "Is Deleted",
+      "Deleted At",
     ],
     PURCHASE_RETURN: [
       "Return ID",
@@ -640,6 +650,12 @@ const CONFIG = {
       "Reason",
       "Before Grand Total",
       "After Grand Total",
+      "Return ID",
+      "Before Return Amount",
+      "After Return Amount",
+      "Before Return Items JSON",
+      "After Return Items JSON",
+      "Edited By",
     ],
     USERS: [
       "User ID",
