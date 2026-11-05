@@ -30,7 +30,13 @@ function loadReport(rows) {
     escapeHtml(value) { return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); },
     formatMoney: value => '৳' + Number(value).toFixed(0),
     withLoader: promise => promise,
-    serverCall: () => { calls += 1; return Promise.resolve(rows); },
+    serverCall: (name, token, filters) => {
+      assert.equal(name, 'getExpenseLedger');
+      calls += 1;
+      const selected = rows.filter(e => (!filters.dateFrom || e.date >= filters.dateFrom) && (!filters.dateTo || e.date <= filters.dateTo));
+      const filteredTotal = selected.filter(e => e.status !== 'Cancelled').reduce((sum,e) => sum + e.amount, 0);
+      return Promise.resolve({ rows: selected, filteredTotal });
+    },
     showToast: msg => toast.push(msg)
   });
   vm.runInContext(script, context);
@@ -69,6 +75,8 @@ test('period details are newest-first, escape source text, and report the actual
     {expenseId:'later', date:'2026-10-02', amount:20, category:'Utility', payeeName:'Sam', description:'<img src=x>'},
     {expenseId:'cancel', date:'2026-10-03', amount:500, status:'Cancelled'}
   ]);
+  page.get('expReportDateFrom').value='2026-10-01';
+  page.get('expReportDateTo').value='2026-10-31';
   await page.context.expRepLoad();
   const cells = page.get('expRepDetailBody').children.map(row => row.innerHTML).join('\n');
   assert.match(cells, /later/);

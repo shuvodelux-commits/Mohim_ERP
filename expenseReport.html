@@ -1,66 +1,103 @@
-<!-- ================= Report ================= -->
-<div class="toolbar" aria-label="Expense report date range">
-  <label style="margin:0 4px 0 0;">From</label>
-  <input id="expReportDateFrom" type="date" style="max-width:150px;">
-  <label style="margin:0 4px 0 0;">To</label>
-  <input id="expReportDateTo" type="date" style="max-width:150px;">
-  <div class="toolbar-spacer"></div>
-  <button class="btn btn-primary" id="expReportRunBtn" type="button">Run Report</button>
-</div>
-<div class="field-error" id="expReportRangeError" role="alert" hidden></div>
+<!-- Expense Report — selected-period figures share the Expense History ledger read path. -->
+<section class="exp-report" aria-label="Expense report">
+  <div class="toolbar exp-report-toolbar">
+    <label for="expReportDateFrom">From <span class="bn-hint">শুরু</span></label>
+    <input id="expReportDateFrom" type="date" aria-label="Report from date">
+    <label for="expReportDateTo">To <span class="bn-hint">শেষ</span></label>
+    <input id="expReportDateTo" type="date" aria-label="Report to date">
+    <div class="toolbar-spacer"></div>
+    <button class="btn btn-primary" id="expReportRunBtn" type="button">Run Report</button>
+  </div>
+  <div class="field-error exp-report-error" id="expReportRangeError" role="alert" hidden></div>
+  <p class="exp-report-applied" id="expRepAppliedRange" aria-live="polite">Choose a date range to view expenses.</p>
 
-<div class="stat-grid">
-  <div class="stat-card"><div class="stat-label">Today's Expense</div><div class="stat-value" id="expRepToday">--</div></div>
-  <div class="stat-card"><div class="stat-label">This Month's Expense</div><div class="stat-value" id="expRepMonth">--</div></div>
-  <div class="stat-card"><div class="stat-label">Period Total</div><div class="stat-value" id="expRepPeriodTotal">--</div></div>
-  <div class="stat-card"><div class="stat-label">Period Entries</div><div class="stat-value" id="expRepPeriodCount">--</div></div>
-</div>
+  <div class="exp-report-overview" aria-label="Selected period summary">
+    <div class="stat-card"><div class="stat-label">Selected Period Total <span class="bn-hint">— মোট খরচ</span></div><div class="stat-value" id="expRepPeriodTotal" aria-live="polite">—</div>
+      <span class="exp-report-kpi-hint">Active expenses in selected dates</span>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Expense Entries <span class="bn-hint">— এন্ট্রি</span></div>
+      <div class="stat-value" id="expRepPeriodCount">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Daily Average <span class="bn-hint">— দৈনিক গড়</span></div>
+      <div class="stat-value" id="expRepDailyAverage">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Largest Expense <span class="bn-hint">— সর্বোচ্চ খরচ</span></div>
+      <div class="stat-value" id="expRepHighest">—</div>
+    </div>
+  </div>
 
-<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px,1fr)); gap:16px;">
-  <div class="card" style="padding:0;">
-    <h3 style="font-size:14px; padding:16px 16px 0;">By Category <span class="bn-hint" style="display:inline;">— খরচের ধরন অনুযায়ী</span></h3>
-    <table><thead><tr><th>Category</th><th class="num">Entries</th><th class="num">Amount</th></tr></thead><tbody id="expRepByCategoryBody"></tbody></table>
-    <div class="empty-state" id="expRepByCategoryEmpty" hidden>No data for this period.</div>
+  <div class="exp-report-breakdowns">
+    <div class="card exp-report-panel">
+      <h3>By Category <span class="bn-hint">— খরচের ধরন</span></h3>
+      <div class="table-scroll"><table>
+        <thead><tr><th>Category</th><th class="num">Entries</th><th class="num">Share</th><th class="num">Amount</th></tr></thead>
+        <tbody id="expRepByCategoryBody"></tbody>
+      </table></div>
+      <div class="empty-state" id="expRepByCategoryEmpty" hidden>No expenses in this period.</div>
+    </div>
+    <div class="card exp-report-panel">
+      <h3>By Payee <span class="bn-hint">— কাকে কত খরচ</span></h3>
+      <div class="table-scroll"><table>
+        <thead><tr><th>Payee</th><th class="num">Entries</th><th class="num">Amount</th></tr></thead>
+        <tbody id="expRepByPayeeBody"></tbody>
+      </table></div>
+      <div class="empty-state" id="expRepByPayeeEmpty" hidden>No expenses in this period.</div>
+    </div>
+    <div class="card exp-report-panel">
+      <h3>Daily Expenses <span class="bn-hint">— তারিখ অনুযায়ী</span></h3>
+      <div class="table-scroll"><table>
+        <thead><tr><th>Date</th><th class="num">Entries</th><th class="num">Amount</th></tr></thead>
+        <tbody id="expRepByDayBody"></tbody>
+      </table></div>
+      <div class="empty-state" id="expRepByDayEmpty" hidden>No expenses in this period.</div>
+    </div>
+    <div class="card exp-report-panel">
+      <h3>By Payment Method <span class="bn-hint">— টাকা দেওয়ার মাধ্যম</span></h3>
+      <div class="table-scroll"><table>
+        <thead><tr><th>Method</th><th class="num">Entries</th><th class="num">Amount</th></tr></thead>
+        <tbody id="expRepByMethodBody"></tbody>
+      </table></div>
+      <div class="empty-state" id="expRepByMethodEmpty" hidden>No expenses in this period.</div>
+    </div>
   </div>
-  <div class="card" style="padding:0;">
-    <h3 style="font-size:14px; padding:16px 16px 0;">By Payee <span class="bn-hint" style="display:inline;">— কাকে কত খরচ</span></h3>
-    <table><thead><tr><th>Payee</th><th class="num">Entries</th><th class="num">Amount</th></tr></thead><tbody id="expRepByPayeeBody"></tbody></table>
-    <div class="empty-state" id="expRepByPayeeEmpty" hidden>No data for this period.</div>
-  </div>
-  <div class="card" style="padding:0;">
-    <h3 style="font-size:14px; padding:16px 16px 0;">By Payment Method <span class="bn-hint" style="display:inline;">— কীভাবে টাকা দেওয়া হয়েছে</span></h3>
-    <table><thead><tr><th>Method</th><th class="num">Entries</th><th class="num">Amount</th></tr></thead><tbody id="expRepByMethodBody"></tbody></table>
-    <div class="empty-state" id="expRepByMethodEmpty" hidden>No data for this period.</div>
-  </div>
-</div>
 
-<div class="card" style="padding:0; margin-top:16px;">
-  <div style="display:flex; align-items:center; flex-wrap:wrap; gap:10px; padding:16px 16px 0;">
-    <h3 style="font-size:14px; margin:0;">Expense Details <span class="bn-hint" style="display:inline;">— তারিখ অনুযায়ী খরচের বিবরণ</span></h3>
-    <span id="expRepDetailCount" class="bn-hint" style="margin-left:auto;">--</span>
-    <button class="btn" id="expRepViewAllBtn" type="button">View Full History</button>
-  </div>
-  <div class="table-scroll">
-    <table>
+  <div class="card exp-report-panel exp-report-details">
+    <div class="exp-report-detail-head">
+      <h3>Expense Details <span class="bn-hint">— খরচের বিস্তারিত</span></h3>
+      <span id="expRepDetailCount" class="bn-hint"></span>
+      <button class="btn" id="expRepViewAllBtn" type="button">View Full History</button>
+    </div>
+    <div class="table-scroll"><table>
       <thead><tr><th>Date</th><th>Expense ID</th><th>Category</th><th>Payee</th><th>Description</th><th class="num">Amount</th></tr></thead>
       <tbody id="expRepDetailBody"></tbody>
-    </table>
+    </table></div>
+    <div class="empty-state" id="expRepDetailEmpty" hidden>No expenses in the selected period.</div>
   </div>
-  <div class="empty-state" id="expRepDetailEmpty" hidden>No expenses in the selected date range.</div>
-</div>
+</section>
 
 <script>
-  var expRepState = { list: [] };
+  var expRepState = { initialized: false, requestSeq: 0 };
 
   function expRepToday_() {
     var d = new Date();
-    var m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0');
-    return d.getFullYear() + '-' + m + '-' + day;
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
 
-  function expRepRangeValid_() {
-    var from = document.getElementById('expReportDateFrom').value;
-    var to = document.getElementById('expReportDateTo').value;
+  function expRepEnsureDates_() {
+    if (expRepState.initialized) return;
+    expRepState.initialized = true;
+    var from = document.getElementById('expReportDateFrom');
+    var to = document.getElementById('expReportDateTo');
+    if (from.value || to.value) return;
+    var today = expRepToday_();
+    from.value = today.slice(0, 7) + '-01';
+    to.value = today;
+  }
+
+  function expRepRangeValid_(from, to) {
     var error = document.getElementById('expReportRangeError');
     var invalid = !!(from && to && from > to);
     error.textContent = invalid ? 'From date must be on or before To date. — শুরুর তারিখ শেষের তারিখের পরে হতে পারবে না।' : '';
@@ -68,46 +105,66 @@
     return !invalid;
   }
 
-  function expRepRun_() {
-    if (!expRepRangeValid_()) return Promise.resolve();
-    return expRepLoad();
-  }
-
-  function expRepLoad() {
-    return withLoader(serverCall('getExpenseList', authToken)).then(function (list) {
-      expRepState.list = list;
-      expRenderReports_();
-    }).catch(function (err) { showToast(err.message, 'error'); });
-  }
-
-  function expRenderReports_() {
-    if (!expRepRangeValid_()) return;
-    var active = expRepState.list.filter(function (e) { return e.status !== 'Cancelled'; });
-    var today = expRepToday_();
-    var thisMonth = today.slice(0, 7);
-
-    var todayTotal = active.filter(function (e) { return e.date === today; }).reduce(function (s, e) { return s + e.amount; }, 0);
-    var monthTotal = active.filter(function (e) { return String(e.date).slice(0, 7) === thisMonth; }).reduce(function (s, e) { return s + e.amount; }, 0);
-    document.getElementById('expRepToday').textContent = formatMoney(todayTotal);
-    document.getElementById('expRepMonth').textContent = formatMoney(monthTotal);
-
-    var from = document.getElementById('expReportDateFrom').value;
-    var to = document.getElementById('expReportDateTo').value;
-    var period = active.filter(function (e) {
-      return (!from || e.date >= from) && (!to || e.date <= to);
+  function expRepClear_() {
+    ['expRepPeriodTotal', 'expRepPeriodCount', 'expRepDailyAverage', 'expRepHighest'].forEach(function (id) {
+      document.getElementById(id).textContent = '—';
     });
-
-    document.getElementById('expRepPeriodTotal').textContent = formatMoney(period.reduce(function (s, e) { return s + e.amount; }, 0));
-    document.getElementById('expRepPeriodCount').textContent = period.length;
-
-    expRenderBreakdown_(period, function (e) { return e.category || 'Uncategorized'; }, 'expRepByCategoryBody', 'expRepByCategoryEmpty');
-    expRenderBreakdown_(period, function (e) { return e.payeeName || 'Unassigned'; }, 'expRepByPayeeBody', 'expRepByPayeeEmpty');
-    expRenderBreakdown_(period, function (e) { return e.paymentMethod || 'Other'; }, 'expRepByMethodBody', 'expRepByMethodEmpty');
-    expRenderDetails_(period);
+    document.getElementById('expRepAppliedRange').textContent = 'No calculated period available.';
+    document.getElementById('expRepDetailCount').textContent = '';
+    [
+      ['expRepByCategoryBody', 'expRepByCategoryEmpty'],
+      ['expRepByPayeeBody', 'expRepByPayeeEmpty'],
+      ['expRepByDayBody', 'expRepByDayEmpty'],
+      ['expRepByMethodBody', 'expRepByMethodEmpty'],
+      ['expRepDetailBody', 'expRepDetailEmpty']
+    ].forEach(function (pair) {
+      document.getElementById(pair[0]).innerHTML = '';
+      document.getElementById(pair[1]).hidden = true;
+    });
   }
 
-  function expRenderDetails_(period) {
-    var latest = period.slice().sort(function (a, b) {
+  function expRepSetError_(message) {
+    var error = document.getElementById('expReportRangeError');
+    error.textContent = message || '';
+    error.hidden = !message;
+  }
+
+  function expRepDayCount_(from, to, rows) {
+    var dates = rows.map(function (e) { return String(e.date || ''); }).filter(Boolean).sort();
+    var first = from || dates[0], last = to || dates[dates.length - 1];
+    if (!first || !last) return 0;
+    var days = (Date.parse(last + 'T00:00:00Z') - Date.parse(first + 'T00:00:00Z')) / 86400000 + 1;
+    return isFinite(days) ? Math.max(0, days) : 0;
+  }
+
+  function expRepShowBreakdown_(rows, keyFn, bodyId, emptyId, total, includeShare) {
+    var groups = new Map();
+    rows.forEach(function (e) {
+      var key = String(keyFn(e) || 'Other');
+      var group = groups.get(key) || { count: 0, amount: 0 };
+      group.count++;
+      group.amount += Number(e.amount) || 0;
+      groups.set(key, group);
+    });
+    var sorted = Array.from(groups.entries()).sort(function (a, b) {
+      return b[1].amount - a[1].amount || a[0].localeCompare(b[0]);
+    });
+    if (bodyId === 'expRepByDayBody') sorted.sort(function (a, b) { return b[0].localeCompare(a[0]); });
+    var body = document.getElementById(bodyId);
+    body.innerHTML = '';
+    sorted.forEach(function (entry) {
+      var group = entry[1], tr = document.createElement('tr');
+      var share = total > 0 ? (group.amount / total * 100).toFixed(1) + '%' : '0%';
+      tr.innerHTML = '<td>' + escapeHtml(entry[0]) + '</td><td class="num">' + group.count + '</td>' +
+        (includeShare ? '<td class="num">' + share + '</td>' : '') +
+        '<td class="num">' + formatMoney(group.amount) + '</td>';
+      body.appendChild(tr);
+    });
+    document.getElementById(emptyId).hidden = sorted.length > 0;
+  }
+
+  function expRepRenderDetails_(rows) {
+    var latest = rows.slice().sort(function (a, b) {
       var byDate = String(b.date || '').localeCompare(String(a.date || ''));
       return byDate || String(b.expenseId || '').localeCompare(String(a.expenseId || ''));
     }).slice(0, 25);
@@ -115,52 +172,88 @@
     body.innerHTML = '';
     latest.forEach(function (e) {
       var tr = document.createElement('tr');
-      tr.innerHTML = '<td>' + escapeHtml(e.date || '') + '</td>' +
-        '<td>' + escapeHtml(e.expenseId || '') + '</td>' +
-        '<td>' + escapeHtml(e.category || 'Uncategorized') + '</td>' +
-        '<td>' + escapeHtml(e.payeeName || 'Unassigned') + '</td>' +
-        '<td>' + escapeHtml(e.description || e.notes || e.referenceNo || '—') + '</td>' +
-        '<td class="num">' + formatMoney(Number(e.amount) || 0) + '</td>';
+      tr.innerHTML = '<td>' + escapeHtml(e.date || '') + '</td><td>' + escapeHtml(e.expenseId || '') +
+        '</td><td>' + escapeHtml(e.category || 'Uncategorized') +
+        '</td><td>' + escapeHtml(e.payeeName || 'Unassigned') +
+        '</td><td>' + escapeHtml(e.description || e.notes || e.referenceNo || '—') +
+        '</td><td class="num">' + formatMoney(Number(e.amount) || 0) + '</td>';
       body.appendChild(tr);
     });
-    document.getElementById('expRepDetailCount').textContent = 'Showing ' + latest.length + ' of ' + period.length + ' entries';
-    document.getElementById('expRepDetailEmpty').hidden = period.length > 0;
+    document.getElementById('expRepDetailCount').textContent = 'Showing ' + latest.length + ' of ' + rows.length + ' entries';
+    document.getElementById('expRepDetailEmpty').hidden = rows.length > 0;
   }
 
-  function expRenderBreakdown_(rows, keyFn, bodyId, emptyId) {
-    var totals = {};
-    rows.forEach(function (e) {
-      var k = keyFn(e);
-      if (!totals[k]) totals[k] = { amount: 0, count: 0 };
-      totals[k].amount += Number(e.amount) || 0;
-      totals[k].count++;
-    });
-    var keys = Object.keys(totals).sort(function (a, b) { return totals[b].amount - totals[a].amount; });
-    var body = document.getElementById(bodyId);
-    body.innerHTML = '';
-    keys.forEach(function (k) {
-      var tr = document.createElement('tr');
-      tr.innerHTML = '<td>' + escapeHtml(k) + '</td><td class="num">' + totals[k].count + '</td><td class="num">' + formatMoney(totals[k].amount) + '</td>';
-      body.appendChild(tr);
-    });
-    document.getElementById(emptyId).hidden = keys.length > 0;
+  function expRepRenderResult_(data, from, to) {
+    if (!data || !Array.isArray(data.rows) || !isFinite(Number(data.filteredTotal))) {
+      throw new Error('Expense report server returned incomplete totals.');
+    }
+    var rows = data.rows.filter(function (e) { return e.status !== 'Cancelled'; });
+    var total = Number(data.filteredTotal);
+    var sum = rows.reduce(function (s, e) { return s + (Number(e.amount) || 0); }, 0);
+    if (Math.abs(total - sum) > 0.01) {
+      throw new Error('Expense total mismatch. The ledger entries do not match the selected period total. Please refresh or contact support.');
+    }
+    var days = expRepDayCount_(from, to, rows);
+    var highest = rows.reduce(function (max, e) { return Math.max(max, Number(e.amount) || 0); }, 0);
+    document.getElementById('expRepAppliedRange').textContent =
+      !from && !to ? 'Applied period: All dates' : 'Applied period: ' + (from || 'Beginning') + ' — ' + (to || 'Latest');
+    document.getElementById('expRepPeriodTotal').textContent = formatMoney(total);
+    document.getElementById('expRepPeriodCount').textContent = rows.length;
+    document.getElementById('expRepDailyAverage').textContent = formatMoney(days ? total / days : 0);
+    document.getElementById('expRepHighest').textContent = formatMoney(highest);
+    expRepShowBreakdown_(rows, function (e) { return e.category || 'Uncategorized'; }, 'expRepByCategoryBody', 'expRepByCategoryEmpty', total, true);
+    expRepShowBreakdown_(rows, function (e) { return e.payeeName || 'Unassigned'; }, 'expRepByPayeeBody', 'expRepByPayeeEmpty', total, false);
+    expRepShowBreakdown_(rows, function (e) { return e.date || 'Unknown date'; }, 'expRepByDayBody', 'expRepByDayEmpty', total, false);
+    expRepShowBreakdown_(rows, function (e) { return e.paymentMethod || 'Other'; }, 'expRepByMethodBody', 'expRepByMethodEmpty', total, false);
+    expRepRenderDetails_(rows);
+  }
+
+  function expRepRun_() {
+    var from = document.getElementById('expReportDateFrom').value;
+    var to = document.getElementById('expReportDateTo').value;
+    var seq = ++expRepState.requestSeq;
+    expRepClear_();
+    if (!expRepRangeValid_(from, to)) {
+      document.getElementById('expReportRunBtn').disabled = false;
+      return Promise.resolve();
+    }
+    expRepSetError_('');
+    var button = document.getElementById('expReportRunBtn');
+    button.disabled = true;
+    return withLoader(serverCall('getExpenseLedger', authToken, { dateFrom: from, dateTo: to }))
+      .then(function (data) {
+        if (seq !== expRepState.requestSeq ||
+            from !== document.getElementById('expReportDateFrom').value ||
+            to !== document.getElementById('expReportDateTo').value) return;
+        expRepRenderResult_(data, from, to);
+      }).catch(function (err) {
+        if (seq !== expRepState.requestSeq) return;
+        expRepClear_();
+        expRepSetError_(err.message || 'Expense report could not be loaded.');
+      }).finally(function () {
+        if (seq === expRepState.requestSeq) button.disabled = false;
+      });
+  }
+
+  function expRepLoad() {
+    expRepEnsureDates_();
+    return expRepRun_();
   }
 
   document.getElementById('expReportRunBtn').addEventListener('click', expRepRun_);
-  document.getElementById('expReportDateFrom').addEventListener('change', expRenderReports_);
-  document.getElementById('expReportDateTo').addEventListener('change', expRenderReports_);
+  document.getElementById('expReportDateFrom').addEventListener('change', expRepRun_);
+  document.getElementById('expReportDateTo').addEventListener('change', expRepRun_);
   document.getElementById('expRepViewAllBtn').addEventListener('click', function () {
     document.getElementById('expListDateFrom').value = document.getElementById('expReportDateFrom').value;
     document.getElementById('expListDateTo').value = document.getElementById('expReportDateTo').value;
     goToPage('expenseList');
     if (typeof expListLoad === 'function') expListLoad();
   });
-
   document.addEventListener('DOMContentLoaded', function () {
     var origGoToPage = goToPage;
     goToPage = function (key) {
       origGoToPage(key);
-      if (key === 'expenseReports' && !expRepState._loaded) { expRepState._loaded = true; expRepLoad(); }
+      if (key === 'expenseReports') expRepLoad();
     };
   });
 </script>
