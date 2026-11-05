@@ -448,6 +448,7 @@ function planSaleReturnRestoration_(invoiceId, productId, productName, qty, opti
         lotRemainingAfter: lotRemainingAfter,
         lotId: row['Lot ID'],
         qty: give,
+        consumptionLinkId: row['Return Consumption Link ID'] || '',
         supplierId: row['Supplier ID'] || ''
       });
     } else {
@@ -457,6 +458,7 @@ function planSaleReturnRestoration_(invoiceId, productId, productName, qty, opti
         saleItemLotQtyAfter: saleItemLotQtyAfter,
         lotId: row['Lot ID'] || '',
         qty: give,
+        consumptionLinkId: row['Return Consumption Link ID'] || '',
         purchasePrice: fallbackPrice,
         supplierId: row['Supplier ID'] || ''
       });
@@ -499,10 +501,15 @@ function applySaleReturnRestorationPlan_(plan, fallbackReference) {
         ''
       );
     }
+    let sourceConsumptionLinkId = draw.consumptionLinkId || '';
     if (draw.saleItemLotRowIndex) {
-      updateRowFields_('SALE_ITEM_LOTS', draw.saleItemLotRowIndex, { 'Quantity': draw.saleItemLotQtyAfter });
+      if (!sourceConsumptionLinkId) sourceConsumptionLinkId = generateId_('RETURN_STOCK_LINEAGE');
+      updateRowFields_('SALE_ITEM_LOTS', draw.saleItemLotRowIndex, {
+        'Quantity': draw.saleItemLotQtyAfter,
+        'Return Consumption Link ID': sourceConsumptionLinkId
+      });
     }
-    restored.push({ lotId: lotId, qty: draw.qty });
+    restored.push({ lotId: lotId, qty: draw.qty, sourceConsumptionLinkId: sourceConsumptionLinkId });
   });
   return restored;
 }
@@ -1108,4 +1115,149 @@ function migrateOpeningStockLots_() {
   } finally {
     lock.releaseLock();
   }
+}
+
+/**
+ * Read-only inverse of the exact physical quantity restored by a completed
+ * Sales Return. Does NOT re-run FIFO: this would take stock from a different
+ * purchase lot and corrupt SALE_ITEM_LOTS consumption evidence.
+ *
+ * Legacy rows without a lineage ID are only reversible when exactly one
+ * original consumption row matches invoice/product/lot/source-product.
+ * Returned fallback lots are reversible only when their sole source is this
+ * Return ID and they still have the necessary quantity.
+ */
+function planSalesReturnStockUndo_(returnId, context) {
+  const opts = context || {};
+  const id = String(returnId || '').trim();
+  const headers = opts.returnHeaders || getAllRows_('SALES_RETURN');
+  const matches = headers.filter(function(r){ return String(r['Return ID']) === id && !isDeleted_(r); });
+  if (matches.length !== 1) throw new Error(matches.length ? 'Duplicate Sales Return ID. Needs Review.' : 'Sales Return not found.');
+  const header = matches[0], invoiceId = String(header['Invoice ID']);
+  const items = (opts.returnItems || getAllRows_('SALES_RETURN_ITEMS')).filter(function(i){
+    return String(i['Return ID']) === id && !isDeleted_(i);
+  });
+  if (!items.length) throw new Error('Return has no active lines. Needs Review.');
+  const movements = (opts.movements || getAllRows_('STOCK_MOVEMENT')).filter(function(m){
+    return m['Type'] === 'Sales Return' && String(m['Reference']) === id && !m['Reversed By'];
+  });
+  if (!movements.length) throw new Error('Return stock movement evidence missing. Needs Review.');
+  const products = opts.products || getAllRows_('PRODUCTS');
+  const lots = opts.stockLots || getAllRows_('STOCK_LOTS');
+  const consumed = opts.consumptionRows || getAllRows_('SALE_ITEM_LOTS');
+  const bundleSnapshots = typeof getSaleBundleSnapshot_ === 'function'
+    ? getSaleBundleSnapshot_(invoiceId, opts.bundleSnapshotRows || getAllRows_('SALE_BUNDLE_COMPONENTS')) : {};
+
+  const expected = {};
+  function key(productId, sourceId) { return String(productId) + '|' + String(sourceId); }
+  items.forEach(function(item){
+    const sourceId = String(item['Product ID']), qty = Number(item['Return Quantity']);
+    if (!Number.isFinite(qty) || qty <= 0) throw new Error('Invalid returned line quantity. Needs Review.');
+    if (item['Sold Product Type'] === 'Bundle') {
+      const snap = bundleSnapshots[sourceId];
+      if (!snap || !snap.components || !snap.components.length) throw new Error('Bundle return source recipe missing. Needs Review.');
+      snap.components.forEach(function(c){
+        const k = key(c.productId, sourceId);
+        expected[k] = (expected[k] || 0) + qty * Number(c.qtyPerSet);
+      });
+    } else {
+      const k = key(sourceId, sourceId);
+      expected[k] = (expected[k] || 0) + qty;
+    }
+  });
+
+  const actual = {}, productGroups = {}, lotGroups = {}, consumptionGroups = {}, movePlans = {};
+  const seenMovementIds = {};
+  movements.forEach(function(m) {
+    const movementId = String(m['Movement ID'] || '');
+    const productId = String(m['Product ID'] || '');
+    const sourceId = String(m['Source Sale Product ID'] || productId);
+    const lotId = String(m['Lot ID'] || '');
+    const qty = Number(m['Quantity In']);
+    if (!movementId || seenMovementIds[movementId] || !productId || !lotId ||
+        !Number.isFinite(qty) || qty <= 0 || Number(m['Quantity Out'] || 0) !== 0)
+      throw new Error('Invalid or duplicate Return stock movement evidence. Needs Review.');
+    seenMovementIds[movementId] = true;
+    const k = key(productId, sourceId);
+    actual[k] = (actual[k] || 0) + qty;
+
+    const productRows = products.filter(function(p){return String(p['Product ID']) === productId && !isDeleted_(p);});
+    const lotRows = lots.filter(function(row){return String(row['Lot ID']) === lotId && String(row['Product ID']) === productId;});
+    if (productRows.length !== 1 || lotRows.length !== 1)
+      throw new Error('Missing or ambiguous stock product/lot evidence. Needs Review.');
+    const product = productRows[0], lot = lotRows[0];
+    const link = String(m['Source Consumption Link ID'] || '');
+    const candidates = consumed.filter(function(c){
+      return String(c['Invoice ID']) === invoiceId &&
+        String(c['Product ID']) === productId &&
+        String(c['Lot ID']) === lotId &&
+        String(c['Source Sale Product ID'] || c['Product ID']) === sourceId &&
+        (!link || String(c['Return Consumption Link ID'] || '') === link);
+    });
+    let sourceRow = null;
+    if (candidates.length === 1) sourceRow = candidates[0];
+    else if (candidates.length > 1 || link)
+      throw new Error('Ambiguous original sale consumption evidence. Needs Review.');
+    else if (String(lot['Purchase ID'] || '') !== id)
+      throw new Error('Original sale consumption evidence missing. Needs Review.');
+    if (!productGroups[productId]) productGroups[productId] = {productId:productId,rowIndex:product._rowIndex,newStock:Number(product['Current Stock'])||0,qty:0};
+    productGroups[productId].qty += qty;
+    if (!lotGroups[lotId]) lotGroups[lotId] = {lotId:lotId,rowIndex:lot._rowIndex,newRemaining:Number(lot['Remaining Quantity'])||0,qty:0};
+    lotGroups[lotId].qty += qty;
+    if (sourceRow) {
+      const rowKey = String(sourceRow._rowIndex);
+      if (!consumptionGroups[rowKey]) consumptionGroups[rowKey] = {
+        rowIndex:sourceRow._rowIndex,newQuantity:Number(sourceRow['Quantity'])||0,qty:0
+      };
+      consumptionGroups[rowKey].qty += qty;
+    }
+    movePlans[movementId] = {rowIndex:m._rowIndex,movementId:movementId,productId:productId,productName:product['Product Name'],
+      lotId:lotId,sourceId:sourceId,qty:qty};
+  });
+  const expectedKeys = Object.keys(expected), actualKeys = Object.keys(actual);
+  if (expectedKeys.length !== actualKeys.length || expectedKeys.some(function(k){
+    return Math.abs((expected[k] || 0) - (actual[k] || 0)) > 1e-8;
+  })) throw new Error('Return stock movement quantity mismatch. Needs Review.');
+
+  const productDeltas = Object.keys(productGroups).map(function(k){
+    const g=productGroups[k];g.newStock-=g.qty;
+    if (g.newStock < -1e-8) throw new Error('Insufficient current product stock to reverse this return.');
+    return g;
+  });
+  const lotDeltas = Object.keys(lotGroups).map(function(k){
+    const g=lotGroups[k];g.newRemaining-=g.qty;
+    if (g.newRemaining < -1e-8) throw new Error('Returned lot has already been consumed; stock reversal blocked.');
+    return g;
+  });
+  const saleConsumptionDeltas = Object.keys(consumptionGroups).map(function(k){
+    const g=consumptionGroups[k];g.newQuantity+=g.qty;return g;
+  });
+  return {returnId:id,invoiceId:invoiceId,productDeltas:productDeltas,lotDeltas:lotDeltas,
+    saleConsumptionDeltas:saleConsumptionDeltas,movements:Object.keys(movePlans).map(function(k){return movePlans[k];})};
+}
+
+/** Called only under ScriptLock after complete validation and journal reservation. */
+function applySalesReturnStockUndo_(plan, operationId, operationType) {
+  const now = new Date();
+  (plan.productDeltas || []).forEach(function(g){
+    updateRowFields_('PRODUCTS',g.rowIndex,{'Current Stock':g.newStock,'Updated At':now});
+  });
+  (plan.lotDeltas || []).forEach(function(g){
+    updateRowFields_('STOCK_LOTS',g.rowIndex,{'Remaining Quantity':g.newRemaining});
+  });
+  (plan.saleConsumptionDeltas || []).forEach(function(g){
+    updateRowFields_('SALE_ITEM_LOTS',g.rowIndex,{'Quantity':g.newQuantity});
+  });
+  (plan.movements || []).forEach(function(m){
+    updateRowFields_('STOCK_MOVEMENT',m.rowIndex,{'Reversed By':operationId,'Reversed At':now});
+    const pd = plan.productDeltas.filter(function(p){return p.productId===m.productId;})[0];
+    appendRow_('STOCK_MOVEMENT',{
+      'Movement ID':generateId_('STOCK_MOVEMENT'),
+      'Date':now,'Product ID':m.productId,'Product Name':m.productName,
+      'Type':'Sales Return '+operationType+' Reversal','Reference':plan.returnId,
+      'Quantity In':'','Quantity Out':m.qty,'Balance Stock':pd.newStock,
+      'Lot ID':m.lotId,'Source Sale Product ID':m.sourceId,
+      'Notes':'Correction '+operationId
+    });
+  });
 }
