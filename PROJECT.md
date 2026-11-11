@@ -1179,3 +1179,12 @@ movement from the same invoice/payment, and never silently re-seed old records.
   or used. Historical Settings rows may remain but have no effect.
 - There is no device-duration cap: protect endpoint/browser access and sign
   out on shared devices. This policy does not alter POS cash sessions.
+
+
+## 2026-11-11 — Flexible Sales Returns (approved TDD change)
+
+- In **Find Customer → Batch Return**, invoices selected/opened with no return quantity are ignored when submitting. If one invoice actually contributes items, the existing single-invoice `completeReturn` workflow is used; two or more contributing invoices use `completeReturnBatch`. The return-date check considers contributing invoice dates only, including zero-priced products with positive return quantity.
+- **Cash Refund** and **Store Credit** remain operator choices regardless of whether the source invoice is fully paid, partially paid, or fully due. Former per-invoice cash-collected caps are informational only; `Cash` debits Cash Book without changing the customer's current due, while `Store Credit` reduces the customer balance through the original customer-ledger workflow.
+- **Not changed:** return quantity / original sale price ceilings, FIFO stock lineage, duplicate/product validation, active Cash Session, permissions, debit/credit posting and correction audit, one child Return ID per participating invoice, and the existing split-payment batch safety restriction (multi-invoice split-payment journals require a separately verified extension).
+- Tests cover fully-due cash batch + single returns, return correction from Credit to Cash, sparse invoice payloads, zero-price returns, and browser visibility of Cash on unpaid invoices.
+- Code is reviewed via GitHub PR on a test branch; no automatic Apps Script deployment.

@@ -1002,7 +1002,7 @@ async function main() {
   ({page,errors}=await boot(browser));
   await page.evaluate(source.match(/page.evaluate\("""(window\.__mockOverrides.getInvoiceForReturn=[\s\S]*?)"""\)/)[1]);
   await route(page,'returns');await page.evaluate("returnsLoadInvoiceById_('INV-UNPAID')");
-  await check('unpaid return uses store credit and blocks cash',async()=>{await page.waitForFunction(()=>document.getElementById('rtRefundMethod').value==='Store Credit');assert.equal(await page.locator('#rtRefundMethod option[value="Cash"]').isDisabled(),true);assert.match(await page.textContent('#rtRefundHint'),/No cash was collected/);});
+  await check('unpaid return keeps cash enabled and explains due handling',async()=>{await page.waitForFunction(()=>document.getElementById('rtInvoiceArea').hidden===false);assert.equal(await page.locator('#rtRefundMethod').inputValue(),'Cash');assert.equal(await page.locator('#rtRefundMethod option[value="Cash"]').isDisabled(),false);assert.match(await page.textContent('#rtRefundHint'),/leaves the customer due unchanged/i);});
   await check('unpaid return browser errors',()=>assert.deepEqual(errors,[]));await page.close();
   ({page,errors}=await boot(browser));await route(page,'posv2');await page.fill('#posSearch','4 inch Test Pipe');await page.press('#posSearch','Enter');
   await page.fill('#posCustomerName','মহিউদ্দিন');await page.fill('#posCustomerPhone','01712345678');await page.click('#posSaveDraftBtn');

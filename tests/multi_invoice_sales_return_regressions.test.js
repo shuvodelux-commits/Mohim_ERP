@@ -326,8 +326,9 @@ test('batch requires 2-20 unique invoices, <=100 lines, and one non-empty Custom
   assert.equal(w5.writes.length, 0);
 });
 
-test('cash batch validates refund provenance independently for each source invoice', () => {
+test('cash batch accepts a fully due invoice without changing customer due', () => {
   const seed = twoInvoiceOwnedSeed({ sale2: { 'Paid Amount': 0, 'Due Amount': 500, 'Payment Status': 'Due' } });
+  seed.CUSTOMERS[0]['Current Due'] = 500;
   seed.CUSTOMER_LEDGER.push({
     'Ledger ID': 'LED-DUE', Date: '2026-09-10', 'Customer ID': 'C1', 'Customer Name': 'Buyer',
     Type: 'Sale', Reference: 'INV2', Debit: 500, Credit: '', Balance: 500, 'Created At': '2026-09-10T10:00:00'
@@ -339,9 +340,62 @@ test('cash batch validates refund provenance independently for each source invoi
       { invoiceId: 'INV2', items: [{ productId: 'P1', qty: 1 }] }
     ]
   }));
-  assert.equal(result.success, false);
-  assert.match(result.message, /INV2|cash refund is limited to 0/i);
-  assert.equal(w.writes.length, 0, 'no child may write when another invoice fails cash provenance');
+  assert.equal(result.success, true, result.message);
+  assert.equal(result.data.returnIds.length, 2);
+  assert.equal(result.data.totalReturnAmount, 200);
+  assert.equal(w.rows('CASH_BOOK').length, 2, 'each child has its own cash refund reference');
+  assert.equal(w.rows('CASH_BOOK').reduce((sum, row) => sum + Number(row.Debit || 0), 0), 200);
+  assert.equal(w.rows('CUSTOMERS')[0]['Current Due'], 500, 'cash-only refund leaves due untouched');
+  assert.equal(w.rows('CUSTOMER_LEDGER').length, 1, 'cash-only refund does not create customer credit');
+});
+
+test('single cash return is available on a fully due invoice', () => {
+  const seed = twoInvoiceOwnedSeed({ sale1: { 'Paid Amount': 0, 'Due Amount': 500, 'Payment Status': 'Due' } });
+  seed.CUSTOMERS[0]['Current Due'] = 500;
+  const w = workbook(seed);
+  const result = w.ctx.completeReturn('token', {
+    invoiceId: 'INV1', items: [{ productId: 'P1', qty: 1, price: 100 }],
+    refundMethod: 'Cash', date: '2026-09-21'
+  });
+  assert.equal(result.success, true, result.message);
+  assert.equal(result.data.totalReturnAmount, 100);
+  assert.equal(w.rows('CASH_BOOK').length, 1);
+  assert.equal(w.rows('CUSTOMERS')[0]['Current Due'], 500);
+});
+
+test('batch UI sends only positive-quantity invoice groups, including zero-price returns', () => {
+  const source = read('returns.html');
+  const fn = source.match(/function rtSelectedBatchPayload_\(\) \{[\s\S]*?\n  \}/);
+  assert.ok(fn, 'batch payload builder exists');
+  const ctx = {
+    rtState: { batchInvoices: [
+      { invoiceId: 'INV1', items: [{ productId: 'P1', name: 'Widget', _returnQty: 2, _returnPrice: 100 }] },
+      { invoiceId: 'INV2', items: [{ productId: 'P2', name: 'Unused', _returnQty: 0, _returnPrice: 100 }] },
+      { invoiceId: 'INV3', items: [{ productId: 'P3', name: 'Gift', _returnQty: 1, _returnPrice: 0 }] }
+    ] }
+  };
+  vm.runInNewContext(fn[0], ctx);
+  const payload = ctx.rtSelectedBatchPayload_();
+  assert.deepEqual(Array.from(payload, child => child.invoiceId), ['INV1', 'INV3']);
+  assert.equal(payload[0].items[0].qty, 2);
+  assert.equal(payload[1].items[0].price, 0);
+});
+
+test('batch UI skips zero-return invoice groups and routes one participating invoice to native single return', () => {
+  const ui = read('returns.html');
+  assert.match(ui, /function rtSelectedBatchPayload_\s*\(/);
+  assert.match(ui, /filter\(function \(child\) \{ return child\.items\.length > 0; \}\)/);
+  assert.doesNotMatch(ui, /invoiceReturns\.length < 2/);
+  assert.match(ui, /invoiceReturns\.length === 1/);
+  assert.match(ui, /serverCall\('completeReturn',\s*authToken/);
+  assert.match(ui, /serverCall\('completeReturnBatch',\s*authToken/);
+});
+
+test('batch return date validates only invoices with a returned item', () => {
+  const ui = read('returns.html');
+  assert.match(ui, /rtState\.batchInvoices\.filter\(function \(inv\)/);
+  assert.match(ui, /inv\.items\.some\(function \(item\)/);
+  assert.match(ui, /Number\(item\._returnQty\)/);
 });
 
 test('cash batch accumulates same-product stock and shared lot restoration across invoices', () => {

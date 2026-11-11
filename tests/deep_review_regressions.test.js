@@ -68,7 +68,7 @@ test('sales return amount is server-authoritative and discounted once', () => {
   const body = fnSource(source, 'prepareSalesReturn_');
   assert.doesNotMatch(body, /Number\(item\.unitPrice\)/);
   assert.match(body, /effectiveTransactionUnitPrice_/);
-  assert.match(body, /maxCashRefund|cashRefund/i);
+  assert.doesNotMatch(body, /maxCashRefund|Cash refund is limited/i);
   assert.match(fnSource(source, 'completeReturn'), /prepareSalesReturn_/);
 });
 

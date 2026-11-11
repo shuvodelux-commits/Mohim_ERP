@@ -348,15 +348,12 @@ test('Second active return on same invoice survives edit/deletion of the first a
  assert.equal(nonDeleted(w,'SALES_RETURN').length,1);
  assert.equal(nonDeleted(w,'SALES_RETURN')[0]['Return ID'],second);
 });
-test('Invalid Cash refund amount (exceeding collected cash) is rejected before a single new write',()=>{
+test('editing credit to cash is allowed even if collected cash is less than return value',()=>{
  const w=workbook(),id=createReturnScenario(w,'Store Credit',2,100);
- w.ctx.customerInvoiceCashCollected_=()=>50;
- const writes=w.writes.length;
- const edit=editReturnScenario(w,id,0,'Cash',2,100,'over-refund-dont-mutate-123');
- assert.equal(edit.success,false,'refund exceeding verified collected cash must fail');
- assert.match(edit.message,/cash|collect|refund/i);
- assert.equal(w.writes.length,writes,'no mutation, no journal');
- assertAccounting(w,{refund:0,credit:200,due:-200,stock:7,qty:2,version:0,id});
+ w.ctx.customerInvoiceCashCollected_=()=>0;
+ const edit=editReturnScenario(w,id,0,'Cash',2,100,'over-refund-with-approval-123');
+ assert.equal(edit.success,true,edit.message);
+ assertAccounting(w,{refund:200,credit:0,due:0,stock:7,qty:2,version:1,id});
 });
 test('Orphan or deleted original Cash Book evidence blocks refund reclassification before writes',()=>{
  const w=workbook(),id=createReturnScenario(w,'Cash',2,100);

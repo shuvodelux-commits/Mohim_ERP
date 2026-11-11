@@ -368,7 +368,7 @@ test('sale delete validates every product before the first reversal write', () =
 });
 
 
-test('cash sales return rejects direct Other-method sale because no refundable cash provenance exists', () => {
+test('cash sales return accepts Other-method invoice independent of prior cash collection', () => {
   const w = workbook({
     SALES: [sale({ Subtotal: 100, 'Grand Total': 100, 'Paid Amount': 100, 'Due Amount': 0, 'Payment Method': 'Other' })],
     SALE_ITEMS: [item(1)],
@@ -377,11 +377,11 @@ test('cash sales return rejects direct Other-method sale because no refundable c
     SALE_ITEM_LOTS: [{ 'Invoice ID': 'INV1', 'Product ID': 'P1', 'Lot ID': 'L1', Quantity: 1, 'Unit Cost': 40 }],
     CUSTOMER_LEDGER: [], SALES_RETURN: [], SALES_RETURN_ITEMS: [], CASH_BOOK: []
   });
-  const before = w.writes.length;
   const result = w.ctx.completeReturn('token', returnPayload(1));
-  assert.equal(result.success, false);
-  assert.match(result.message, /Cash refund is limited to 0/);
-  assert.equal(w.writes.length, before, 'invalid cash refund must be rejected before stock or money writes');
+  assert.equal(result.success, true, result.message);
+  assert.equal(w.rows('SALES_RETURN').length, 1);
+  assert.equal(w.rows('CASH_BOOK').length, 1);
+  assert.equal(Number(w.rows('CASH_BOOK')[0].Debit), 100);
 });
 
 test('vendor sourcing reversal falls back to quantity times unit cost when legacy Total Cost is blank', () => {
