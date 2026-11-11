@@ -477,18 +477,10 @@ function prepareSalesReturn_(payload, options) {
     };
   });
 
-  if (payload.refundMethod === 'Cash') {
-    const maxCashRefund = opts.cashRefundAvailable !== undefined
-      ? Number(opts.cashRefundAvailable) || 0
-      : salesReturnCashRefundAvailable_(payload.invoiceId, sale['Paid Amount']);
-    if (totalReturnAmount > maxCashRefund + 0.005) {
-      throw new Error(
-        'Cash refund is limited to ' + roundMoney_(maxCashRefund) +
-        ' that is verifiably collected on this invoice. Use Store Credit for the remaining return value.'
-      );
-    }
-  }
-
+  // Cash is an operator-selected outgoing payment, not a reimbursement
+  // ceiling derived from this invoice's prior collections. On an unpaid
+  // invoice it must leave the customer's existing due unchanged.
+  // Preserve cash collection evidence as informational data in return views.
   const productsById = opts.productsById || (function () {
     const map = {};
     activeRows_('PRODUCTS').forEach(function (p) { map[p['Product ID']] = p; });
@@ -1185,12 +1177,6 @@ function prepareSalesReturnChange_(token, returnId, requested, mode) {
       availableOwn = outstandingSaleOwnStockByProduct_(invoiceId,saleItems,otherReturnItems,currentConsumptions,getAllRows_('VENDOR_SOURCING'));
       Object.keys(oldQty).forEach(function(k){availableOwn[k]=(availableOwn[k]||0)+oldQty[k];});
     }
-    const collected = typeof customerInvoiceCashCollected_ === 'function'
-      ? customerInvoiceCashCollected_(invoiceId) : Number(sale['Paid Amount']) || 0;
-    const priorCash = otherReturnHeaders.reduce(function(total,row){
-      return total + (row['Refund Method'] === 'Cash' ? Number(row['Total Return Amount']) || 0 : 0);
-    },0);
-    const maxCash = Math.max(0,roundMoney_(collected-priorCash));
     replacement = prepareSalesReturn_({
       invoiceId:invoiceId,items:payload.items,refundMethod:payload.refundMethod,
       reason:payload.reason,notes:payload.notes
@@ -1200,7 +1186,7 @@ function prepareSalesReturnChange_(token, returnId, requested, mode) {
       sale:sale,saleItems:saleItems,returnItems:otherReturnItems,
       products:vProducts,productsById:productsById,consumptionRows:vConsumptions,stockLots:vLots,
       vendorSourcingRows:getAllRows_('VENDOR_SOURCING'),
-      cashRefundAvailable:maxCash,skipPhysicalRestoration:!needsStockChange,
+      skipPhysicalRestoration:!needsStockChange,
       outstandingOwnQtyByProduct:availableOwn
     });
   } else {
