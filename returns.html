@@ -56,7 +56,7 @@
     <div class="return-invoice-summary" style="display:flex; gap:24px; flex-wrap:wrap; margin-top:14px; border-top:1px solid var(--color-border); padding-top:12px;">
       <div><div class="stat-label">Original Total</div><div id="rtInvGrandTotal"></div></div>
       <div><div class="stat-label">Paid</div><div id="rtInvPaid"></div></div>
-      <div><div class="stat-label">Cash Refund Available</div><div id="rtCashRefundAvailable"></div></div>
+      <div><div class="stat-label">Cash Collected (Info)</div><div id="rtCashRefundAvailable"></div></div>
       <div><div class="stat-label">Due</div><div id="rtInvDue"></div></div>
       <div><div class="stat-label">Previously Returned</div><div id="rtInvPrevReturned"></div></div>
       <div><div class="stat-label">Net Sale</div><div id="rtInvNetSale"></div></div>
@@ -437,7 +437,7 @@
       document.getElementById('rtInvAddress').textContent = inv.customerAddress || '—';
       document.getElementById('rtInvGrandTotal').textContent = formatMoney(rtSumInvoices_('grandTotal'));
       document.getElementById('rtInvPaid').textContent = formatMoney(rtSumInvoices_('paidAmount'));
-      document.getElementById('rtCashRefundAvailable').textContent = formatMoney(rtSumInvoices_('cashRefundAvailable')) + ' total (checked per invoice)';
+      document.getElementById('rtCashRefundAvailable').textContent = formatMoney(rtSumInvoices_('cashRefundAvailable')) + ' total (reference only)';
       document.getElementById('rtInvDue').textContent = formatMoney(rtSumInvoices_('dueAmount'));
       document.getElementById('rtInvPrevReturned').textContent = formatMoney(rtSumInvoices_('previouslyReturnedAmount'));
       document.getElementById('rtInvNetSale').textContent = formatMoney(rtSumInvoices_('netSale'));
@@ -490,7 +490,7 @@
         var group = document.createElement('tr');
         group.className = 'return-batch-invoice-row';
         group.innerHTML = '<td colspan="7"><strong>' + escapeHtml(inv.invoiceId) + '</strong> — ' + escapeHtml(inv.date) +
-          ' · Cash refundable ' + formatMoney(inv.cashRefundAvailable || 0) + '</td>';
+          ' · Collected cash (info) ' + formatMoney(inv.cashRefundAvailable || 0) + '</td>';
         body.appendChild(group);
         inv.items.forEach(function (item, i) { body.appendChild(rtRenderItemRow_(item, i, bi)); });
       });
@@ -541,34 +541,13 @@
     var refundSelect = document.getElementById('rtRefundMethod');
     var cashOption = refundSelect.querySelector('option[value="Cash"]');
     var hint = document.getElementById('rtRefundHint');
-    if (rtState.batchMode) {
-      var allNoCash = rtState.batchInvoices.every(function (inv) { return (Number(inv.cashRefundAvailable) || 0) <= 0; });
-      cashOption.disabled = allNoCash;
-      if (allNoCash && refundSelect.value === 'Cash') refundSelect.value = 'Store Credit';
-      var shortfall = rtState.batchInvoices.filter(function (inv) {
-        return rtBatchInvoiceTotal_(inv) > (Number(inv.cashRefundAvailable) || 0) + 0.005;
-      })[0];
-      if (refundSelect.value === 'Cash' && shortfall) {
-        hint.textContent = shortfall.invoiceId + ': cash refund available is ' + formatMoney(shortfall.cashRefundAvailable || 0) + '. Cash is checked separately for each invoice.';
-      } else {
-        hint.textContent = 'Cash refund eligibility is checked separately for every selected invoice.';
-      }
-      return;
-    }
-    var cashRefundAvailable = Number(rtState.invoice && rtState.invoice.cashRefundAvailable) || 0;
-    if (rtState.editingReturnId && rtState.editHeader && rtState.editHeader['Refund Method'] === 'Cash') {
-      cashRefundAvailable += Number(rtState.editHeader['Total Return Amount']) || 0;
-    }
-    var total = rtReturnTotal_();
-    cashOption.disabled = cashRefundAvailable <= 0;
-    if (cashRefundAvailable <= 0 && refundSelect.value === 'Cash') refundSelect.value = 'Store Credit';
-    if (cashRefundAvailable <= 0) {
-      hint.textContent = 'No cash was collected on this invoice. The return will reduce customer due / create store credit.';
-    } else if (refundSelect.value === 'Cash' && total > cashRefundAvailable + 0.005) {
-      hint.textContent = 'Cash refund available: ' + formatMoney(cashRefundAvailable) + '. Choose Adjust to Customer Due / Store Credit for a larger return.';
-    } else {
-      hint.textContent = 'Cash refund available: ' + formatMoney(cashRefundAvailable) + '.';
-    }
+    cashOption.disabled = false;
+    var hasDue = rtState.batchMode
+      ? rtState.batchInvoices.some(function (inv) { return (Number(inv.dueAmount) || 0) > 0.005; })
+      : (Number(rtState.invoice && rtState.invoice.dueAmount) || 0) > 0.005;
+    hint.textContent = hasDue
+      ? 'Cash Refund pays out cash and leaves the customer due unchanged. Use Store Credit to adjust the customer balance.'
+      : 'Cash Refund pays out cash; Store Credit adjusts the customer balance.';
   }
 
   function rtRecalcTotal_() {
@@ -614,28 +593,21 @@
 
     if (rtState.batchMode) {
       var invoiceReturns = rtSelectedBatchPayload_();
-      if (invoiceReturns.length < 2) {
-        errEl.textContent = 'Enter return quantities on at least two selected invoices for a batch return.';
+      if (invoiceReturns.length < 1) {
+        errEl.textContent = 'Enter a return quantity on at least one selected invoice.';
         errEl.style.display = 'block';
         return;
       }
-      var latestInvoiceDate = rtState.batchInvoices.reduce(function (latest, inv) { return inv.date > latest ? inv.date : latest; }, '');
+      var participatingInvoices = rtState.batchInvoices.filter(function (inv) {
+        return inv.items.some(function (item) { return (Number(item._returnQty) || 0) > 0; });
+      });
+      var latestInvoiceDate = participatingInvoices.reduce(function (latest, inv) { return inv.date > latest ? inv.date : latest; }, '');
       if (latestInvoiceDate && rtDate < latestInvoiceDate) {
         errEl.textContent = 'Return date cannot be before selected invoice date ' + latestInvoiceDate + '.';
         errEl.style.display = 'block';
         return;
       }
       var method = document.getElementById('rtRefundMethod').value;
-      if (method === 'Cash') {
-        var shortfall = rtState.batchInvoices.filter(function (inv) {
-          return rtBatchInvoiceTotal_(inv) > (Number(inv.cashRefundAvailable) || 0) + 0.005;
-        })[0];
-        if (shortfall) {
-          errEl.textContent = shortfall.invoiceId + ': cash refund available is ' + formatMoney(shortfall.cashRefundAvailable || 0) + '. Use Store Credit for a larger return.';
-          errEl.style.display = 'block';
-          return;
-        }
-      }
       var payload = {
         invoiceReturns: invoiceReturns,
         refundMethod: method,
@@ -646,6 +618,44 @@
       };
       var total = rtReturnTotal_();
       var itemCount = invoiceReturns.reduce(function (sum, child) { return sum + child.items.length; }, 0);
+      if (invoiceReturns.length === 1) {
+        var onlyReturn = invoiceReturns[0];
+        var onlyInvoice = participatingInvoices[0];
+        var singlePayload = {
+          invoiceId: onlyReturn.invoiceId, items: onlyReturn.items,
+          refundMethod: method, reason: payload.reason, notes: payload.notes,
+          date: rtDate, backdatedReason: rtBackdatedReason
+        };
+        runConfirmedAction({
+          type: 'financial',
+          title: 'Complete Sales Return?',
+          message: 'Only one of the opened invoices has returned products. This will create one normal Sales Return.',
+          details: [
+            { label: 'Invoice', value: singlePayload.invoiceId, emphasis: true },
+            { label: 'Return Amount', value: formatMoney(total), emphasis: true },
+            { label: 'Items Returning', value: String(itemCount) },
+            { label: 'Refund Method', value: method },
+            { label: 'Date', value: rtDate }
+          ],
+          confirmLabel: 'Complete Return',
+          loadingLabel: 'Completing...',
+          trigger: document.getElementById('rtCompleteBtn')
+        }, function () {
+          if (String(onlyInvoice.paymentDetailVersion || '') === '1') {
+            var fingerprint = JSON.stringify(singlePayload);
+            if (rtState.returnAttemptFingerprint && rtState.returnAttemptFingerprint !== fingerprint) {
+              throw new Error('Previous refund request changed. Check the original return before retrying.');
+            }
+            rtState.returnAttemptFingerprint = fingerprint;
+            singlePayload.operationId = rtReturnOperationId_();
+          }
+          return withLoader(serverCall('completeReturn', authToken, singlePayload)).then(function (res) {
+            showToast('Return ' + res.returnId + ' completed — ' + formatMoney(res.totalReturnAmount), 'success');
+            rtReset_();
+          });
+        }).catch(function (err) { errEl.textContent = err.message; errEl.style.display = 'block'; });
+        return;
+      }
       runConfirmedAction({
         type: 'financial',
         title: 'Complete Batch Sales Return?',
@@ -695,14 +705,6 @@
         editReason: editReason
       };
       var editAmount = rtReturnTotal_();
-      var editCashAvailable = (Number(rtState.invoice.cashRefundAvailable) || 0) +
-        (rtState.editHeader && rtState.editHeader['Refund Method'] === 'Cash'
-          ? (Number(rtState.editHeader['Total Return Amount']) || 0) : 0);
-      if (editPayload.refundMethod === 'Cash' && editAmount > editCashAvailable + 0.005) {
-        errEl.textContent = 'Cash refund available: ' + formatMoney(editCashAvailable) + '. Choose Store Credit for any remaining value.';
-        errEl.style.display = 'block';
-        return;
-      }
       runConfirmedAction({
         type:'financial',title:'Update Sales Return '+rtState.editingReturnId+'?',
         message:'This may reverse and repost stock and customer accounting. Original history will remain in the audit log.',
@@ -753,12 +755,6 @@
       backdatedReason: rtBackdatedReason
     };
     var salesReturnTotal = rtReturnTotal_();
-    var cashRefundAvailable = Number(rtState.invoice.cashRefundAvailable) || 0;
-    if (payloadSingle.refundMethod === 'Cash' && salesReturnTotal > cashRefundAvailable + 0.005) {
-      errEl.textContent = 'Cash refund available is ' + formatMoney(cashRefundAvailable) + '. Choose Adjust to Customer Due / Store Credit for the remaining return value.';
-      errEl.style.display = 'block';
-      return;
-    }
     runConfirmedAction({
       type: 'financial',
       title: 'Complete Sales Return?',
