@@ -376,7 +376,8 @@ test('batch UI skips zero-return invoice groups and routes one participating inv
 test('batch return date validates only invoices with a returned item', () => {
   const ui = read('returns.html');
   assert.match(ui, /rtState\.batchInvoices\.filter\(function \(inv\)/);
-  assert.match(ui, /rtBatchInvoiceTotal_\(inv\) > 0/);
+  assert.match(ui, /inv\.items\.some\(function \(item\)/);
+  assert.match(ui, /Number\(item\._returnQty\)/);
 });
 
 test('cash batch accumulates same-product stock and shared lot restoration across invoices', () => {
