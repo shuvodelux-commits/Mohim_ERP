@@ -94,12 +94,12 @@ test('sales return bootstrap exposes remaining invoice cash-refund capacity', ()
   assert.match(salesReturn, /priorCashRefunds/);
 });
 
-test('return UI does not default to an impossible cash refund', () => {
+test('return UI keeps Cash selectable even if nothing was collected on source invoice', () => {
   assert.match(returnsHtml, /id="rtCashRefundAvailable"/);
   assert.match(returnsHtml, /function\s+rtApplyRefundAvailability_\s*\(/);
-  assert.match(returnsHtml, /cashRefundAvailable\s*<=\s*0/);
-  assert.match(returnsHtml, /refundSelect\.value\s*=\s*'Store Credit'/);
-  assert.match(returnsHtml, /cashOption\.disabled\s*=\s*cashRefundAvailable\s*<=\s*0/);
+  assert.doesNotMatch(returnsHtml, /cashOption\.disabled\s*=\s*cashRefundAvailable\s*<=\s*0/);
+  assert.doesNotMatch(returnsHtml, /refundSelect\.value\s*=\s*'Store Credit'/);
+  assert.match(returnsHtml, /Refund Method/);
 });
 
 console.log(`\n${pass}/${pass + fail} passed`);
