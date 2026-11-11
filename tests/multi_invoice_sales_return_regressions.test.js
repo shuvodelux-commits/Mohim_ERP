@@ -363,6 +363,24 @@ test('single cash return is available on a fully due invoice', () => {
   assert.equal(w.rows('CUSTOMERS')[0]['Current Due'], 500);
 });
 
+test('batch UI sends only positive-quantity invoice groups, including zero-price returns', () => {
+  const source = read('returns.html');
+  const fn = source.match(/function rtSelectedBatchPayload_\(\) \{[\s\S]*?\n  \}/);
+  assert.ok(fn, 'batch payload builder exists');
+  const ctx = {
+    rtState: { batchInvoices: [
+      { invoiceId: 'INV1', items: [{ productId: 'P1', name: 'Widget', _returnQty: 2, _returnPrice: 100 }] },
+      { invoiceId: 'INV2', items: [{ productId: 'P2', name: 'Unused', _returnQty: 0, _returnPrice: 100 }] },
+      { invoiceId: 'INV3', items: [{ productId: 'P3', name: 'Gift', _returnQty: 1, _returnPrice: 0 }] }
+    ] }
+  };
+  vm.runInNewContext(fn[0], ctx);
+  const payload = ctx.rtSelectedBatchPayload_();
+  assert.deepEqual(Array.from(payload, child => child.invoiceId), ['INV1', 'INV3']);
+  assert.equal(payload[0].items[0].qty, 2);
+  assert.equal(payload[1].items[0].price, 0);
+});
+
 test('batch UI skips zero-return invoice groups and routes one participating invoice to native single return', () => {
   const ui = read('returns.html');
   assert.match(ui, /function rtSelectedBatchPayload_\s*\(/);
