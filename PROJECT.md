@@ -374,7 +374,11 @@ This separation is important because the ERP has no general database transaction
 
 If physical lots cannot satisfy the sale, the remaining shortage becomes an `OVERSOLD` lot with negative remaining quantity.
 
-Negative stock is intentional business behavior.
+**Oversold provisional purchase cost (2026-11-20):** For any new OVERSOLD shortage, use the last genuine `PUR-*` purchase lot's Purchase Price as of that sale's verified business date, even when the genuine purchase lot has already been consumed (Remaining Quantity = 0). The editable Products.Purchase Price must not silently replace that historical price. Deterministic selection uses purchase date, then Lot ID on the same date; excludes deleted, internal opening/adjustment, other products and future purchases. Without trustworthy prior purchase-lot evidence, fail closed with Needs Review before money, stock or invoice writes. Preserve this source in `STOCK_LOTS.Provisional Cost Source Lot ID` and `Provisional Cost Source Purchase ID` for the newly created OVERSOLD lot and its original `SALE_ITEM_LOTS.Unit Cost`.
+
+**Not yet included:** Funding that original negative lot from subsequent new purchases and adjusting the original provisional sale COGS/profit require a separately tested, audited settlement writer with sale/purchase return safety, reconciliation and owner approval. A negative lot is **not** automatically revalued when a new positive lot appears; do not report a final COGS adjustment before that Stage B is implemented. Neither the original invoice revenue nor Cash/Bank/Party balances change due to cost attribution alone.
+
+Negative stock is intentional business behavior, subject to a verifiable cost source for new OVERSOLD entries.
 
 ### Returns
 
@@ -503,10 +507,7 @@ cannot recover it from the network response or from `posState`. The
 payload also carries a `showPurchasePrice` boolean so POS can tell "not
 mine to see" apart from "cost is genuinely 0".
 
-The figure shown is `Products.Purchase Price` — the same field the
-Products page shows and the same one FIFO falls back to for oversold
-lots. It is not the FIFO lot cost, and `Purchase.gs` does not write back
-to it, so it is only as current as the last manual product edit.
+The original POS visibility implementation showed editable `Products.Purchase Price`; read-only FIFO cost display is being reviewed separately in PR #54. **Oversold-sale provisional costing does not use this product master field**: the sale planner instead uses the most recent genuine purchase lot available on the sale date. Cost visibility still requires the existing double server-side permission gate; no provisional cost source is disclosed to unauthorized users.
 
 Display is deliberately discreet. Each cart line renders a small faint
 dot next to the unit — no label, no tooltip, and the number is not in the
