@@ -27,6 +27,8 @@
 3. Multiple active positive lots, returns, fractional Foot or tile conversions must not fabricate source allocation.
 4. Privilege denied: no purchase cost nor any lot cost tier in POS network payload.
 5. Retrying a partial Sheet write must not double-offset historical OVERSOLD or replay a Cash/Party transaction.
+6. On an oversold sale, provisional cost must be sourced from the latest genuine purchased stock lot *existing as of that sale*, including a fully consumed lot, never the editable product master price.
+7. On restock, only the portion actually allocated from each new purchase lot receives that purchase lot's real cost. Remaining oversold debt preserves its earlier provisional cost; the final effective COGS/profit adjustment is source-linked and auditable.
 
 ## Stage A — Read-only preview / display (initial PR)
 
@@ -70,11 +72,25 @@
 
 ## Stage B — New purchase automatic settlement (subsequent scoped PR; requires Stage A review)
 
+### Task 3A: Correct provisional oversold sale cost from last actual purchase lot
+
+**Files:** `StockLots.gs:planStockConsumption_` and oversold creation/SALE_ITEM_LOTS recording, `Sales.gs` only if source sale posting requires it; `tests/oversold_last_purchase_cost.test.js`.
+
+**Rule:** Read the latest genuine purchased lot as-of the oversold **sale event** using purchase chronology + stable lot ID. This still works when the last purchased lot's remaining quantity is **zero**. Do not use the product master `Purchase Price`, later purchases, another product's cost or an old `OVERSOLD` cost as the fallback. If no trustworthy purchased lot can be proven, mark Needs Review and block an unauditable cost rather than guessing.
+
+- [ ] RED tests: fully consumed last purchase at ৳68 with editable product master set to ৳72 -> new oversold provisional cost **৳68**; older lots and later/backdated purchases must not override the as-of-sale evidence; no reliable last purchased lot -> Needs Review.
+- [ ] Implement minimal **source-lot-provenance** helper and use it for oversold provisional cost and persisted `SALE_ITEM_LOTS.Unit Cost` evidence without changing sale revenue, selling price, customer balances, Cash Session, vendor sourcing or stock movements.
+- [ ] Include multiple units and tiles using canonical quantities; preserve the genuine last purchased lot identity and source date in immutable oversold provenance.
+- [ ] Test that a sale consumed partly from positive FIFO lots and partly oversold has distinct lot cost allocations, not a blanket unit cost.
+- [ ] Re-run targeted and full Node suites; separate owner-reviewed PR before production deployment.
+
 ### Task 4: Pure purchase settlement and recovery design
 
 **Files:** `StockLots.gs`, `Config.gs`, `Setup.gs`, `tests/oversold_lot_purchase_settlement.test.js`.
 
 - [ ] RED for 240 bought / 231 debt -> 9 remaining; zero net change on settlement; partial purchase; multiple costs/debts; backdated purchase; identical operation replay; corrupted source IDs.
+- [ ] RED for previous 10 Foot oversold at last purchased lot cost ৳68 and new purchase @ ৳64.75: record **final effective COGS = ৳647.50**, provisional COGS = ৳680.00 and an auditable favorable difference of ৳32.50; no historical invoice/payment rewrite.
+- [ ] RED for partial restock (6/10 Foot funded at ৳64.75, 4 still provisional at ৳68), and subsequent restock at another unit cost; preserve distinct linked cost allocations and proper per-sale profit.
 - [ ] Plan allocations before writes, store source and operation evidence in additive `STOCK_LOT_SETTLEMENTS` audit schema; ledger pending/finished/recovery states and unique link provenance.
 - [ ] Test write-failure retry after each row update with isolated fake Sheet ledger and reproducible recovery, not just pure numeric assertions.
 - [ ] Validate relevant return dependency gates and full suite, then PR.
@@ -85,6 +101,7 @@
 
 - [ ] RED integration for purchase posting with lock, lot settlement and stable cash/supplier balances.
 - [ ] RED sale/return tests: original negative sale restored after funding, supplier return of only unsold positive, purchase edit/deletion blocked against settled stock.
+- [ ] RED accounting tests: recompute affected sale profit by delta between provisional and funded lot costs, preserving the original provisional audit evidence; reversing a funded sale unwinds exactly that linked variance once without modifying selling price, payment, Cash/Bank/Party.
 - [ ] Implement only after immutable source links, pre-write validation, crash recovery and full tests.
 - [ ] Full node suite and clasp preview against copy of Google Sheet; owner review and approval before deployment.
 
