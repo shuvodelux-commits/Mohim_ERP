@@ -50,10 +50,14 @@ function getProductsBootstrap(token) {
     // cost purchase). Only unpriced internal opening/adjustment stock and a
     // positive quantity gap fall back to Products.Purchase Price. This fixes
     // the display without replacing normal FIFO valuation.
+    const allStockLots = getAllRows_("STOCK_LOTS");
     const lotStatsByProduct = {};
-    getAllRows_("STOCK_LOTS").forEach(function (l) {
+    const lotCostRowsByProduct = {};
+    allStockLots.forEach(function (l) {
       const pid = l["Product ID"];
       if (!pid) return;
+      if (!lotCostRowsByProduct[pid]) lotCostRowsByProduct[pid] = [];
+      lotCostRowsByProduct[pid].push(l);
       const qty = Number(l["Remaining Quantity"]) || 0;
       const cost = Number(l["Purchase Price"]) || 0;
       const source = String(l["Purchase ID"] || "").toUpperCase();
@@ -84,6 +88,10 @@ function getProductsBootstrap(token) {
       const currentStock = isBundle ? 0 : (Number(p["Current Stock"]) || 0);
       const productCost = Number(p["Purchase Price"]) || 0;
       const stats = lotStatsByProduct[pid];
+      const fifoCost = isBundle ? null : buildLotCostSnapshot_(pid, lotCostRowsByProduct[pid] || [], p);
+      // A partially settled stock value is not a booked inventory asset.
+      const lotValueNeedsReview = fifoCost && (fifoCost.status === 'UNSETTLED' ||
+        (fifoCost.status === 'NEEDS_REVIEW' && stats && fifoCost.issue !== 'UNPRICED_INTERNAL_LOT'));
       let stockValue;
 
       // Preserve the original no-lot fallback exactly (including negative
@@ -109,7 +117,12 @@ function getProductsBootstrap(token) {
         'Bundle Error': isBundle ? (bundleErrorById[p['Product ID']]||'') : '',
         'Available Sets': isBundle && !bundleErrorById[p['Product ID']] ?
           getBundleAvailability_(bundleDefinitions[p['Product ID']],productMap) : 0,
-        "Stock Value": isBundle ? 0 : stockValue,
+        "Stock Value": isBundle ? 0 : (lotValueNeedsReview ? null : stockValue),
+        "Next FIFO Cost": fifoCost ? fifoCost.nextUnitCost : null,
+        "Lot Cost Status": fifoCost ? fifoCost.status : 'BUNDLE',
+        "Lot Cost Issue": fifoCost ? fifoCost.issue : '',
+        "Projected Stock Value": fifoCost ? fifoCost.projectedStockValue : null,
+        "Oversold Remaining Qty": fifoCost ? fifoCost.unresolvedOversold : 0,
         "Unpriced Lot Count": stats ? (stats.unpricedInternalLotCount || 0) : 0,
         "Unpriced Remaining Quantity": stats ? (stats.unpricedInternalQty || 0) : 0
       });

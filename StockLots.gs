@@ -1265,3 +1265,127 @@ function applySalesReturnStockUndo_(plan, operationId, operationType) {
     });
   });
 }
+
+/**
+ * Read-only cost and oversold exposure snapshot for Products/POS.
+ *
+ * This calculation does NOT settle an OVERSOLD lot, change a posted COGS
+ * entry or authorize a historic correction. When a negative lot and a
+ * positive purchase coexist, projectedStockValue is a PROJECTION only:
+ * the authoritative Stock Value remains blocked pending reconciliation.
+ *
+ * Product Master Purchase Price is never substituted for a valid real
+ * purchase lot cost. Cost disclosure is controlled by each caller.
+ */
+function buildLotCostSnapshot_(productId, allLots, productRow) {
+  const pid = String(productId || '');
+  const stock = Number(productRow && productRow['Current Stock']);
+  const output = {
+    status: 'NEEDS_REVIEW',
+    issue: '',
+    netQty: null,
+    unresolvedOversold: 0,
+    originalStockValue: null,
+    projectedStockValue: null,
+    nextUnitCost: null,
+    costTiers: []
+  };
+  if (!pid || !productRow || productRow['Product ID'] !== pid ||
+      !Array.isArray(allLots) || !Number.isFinite(stock)) {
+    output.issue = 'INVALID_PRODUCT_OR_STOCK';
+    return output;
+  }
+  const positive = [], negative = [], ids = {};
+  let netQty = 0, rawValue = 0, oversoldQty = 0, fault = '';
+  allLots.forEach(function (lot) {
+    if (!lot || lot['Product ID'] !== pid) return;
+    const id = String(lot['Lot ID'] || '');
+    const remainingRaw = lot['Remaining Quantity'];
+    const rawCost = lot['Purchase Price'];
+    const qty = Number(remainingRaw);
+    const price = Number(rawCost);
+    const source = String(lot['Purchase ID'] || '').toUpperCase();
+    const status = String(lot['Status'] || '');
+    if (!id || ids[id]) fault = 'INVALID_OR_DUPLICATE_LOT_ID';
+    ids[id] = true;
+    if (remainingRaw === '' || remainingRaw === null || remainingRaw === undefined ||
+        !Number.isFinite(qty) || rawCost === '' || rawCost === null ||
+        rawCost === undefined || !Number.isFinite(price) || price < 0) {
+      fault = 'INVALID_LOT_QUANTITY_OR_COST';
+      return;
+    }
+    if (qty > 0 && (status === 'Deleted' || status !== 'Active')) fault = 'INVALID_ACTIVE_LOT_STATUS';
+    if (qty < 0 && (source !== 'OVERSOLD' || status !== 'Oversold')) fault = 'INVALID_OVERSOLD_LOT';
+    if (qty > 0 && price === 0 && (
+      source === 'OPENING' || source === 'OPENING-MIGRATION' || source === 'LEGACY' ||
+      source === 'ADJUSTMENT' || source.indexOf('OPENING-') === 0 ||
+      source.indexOf('ADJUSTMENT-') === 0)) fault = 'UNPRICED_INTERNAL_LOT';
+    netQty += qty;
+    rawValue += qty * price;
+    if (qty > 0) positive.push(lot);
+    if (qty < 0) {
+      oversoldQty += -qty;
+      negative.push(lot);
+    }
+  });
+  output.netQty = Math.round(netQty * 1000000) / 1000000;
+  output.originalStockValue = Math.round(rawValue * 100) / 100;
+  output.unresolvedOversold = Math.round(oversoldQty * 1000000) / 1000000;
+  if (fault) { output.issue = fault; return output; }
+  if (Math.abs(netQty - stock) > 0.0000001) {
+    output.issue = 'STOCK_MISMATCH';
+    return output;
+  }
+  if (!positive.length && !negative.length) {
+    output.status = stock === 0 ? 'EMPTY' : 'NEEDS_REVIEW';
+    if (stock !== 0) output.issue = 'NO_STOCK_LOTS';
+    return output;
+  }
+  // A purchase dated before an unresolved oversold event cannot
+  // automatically be pledged against that later sale.
+  if (negative.length) {
+    const key = function (lot) {
+      const d = safeDateOnly_(lot['Purchase Date']) || safeDateOnly_(lot['Created At']);
+      return d ? d + '|' + String(lot['Lot ID'] || '') : '';
+    };
+    const missingDate = positive.concat(negative).some(function (lot) { return !key(lot); });
+    if (missingDate) { output.issue = 'MISSING_LOT_DATE'; return output; }
+    const lastDebt = negative.map(key).sort().pop();
+    if (positive.some(function (lot) { return key(lot) < lastDebt; })) {
+      output.issue = 'BACKDATED_OR_AMBIGUOUS_LOT';
+      return output;
+    }
+  }
+  let reserve = oversoldQty;
+  const ordered = positive.slice().sort(compareLotsFifo_);
+  const tiers = [];
+  ordered.forEach(function (lot) {
+    let available = Number(lot['Remaining Quantity']);
+    const usedForDebt = Math.min(available, reserve);
+    available -= usedForDebt;
+    reserve -= usedForDebt;
+    if (available > 0.0000001) {
+      tiers.push({
+        qty: Math.round(available * 1000000) / 1000000,
+        unitCost: Number(lot['Purchase Price']),
+        lotId: String(lot['Lot ID'])
+      });
+    }
+  });
+  if (reserve > 0.0000001 || netQty < -0.0000001) {
+    output.status = 'NEGATIVE_STOCK';
+    return output;
+  }
+  const eligibleQty = tiers.reduce(function (sum, tier) { return sum + tier.qty; }, 0);
+  if (Math.abs(eligibleQty - Math.max(0, stock)) > 0.0000001) {
+    output.issue = 'ELIGIBLE_STOCK_MISMATCH';
+    return output;
+  }
+  output.status = oversoldQty > 0 ? 'UNSETTLED' : 'OK';
+  output.costTiers = tiers;
+  output.nextUnitCost = tiers.length ? tiers[0].unitCost : null;
+  output.projectedStockValue = Math.round(
+    tiers.reduce(function (sum, tier) { return sum + tier.qty * tier.unitCost; }, 0) * 100
+  ) / 100;
+  return output;
+}

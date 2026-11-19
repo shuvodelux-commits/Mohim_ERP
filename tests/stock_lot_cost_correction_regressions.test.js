@@ -678,6 +678,12 @@ test('opening-lot migration skips and reports positive-stock products whose Purc
 
 test('Products bootstrap exposes unresolved internal lot count and quantity without counting zero-cost Purchase lots', () => {
   const api = loadProductFunctions(['getProductsBootstrap'], {
+    // Product bootstrap now also projects FIFO cost; this test isolates
+    // the pre-existing unpriced internal-lot valuation fallback only.
+    buildLotCostSnapshot_: () => ({
+      status: 'NEEDS_REVIEW', issue: 'UNPRICED_INTERNAL_LOT',
+      nextUnitCost: null, projectedStockValue: null, unresolvedOversold: 0
+    }),
     requirePermission_: () => ({}),
     activeRows_: key => key === 'PRODUCTS' ? [
       { 'Product ID': 'P1', 'Product Name': 'Tank', 'Current Stock': 3, 'Purchase Price': 100, Status: 'Active' }

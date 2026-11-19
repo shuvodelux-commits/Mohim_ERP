@@ -54,7 +54,7 @@ test('Product column displays only name, no brand, unit, bundle badge, or unpric
   const [row] = renderedRows([{
     'Product ID': 'p1', 'Product Name': 'Test Bundle Products 100 pcs 2',
     Brand: 'BRB', Category: 'Pipe', Unit: 'pc', 'Current Stock': 80, 'Minimum Stock': 30,
-    'Purchase Price': 120, 'Selling Price': 130, 'Stock Value': 9600,
+    'Purchase Price': 120, 'Next FIFO Cost': 120, 'Lot Cost Status': 'OK', 'Selling Price': 130, 'Stock Value': 9600,
     'Unpriced Lot Count': 2, Status: 'Active'
   }]);
   const columns = cells(row);
