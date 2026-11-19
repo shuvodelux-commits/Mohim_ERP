@@ -498,6 +498,9 @@ const CONFIG = {
       // legacy back-fill, opening migration). Additive.
       "Supplier ID",
       "Supplier Name",
+      // Provisional COGS provenance for an OVERSOLD sale (never rewritten).
+      "Provisional Cost Source Lot ID",
+      "Provisional Cost Source Purchase ID",
     ],
     SALE_ITEM_LOTS: [
       "Invoice ID",

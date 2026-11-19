@@ -38,6 +38,16 @@ function workbook(motorStock = 8) {
     STOCK_MOVEMENT:[], SALES_RETURN:[], SALES_RETURN_ITEMS:[],
     VENDORS:[], CASH_BOOK:[]
   };
+  // A zero-stock motor still has a fully consumed real purchase. Under the
+  // approved oversold-cost rule, that source is mandatory for provisional
+  // COGS even though its remaining quantity is already zero.
+  if (motorStock === 0) rows.STOCK_LOTS.push({
+    'Lot ID':'LOT-motor-history','Product ID':'motor',
+    'Purchase ID':'PUR-MOTOR-01','Purchase Date':'2026-10-01',
+    'Remaining Quantity':0,'Original Quantity':8,'Purchase Price':3000,
+    'Sell Price':3500,'Status':'Consumed',
+    _rowIndex:rows.STOCK_LOTS.length+2
+  });
   const row = (key,value) => {
     const table = rows[key] || (rows[key]=[]);
     table.push({...value,_rowIndex:table.length+2});
@@ -125,7 +135,10 @@ test('bundle sale allows motor stock to go negative through an OVERSOLD lot',()=
  const w=workbook(0),res=w.sell([w.kit()]);
  assert.equal(res.success,true,res.message);
  assert.equal(w.state().motor,-2);
- assert.equal(w.rows.STOCK_LOTS.find(l=>l['Purchase ID']==='OVERSOLD')['Remaining Quantity'],-2);
+ const oversold=w.rows.STOCK_LOTS.find(l=>l['Purchase ID']==='OVERSOLD');
+ assert.equal(oversold['Remaining Quantity'],-2);
+ assert.equal(oversold['Purchase Price'],3000);
+ assert.equal(oversold['Provisional Cost Source Lot ID'],'LOT-motor-history');
  assert.equal(w.rows.SALE_ITEM_LOTS.find(l=>l['Product ID']==='motor').Quantity,2);
 });
 
