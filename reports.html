@@ -198,6 +198,10 @@
 
 <!-- --------------------------------------------------------- Profit -->
 <div class="tab-panel" id="rptProfit" hidden>
+  <div class="card" id="rfCostReconciliationCard" style="margin-bottom:16px; border-left:3px solid var(--color-warning, #b7791f);" hidden>
+    <h3 style="font-size:14px; margin-bottom:6px;">Oversold purchase-cost reconciliation <span class="bn-hint" style="display:inline;">— বাকি বিক্রির প্রকৃত ক্রয়মূল্য</span></h3>
+    <p id="rfCostReconciliationMessage" style="font-size:12px; color:var(--color-text-muted); margin:0;"></p>
+  </div>
   <div class="card" id="rfCoverageCard" style="margin-bottom:20px; border-left:3px solid var(--color-warning, #b7791f);" hidden>
     <h3 style="font-size:14px; margin-bottom:6px;">Profit is overstated for this range <span class="bn-hint" style="display:inline;">— লাভ পুরোপুরি সঠিক নয়</span></h3>
     <p style="font-size:12px; margin:0 0 8px; color:var(--color-text-muted);">
@@ -442,6 +446,24 @@
       rptSet_('rfCustSettleDiscount', rptMoney_(d.totals.customerSettlementDiscount || 0));
       rptSet_('rfSupSettleDiscount', rptMoney_(d.totals.supplierSettlementDiscountReceived || 0));
       rptSet_('rfNet', rptMoney_(d.totals.netProfit));
+
+      var costReconciliation = d.costReconciliation || {};
+      var costProvisional = costReconciliation.status === 'PROVISIONAL';
+      var costChanged = Number(costReconciliation.cogsDeltaMinor || 0) !== 0;
+      document.getElementById('rfCostReconciliationCard').hidden = !(costProvisional || costChanged);
+      if (costProvisional || costChanged) {
+        var costNote = costChanged
+          ? 'Verified actual purchase costs have adjusted this period’s COGS by ' + rptMoney_(costReconciliation.cogsDelta || 0) + '. '
+          : '';
+        if (costProvisional) {
+          costNote += 'Final COGS is not available for ' +
+            (Number(costReconciliation.provisionalSourceCount) || 0) +
+            ' oversold source(s) until they are replenished. Current profit includes provisional cost.';
+        } else {
+          costNote += 'Only committed, verified cost allocations are included.';
+        }
+        document.getElementById('rfCostReconciliationMessage').textContent = costNote;
+      }
 
       var gap = d.coverage.invoicesMissingLotData > 0;
       document.getElementById('rfCoverageCard').hidden = !gap;
