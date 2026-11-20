@@ -166,11 +166,10 @@ function createLot_(productId, productName, purchaseId, purchaseDate, purchasePr
  * (which already knows the pre-write Current Stock and reference/type,
  * same as the pre-lot code) does that, so batched appends stay intact.
  *
- * Self-healing: if the product's lots don't add up to `qty` (legacy data
- * from before the lot system / before migrateOpeningStockLots ran), the
- * shortfall is recorded as an "OVERSOLD" negative lot at the product's
- * on-file Purchase Price instead of blocking the sale — same spirit as
- * getSheetHeaders_ self-healing missing columns.
+ * Negative sale shortage records an OVERSOLD lot using the last real
+ * purchase lot cost as of the sale date (including consumed purchase lots).
+ * If no trustworthy purchase-cost source exists, it fails closed before
+ * any stock or financial mutation rather than using the product master.
  *
  * Returns [{ lotId, qty, unitCost }, ...] — one entry per lot drawn from.
  *
@@ -244,6 +243,43 @@ function outstandingSaleOwnStockByProduct_(invoiceId, saleItems, returnItems, co
 }
 
 /**
+ * At the moment a shop sells beyond available stock, price that OVERSOLD
+ * quantity using the LAST ACTUAL PURCHASE LOT that existed on the business
+ * sale date. This includes a fully consumed purchase lot.
+ *
+ * Never use an editable Product master/default price, a later purchase, an
+ * OVERSOLD lot or an internal stock adjustment as a source for provisional
+ * COGS. A missing/ambiguous source fails BEFORE any transaction writes.
+ */
+function lastPurchasedLotCostAsOf_(productId, allLots, asOfDate) {
+  const effectiveDate = safeDateOnly_(asOfDate);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveDate)) {
+    throw new Error('Last purchase lot cost date is invalid. Needs Review.');
+  }
+  const candidateLots = (allLots || []).filter(function (lot) {
+    const purchaseId = String(lot['Purchase ID'] || '').trim().toUpperCase();
+    if (lot['Product ID'] !== productId || !/^PUR(?:-|[0-9])/.test(purchaseId)) return false;
+    if (lot['Status'] === 'Deleted' || (typeof isDeleted_ === 'function' && isDeleted_(lot))) return false;
+    const date = safeDateOnly_(lot['Purchase Date']) || safeDateOnly_(lot['Created At']);
+    return date && date <= effectiveDate;
+  }).sort(compareLotsFifo_);
+  if (!candidateLots.length) {
+    throw new Error('No historical purchase lot cost for oversold product. Needs Review.');
+  }
+  const selected = candidateLots[candidateLots.length - 1];
+  const id = String(selected['Lot ID'] || '');
+  if (!id || candidateLots.filter(function(lot){return String(lot['Lot ID']||'')===id;}).length!==1) {
+    throw new Error('Historical purchase lot identity is ambiguous. Needs Review.');
+  }
+  const raw = selected['Purchase Price'];
+  if (raw === '' || raw === null || raw === undefined ||
+      !isValidNonNegativeNumber_(raw)) {
+    throw new Error('Last purchased lot has invalid purchase cost. Needs Review.');
+  }
+  return { lotId:id, purchaseId:String(selected['Purchase ID']), unitCost:Number(raw) };
+}
+
+/**
  * Decides which lots would satisfy `qty`, and WRITES NOTHING. This is the
  * half a caller runs during validation, so it can find out that line 3 is
  * short before line 1 has been touched.
@@ -254,7 +290,7 @@ function outstandingSaleOwnStockByProduct_(invoiceId, saleItems, returnItems, co
  * Returns { productId, draws: [{ lotId, rowIndex, take, unitCost,
  * remainingAfter }], shortfall, fallbackPrice, fallbackName }.
  */
-function planStockConsumption_(productId, qty, allLots, productRow) {
+function planStockConsumption_(productId, qty, allLots, productRow, asOfSaleDate) {
   let need = Number(qty) || 0;
   const product = productRow || getAllRows_('PRODUCTS').filter(function (p) { return p['Product ID'] === productId; })[0];
   const plan = {
@@ -292,6 +328,12 @@ function planStockConsumption_(productId, qty, allLots, productRow) {
     // selling past zero, so the shortfall becomes an OVERSOLD lot.
     // zero (see completeSale/updateSale). Recorded as a shortfall now;
     // applyStockConsumption_ back-fills a lot rather than blocking the sale.
+    const costSource = lastPurchasedLotCostAsOf_(
+      productId, allLots || getAllRows_('STOCK_LOTS'), asOfSaleDate || new Date()
+    );
+    plan.fallbackPrice = costSource.unitCost;
+    plan.fallbackCostLotId = costSource.lotId;
+    plan.fallbackCostPurchaseId = costSource.purchaseId;
     plan.shortfall = need;
   }
   return plan;
@@ -348,7 +390,9 @@ function applyStockConsumption_(plan) {
     const lot = createLotWithRow_(plan.productId, plan.fallbackName, 'OVERSOLD', new Date(), plan.fallbackPrice, plan.shortfall, '', '', plan.fallbackSellPrice);
     updateRowFields_('STOCK_LOTS', lot.rowIndex, {
       'Remaining Quantity': -plan.shortfall,
-      'Status': 'Oversold'
+      'Status': 'Oversold',
+      'Provisional Cost Source Lot ID': plan.fallbackCostLotId,
+      'Provisional Cost Source Purchase ID': plan.fallbackCostPurchaseId
     });
     consumption.push({ lotId: lot.id, qty: plan.shortfall, unitCost: plan.fallbackPrice, unitSellPrice: plan.fallbackSellPrice });
   }
@@ -1388,4 +1432,231 @@ function buildLotCostSnapshot_(productId, allLots, productRow) {
     tiers.reduce(function (sum, tier) { return sum + tier.qty * tier.unitCost; }, 0) * 100
   ) / 100;
   return output;
+}
+
+/**
+ * Stage B Task 4 — read-only, NON-POSTABLE oversold purchase-settlement plan.
+ *
+ * Actual GAS Sheets settlement is intentionally NOT implemented here. The
+ * inputs are exact source-shaped rows read by a trusted purchase caller;
+ * they must be checked again under ScriptLock by the future native writer.
+ * A plan is neither a write authorization nor a financial journal.
+ *
+ * Quantities use explicit integer ticks per product unit. Monetary outputs
+ * are integer BDT paisa, with half-up rounding at each source allocation.
+ * Never update original SALE_ITEM_LOTS or invoice/payment rows from here.
+ */
+function planOversoldPurchaseSettlement_(input) {
+  function frozen(value) {
+    if (value && typeof value === 'object') {
+      Object.keys(value).forEach(function (k) { frozen(value[k]); });
+      Object.freeze(value);
+    }
+    return value;
+  }
+  const response = function (status, issueList, fields) {
+    return frozen(Object.assign({
+      status: status, postable: false, issues: issueList || [], allocations: [],
+      existingReceiptRef: null, currentStockBeforeTicks: null,
+      currentStockAfterTicks: null, purchaseQtyTicks: null,
+      settledQtyTicks: 0, newLotRemainingQtyTicks: null,
+      favorableVarianceMinor: 0
+    }, fields || {}));
+  };
+  const review = function (code) { return response('NEEDS_REVIEW', [{ code: code }]); };
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return review('INVALID_INPUT');
+  const p = input.purchase || {};
+  const productId = String(input.productId || '');
+  const product = input.product || {};
+  if (!productId || String(product['Product ID']) !== productId ||
+      !Array.isArray(input.stockLots) || !Array.isArray(input.saleItemLots) ||
+      !Array.isArray(input.sales) || !Array.isArray(input.operationJournal) ||
+      !Array.isArray(input.settlementHistory)) return review('INVALID_SOURCE_SNAPSHOT');
+
+  const scale = Number(p.quantityScale);
+  if (!Number.isSafeInteger(scale) || scale <= 0 || scale > 1000000) {
+    return review('INVALID_QUANTITY_PRECISION');
+  }
+  function ticks(v) {
+    if (v === '' || v === null || v === undefined || !Number.isFinite(Number(v))) return null;
+    const scaled = Number(v) * scale;
+    if (!Number.isSafeInteger(Math.round(scaled)) || Math.abs(scaled - Math.round(scaled)) > 0.0000001) return null;
+    return Math.round(scaled);
+  }
+  function minor(v) {
+    if (v === '' || v === null || v === undefined || !Number.isFinite(Number(v)) || Number(v) < 0) return null;
+    const scaled = Number(v) * 100;
+    if (!Number.isSafeInteger(Math.round(scaled)) || Math.abs(scaled - Math.round(scaled)) > 0.0000001) return null;
+    return Math.round(scaled);
+  }
+  function qtyMoney(q, price) {
+    const d = BigInt(scale), n = BigInt(q) * BigInt(price);
+    const value = (n + d / 2n) / d;
+    if (value > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+    return Number(value);
+  }
+  const date = safeDateOnly_(p.date);
+  const operationId = String(p.operationId || '');
+  const purchaseId = String(p.purchaseId || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^[A-Za-z0-9_-]{8,100}$/.test(operationId) ||
+      !/^[A-Za-z0-9_-]{3,128}$/.test(purchaseId)) return review('INVALID_PURCHASE_ID_OR_DATE');
+  const purchaseQtyTicks = ticks(p.quantity);
+  if (purchaseQtyTicks === null || purchaseQtyTicks <= 0) return review('INVALID_QUANTITY_PRECISION');
+  const purchaseCostMinor = minor(p.unitCost);
+  if (purchaseCostMinor === null) return review('INVALID_PURCHASE_COST_PRECISION');
+  const fingerprint = [productId, purchaseId, date, purchaseQtyTicks, purchaseCostMinor, scale].join('|');
+
+  // One operation ID, exactly one committed receipt. Unknown/interruptible
+  // write outcomes cannot be retried as fresh purchases or stock changes.
+  const sameOp = input.operationJournal.filter(function (j) { return j.operationId === operationId; });
+  if (sameOp.length > 1) return review('DUPLICATE_OPERATION');
+  if (sameOp.length) {
+    const old = sameOp[0];
+    if (old.productId !== productId || old.intentFingerprint !== fingerprint) return review('OPERATION_CONFLICT');
+    if (old.state !== 'COMMITTED' || !old.receiptRef) return review('UNRESOLVED_WRITE');
+    return response('REPLAY', [], { existingReceiptRef: old.receiptRef });
+  }
+  if (input.operationJournal.some(function (j) {
+    return j.productId === productId && j.state !== 'COMMITTED';
+  })) return review('UNRESOLVED_WRITE');
+  // A different operation ID may not reuse a purchase identity:
+  // idempotency is anchored to both stable operation and source purchase.
+  if (input.operationJournal.some(function (j) {
+    return j.productId === productId && j.purchaseId === purchaseId;
+  })) return review('DUPLICATE_PURCHASE_ID');
+
+  const beforeTicks = ticks(product['Current Stock']);
+  if (beforeTicks === null) return review('INVALID_PRODUCT_STOCK');
+  const ids = {}, negative = [];
+  let sumTicks = 0, positiveTicks = 0;
+  for (const lot of input.stockLots) {
+    if (!lot || lot['Product ID'] !== productId) continue;
+    const id = String(lot['Lot ID'] || '');
+    const remTicks = ticks(lot['Remaining Quantity']);
+    if (!id || ids[id]) return review('DUPLICATE_OR_MISSING_LOT_ID');
+    ids[id] = true;
+    if (remTicks === null || !Number.isSafeInteger(sumTicks + remTicks)) return review('INVALID_LOT_QUANTITY');
+    const isDeleted = lot['Status'] === 'Deleted' || lot['Is Deleted'] === true ||
+      String(lot['Is Deleted']).toUpperCase() === 'TRUE';
+    if (isDeleted && remTicks !== 0) return review('INVALID_NEGATIVE_LOT');
+    if (remTicks < 0 && (String(lot['Purchase ID']) !== 'OVERSOLD' ||
+        lot['Status'] !== 'Oversold' || isDeleted || minor(lot['Purchase Price']) === null)) {
+      return review('INVALID_NEGATIVE_LOT');
+    }
+    if (remTicks > 0) positiveTicks += remTicks;
+    if (remTicks < 0) negative.push({ lot: lot, outstandingTicks: -remTicks });
+    sumTicks += remTicks;
+  }
+  if (sumTicks !== beforeTicks) return review('STOCK_CACHE_MISMATCH');
+  const historyIds = {};
+  const fundedByLot = {};
+  for (const event of input.settlementHistory) {
+    if (!event || event.state !== 'COMMITTED') return review('UNRESOLVED_SETTLEMENT_HISTORY');
+    const eventId = String(event.settlementId || '');
+    if (!eventId || historyIds[eventId]) return review('DUPLICATE_SETTLEMENT_HISTORY');
+    historyIds[eventId] = true;
+    if (event.productId !== productId || !ids[event.oversoldLotId]) return review('UNKNOWN_SETTLEMENT_LINK');
+    if (!event.sourceInvoiceId || !event.sourceSaleProductId || !event.purchaseLotId ||
+        !event.operationId || !Number.isSafeInteger(event.settledQtyTicks) ||
+        event.settledQtyTicks <= 0 || !Number.isSafeInteger(event.actualUnitCostMinor) ||
+        event.actualUnitCostMinor < 0) return review('INVALID_SETTLEMENT_HISTORY');
+    const key = String(event.oversoldLotId);
+    if (!fundedByLot[key]) fundedByLot[key] = { qty: 0, invoiceId: event.sourceInvoiceId,
+      saleProductId: event.sourceSaleProductId };
+    const record = fundedByLot[key];
+    if (record.invoiceId !== event.sourceInvoiceId ||
+        record.saleProductId !== event.sourceSaleProductId ||
+        !Number.isSafeInteger(record.qty + event.settledQtyTicks)) return review('SETTLEMENT_HISTORY_CONFLICT');
+    record.qty += event.settledQtyTicks;
+  }
+
+
+  if (!negative.length) {
+    if (!Number.isSafeInteger(beforeTicks + purchaseQtyTicks)) return review('UNSAFE_STOCK_ARITHMETIC');
+    return response('NO_DEBT', [], {
+      currentStockBeforeTicks: beforeTicks, currentStockAfterTicks: beforeTicks + purchaseQtyTicks,
+      purchaseQtyTicks: purchaseQtyTicks, newLotRemainingQtyTicks: purchaseQtyTicks
+    });
+  }
+  if (positiveTicks > 0) return review('EXISTING_POSITIVE_WITH_DEBT');
+
+  // Strict immutable source check: each negative lot belongs to exactly
+  // one evidenced sale-item-lot with its original source sale and cost.
+  const invoiceIndex = {};
+  for (const sale of input.sales) {
+    const id = String(sale['Invoice ID'] || '');
+    if (id) {
+      if (!invoiceIndex[id]) invoiceIndex[id] = [];
+      invoiceIndex[id].push(sale);
+    }
+  }
+  const debt = [];
+  for (const item of negative) {
+    const id = String(item.lot['Lot ID']);
+    const matches = input.saleItemLots.filter(function (s) {
+      return s['Lot ID'] === id && s['Product ID'] === productId;
+    });
+    if (!matches.length) return review('MISSING_SALE_ITEM_LINK');
+    if (matches.length !== 1) return review('DUPLICATE_SALE_ITEM_LINK');
+    const source = matches[0];
+    const sourceQtyTicks = ticks(source.Quantity);
+    const sourceCostMinor = minor(source['Unit Cost']);
+    const oversoldCostMinor = minor(item.lot['Purchase Price']);
+    const previous = fundedByLot[id];
+    if (sourceCostMinor === null || oversoldCostMinor !== sourceCostMinor)
+      return review('PROVISIONAL_COST_MISMATCH');
+    if (sourceQtyTicks === null || sourceQtyTicks <= 0 ||
+        sourceQtyTicks !== item.outstandingTicks + (previous ? previous.qty : 0))
+      return review('SALE_ITEM_QTY_MISMATCH');
+    const invoiceId = String(source['Invoice ID'] || '');
+    const sourceSaleProductId = String(source['Source Sale Product ID'] || source['Product ID'] || '');
+    const sales = invoiceIndex[invoiceId] || [];
+    if (!sales.length) return review('MISSING_SOURCE_SALE');
+    if (sales.length !== 1) return review('DUPLICATE_SOURCE_SALE');
+    const invoice = sales[0];
+    if (invoice['Is Deleted'] === true || String(invoice['Is Deleted']).toUpperCase() === 'TRUE')
+      return review('DELETED_SOURCE_SALE');
+    const saleDate = safeDateOnly_(invoice.Date);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(saleDate)) return review('INVALID_SOURCE_SALE_DATE');
+    if (saleDate > date) return review('PURCHASE_BEFORE_OVERSOLD_SALE');
+    if (previous && (previous.invoiceId !== invoiceId ||
+        previous.saleProductId !== sourceSaleProductId)) return review('SETTLEMENT_HISTORY_CONFLICT');
+    debt.push({ lotId: id, invoiceId: invoiceId, saleProductId: sourceSaleProductId,
+      saleDate: saleDate, outstanding: item.outstandingTicks,
+      sourceUnitCostMinor: sourceCostMinor });
+  }
+  debt.sort(function (a, b) {
+    return a.saleDate < b.saleDate ? -1 : (a.saleDate > b.saleDate ? 1 :
+      (a.lotId < b.lotId ? -1 : (a.lotId > b.lotId ? 1 : 0)));
+  });
+
+  let remaining = purchaseQtyTicks, settled = 0, variance = 0;
+  const allocations = [];
+  for (const row of debt) {
+    if (remaining <= 0) break;
+    const taken = Math.min(row.outstanding, remaining);
+    const provisionalCOGSMinor = qtyMoney(taken, row.sourceUnitCostMinor);
+    const actualCOGSMinor = qtyMoney(taken, purchaseCostMinor);
+    if (provisionalCOGSMinor === null || actualCOGSMinor === null) return review('UNSAFE_COST_ARITHMETIC');
+    const favorableVarianceMinor = provisionalCOGSMinor - actualCOGSMinor;
+    if (!Number.isSafeInteger(variance + favorableVarianceMinor)) return review('UNSAFE_COST_ARITHMETIC');
+    variance += favorableVarianceMinor;
+    allocations.push({
+      oversoldLotId: row.lotId, sourceInvoiceId: row.invoiceId,
+      sourceSaleProductId: row.saleProductId, settledQtyTicks: taken,
+      remainingDebtAfterTicks: row.outstanding - taken,
+      provisionalUnitCostMinor: row.sourceUnitCostMinor, actualUnitCostMinor: purchaseCostMinor,
+      provisionalCOGSMinor: provisionalCOGSMinor, actualCOGSMinor: actualCOGSMinor,
+      favorableVarianceMinor: favorableVarianceMinor
+    });
+    settled += taken;
+    remaining -= taken;
+  }
+  if (!Number.isSafeInteger(beforeTicks + purchaseQtyTicks)) return review('UNSAFE_STOCK_ARITHMETIC');
+  return response('READY', [], {
+    currentStockBeforeTicks: beforeTicks, currentStockAfterTicks: beforeTicks + purchaseQtyTicks,
+    purchaseQtyTicks: purchaseQtyTicks, settledQtyTicks: settled,
+    newLotRemainingQtyTicks: remaining, favorableVarianceMinor: variance,
+    allocations: allocations, intentFingerprint: fingerprint
+  });
 }

@@ -497,3 +497,51 @@ test('invoice quantity increase with vendor sourcing also uses net Current Stock
   assert.equal(sourcing[0].Quantity, 1);
   assert.equal(sourcing[0]['Total Cost'], 440);
 });
+
+test('OVERSOLD full sale uses last actually purchased lot as of backdated sale date and preserves money', () => {
+  const w = workbook({
+    PRODUCTS: [{ ...product(0), 'Purchase Price': 72 }],
+    STOCK_LOTS: [
+      lot('L-PAST',0,'2026-09-01',{'Purchase Price':68,Status:'Consumed'}),
+      lot('L-LATER',0,'2026-09-10',{'Purchase Price':90,Status:'Consumed'})
+    ]
+  });
+  const response = w.ctx.completeSale('token',payload(10));
+  assert.equal(response.success,true,response.message);
+  const oversold=w.rows('STOCK_LOTS').find(row=>row['Purchase ID']==='OVERSOLD');
+  assert.ok(oversold);
+  assert.equal(oversold['Purchase Price'],68);
+  assert.equal(oversold['Provisional Cost Source Lot ID'],'L-PAST');
+  assert.equal(oversold['Provisional Cost Source Purchase ID'],'PUR1');
+  const consumed=w.rows('SALE_ITEM_LOTS');
+  assert.equal(consumed.length,1);
+  assert.equal(consumed[0]['Unit Cost'],68);
+  assert.equal(consumed[0].Quantity,10);
+  assert.equal(w.rows('PRODUCTS')[0]['Current Stock'],-10);
+  assert.equal(w.rows('PRODUCTS')[0]['Purchase Price'],72);
+  assert.equal(w.rows('CASH_BOOK')[0].Credit,1000);
+});
+
+test('mixed FIFO sale uses own historical lot price for own stock and last purchase price for shortage', () => {
+  const w=workbook({
+    PRODUCTS:[{...product(2),'Purchase Price':72}],
+    STOCK_LOTS:[
+      lot('FIFO-1',2,'2026-09-01',{'Purchase Price':60}),
+      lot('LAST-OWN',0,'2026-09-02',{'Purchase Price':68,Status:'Consumed'})
+    ]
+  });
+  const response=w.ctx.completeSale('token',payload(5));
+  assert.equal(response.success,true,response.message);
+  const consumed=w.rows('SALE_ITEM_LOTS');
+  assert.deepEqual(consumed.map(row=>[row.Quantity,row['Unit Cost']]),[[2,60],[3,68]]);
+  assert.equal(w.rows('PRODUCTS')[0]['Current Stock'],-3);
+  assert.equal(w.rows('CASH_BOOK')[0].Credit,500);
+});
+
+test('oversold sale with no real historical purchase cost fails before first mutation',()=>{
+  const w=workbook({PRODUCTS:[{...product(0),'Purchase Price':72}],STOCK_LOTS:[]});
+  const response=w.ctx.completeSale('token',payload(2));
+  assert.equal(response.success,false);
+  assert.match(response.message,/Needs Review/i);
+  assert.deepEqual(w.writes,[]);
+});

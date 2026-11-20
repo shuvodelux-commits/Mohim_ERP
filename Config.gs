@@ -39,6 +39,10 @@ const CONFIG = {
     SUPPLIERS: "Suppliers",
     SUPPLIER_LEDGER: "Supplier Ledger",
     STOCK_LOTS: "Stock Lots",
+    // Reserved for future owner-reviewed purchase settlement writer;
+    // merely declaring schema does not activate live posting.
+    STOCK_LOT_SETTLEMENTS: "Stock Lot Settlements",
+    PURCHASE_SETTLEMENT_JOURNAL: "Purchase Settlement Journal",
     SALE_ITEM_LOTS: "Sale Item Lots",
     STOCK_LOT_COST_CORRECTIONS: "Stock Lot Cost Corrections",
     PURCHASES: "Purchases",
@@ -498,6 +502,26 @@ const CONFIG = {
       // legacy back-fill, opening migration). Additive.
       "Supplier ID",
       "Supplier Name",
+      // Provisional COGS provenance for an OVERSOLD sale (never rewritten).
+      "Provisional Cost Source Lot ID",
+      "Provisional Cost Source Purchase ID",
+    ],
+    // Future immutable linked allocations: only committed receipts count in
+    // stock/COGS reconciliation; original sale-item lots are never rewritten.
+    STOCK_LOT_SETTLEMENTS: [
+      "Settlement ID", "Operation ID", "Product ID", "Purchase ID",
+      "Purchase Lot ID", "Oversold Lot ID", "Source Invoice ID",
+      "Source Sale Product ID", "Quantity Ticks", "Quantity Scale",
+      "Provisional Unit Cost Minor", "Actual Unit Cost Minor",
+      "Provisional COGS Minor", "Actual COGS Minor",
+      "Favorable Variance Minor", "State", "Created At", "Actor",
+    ],
+    // A Writing / Needs Review operation must be manually reconciled from
+    // evidence before replay; Google Sheets has no atomic multi-row rollback.
+    PURCHASE_SETTLEMENT_JOURNAL: [
+      "Operation ID", "Purchase ID", "Product ID", "Intent Fingerprint",
+      "State", "Last Completed Stage", "Result Receipt",
+      "Actor", "Created At", "Updated At", "Error",
     ],
     SALE_ITEM_LOTS: [
       "Invoice ID",
@@ -1063,6 +1087,8 @@ const CONFIG = {
     SUPPLIERS: "SUP",
     PURCHASES: "PUR",
     STOCK_LOTS: "LOT",
+    STOCK_LOT_SETTLEMENTS: "STL",
+    PURCHASE_SETTLEMENT_JOURNAL: "PSJ",
     STOCK_LOT_COST_CORRECTIONS: "SLC",
     SALES: "INV",
     SALE_PAYMENTS: "SPAY",

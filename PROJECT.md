@@ -374,7 +374,11 @@ This separation is important because the ERP has no general database transaction
 
 If physical lots cannot satisfy the sale, the remaining shortage becomes an `OVERSOLD` lot with negative remaining quantity.
 
-Negative stock is intentional business behavior.
+**Oversold provisional purchase cost (2026-11-20):** For any new OVERSOLD shortage, use the last genuine `PUR-*` purchase lot's Purchase Price as of that sale's verified business date, even when the genuine purchase lot has already been consumed (Remaining Quantity = 0). The editable Products.Purchase Price must not silently replace that historical price. Deterministic selection uses purchase date, then Lot ID on the same date; excludes deleted, internal opening/adjustment, other products and future purchases. Without trustworthy prior purchase-lot evidence, fail closed with Needs Review before money, stock or invoice writes. Preserve this source in `STOCK_LOTS.Provisional Cost Source Lot ID` and `Provisional Cost Source Purchase ID` for the newly created OVERSOLD lot and its original `SALE_ITEM_LOTS.Unit Cost`.
+
+**Not yet included:** Funding that original negative lot from subsequent new purchases and adjusting the original provisional sale COGS/profit require a separately tested, audited settlement writer with sale/purchase return safety, reconciliation and owner approval. A negative lot is **not** automatically revalued when a new positive lot appears; do not report a final COGS adjustment before that Stage B is implemented. Neither the original invoice revenue nor Cash/Bank/Party balances change due to cost attribution alone.
+
+Negative stock is intentional business behavior, subject to a verifiable cost source for new OVERSOLD entries.
 
 ### Returns
 
@@ -503,10 +507,7 @@ cannot recover it from the network response or from `posState`. The
 payload also carries a `showPurchasePrice` boolean so POS can tell "not
 mine to see" apart from "cost is genuinely 0".
 
-The figure shown is `Products.Purchase Price` — the same field the
-Products page shows and the same one FIFO falls back to for oversold
-lots. It is not the FIFO lot cost, and `Purchase.gs` does not write back
-to it, so it is only as current as the last manual product edit.
+The original POS visibility implementation showed editable `Products.Purchase Price`; read-only FIFO cost display is being reviewed separately in PR #54. **Oversold-sale provisional costing does not use this product master field**: the sale planner instead uses the most recent genuine purchase lot available on the sale date. Cost visibility still requires the existing double server-side permission gate; no provisional cost source is disclosed to unauthorized users.
 
 Display is deliberately discreet. Each cart line renders a small faint
 dot next to the unit — no label, no tooltip, and the number is not in the
@@ -1188,3 +1189,13 @@ movement from the same invoice/payment, and never silently re-seed old records.
 - **Not changed:** return quantity / original sale price ceilings, FIFO stock lineage, duplicate/product validation, active Cash Session, permissions, debit/credit posting and correction audit, one child Return ID per participating invoice, and the existing split-payment batch safety restriction (multi-invoice split-payment journals require a separately verified extension).
 - Tests cover fully-due cash batch + single returns, return correction from Credit to Cash, sparse invoice payloads, zero-price returns, and browser visibility of Cash on unpaid invoices.
 - Code is reviewed via GitHub PR on a test branch; no automatic Apps Script deployment.
+
+## 2026-11-20 — OVERSOLD purchase-settlement preflight (non-postable)
+
+This branch adds `StockLots.gs:planOversoldPurchaseSettlement_` as a pure source-linked calculator. It validates net lot quantity, sale-item-lot provenance, outstanding negative lots, purchase chronology, committed previous allocations, exact per-unit integer quantities and paisa cost differences. Proposed new purchase funding is oldest original sale first, never gross-positive resale of stock owed to historical sales. Repeated or interrupted purchase operations fail closed. All results set `postable:false` and perform no stock, finance or Sheets write.
+
+Two new **reserved, additive** schemas in Config.gs (`STOCK_LOT_SETTLEMENTS`, `PURCHASE_SETTLEMENT_JOURNAL`) allow a future native GAS purchase writer to retain exact immutable allocation and write-stage evidence. Config declaration alone does not deploy, activate posting, run setup or modify a workbook.
+
+The existing native `Purchase.gs:createPurchase` continues to create new purchase lots without funding OVERSOLD debt until a separately reviewed and fault-injection-tested integration is implemented. A future writer must use ScriptLock, verify the entire supplier/payment/cart purchase before any write, preserve just one Current Stock +Q movement, journal every mutation stage for crash recovery, and block any unresolved partial write. Original sale income and Customer/Supplier/Cash/Bank transactions are never rewritten merely because unit purchase cost changes. Replenishment's final COGS/profit, date/variance recognition, and exact return reversal semantics require separate accounting sign-off.
+
+Review contract and full limitations: `docs/reviews/2026-11-20-gas-purchase-oversold-settlement-preflight.md`. No live GAS/Sheets deployment or historical repair authorized.
