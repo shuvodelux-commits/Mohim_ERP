@@ -719,7 +719,7 @@ function updateSaleInternal_(token, invoiceId, payload, options) {
         if (oldVendorRow && requestedResolution === 'negative') {
           queueVendorReversal_(oldVendorRow, info.name);
           if (oldVendorQty > 0) {
-            const plan = planStockConsumption_(info.productId, oldVendorQty, planningLots, product);
+            const plan = planStockConsumption_(info.productId, oldVendorQty, planningLots, product, editDate);
             stockChanges.push({
               productId: info.productId, name: product['Product Name'], rowIndex: product._rowIndex,
               delta: oldVendorQty, newStock: currentStock - oldVendorQty, plan: plan
@@ -777,7 +777,7 @@ function updateSaleInternal_(token, invoiceId, payload, options) {
         // Increasing real stock need — planned now (writes nothing), same as completeSale.
         plan = requestedVendorId
           ? planSaleVendorConsumption_(info.productId, lotDelta, planningLots, product)
-          : planStockConsumption_(info.productId, lotDelta, planningLots, product);
+          : planStockConsumption_(info.productId, lotDelta, planningLots, product, editDate);
         if (requestedVendorId) {
           if (plan.shortfall <= 0) throw new Error(info.name + ': there is no shortage on this line to source from a vendor.');
           vendorRow = vendorsById[requestedVendorId];

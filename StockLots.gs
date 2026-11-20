@@ -166,11 +166,10 @@ function createLot_(productId, productName, purchaseId, purchaseDate, purchasePr
  * (which already knows the pre-write Current Stock and reference/type,
  * same as the pre-lot code) does that, so batched appends stay intact.
  *
- * Self-healing: if the product's lots don't add up to `qty` (legacy data
- * from before the lot system / before migrateOpeningStockLots ran), the
- * shortfall is recorded as an "OVERSOLD" negative lot at the product's
- * on-file Purchase Price instead of blocking the sale — same spirit as
- * getSheetHeaders_ self-healing missing columns.
+ * Negative sale shortage records an OVERSOLD lot using the last real
+ * purchase lot cost as of the sale date (including consumed purchase lots).
+ * If no trustworthy purchase-cost source exists, it fails closed before
+ * any stock or financial mutation rather than using the product master.
  *
  * Returns [{ lotId, qty, unitCost }, ...] — one entry per lot drawn from.
  *
@@ -244,6 +243,43 @@ function outstandingSaleOwnStockByProduct_(invoiceId, saleItems, returnItems, co
 }
 
 /**
+ * At the moment a shop sells beyond available stock, price that OVERSOLD
+ * quantity using the LAST ACTUAL PURCHASE LOT that existed on the business
+ * sale date. This includes a fully consumed purchase lot.
+ *
+ * Never use an editable Product master/default price, a later purchase, an
+ * OVERSOLD lot or an internal stock adjustment as a source for provisional
+ * COGS. A missing/ambiguous source fails BEFORE any transaction writes.
+ */
+function lastPurchasedLotCostAsOf_(productId, allLots, asOfDate) {
+  const effectiveDate = safeDateOnly_(asOfDate);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveDate)) {
+    throw new Error('Last purchase lot cost date is invalid. Needs Review.');
+  }
+  const candidateLots = (allLots || []).filter(function (lot) {
+    const purchaseId = String(lot['Purchase ID'] || '').trim().toUpperCase();
+    if (lot['Product ID'] !== productId || !/^PUR(?:-|[0-9])/.test(purchaseId)) return false;
+    if (lot['Status'] === 'Deleted' || (typeof isDeleted_ === 'function' && isDeleted_(lot))) return false;
+    const date = safeDateOnly_(lot['Purchase Date']) || safeDateOnly_(lot['Created At']);
+    return date && date <= effectiveDate;
+  }).sort(compareLotsFifo_);
+  if (!candidateLots.length) {
+    throw new Error('No historical purchase lot cost for oversold product. Needs Review.');
+  }
+  const selected = candidateLots[candidateLots.length - 1];
+  const id = String(selected['Lot ID'] || '');
+  if (!id || candidateLots.filter(function(lot){return String(lot['Lot ID']||'')===id;}).length!==1) {
+    throw new Error('Historical purchase lot identity is ambiguous. Needs Review.');
+  }
+  const raw = selected['Purchase Price'];
+  if (raw === '' || raw === null || raw === undefined ||
+      !isValidNonNegativeNumber_(raw)) {
+    throw new Error('Last purchased lot has invalid purchase cost. Needs Review.');
+  }
+  return { lotId:id, purchaseId:String(selected['Purchase ID']), unitCost:Number(raw) };
+}
+
+/**
  * Decides which lots would satisfy `qty`, and WRITES NOTHING. This is the
  * half a caller runs during validation, so it can find out that line 3 is
  * short before line 1 has been touched.
@@ -254,7 +290,7 @@ function outstandingSaleOwnStockByProduct_(invoiceId, saleItems, returnItems, co
  * Returns { productId, draws: [{ lotId, rowIndex, take, unitCost,
  * remainingAfter }], shortfall, fallbackPrice, fallbackName }.
  */
-function planStockConsumption_(productId, qty, allLots, productRow) {
+function planStockConsumption_(productId, qty, allLots, productRow, asOfSaleDate) {
   let need = Number(qty) || 0;
   const product = productRow || getAllRows_('PRODUCTS').filter(function (p) { return p['Product ID'] === productId; })[0];
   const plan = {
@@ -292,6 +328,12 @@ function planStockConsumption_(productId, qty, allLots, productRow) {
     // selling past zero, so the shortfall becomes an OVERSOLD lot.
     // zero (see completeSale/updateSale). Recorded as a shortfall now;
     // applyStockConsumption_ back-fills a lot rather than blocking the sale.
+    const costSource = lastPurchasedLotCostAsOf_(
+      productId, allLots || getAllRows_('STOCK_LOTS'), asOfSaleDate || new Date()
+    );
+    plan.fallbackPrice = costSource.unitCost;
+    plan.fallbackCostLotId = costSource.lotId;
+    plan.fallbackCostPurchaseId = costSource.purchaseId;
     plan.shortfall = need;
   }
   return plan;
@@ -348,7 +390,9 @@ function applyStockConsumption_(plan) {
     const lot = createLotWithRow_(plan.productId, plan.fallbackName, 'OVERSOLD', new Date(), plan.fallbackPrice, plan.shortfall, '', '', plan.fallbackSellPrice);
     updateRowFields_('STOCK_LOTS', lot.rowIndex, {
       'Remaining Quantity': -plan.shortfall,
-      'Status': 'Oversold'
+      'Status': 'Oversold',
+      'Provisional Cost Source Lot ID': plan.fallbackCostLotId,
+      'Provisional Cost Source Purchase ID': plan.fallbackCostPurchaseId
     });
     consumption.push({ lotId: lot.id, qty: plan.shortfall, unitCost: plan.fallbackPrice, unitSellPrice: plan.fallbackSellPrice });
   }

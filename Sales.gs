@@ -400,6 +400,10 @@ function completeSale(token, payload) {
     const nameInput = sanitizeInput_(payload.customerName);
     const phoneInput = sanitizeInput_(payload.customerPhone);
     if (!nameInput || !phoneInput) return fail_('Customer name and phone are required for every sale.');
+    // Verify the business date BEFORE planning OVERSOLD provisional cost:
+    // a backdated sale may not borrow the cost from a later purchase lot.
+    const txDate = resolveTransactionDate_(token, 'pos', payload.date, payload.backdatedReason, 'Sale');
+    const dateStr = txDate.dateStr;
 
     // ================== VALIDATION PHASE — writes nothing ==================
     // Reads for the whole cart up front, instead of a findRowIndex_ plus a
@@ -461,7 +465,7 @@ function completeSale(token, payload) {
       const requestedVendorId = sanitizeInput_(item.vendorId);
       const plan = isBundle ? null : (requestedVendorId
         ? planSaleVendorConsumption_(item.productId, qty, allLots, product)
-        : planStockConsumption_(item.productId, qty, allLots, product));
+        : planStockConsumption_(item.productId, qty, allLots, product, dateStr));
       // Automatic sale pricing is server-authoritative. Compute it before a
       // vendor resolution neutralizes plan.shortfall: shortage units still
       // sell at the product's current/default selling price.
@@ -540,7 +544,7 @@ function completeSale(token, payload) {
         const product = productsById[productId];
         if (!product || bundleProductType_(product) !== 'Standard') throw new Error('Bundle component no longer exists.');
         const qty = demand.requirementsByProductId[productId];
-        const fifoPlan = planStockConsumption_(productId,qty,allLots,product);
+        const fifoPlan = planStockConsumption_(productId,qty,allLots,product,dateStr);
         // Preflight the parent allocation before posting any invoice or lot.
         // applyStockConsumption_ later assigns actual OVERSOLD lot IDs.
         const virtualDraws=fifoPlan.draws.map(function(d){return {lotId:d.lotId,qty:d.take,unitCost:d.unitCost,unitSellPrice:d.unitSellPrice};});
@@ -605,8 +609,7 @@ function completeSale(token, payload) {
 
     // Throws on a future date, a malformed date, a missing backdate reason,
     // or no backdate permission — so it belongs on this side of the line.
-    const txDate = resolveTransactionDate_(token, 'pos', payload.date, payload.backdatedReason, 'Sale');
-    const dateStr = txDate.dateStr;
+    // Business date was validated before the stock/COGS read-only plan.
 
     // ======================== WRITE PHASE ========================
     // Nothing below here raises a validation error. Apps Script has no
