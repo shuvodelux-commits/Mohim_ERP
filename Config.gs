@@ -34,6 +34,10 @@ const CONFIG = {
   // Sheets recovery audit must pass before enabling this native writer.
   // A Settings value alone may never activate unreconciled stock posting.
   PURCHASE_SETTLEMENT_WRITER_RELEASE_APPROVED: false,
+  // Independently frozen funded-return writer. Neither a Settings edit nor
+  // enabling purchase settlement can activate returns before profit reversal
+  // reporting, exact receipt readback and copied-Sheet fault QA are approved.
+  FUNDED_RETURN_WRITER_RELEASE_APPROVED: false,
 
   // ---- Sheet names ----------------------------------------------------
   SHEETS: {
@@ -47,6 +51,9 @@ const CONFIG = {
     // merely declaring schema does not activate live posting.
     STOCK_LOT_SETTLEMENTS: "Stock Lot Settlements",
     PURCHASE_SETTLEMENT_JOURNAL: "Purchase Settlement Journal",
+    // Reserved audit-only sheets for source-linked funded Sale Returns.
+    STOCK_LOT_SETTLEMENT_REVERSALS: "Stock Lot Settlement Reversals",
+    FUNDED_RETURN_JOURNAL: "Funded Return Journal",
     SALE_ITEM_LOTS: "Sale Item Lots",
     STOCK_LOT_COST_CORRECTIONS: "Stock Lot Cost Corrections",
     PURCHASES: "Purchases",
@@ -525,6 +532,19 @@ const CONFIG = {
     PURCHASE_SETTLEMENT_JOURNAL: [
       "Operation ID", "Purchase ID", "Product ID", "Intent Fingerprint",
       "State", "Last Completed Stage", "Result Receipt",
+      "Actor", "Created At", "Updated At", "Error",
+    ],
+    STOCK_LOT_SETTLEMENT_REVERSALS: [
+      "Reversal ID", "Return Operation ID", "Return ID", "Settlement ID",
+      "Source Invoice ID", "Source Sale Product ID", "Product ID",
+      "Oversold Lot ID", "Purchase Lot ID", "Quantity Ticks", "Quantity Scale",
+      "Provisional Unit Cost Minor", "Actual Unit Cost Minor",
+      "Provisional Returned Cost Minor", "Actual Returned Cost Minor",
+      "Cogs Delta Reversal Minor", "State", "Created At", "Actor",
+    ],
+    FUNDED_RETURN_JOURNAL: [
+      "Operation ID", "Return ID", "Invoice ID", "Product ID",
+      "Intent Fingerprint", "State", "Last Completed Stage", "Result Receipt",
       "Actor", "Created At", "Updated At", "Error",
     ],
     SALE_ITEM_LOTS: [
@@ -1093,6 +1113,8 @@ const CONFIG = {
     STOCK_LOTS: "LOT",
     STOCK_LOT_SETTLEMENTS: "STL",
     PURCHASE_SETTLEMENT_JOURNAL: "PSJ",
+    STOCK_LOT_SETTLEMENT_REVERSALS: "SRV",
+    FUNDED_RETURN_JOURNAL: "FRJ",
     STOCK_LOT_COST_CORRECTIONS: "SLC",
     SALES: "INV",
     SALE_PAYMENTS: "SPAY",
