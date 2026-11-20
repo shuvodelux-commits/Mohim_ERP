@@ -689,7 +689,7 @@
       tile.innerHTML =
         '<div class="p-name">' + escapeHtml(p.name) + '</div>' +
         (meta ? '<div class="p-search-meta">' + escapeHtml(meta) + '</div>' : '') +
-        '<div class="p-price">' + formatMoney(p.autoSellingPrice !== undefined ? p.autoSellingPrice : p.sellingPrice) + '</div>' +
+        '<div class="p-price">' + (p.pricingNeedsReview ? 'Needs Review' : formatMoney(p.autoSellingPrice !== undefined ? p.autoSellingPrice : p.sellingPrice)) + '</div>' +
         '<div class="p-stock" style="' + stockColor + '">' + stock + ' ' + escapeHtml(p.unit || '') + (p.productType === 'Bundle' ? ' available from components · negative sale allowed' : ' in stock') + '</div>';
       tile.addEventListener('mouseenter', function () { posState.searchActiveIndex = idx; posApplySearchHighlight_(); });
       tile.addEventListener('click', function () {
@@ -751,6 +751,14 @@
     line.lineTotal = Math.round((((Number(line.qty) || 0) * (Number(line.unitPrice) || 0)) + Number.EPSILON) * 100) / 100;
   }
 
+  function posProductPriceIsVerified_(product) {
+    if (product && product.pricingNeedsReview) {
+      showToast(product.name + ': stock lots require reconciliation before selling.', 'error');
+      return false;
+    }
+    return true;
+  }
+
   function posCreateCartLine_(product) {
     var pricing = posComputeAutoPricing_(product, 1);
     return {
@@ -770,6 +778,7 @@
   }
 
   function posAddToCart_(product) {
+    if (!posProductPriceIsVerified_(product)) return;
     posState.cartEntryIndex = null;
     var line = posState.cart.filter(function (l) { return l.productId === product.id; })[0];
     if (line) {
@@ -817,7 +826,7 @@
             '<span class="pos-picker-meta">Category: ' + escapeHtml(category || '—') + ' · Brand: ' + escapeHtml(brand || '—') + '</span>' +
           '</span>' +
           '<span class="pos-picker-details">' +
-            '<span class="pos-picker-price">' + formatMoney(price) + (unit ? '<span class="pos-picker-unit">/' + escapeHtml(unit) + '</span>' : '') + '</span>' +
+            '<span class="pos-picker-price">' + (product.pricingNeedsReview ? 'Needs Review' : formatMoney(price) + (unit ? '<span class="pos-picker-unit">/' + escapeHtml(unit) + '</span>' : '')) + '</span>' +
             '<span class="pos-picker-stock' + (stock <= 0 ? ' is-short' : '') + '">' + escapeHtml(stockLabel) + '</span>' +
           '</span>' +
         '</button>';
@@ -978,6 +987,7 @@
   function posReplaceCartProduct_(index, product) {
     index = Number(index);
     if (!product || isNaN(index) || index < 0 || index >= posState.cart.length) return false;
+    if (!posProductPriceIsVerified_(product)) return false;
     var current = posState.cart[index];
     if (current && current.productId === product.id) {
       posState.cartEditIndex = null;
@@ -1031,7 +1041,7 @@
   document.addEventListener('keydown', posHandleCartFastEntryKeydown_);
 
   function posStartCartEntry_(product) {
-    if (!product) return false;
+    if (!product || !posProductPriceIsVerified_(product)) return false;
     var already = posState.cart.some(function (line) { return line.productId === product.id; });
     if (already) {
       showToast(product.name + ' is already in cart.', 'error');
@@ -1048,6 +1058,7 @@
   function posChangeCartEntryProduct_(product) {
     var index = Number(posState.cartEntryIndex);
     if (!product || isNaN(index) || index < 0 || index >= posState.cart.length) return false;
+    if (!posProductPriceIsVerified_(product)) return false;
     var already = posState.cart.some(function (line, i) {
       return i !== index && line.productId === product.id;
     });

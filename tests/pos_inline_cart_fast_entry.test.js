@@ -165,6 +165,7 @@ test('Qty Enter focuses Add Product and next Enter selects an available suggesti
     'posRenderCartProductResults_', 'posPlaceCartProductResults_',
     functionSource('posCartProductMatches_') + '\n' +
     functionSource('posFinishCartEntry_') + '\n' +
+    functionSource('posProductPriceIsVerified_') + '\n' +
     functionSource('posStartCartEntry_') + '\n' +
     'return { matches:posCartProductMatches_, finish:posFinishCartEntry_, start:posStartCartEntry_ };'
   )(state, (list, query, limit) =>

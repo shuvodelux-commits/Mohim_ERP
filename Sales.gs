@@ -125,9 +125,17 @@ function getPosBootstrap(token) {
       products: products.filter(function (p) { return !bundleUnavailableById[p['Product ID']]; }).map(function (p) {
         const bundle = bundleProductType_(p) === 'Bundle';
         const definition = bundle ? bundleDefinitions[p['Product ID']] : null;
-        const pricing = bundle
-          ? {segments: [], fallbackSellPrice:Number(p['Selling Price'])||0, autoSellingPrice:Number(p['Selling Price'])||0}
-          : buildLotPricingLadder_(p['Product ID'], allLots, p);
+        let pricing;
+        try {
+          pricing = bundle
+            ? {segments: [], fallbackSellPrice:Number(p['Selling Price'])||0, autoSellingPrice:Number(p['Selling Price'])||0}
+            : buildLotPricingLadder_(p['Product ID'], allLots, p);
+        } catch (err) {
+          // One inconsistent product must not hide the entire POS catalog.
+          // Never offer an automatic price for a lot history the sale planner
+          // would reject; keep this product unavailable until reconciled.
+          pricing = {segments: [], fallbackSellPrice:0, autoSellingPrice:null, needsReview:true};
+        }
         const out = {
           id: p['Product ID'], name: p['Product Name'], brand: p['Brand'] || '',
           unit: p['Unit'], barcode: p['Barcode'] || '',
@@ -135,6 +143,7 @@ function getPosBootstrap(token) {
           lotPricing: pricing.segments,
           fallbackSellPrice: pricing.fallbackSellPrice,
           autoSellingPrice: pricing.autoSellingPrice,
+          pricingNeedsReview: !!pricing.needsReview,
           stock: bundle ? getBundleAvailability_(definition,productsById) : (Number(p['Current Stock']) || 0),
           category: p['Category'], productType: bundle ? 'Bundle' : 'Standard',
           bundleRevision: bundle ? definition.revision : 0
