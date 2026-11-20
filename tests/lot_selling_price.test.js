@@ -90,6 +90,54 @@ test('lot pricing ladder follows FIFO and preserves per-lot sell prices', () => 
   assert.strictEqual(pricing.autoSellingPrice, 120);
 });
 
+test('POS selling preview reserves old OVERSOLD debt before selecting FIFO lot selling prices', () => {
+  const source = read('StockLots.gs');
+  const ctx = {
+    safeDateOnly_: v => String(v || '').slice(0, 10),
+    isValidNonNegativeNumber_: v => Number.isFinite(Number(v)) && Number(v) >= 0
+  };
+  vm.createContext(ctx);
+  ['compareLotsFifo_', 'lotSellPrice_', 'planPurchaseLotOwnAvailability_', 'buildLotPricingLadder_']
+    .forEach(name => vm.runInContext(fnSource(source, name), ctx));
+
+  const product = { 'Product ID': 'PIPE', 'Current Stock': 398, 'Selling Price': 75 };
+  const lots = [
+    { 'Lot ID': 'LOT-000762', 'Product ID': 'PIPE', 'Purchase ID': 'PUR-000036',
+      'Purchase Date': '2026-10-07', 'Remaining Quantity': 2, 'Purchase Price': 64.68,
+      'Sell Price': 70, 'Status': 'Active' },
+    { 'Lot ID': 'LOT-000776', 'Product ID': 'PIPE', 'Purchase ID': 'OVERSOLD',
+      'Purchase Date': '2026-11-20', 'Remaining Quantity': -404,
+      'Purchase Price': 64.68, 'Status': 'Oversold' },
+    { 'Lot ID': 'LOT-000777', 'Product ID': 'PIPE', 'Purchase ID': 'PUR-000040',
+      'Purchase Date': '2026-11-20', 'Remaining Quantity': 800, 'Purchase Price': 70,
+      'Sell Price': 75, 'Status': 'Active' }
+  ];
+  const before = JSON.stringify(lots);
+  const pricing = ctx.buildLotPricingLadder_('PIPE', lots, product);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(pricing.segments)), [{ qty: 398, sellPrice: 75 }]);
+  assert.strictEqual(pricing.autoSellingPrice, 75);
+  assert.strictEqual(JSON.stringify(lots), before, 'price preview never mutates stock history');
+
+  assert.throws(
+    () => ctx.buildLotPricingLadder_('PIPE', lots, { ...product, 'Current Stock': 396 }),
+    /mismatch|Needs Review/i,
+    'a cached stock mismatch must not silently publish a trusted price preview'
+  );
+});
+
+test('POS keeps other products usable but blocks a product whose reserved lot prices cannot reconcile', () => {
+  const bootstrap = fnSource(read('Sales.gs'), 'getPosBootstrap');
+  const ui = read('pos.html');
+  assert.match(bootstrap, /catch\s*\(err\)/);
+  assert.match(bootstrap, /needsReview:true/);
+  assert.match(bootstrap, /pricingNeedsReview:\s*!!pricing\.needsReview/);
+  assert.match(fnSource(ui, 'posAddToCart_'), /posProductPriceIsVerified_/);
+  assert.match(fnSource(ui, 'posStartCartEntry_'), /posProductPriceIsVerified_/);
+  assert.match(fnSource(ui, 'posReplaceCartProduct_'), /posProductPriceIsVerified_/);
+  assert.match(fnSource(ui, 'posChangeCartEntryProduct_'), /posProductPriceIsVerified_/);
+  assert.match(fnSource(ui, 'posRenderProductGrid_'), /Needs Review/);
+});
+
 test('stock consumption plan and apply preserve lot sell price independently from unit cost', () => {
   const stock = read('StockLots.gs');
   const plan = fnSource(stock, 'planStockConsumption_');

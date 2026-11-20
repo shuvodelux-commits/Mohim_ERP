@@ -98,14 +98,24 @@ function lotSellPrice_(lot, productRow) {
  */
 function buildLotPricingLadder_(productId, allLots, productRow) {
   const fallbackSellPrice = lotSellPrice_(null, productRow);
-  const lots = (allLots || [])
+  const productLots = (allLots || []).filter(function (l) { return l['Product ID'] === productId; });
+  const lots = productLots
     .filter(function (l) {
-      return l['Product ID'] === productId && (Number(l['Remaining Quantity']) || 0) > 0 && l['Status'] !== 'Deleted';
+      return (Number(l['Remaining Quantity']) || 0) > 0 && l['Status'] !== 'Deleted';
     })
     .sort(compareLotsFifo_);
+  // Use the same old-OVERSOLD reservation as the server's sale planner.
+  // Otherwise a positive lot already owed to an earlier sale is advertised
+  // in POS, and the posted invoice may use a different lot/selling price.
+  const hasDebt = productLots.some(function (l) { return Number(l['Remaining Quantity']) < 0; });
+  const freeByLot = {};
+  if (hasDebt) {
+    const availability = planPurchaseLotOwnAvailability_(productId, productLots, productRow);
+    availability.lots.forEach(function (entry) { freeByLot[entry.lotId] = entry.freeQty; });
+  }
   const segments = [];
   lots.forEach(function (lot) {
-    const qty = Number(lot['Remaining Quantity']) || 0;
+    const qty = hasDebt ? (freeByLot[String(lot['Lot ID'])] || 0) : Number(lot['Remaining Quantity']) || 0;
     if (qty <= 0) return;
     const sellPrice = lotSellPrice_(lot, productRow);
     const prev = segments.length ? segments[segments.length - 1] : null;
