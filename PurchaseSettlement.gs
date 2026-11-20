@@ -1,3 +1,19 @@
+/** Google Apps Script V8-compatible, exact safe-integer half-up cents.
+ * Decompose whole and fractional units to avoid an overflowing raw product.
+ * Unsupported inputs/ranges fail closed; never approximate a financial cost. */
+function purchaseSettlementScaledPaisa_(ticks,cents,scale) {
+  if (!Number.isSafeInteger(ticks)||ticks<0 ||
+      !Number.isSafeInteger(cents)||cents<0 ||
+      !Number.isSafeInteger(scale)||scale<=0||scale>1000000) return null;
+  const whole=Math.floor(ticks/scale),rem=ticks%scale;
+  const wholeCents=whole*cents,frac=rem*cents;
+  const biased=frac+Math.floor(scale/2);
+  if (!Number.isSafeInteger(wholeCents)||
+      !Number.isSafeInteger(frac)||!Number.isSafeInteger(biased)) return null;
+  const rounded=wholeCents+Math.floor(biased/scale);
+  return Number.isSafeInteger(rounded)?rounded:null;
+}
+
 /**
  * Mohim_ERP GAS · Stage 5C1: whole-purchase, read-only settlement preflight.
  *
@@ -283,11 +299,10 @@ function buildPurchaseSettlementIntentHash_(request) {
   const purchaseDiscountMinor = minor(payment.discount === undefined?0:payment.discount,'discount');
   const paidMinor = minor(payment.paidAmount === undefined?0:payment.paidAmount,'paid amount');
   const subtotalMinor = lines.reduce(function (total,line) {
-    const cents = BigInt(line.qtyTicks)*BigInt(line.unitCostMinor);
-    const rounded = (cents+BigInt(line.scale)/2n)/BigInt(line.scale);
-    if (rounded>BigInt(Number.MAX_SAFE_INTEGER) || !Number.isSafeInteger(total+Number(rounded)))
+    const rounded = purchaseSettlementScaledPaisa_(line.qtyTicks,line.unitCostMinor,line.scale);
+    if (rounded===null || !Number.isSafeInteger(total+rounded))
       throw new Error('Purchase line money overflow.');
-    return total+Number(rounded);
+    return total+rounded;
   },0);
   if (purchaseDiscountMinor>subtotalMinor || paidMinor>subtotalMinor-purchaseDiscountMinor)
     throw new Error('Purchase discount or payment exceeds verified subtotal.');

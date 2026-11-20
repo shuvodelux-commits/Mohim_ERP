@@ -1,3 +1,18 @@
+/** Google Apps Script V8-compatible, exact safe-integer half-up cents.
+ * Decompose whole and fractional units to avoid an overflowing raw product.
+ * Unsupported inputs/ranges fail closed; never approximate a financial cost. */
+function profitScaledPaisa_(ticks,cents,scale) {
+  if (!Number.isSafeInteger(ticks)||ticks<0 ||
+      !Number.isSafeInteger(cents)||cents<0 ||
+      !Number.isSafeInteger(scale)||scale<=0||scale>1000000) return null;
+  const whole=Math.floor(ticks/scale),rem=ticks%scale;
+  const wholeCents=whole*cents,frac=rem*cents;
+  const biased=frac+Math.floor(scale/2);
+  if (!Number.isSafeInteger(wholeCents)||
+      !Number.isSafeInteger(frac)||!Number.isSafeInteger(biased)) return null;
+  const rounded=wholeCents+Math.floor(biased/scale);
+  return Number.isSafeInteger(rounded)?rounded:null;
+}
 /**
  * Mohim_ERP · Task 5C3A — source-linked effective purchase-cost overlay.
  *
@@ -141,7 +156,7 @@ function computeCommittedOversoldCostOverlay_(source) {
     if (!reversalPresent && debt.funded>debt.qtyTicks)
       return bad('FUNDED_QUANTITY_EXCEEDS_RETURN_ADJUSTED_SALE');
     const roundedMoney=function(cents){
-      return Number((BigInt(ticks)*BigInt(cents)+BigInt(scale)/2n)/BigInt(scale));
+      return profitScaledPaisa_(ticks,cents,scale);
     };
     const provisionalCogs=roundedMoney(provisional),actualCogs=roundedMoney(actual);
     if (![provisionalCogs,actualCogs].every(Number.isSafeInteger) ||
@@ -194,16 +209,19 @@ function computeCommittedOversoldCostOverlay_(source) {
         Number(r['Actual Unit Cost Minor'])!==Number(sourceEvent['Actual Unit Cost Minor']))
       return bad('REVERSAL_SOURCE_COST_OR_LOT_MISMATCH');
     const qty=Number(r['Quantity Ticks']),previous=reversalByEvent[eid]||0;
-    const grossTicks=Number(sourceEvent['Quantity Ticks']),scale=BigInt(adjustment.quantityScale);
+    const grossTicks=Number(sourceEvent['Quantity Ticks']),scale=Number(adjustment.quantityScale);
     if (!Number.isSafeInteger(qty)||qty<=0||!Number.isSafeInteger(previous+qty)||
         previous+qty>grossTicks)return bad('REVERSAL_QUANTITY_EXCEEDS_PURCHASE_FUNDING');
     function rounded(ticks,cents){
-      return Number((BigInt(ticks)*BigInt(cents)+scale/2n)/scale);
+      return profitScaledPaisa_(ticks,cents,scale);
     }
     const prov=Number(sourceEvent['Provisional Unit Cost Minor']);
     const actual=Number(sourceEvent['Actual Unit Cost Minor']);
-    const pr=rounded(previous+qty,prov)-rounded(previous,prov);
-    const ar=rounded(previous+qty,actual)-rounded(previous,actual);
+    const prEnd=rounded(previous+qty,prov),prStart=rounded(previous,prov);
+    const arEnd=rounded(previous+qty,actual),arStart=rounded(previous,actual);
+    if (![prEnd,prStart,arEnd,arStart].every(Number.isSafeInteger))
+      return bad('UNREPRESENTABLE_REVERSAL_COST');
+    const pr=prEnd-prStart,ar=arEnd-arStart;
     const returnedDifference=pr-ar;
     if (![pr,ar,returnedDifference].every(Number.isSafeInteger)||
         Number(r['Provisional Returned Cost Minor'])!==pr||

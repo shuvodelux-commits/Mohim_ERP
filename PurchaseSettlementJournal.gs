@@ -1,3 +1,18 @@
+/** Google Apps Script V8-compatible, exact safe-integer half-up cents.
+ * Decompose whole and fractional units to avoid an overflowing raw product.
+ * Unsupported inputs/ranges fail closed; never approximate a financial cost. */
+function purchaseJournalScaledPaisa_(ticks,cents,scale) {
+  if (!Number.isSafeInteger(ticks)||ticks<0 ||
+      !Number.isSafeInteger(cents)||cents<0 ||
+      !Number.isSafeInteger(scale)||scale<=0||scale>1000000) return null;
+  const whole=Math.floor(ticks/scale),rem=ticks%scale;
+  const wholeCents=whole*cents,frac=rem*cents;
+  const biased=frac+Math.floor(scale/2);
+  if (!Number.isSafeInteger(wholeCents)||
+      !Number.isSafeInteger(frac)||!Number.isSafeInteger(biased)) return null;
+  const rounded=wholeCents+Math.floor(biased/scale);
+  return Number.isSafeInteger(rounded)?rounded:null;
+}
 /**
  * Mohim_ERP GAS — Task 5C2A purchase operation journal and crash gate.
  *
@@ -303,8 +318,7 @@ function verifyPurchaseSettlementReceipt_(snapshot) {
       const product=one(snapshot.products,function(r){return String(r['Product ID'])===productId;});
       const lot=one(snapshot.stockLots,function(r){return String(r['Lot ID'])===lotId;});
       const movement=one(movements,function(r){return String(r['Product ID'])===productId;});
-      const lineValue=Number((BigInt(line.quantityTicks)*BigInt(line.unitCostMinor)+
-        BigInt(scale)/2n)/BigInt(scale));
+      const lineValue=purchaseJournalScaledPaisa_(line.quantityTicks,line.unitCostMinor,scale);
       if (!Number.isSafeInteger(lineValue) || !Number.isSafeInteger(expectedSubtotal+lineValue))
         return false;
       expectedSubtotal+=lineValue;
@@ -347,9 +361,10 @@ function verifyPurchaseSettlementReceipt_(snapshot) {
         return false;
       // Derive both sides of the signed cost adjustment independently in
       // integer paisa. Never round a per-unit variance before multiplying.
-      const scale=BigInt(srcLine.quantityScale),qty=BigInt(expected.settledQtyTicks);
-      const prov=Number((qty*BigInt(expected.provisionalUnitCostMinor)+scale/2n)/scale);
-      const actual=Number((qty*BigInt(expected.actualUnitCostMinor)+scale/2n)/scale);
+      const prov=purchaseJournalScaledPaisa_(expected.settledQtyTicks,
+        expected.provisionalUnitCostMinor,srcLine.quantityScale);
+      const actual=purchaseJournalScaledPaisa_(expected.settledQtyTicks,
+        expected.actualUnitCostMinor,srcLine.quantityScale);
       if (!Number.isSafeInteger(prov) || !Number.isSafeInteger(actual) ||
           expected.provisionalCOGSMinor!==prov || expected.actualCOGSMinor!==actual ||
           expected.favorableVarianceMinor!==prov-actual)

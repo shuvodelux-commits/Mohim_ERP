@@ -1,3 +1,19 @@
+/** Google Apps Script V8-compatible, exact safe-integer half-up cents.
+ * Decompose whole and fractional units to avoid an overflowing raw product.
+ * Unsupported inputs/ranges fail closed; never approximate a financial cost. */
+function stockLotsScaledPaisa_(ticks,cents,scale) {
+  if (!Number.isSafeInteger(ticks)||ticks<0 ||
+      !Number.isSafeInteger(cents)||cents<0 ||
+      !Number.isSafeInteger(scale)||scale<=0||scale>1000000) return null;
+  const whole=Math.floor(ticks/scale),rem=ticks%scale;
+  const wholeCents=whole*cents,frac=rem*cents;
+  const biased=frac+Math.floor(scale/2);
+  if (!Number.isSafeInteger(wholeCents)||
+      !Number.isSafeInteger(frac)||!Number.isSafeInteger(biased)) return null;
+  const rounded=wholeCents+Math.floor(biased/scale);
+  return Number.isSafeInteger(rounded)?rounded:null;
+}
+
 /**
  * StockLots.gs
  * ---------------------------------------------------------------------
@@ -1693,10 +1709,7 @@ function planOversoldPurchaseSettlement_(input) {
     return Math.round(scaled);
   }
   function qtyMoney(q, price) {
-    const d = BigInt(scale), n = BigInt(q) * BigInt(price);
-    const value = (n + d / 2n) / d;
-    if (value > BigInt(Number.MAX_SAFE_INTEGER)) return null;
-    return Number(value);
+    return stockLotsScaledPaisa_(q, price, scale);
   }
   const date = safeDateOnly_(p.date);
   const operationId = String(p.operationId || '');
