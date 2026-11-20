@@ -474,8 +474,26 @@
   var purState = {
     products: [], suppliers: [], categories: [], bankAccounts: [], cart: [], currencySymbol: "",
     history: [], updatePurchaseId: null, updateReason: null,
-    cartEntryIndex: null, cartEditIndex: null, supplierCombo: null
+    cartEntryIndex: null, cartEditIndex: null, supplierCombo: null,
+    pendingPurchaseOperationId: ''
   };
+
+  // A network timeout does not tell us whether Sheets committed the purchase.
+  // Keep the same operation ID on retry; only a confirmed success resets it.
+  function purPurchaseOperationId_() {
+    if (purState.pendingPurchaseOperationId) return purState.pendingPurchaseOperationId;
+    var bytes = new Uint8Array(12);
+    if (window.crypto && window.crypto.getRandomValues) {
+      window.crypto.getRandomValues(bytes);
+    } else {
+      for (var i=0; i<bytes.length; i++) bytes[i] = Math.floor(Math.random()*256);
+    }
+    var hex = Array.prototype.map.call(bytes,function(n){
+      return ('0'+n.toString(16)).slice(-2);
+    }).join('');
+    purState.pendingPurchaseOperationId = 'purchase-'+Date.now().toString(36)+'-'+hex;
+    return purState.pendingPurchaseOperationId;
+  }
 
   document.querySelectorAll("#page-purchase .tab-btn").forEach(function (btn) {
     btn.addEventListener("click", function () {
@@ -1367,7 +1385,9 @@
         date: purDate,
         backdatedReason: backdatedReason,
       };
+      if (!isUpdate) payload.operationId = purPurchaseOperationId_();
       function finishPurchaseSave_(purchaseId) {
+        purState.pendingPurchaseOperationId = '';
         purState.cart = [];
         purState.cartEntryIndex = null;
         purState.cartEditIndex = null;

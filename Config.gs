@@ -30,6 +30,10 @@
 
 const CONFIG = {
   APP_NAME: "Hardware Store ERP",
+  // Release freeze: full effective-COGS reporting, funded returns and copied-
+  // Sheets recovery audit must pass before enabling this native writer.
+  // A Settings value alone may never activate unreconciled stock posting.
+  PURCHASE_SETTLEMENT_WRITER_RELEASE_APPROVED: false,
 
   // ---- Sheet names ----------------------------------------------------
   SHEETS: {
