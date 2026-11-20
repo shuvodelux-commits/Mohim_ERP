@@ -49,7 +49,11 @@ test('exclude OVERSOLD, OPENING, adjustment, deleted and unrelated product from 
  lot('OTHER','2026-09-24',110,0,{'Product ID':'P2'})
  ];
  const w=harness(rows);
- assert.equal(w.plan(1,'2026-09-30').fallbackPrice,68);
+ // This test isolates historical *source selection*; the synthetic lot
+ // snapshot is intentionally not stock-balanced (-2) and a real sale must
+ // now reject it before posting rather than silently spending gross stock.
+ assert.equal(w.ctx.lastPurchasedLotCostAsOf_('P1',rows,'2026-09-30').unitCost,68);
+ assert.throws(()=>w.plan(1,'2026-09-30'),/mismatch|Needs Review/i);
 });
 test('invalid most recent real purchase cost fails closed, not older or master price',()=>{
  const w=harness([lot('OLD','2026-09-01',68),lot('BAD','2026-09-05','')],72);
