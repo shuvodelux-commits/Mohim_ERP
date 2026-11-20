@@ -222,6 +222,8 @@ function paySupplier(token, supplierId, amount, method, bankAccountId, notes, da
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     const actingUser = requirePermission_(token, "suppliers", "edit");
+    // Block stock and money writes if any prior purchase/refund result is uncertain.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
     if (!isValidNonNegativeNumber_(amount) || Number(amount) <= 0)
       return fail_("Enter a valid payment amount.");

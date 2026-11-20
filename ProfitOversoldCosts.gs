@@ -34,12 +34,33 @@ function computeCommittedOversoldCostOverlay_(source) {
     });
     return map;
   };
+  const reversalPresent=['reversals','returnJournals','returnReceipts','returnItems']
+    .some(function(k){return Object.prototype.hasOwnProperty.call(source,k);});
+  if (reversalPresent && ['reversals','returnJournals','returnReceipts','returnItems']
+    .some(function(k){return !Array.isArray(source[k]);}))
+    return bad('INCOMPLETE_RETURN_REVERSAL_EVIDENCE');
+  const reversals=reversalPresent?source.reversals:[];
+  const returnJournals=reversalPresent?source.returnJournals:[];
+  const returnReceipts=reversalPresent?source.returnReceipts:[];
+  const returnItems=reversalPresent?source.returnItems:[];
+  const returnJournalMap=byId(returnJournals,'Operation ID');
+  const returnReceiptMap=byId(returnReceipts,'Return ID');
+  const reversalByEvent={};
+  for (const j of returnJournals) {
+    const id=String(j['Operation ID']||'');
+    if (!id || returnJournalMap[id].length!==1 ||
+      j.State!=='Committed' || j['Last Completed Stage']!=='Committed' ||
+      !j['Return ID'] || String(j['Result Receipt'])!==String(j['Return ID']))
+      return bad('PENDING_OR_DUPLICATE_RETURN_JOURNAL_NEEDS_REVIEW');
+  }
   const journals=byId(source.journals,'Operation ID'),purchases=byId(source.purchases,'Purchase ID');
   const lotMap=byId(source.stockLots,'Lot ID');
   const eventIdMap={};
   const sourceLinks={};
   const debts={};
   const purchaseAllocated={};
+  const eventMap={};
+  const adjustmentByEvent={};
   const adjustments=[];
   for (const link of source.saleItemLots) {
     const lotId=String(link['Lot ID']||'');
@@ -113,7 +134,11 @@ function computeCommittedOversoldCostOverlay_(source) {
     if (debt.productId!==pid || debt.scale!==scale || debt.qtyTicks!==sourceQty)
       return bad('MIXED_SOURCE_QUANTITY_SCALES');
     debt.funded+=ticks;
-    if (!Number.isSafeInteger(debt.funded)||debt.funded>debt.qtyTicks)
+    // Gross committed funding may exceed net sold quantities AFTER a
+    // legitimately returned funded unit. Validate net funding only after
+    // all source-verified committed reversal records have been applied.
+    if (!Number.isSafeInteger(debt.funded))return bad('FUNDED_QUANTITY_OVERFLOW');
+    if (!reversalPresent && debt.funded>debt.qtyTicks)
       return bad('FUNDED_QUANTITY_EXCEEDS_RETURN_ADJUSTED_SALE');
     const roundedMoney=function(cents){
       return Number((BigInt(ticks)*BigInt(cents)+BigInt(scale)/2n)/BigInt(scale));
@@ -130,16 +155,90 @@ function computeCommittedOversoldCostOverlay_(source) {
     allocation.qty+=ticks;
     if (!Number.isSafeInteger(allocation.qty))
       return bad('PURCHASE_ALLOCATION_OVERFLOW');
-    adjustments.push({invoiceId:invoice,sourceSaleProductId:sourceProduct,
+    const adj={invoiceId:invoice,sourceSaleProductId:sourceProduct,
       sourceProductId:pid,oversoldLotId:oldLotId,purchaseLotId:newLotId,
       settlementId:eventId,quantityTicks:ticks,quantityScale:scale,
-      deltaMinor:actualCogs-provisionalCogs});
+      deltaMinor:actualCogs-provisionalCogs};
+    adjustments.push(adj);
+    adjustmentByEvent[eventId]=adj;
+    eventMap[eventId]=event;
+  }
+  const seenReversalIds={},returnQtyById={};
+  for (const r of reversals) {
+    const rid=String(r['Reversal ID']||''),eid=String(r['Settlement ID']||'');
+    if (!rid||seenReversalIds[rid])return bad('DUPLICATE_RETURN_REVERSAL_ID');
+    seenReversalIds[rid]=true;
+    if (r.State!=='Committed')return bad('PENDING_RETURN_REVERSAL_NEEDS_REVIEW');
+    const sourceEvent=eventMap[eid],adjustment=adjustmentByEvent[eid];
+    if (!sourceEvent||!adjustment)return bad('MISSING_REVERSAL_SOURCE_SETTLEMENT');
+    const op=String(r['Return Operation ID']||''),returnId=String(r['Return ID']||'');
+    const j=returnJournalMap[op]||[],receipts=returnReceiptMap[returnId]||[];
+    if (receipts.length===1 &&
+        (String(receipts[0]['Is Deleted']||'').toUpperCase()==='TRUE' ||
+         String(receipts[0].Status||'')==='Cancelled'))
+      return bad('DELETED_OR_CANCELLED_RETURN_RECEIPT_NEEDS_REVIEW');
+    if (j.length!==1||receipts.length!==1||
+        String(j[0]['Return ID'])!==returnId||
+        String(j[0]['Invoice ID'])!==String(adjustment.invoiceId)||
+        String(j[0]['Product ID'])!==String(adjustment.sourceProductId)||
+        String(receipts[0]['Return Operation ID'])!==op||
+        String(receipts[0]['Invoice ID'])!==String(adjustment.invoiceId))
+      return bad('INVALID_RETURN_RECEIPT_OR_JOURNAL');
+    if (String(r['Source Invoice ID'])!==String(adjustment.invoiceId)||
+        String(r['Source Sale Product ID'])!==String(adjustment.sourceSaleProductId)||
+        String(r['Product ID'])!==String(adjustment.sourceProductId)||
+        String(r['Oversold Lot ID'])!==String(adjustment.oversoldLotId)||
+        String(r['Purchase Lot ID'])!==String(adjustment.purchaseLotId)||
+        Number(r['Quantity Scale'])!==adjustment.quantityScale||
+        Number(r['Provisional Unit Cost Minor'])!==Number(sourceEvent['Provisional Unit Cost Minor'])||
+        Number(r['Actual Unit Cost Minor'])!==Number(sourceEvent['Actual Unit Cost Minor']))
+      return bad('REVERSAL_SOURCE_COST_OR_LOT_MISMATCH');
+    const qty=Number(r['Quantity Ticks']),previous=reversalByEvent[eid]||0;
+    const grossTicks=Number(sourceEvent['Quantity Ticks']),scale=BigInt(adjustment.quantityScale);
+    if (!Number.isSafeInteger(qty)||qty<=0||!Number.isSafeInteger(previous+qty)||
+        previous+qty>grossTicks)return bad('REVERSAL_QUANTITY_EXCEEDS_PURCHASE_FUNDING');
+    function rounded(ticks,cents){
+      return Number((BigInt(ticks)*BigInt(cents)+scale/2n)/scale);
+    }
+    const prov=Number(sourceEvent['Provisional Unit Cost Minor']);
+    const actual=Number(sourceEvent['Actual Unit Cost Minor']);
+    const pr=rounded(previous+qty,prov)-rounded(previous,prov);
+    const ar=rounded(previous+qty,actual)-rounded(previous,actual);
+    const returnedDifference=pr-ar;
+    if (![pr,ar,returnedDifference].every(Number.isSafeInteger)||
+        Number(r['Provisional Returned Cost Minor'])!==pr||
+        Number(r['Actual Returned Cost Minor'])!==ar||
+        Number(r['Cogs Delta Reversal Minor'])!==returnedDifference)
+      return bad('INVALID_RETURN_REVERSAL_COGS_VARIANCE');
+    const items=returnItems.filter(function(i){
+      return String(i['Return ID'])===returnId &&
+        String(i['Invoice ID'])===String(adjustment.invoiceId) &&
+        String(i['Product ID'])===String(adjustment.sourceSaleProductId);
+    });
+    if (items.length!==1)return bad('MISSING_OR_DUPLICATE_SOURCE_RETURN_ITEM');
+    const returnedTicks=Number(items[0]['Return Quantity'])*adjustment.quantityScale;
+    if (!Number.isSafeInteger(Math.round(returnedTicks))||
+        Math.abs(returnedTicks-Math.round(returnedTicks))>0.0000001)
+      return bad('INVALID_SOURCE_RETURN_QUANTITY');
+    returnQtyById[returnId]=(returnQtyById[returnId]||0)+qty;
+    if (returnQtyById[returnId]>Math.round(returnedTicks))
+      return bad('REVERSAL_EXCEEDS_RETURN_DOCUMENT_QUANTITY');
+    reversalByEvent[eid]=previous+qty;
+    adjustment.deltaMinor+=returnedDifference;
+    adjustment.quantityTicks-=qty;
+    debts[adjustment.oversoldLotId].funded-=qty;
+    purchaseAllocated[adjustment.purchaseLotId].qty-=qty;
+    if (!Number.isSafeInteger(adjustment.deltaMinor)||
+        !Number.isSafeInteger(debts[adjustment.oversoldLotId].funded)||
+        !Number.isSafeInteger(purchaseAllocated[adjustment.purchaseLotId].qty))
+      return bad('RETURN_ADJUSTMENT_OVERFLOW');
   }
   for (const debtId of Object.keys(debts)) {
     const debt=debts[debtId],remaining=Number(debt.lot['Remaining Quantity'])*debt.scale;
     if (!Number.isSafeInteger(Math.round(remaining)) ||
         Math.abs(remaining-Math.round(remaining))>0.0000001 ||
-        remaining>0 || Math.round(remaining)!==debt.funded-debt.qtyTicks ||
+        remaining>0 || debt.funded<0 || debt.funded>debt.qtyTicks ||
+        Math.round(remaining)!==debt.funded-debt.qtyTicks ||
         String(debt.lot.Status)!==(remaining===0?'Consumed':'Oversold'))
       return bad('OLD_DEBT_QUANTITY_NOT_CONSERVED');
   }
@@ -216,13 +315,37 @@ function loadCommittedOversoldCostOverlay_() {
           headers.some(function(header){return actual.indexOf(String(header))===-1;}))
         return review('SETTLEMENT_SCHEMA_AMBIGUOUS_NEEDS_REVIEW');
     }
-    return computeCommittedOversoldCostOverlay_({
+    const source={
       saleItemLots:getAllRows_('SALE_ITEM_LOTS'),
       stockLots:getAllRows_('STOCK_LOTS'),
       settlements:getAllRows_('STOCK_LOT_SETTLEMENTS'),
       journals:getAllRows_('PURCHASE_SETTLEMENT_JOURNAL'),
       purchases:getAllRows_('PURCHASES')
-    });
+    };
+    // A legacy workbook may lack both additive reversal sheets. One
+    // missing member of a partly created pair cannot mean zero reversals.
+    const reversalKeys=['STOCK_LOT_SETTLEMENT_REVERSALS','FUNDED_RETURN_JOURNAL'];
+    if (reversalKeys.every(function(k){return !!CONFIG.SHEETS[k];})) {
+      const reversalSheets=reversalKeys.map(function(k){return ss.getSheetByName(CONFIG.SHEETS[k]);});
+      if (!!reversalSheets[0]!==!!reversalSheets[1])
+        return review('PARTIAL_RETURN_REVERSAL_SCHEMA_NEEDS_REVIEW');
+      if (reversalSheets[0] && reversalSheets[1]) {
+        for (let i=0;i<reversalKeys.length;i++) {
+          const expected=CONFIG.HEADERS[reversalKeys[i]],sheet=reversalSheets[i];
+          const lastCol=sheet.getLastColumn();
+          if (!expected||lastCol<expected.length)
+            return review('MISSING_RETURN_REVERSAL_HEADERS');
+          const actual=sheet.getRange(1,1,1,lastCol).getValues()[0].map(String);
+          if (new Set(actual).size!==actual.length || expected.some(function(h){return actual.indexOf(h)===-1;}))
+            return review('AMBIGUOUS_RETURN_REVERSAL_HEADERS');
+        }
+        source.reversals=getAllRows_('STOCK_LOT_SETTLEMENT_REVERSALS');
+        source.returnJournals=getAllRows_('FUNDED_RETURN_JOURNAL');
+        source.returnReceipts=getAllRows_('SALES_RETURN');
+        source.returnItems=getAllRows_('SALES_RETURN_ITEMS');
+      }
+    }
+    return computeCommittedOversoldCostOverlay_(source);
   } catch(err) {
     return review('SETTLEMENT_SOURCE_READBACK_FAILED_NEEDS_REVIEW');
   }

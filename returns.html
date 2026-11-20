@@ -641,14 +641,14 @@
           loadingLabel: 'Completing...',
           trigger: document.getElementById('rtCompleteBtn')
         }, function () {
-          if (String(onlyInvoice.paymentDetailVersion || '') === '1') {
-            var fingerprint = JSON.stringify(singlePayload);
-            if (rtState.returnAttemptFingerprint && rtState.returnAttemptFingerprint !== fingerprint) {
-              throw new Error('Previous refund request changed. Check the original return before retrying.');
-            }
-            rtState.returnAttemptFingerprint = fingerprint;
-            singlePayload.operationId = rtReturnOperationId_();
+          // All new returns preserve operation ID on uncertain network replies;
+          // legacy non-funded returns simply ignore this extra field.
+          var fingerprint = JSON.stringify(singlePayload);
+          if (rtState.returnAttemptFingerprint && rtState.returnAttemptFingerprint !== fingerprint) {
+            throw new Error('Previous refund request changed. Check the original return before retrying.');
           }
+          rtState.returnAttemptFingerprint = fingerprint;
+          singlePayload.operationId = rtReturnOperationId_();
           return withLoader(serverCall('completeReturn', authToken, singlePayload)).then(function (res) {
             showToast('Return ' + res.returnId + ' completed — ' + formatMoney(res.totalReturnAmount), 'success');
             rtReset_();
@@ -773,14 +773,13 @@
       loadingLabel: 'Completing...',
       trigger: document.getElementById('rtCompleteBtn')
     }, function () {
-      if (rtState.invoice && String(rtState.invoice.paymentDetailVersion || '') === '1') {
-        var fingerprint = JSON.stringify(payloadSingle);
-        if (rtState.returnAttemptFingerprint && rtState.returnAttemptFingerprint !== fingerprint) {
-          throw new Error('Previous refund request changed. Check the original return before retrying.');
-        }
-        rtState.returnAttemptFingerprint = fingerprint;
-        payloadSingle.operationId = rtReturnOperationId_();
+      // Stable source operation identity for simple and split-payment returns.
+      var fingerprint = JSON.stringify(payloadSingle);
+      if (rtState.returnAttemptFingerprint && rtState.returnAttemptFingerprint !== fingerprint) {
+        throw new Error('Previous refund request changed. Check the original return before retrying.');
       }
+      rtState.returnAttemptFingerprint = fingerprint;
+      payloadSingle.operationId = rtReturnOperationId_();
       return withLoader(serverCall('completeReturn', authToken, payloadSingle)).then(function (res) {
         showToast('Return ' + res.returnId + ' completed — ' + formatMoney(res.totalReturnAmount) + ' refunded', 'success');
         rtReset_();

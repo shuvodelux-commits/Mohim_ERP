@@ -108,6 +108,8 @@ function addExpense(token, payload) {
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     const actingUser = requirePermission_(token, 'expense', 'add');
+    // Block stock and money writes if any prior purchase/refund result is uncertain.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
     if (!isValidNonNegativeNumber_(payload.amount) || Number(payload.amount) <= 0) return fail_('Enter a valid expense amount.');
     if (!payload.categoryId) return fail_('Choose an expense category.');
@@ -340,6 +342,8 @@ function updateExpenseInternal_(token, expenseId, payload, options) {
   if (lock) lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     requirePermission_(token, 'expense', 'edit');
+    // Block stock and money writes if any prior purchase/refund result is uncertain.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
     const rowIndex = findRowIndex_('EXPENSES', 'Expense ID', expenseId);
     if (rowIndex === -1) return fail_('Expense not found.');
@@ -434,6 +438,8 @@ function cancelExpense(token, expenseId, reason) {
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     requirePermission_(token, 'expense', 'edit');
+    // Block stock and money writes if any prior purchase/refund result is uncertain.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
     const rowIndex = findRowIndex_('EXPENSES', 'Expense ID', expenseId);
     if (rowIndex === -1) return fail_('Expense not found.');

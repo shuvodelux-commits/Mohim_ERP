@@ -404,6 +404,8 @@ function receivePayment(token, customerId, amount, method, bankAccountId, notes,
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     const actingUser = requirePermission_(token, "customers", "edit");
+    // Block stock and money writes if any prior purchase/refund result is uncertain.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
     if (!isValidNonNegativeNumber_(amount) || Number(amount) <= 0)
       return fail_("Enter a valid payment amount.");
@@ -513,6 +515,8 @@ function refundCustomerAdvance(token, customerId, amount, method, bankAccountId,
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     const actingUser = requirePermission_(token, "customers", "edit");
+    // Block stock and money writes if any prior purchase/refund result is uncertain.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
     if (!isValidNonNegativeNumber_(amount) || Number(amount) <= 0) {
       return fail_("Enter a valid credit refund amount.");

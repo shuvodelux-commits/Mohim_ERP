@@ -219,7 +219,11 @@ function updatePurchaseInternal_(token, purchaseId, payload, options) {
   if (lock) lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     requirePermission_(token, 'purchase', 'edit');
+    // Block stock and money writes if any prior purchase/refund result is uncertain.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
+    if (typeof assertSourceLinkedPurchaseNotModified_ === 'function')
+      assertSourceLinkedPurchaseNotModified_(purchaseId);
     if (!payload.items || !payload.items.length) return fail_('Add at least one product line.');
     if (!sanitizeInput_(payload.reason)) return fail_('Enter a reason for this update.');
 

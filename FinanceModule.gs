@@ -388,6 +388,8 @@ function addFinanceTransaction(token, payload) {
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     const actingUser = requirePermission_(token, 'finance', 'add');
+    // Block stock and money writes if any prior purchase/refund result is uncertain.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     payload = payload || {};
 
     const type = financeTransactionType_(sanitizeInput_(payload.transactionType));

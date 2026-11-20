@@ -49,6 +49,8 @@ function startCashSession(token, openingCash, notes) {
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     requirePermission_(token, 'pos', 'add');
+    // Refuse new accounting writes under an unresolved purchase or funded return.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     if (!isValidNonNegativeNumber_(openingCash)) return fail_('Enter a valid opening cash amount.');
     const openingAmount = roundMoney_(Number(openingCash));
 
@@ -281,6 +283,8 @@ function closeCashSession(token, countedCash, notes) {
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     requirePermission_(token, 'pos', 'add');
+    // Refuse new accounting writes under an unresolved purchase or funded return.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     if (!isValidNonNegativeNumber_(countedCash)) return fail_('Enter a valid counted cash amount.');
     const countedAmount = roundMoney_(Number(countedCash));
 

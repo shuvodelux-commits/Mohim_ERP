@@ -130,6 +130,8 @@ function transferBetweenBankAccounts(token, payload) {
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     const actingUser = requirePermission_(token, 'bank', 'add');
+    // Block stock and money writes if any prior purchase/refund result is uncertain.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
     if (!payload.fromAccountId || !payload.toAccountId) return fail_('Choose both a from and to account.');
     if (payload.fromAccountId === payload.toAccountId) return fail_('Choose two different bank accounts.');

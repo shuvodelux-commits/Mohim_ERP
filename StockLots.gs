@@ -1062,6 +1062,8 @@ function correctInternalStockLotCosts(token, payload) {
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     const user = requirePermission_(token, 'products', 'edit');
+    // Refuse new accounting writes under an unresolved purchase or funded return.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     const context = loadInternalStockLotCostCorrectionContext_();
     const prepared = prepareInternalStockLotCostCorrections_(payload, context);
     const reason = sanitizeInput_(payload && payload.reason);
