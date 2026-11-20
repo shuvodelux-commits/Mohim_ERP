@@ -167,6 +167,20 @@ function createPurchase(token, payload) {
     const bankAccount = resolveBankAccount_(paymentMethod, payload.bankAccountId);
     const bankAccountId = bankAccount.id, bankAccountName = bankAccount.name;
 
+    // Source-native, receipt-journalled purchase settlement may run ONLY
+    // after explicit code-review release approval AND tenant opt-in. The
+    // default/legacy purchase path is unchanged until both gates activate.
+    if (typeof isPurchaseSettlementWriterEnabled_ === 'function' &&
+        isPurchaseSettlementWriterEnabled_()) {
+      return createPurchaseWithSettlement_(payload, {
+        actingUser:actingUser,supplierRow:supplierRow,productsById:productsById,
+        lines:lines,subtotal:subtotal,discount:discount,grandTotal:grandTotal,
+        paidAmount:paidAmount,dueAmount:dueAmount,paymentStatus:paymentStatus,
+        paymentMethod:paymentMethod,bankAccountId:bankAccountId,
+        bankAccountName:bankAccountName,dateStr:dateStr,txDate:txDate,now:now
+      });
+    }
+
     // ======================== WRITE PHASE ========================
     // Nothing below here raises a validation error.
     const purchaseId = generateId_('PURCHASES');
