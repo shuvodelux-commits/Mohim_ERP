@@ -11,47 +11,92 @@
  * freeze subsequent financial writes until an owner-reviewed reconciliation.
  */
 function inspectTransactionUncertainty_() {
-  const safe=function(){return {safe:true,status:'CLEAR',issues:[]};};
-  const blocked=function(reason){return {safe:false,status:'NEEDS_REVIEW',issues:[String(reason)]};};
+  const clear=function(){return {safe:true,status:'CLEAR',issues:[]};};
+  const blocked=function(issue){return {safe:false,status:'NEEDS_REVIEW',issues:[String(issue)]};};
   try {
     if (!CONFIG || !CONFIG.SHEETS || typeof getSpreadsheet_!=='function')
       return blocked('JOURNAL_READBACK_UNAVAILABLE');
     const ss=getSpreadsheet_();
-    const targets=[
-      {key:'PURCHASE_SETTLEMENT_JOURNAL',receipt:'Purchase ID',flag:'PURCHASE_SETTLEMENT_WRITER_RELEASE_APPROVED'},
-      {key:'FUNDED_RETURN_JOURNAL',receipt:'Return ID',flag:'FUNDED_RETURN_WRITER_RELEASE_APPROVED'}
+    // Both halves of the lineage must exist. A deleted event sheet cannot
+    // turn a previously funded sale/refund into an apparently clean legacy
+    // workbook, even while an optional release flag has since been disabled.
+    const pairs=[
+      {journal:'PURCHASE_SETTLEMENT_JOURNAL',event:'STOCK_LOT_SETTLEMENTS',
+       flag:'PURCHASE_SETTLEMENT_WRITER_RELEASE_APPROVED',receipt:'Purchase ID',
+       eventId:'Settlement ID',eventOp:'Operation ID'},
+      {journal:'FUNDED_RETURN_JOURNAL',event:'STOCK_LOT_SETTLEMENT_REVERSALS',
+       flag:'FUNDED_RETURN_WRITER_RELEASE_APPROVED',receipt:'Return ID',
+       eventId:'Reversal ID',eventOp:'Return Operation ID'}
     ];
-    for (const target of targets) {
-      const name=CONFIG.SHEETS[target.key];
-      if (!name) return blocked('MISSING_JOURNAL_CONFIG_'+target.key);
-      const sheet=ss.getSheetByName(name);
-      if (!sheet) {
-        if (CONFIG[target.flag]===true) return blocked('MISSING_ACTIVE_JOURNAL_'+target.key);
+    function readTable(sheet,required,key) {
+      const columns=sheet.getLastColumn(),lastRow=sheet.getLastRow();
+      if (!Number.isInteger(columns)||columns<required.length ||
+          !Number.isInteger(lastRow)||lastRow<1)
+        throw new Error('MALFORMED_JOURNAL_DIMENSIONS_'+key);
+      const values=sheet.getRange(1,1,lastRow,columns).getValues();
+      if (values.length!==lastRow||!values.length)
+        throw new Error('INVALID_JOURNAL_READBACK_'+key);
+      const headers=values[0].map(String);
+      if (headers.length!==new Set(headers).size ||
+          required.some(function(h){return headers.indexOf(h)===-1;}))
+        throw new Error('MALFORMED_JOURNAL_HEADER_'+key);
+      const indices=required.map(function(h){return headers.indexOf(h);});
+      return values.slice(1).filter(function(row){
+        return !row.every(function(cell){return cell===''||cell===null||cell===undefined;});
+      }).map(function(row){
+        return indices.map(function(index){
+          const cell=row[index];return cell===null||cell===undefined?'':String(cell);
+        });
+      });
+    }
+    for(const pair of pairs) {
+      const journalName=CONFIG.SHEETS[pair.journal],eventName=CONFIG.SHEETS[pair.event];
+      if (!journalName||!eventName)return blocked('MISSING_LINEAGE_SCHEMA_CONFIG_'+pair.journal);
+      const journalSheet=ss.getSheetByName(journalName),eventSheet=ss.getSheetByName(eventName);
+      if (!journalSheet||!eventSheet) {
+        if (journalSheet||eventSheet||CONFIG[pair.flag]===true)
+          return blocked('MISSING_OR_PARTIAL_LINEAGE_SHEETS_'+pair.journal);
+        // Original workbook with neither journal nor event Sheet. The
+        // offline production release flags must remain disabled.
         continue;
       }
-      const col=sheet.getLastColumn(),lastRow=sheet.getLastRow();
-      if (!Number.isInteger(col)||col<5||!Number.isInteger(lastRow)||lastRow<1)
-        return blocked('INVALID_JOURNAL_DIMENSIONS_'+target.key);
-      const data=sheet.getRange(1,1,lastRow,col).getValues();
-      if (!data.length)return blocked('MISSING_JOURNAL_HEADER_'+target.key);
-      const header=data[0].map(String),required=['Operation ID',target.receipt,'State','Last Completed Stage','Result Receipt'];
-      if (header.length!==new Set(header).size || required.some(function(key){return header.indexOf(key)<0;}))
-        return blocked('MALFORMED_JOURNAL_HEADER_'+target.key);
-      const indices=required.map(function(key){return header.indexOf(key);});
-      const seenOperations={},seenReceipts={};
-      for (let r=1;r<data.length;r++) {
-        const raw=data[r];
-        if (raw.every(function(cell){return cell===''||cell===null||cell===undefined;}))continue;
-        const values=indices.map(function(i){return String(raw[i]===null||raw[i]===undefined?'':raw[i]);});
-        const operation=values[0],receipt=values[1],state=values[2],stage=values[3],proof=values[4];
-        if (!operation||!receipt||seenOperations[operation]||seenReceipts[receipt] ||
+      const journalCols=['Operation ID',pair.receipt,'State','Last Completed Stage','Result Receipt'];
+      const eventCols=[pair.eventId,pair.eventOp,pair.receipt,'State'];
+      const journals=readTable(journalSheet,journalCols,pair.journal);
+      const events=readTable(eventSheet,eventCols,pair.event);
+      const byOp=Object.create(null),byReceipt=Object.create(null),eventsByOp=Object.create(null);
+      for(const row of journals) {
+        const op=row[0],receipt=row[1],state=row[2],stage=row[3],proof=row[4];
+        if (!op||!receipt||byOp[op]||byReceipt[receipt] ||
             state!=='Committed'||stage!=='Committed'||proof!==receipt)
-          return blocked('UNVERIFIED_OR_DUPLICATE_JOURNAL_'+target.key);
-        seenOperations[operation]=true;seenReceipts[receipt]=true;
+          return blocked('UNVERIFIED_OR_DUPLICATE_JOURNAL_'+pair.journal);
+        byOp[op]=receipt;byReceipt[receipt]=true;
+      }
+      const seenEvents=Object.create(null);
+      for(const row of events) {
+        const eventId=row[0],op=row[1],receipt=row[2],state=row[3];
+        if(!eventId||seenEvents[eventId])
+          return blocked('DUPLICATE_OR_MISSING_EVENT_ID_'+pair.event);
+        seenEvents[eventId]=true;
+        if(state!=='Committed')return blocked('UNCOMMITTED_LINEAGE_EVENT_'+pair.event);
+        if(!op||!receipt||!byOp[op]||byOp[op]!==receipt)
+          return blocked('ORPHAN_OR_MISMATCHED_SOURCE_EVENT_'+pair.event);
+        eventsByOp[op]=(eventsByOp[op]||0)+1;
+      }
+      for(const op of Object.keys(byOp)) {
+        if (!eventsByOp[op])
+          return blocked('COMMITTED_JOURNAL_MISSING_SOURCE_EVENT_'+pair.journal);
       }
     }
-    return safe();
-  } catch(error) {return blocked('JOURNAL_READBACK_UNCERTAIN');}
+    return clear();
+  }catch(error){
+    // Only our own fixed validation identifiers may be surfaced; arbitrary
+    // SpreadsheetApp error contents (including sheet data) stay private.
+    const code=String(error&&error.message||'');
+    return blocked(/^MALFORMED_JOURNAL_(?:DIMENSIONS|HEADER)_[A-Z_]+$/.test(code) ||
+      /^INVALID_JOURNAL_READBACK_[A-Z_]+$/.test(code)
+        ?code:'JOURNAL_LINEAGE_READBACK_UNCERTAIN');
+  }
 }
 
 function assertNoUncertainTransactionWrites_() {
@@ -93,4 +138,13 @@ function assertSourceLinkedPurchaseNotModified_(purchaseId) {
 function assertSourceLinkedReturnNotCorrected_(returnId) {
   if (hasAuthoritativeSourceLink_('STOCK_LOT_SETTLEMENT_REVERSALS','Return ID',returnId))
     throw new Error('Funded Sales Return has immutable cost reversal; edit/delete requires source-linked review.');
+}
+
+/** Historic invoice identity is immutable while any genuine purchase lot
+ * allocation or return reversal refers to it. Deleting it through the old
+ * Sales/Delete Engine would strand source COGS even if every unit returned. */
+function assertSourceLinkedSaleNotDeleted_(invoiceId) {
+  if (hasAuthoritativeSourceLink_('STOCK_LOT_SETTLEMENTS','Source Invoice ID',invoiceId) ||
+      hasAuthoritativeSourceLink_('STOCK_LOT_SETTLEMENT_REVERSALS','Source Invoice ID',invoiceId))
+    throw new Error('Source-linked OVERSOLD invoice deletion requires Needs Review; preserve original funded sale.');
 }

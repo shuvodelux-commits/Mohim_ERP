@@ -5,10 +5,12 @@ const paths=['Sales.gs','Purchase.gs','PurchaseReturn.gs','SalesReturn.gs','Expe
 function fixture(){
  const tables={
    'Purchase Settlement Journal':[['Operation ID','Purchase ID','State','Last Completed Stage','Result Receipt'],['OP-P1','PUR-1','Committed','Committed','PUR-1']],
-   'Funded Return Journal':[['Operation ID','Return ID','State','Last Completed Stage','Result Receipt'],['OP-R1','SRT-1','Committed','Committed','SRT-1']]
+   'Stock Lot Settlements':[['Settlement ID','Operation ID','Purchase ID','State'],['STL-1','OP-P1','PUR-1','Committed']],
+   'Funded Return Journal':[['Operation ID','Return ID','State','Last Completed Stage','Result Receipt'],['OP-R1','SRT-1','Committed','Committed','SRT-1']],
+   'Stock Lot Settlement Reversals':[['Reversal ID','Return Operation ID','Return ID','State'],['SRV-1','OP-R1','SRT-1','Committed']]
  };
  let writes=0;
- const c={console,Date,JSON,Math,Number,CONFIG:{SHEETS:{PURCHASE_SETTLEMENT_JOURNAL:'Purchase Settlement Journal',FUNDED_RETURN_JOURNAL:'Funded Return Journal'},PURCHASE_SETTLEMENT_WRITER_RELEASE_APPROVED:false,FUNDED_RETURN_WRITER_RELEASE_APPROVED:false},getSpreadsheet_:()=>({getSheetByName:name=>tables[name]?{getLastColumn:()=>tables[name][0].length,getLastRow:()=>tables[name].length,getRange:(_r,_c,_nr,_nc)=>({getValues:()=>tables[name].map(row=>row.slice())})}:null}),getSheet_:()=>{writes++;throw Error('no sheet creation')},appendRow_:()=>{writes++;throw Error('no writes')}};
+ const c={console,Date,JSON,Math,Number,CONFIG:{SHEETS:{PURCHASE_SETTLEMENT_JOURNAL:'Purchase Settlement Journal',STOCK_LOT_SETTLEMENTS:'Stock Lot Settlements',FUNDED_RETURN_JOURNAL:'Funded Return Journal',STOCK_LOT_SETTLEMENT_REVERSALS:'Stock Lot Settlement Reversals'},PURCHASE_SETTLEMENT_WRITER_RELEASE_APPROVED:false,FUNDED_RETURN_WRITER_RELEASE_APPROVED:false},getSpreadsheet_:()=>({getSheetByName:name=>tables[name]?{getLastColumn:()=>tables[name][0].length,getLastRow:()=>tables[name].length,getRange:(_r,_c,_nr,_nc)=>({getValues:()=>tables[name].map(row=>row.slice())})}:null}),getSheet_:()=>{writes++;throw Error('no sheet creation')},appendRow_:()=>{writes++;throw Error('no writes')}};
  vm.createContext(c);vm.runInContext(source,c);return {c,tables,writes:()=>writes};
 }
 test('good committed receipt journals permit normal posts with no writes',()=>{
@@ -29,7 +31,9 @@ test('malformed Committed receipt and duplicate operation ID fail closed',()=>{
  const y=fixture();y.tables['Funded Return Journal'].push([...y.tables['Funded Return Journal'][1]]);assert.equal(y.c.inspectTransactionUncertainty_().safe,false);
 });
 test('missing optional legacy journal Sheets do not mutate workbook or block old ERP',()=>{
- const x=fixture();delete x.tables['Purchase Settlement Journal'];delete x.tables['Funded Return Journal'];assert.equal(x.c.inspectTransactionUncertainty_().safe,true);assert.equal(x.writes(),0);
+ const x=fixture();delete x.tables['Purchase Settlement Journal'];delete x.tables['Funded Return Journal'];
+ delete x.tables['Stock Lot Settlements'];delete x.tables['Stock Lot Settlement Reversals'];
+ assert.equal(x.c.inspectTransactionUncertainty_().safe,true);assert.equal(x.writes(),0);
 });
 test('released writer with missing corresponding journal fails closed rather than creating it',()=>{
  const x=fixture();delete x.tables['Purchase Settlement Journal'];x.c.CONFIG.PURCHASE_SETTLEMENT_WRITER_RELEASE_APPROVED=true;assert.equal(x.c.inspectTransactionUncertainty_().safe,false);
@@ -65,4 +69,14 @@ test('cash sessions, sale edits and inventory cost corrections are guarded too',
   const text=fs.readFileSync(path.join(__dirname,'..',filename),'utf8');
   assert.match(text,/assertNoUncertainTransactionWrites_\(/,filename);
  }
+});
+
+test('original invoice referenced by committed purchase funding cannot be deleted',()=>{
+ const x=fixture(),table=x.tables['Stock Lot Settlements'];
+ table[0].push('Source Invoice ID');table[1].push('INV-FUNDED');
+ const reversals=x.tables['Stock Lot Settlement Reversals'];
+ reversals[0].push('Source Invoice ID');reversals[1].push('INV-OTHER');
+ assert.throws(()=>x.c.assertSourceLinkedSaleNotDeleted_('INV-FUNDED'),/funded|Needs Review|linked/i);
+ assert.doesNotThrow(()=>x.c.assertSourceLinkedSaleNotDeleted_('INV-UNLINKED'));
+ assert.equal(x.writes(),0);
 });

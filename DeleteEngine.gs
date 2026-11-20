@@ -238,6 +238,9 @@ function deleteSalesInvoice(token, invoiceId, reason) {
     if (isDeleted_(sale)) return fail_('This invoice is already deleted.');
 
     var user = requireDeletePermission_(token, 'sales', sale['Date']);
+    // Financial mutations cannot proceed with an unresolved stock/refund journal.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
+    if (typeof assertSourceLinkedSaleNotDeleted_ === 'function') assertSourceLinkedSaleNotDeleted_(invoiceId);
     requireActiveCashSession_();
     var splitPaymentInvoice = String(sale['Payment Detail Version']) === '1';
     var deleteOperationId = '';
@@ -413,6 +416,9 @@ function deletePurchase(token, purchaseId, reason) {
     if (isDeleted_(purchase)) return fail_('This purchase is already deleted.');
 
     var user = requireDeletePermission_(token, 'purchase', purchase['Date']);
+    // Financial mutations cannot proceed with an unresolved stock/refund journal.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
+    if (typeof assertSourceLinkedPurchaseNotModified_ === 'function') assertSourceLinkedPurchaseNotModified_(purchaseId);
     requireActiveCashSession_();
 
     var hasReturn = activeRows_('PURCHASE_RETURN').some(function (r) { return r['Purchase ID'] === purchaseId; });
@@ -540,6 +546,8 @@ function deleteExpense(token, expenseId, reason) {
     if (isDeleted_(exp)) return fail_('This expense is already deleted.');
 
     var user = requireDeletePermission_(token, 'expense', exp['Date']);
+    // Financial mutations cannot proceed with an unresolved stock/refund journal.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
     var now = new Date();
 
@@ -580,6 +588,8 @@ function deleteSupplier(token, supplierId, reason) {
     if (isDeleted_(sup)) return fail_('This supplier is already deleted.');
 
     var user = requireDeletePermission_(token, 'suppliers', sup['Created At'] || formatDate_(new Date()));
+    // Financial mutations cannot proceed with an unresolved stock/refund journal.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
 
     var due = Number(sup['Current Due']) || 0;
     if (Math.abs(due) > 0.009) {
@@ -627,6 +637,8 @@ function deleteProduct(token, productId, reason) {
     if (isDeleted_(prod)) return fail_('This product is already deleted.');
 
     var user = requireDeletePermission_(token, 'products', prod['Created At'] || formatDate_(new Date()));
+    // Financial mutations cannot proceed with an unresolved stock/refund journal.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
 
     // A standard product used inside any active set or sold bundle is
     // required for future returns/deletions, even when its stock is zero.
@@ -694,6 +706,8 @@ function deleteBankTransaction(token, entryId, reason) {
     if (entry['Status'] === 'Reversed') return fail_('This transaction is already reversed.');
 
     var user = requireDeletePermission_(token, 'bank', entry['Date']);
+    // Financial mutations cannot proceed with an unresolved stock/refund journal.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
 
     var ref = String(entry['Reference'] || '');
@@ -795,6 +809,8 @@ function updateSupplierPaymentInternal_(token, ledgerId, payload, options) {
   if (lock) lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     requirePermission_(token, 'suppliers', 'edit');
+    // Financial mutations cannot proceed with an unresolved stock/refund journal.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
     var row = getAllRows_('SUPPLIER_LEDGER').filter(function (l) { return l['Ledger ID'] === ledgerId; })[0];
     if (!row) return fail_('Payment not found.');
@@ -896,6 +912,8 @@ function deleteSupplierPayment(token, ledgerId, reason) {
     if (row['Type'] !== 'Payment') return fail_('Only payment rows can be deleted here.');
 
     var user = requireDeletePermission_(token, 'suppliers', row['Date']);
+    // Financial mutations cannot proceed with an unresolved stock/refund journal.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
     var now = new Date();
     var paymentAmount = settlementPaymentAmount_(row);
@@ -1011,6 +1029,8 @@ function updateCustomerPaymentInternal_(token, ledgerId, payload, options) {
   if (lock) lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     requirePermission_(token, 'customers', 'edit');
+    // Financial mutations cannot proceed with an unresolved stock/refund journal.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
     var row = getAllRows_('CUSTOMER_LEDGER').filter(function (l) { return l['Ledger ID'] === ledgerId; })[0];
     if (!row) return fail_('Payment not found.');
@@ -1073,6 +1093,8 @@ function deleteCustomerPayment(token, ledgerId, reason) {
     if (row['Type'] !== 'Payment') return fail_('Only payment rows can be deleted here.');
 
     var user = requireDeletePermission_(token, 'customers', row['Date']);
+    // Financial mutations cannot proceed with an unresolved stock/refund journal.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
     var now = new Date();
     var paymentAmount = settlementPaymentAmount_(row);
@@ -1145,6 +1167,8 @@ function updateFinanceTransactionInternal_(token, financeId, payload, options) {
   if (lock) lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     var user = requirePermission_(token, 'finance', 'edit');
+    // Financial mutations cannot proceed with an unresolved stock/refund journal.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     payload = payload || {};
     var row = getAllRows_('FINANCE_TRANSACTIONS').filter(function (f) { return f['Finance ID'] === financeId; })[0];
     if (!row) return fail_('Transaction not found.');
@@ -1210,6 +1234,8 @@ function deleteFinanceTransaction(token, financeId, reason) {
     if (isDeleted_(row)) return fail_('This transaction is already deleted.');
 
     var user = requireDeletePermission_(token, 'finance', row['Date']);
+    // Financial mutations cannot proceed with an unresolved stock/refund journal.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     var type = financeTransactionType_(row['Transaction Type']);
     var movesMoney = financeTypeHasMoneyMovement_(type);
     if (movesMoney) requireActiveCashSession_();
@@ -1287,6 +1313,8 @@ function updateVendorPaymentInternal_(token, ledgerId, payload, options) {
   if (lock) lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     requirePermission_(token, 'vendors', 'edit');
+    // Financial mutations cannot proceed with an unresolved stock/refund journal.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
     var row = getAllRows_('VENDOR_LEDGER').filter(function (l) { return l['Ledger ID'] === ledgerId; })[0];
     if (!row) return fail_('Payment not found.');
@@ -1352,6 +1380,8 @@ function deleteVendorPayment(token, ledgerId, reason) {
     if (row['Type'] !== 'Payment') return fail_('Only payment rows can be deleted here.');
 
     var user = requireDeletePermission_(token, 'vendors', row['Date']);
+    // Financial mutations cannot proceed with an unresolved stock/refund journal.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
     var now = new Date();
     var amount = Number(row['Credit']) || 0;
@@ -1418,6 +1448,8 @@ function updateVendorReturnInternal_(token, returnId, payload, options) {
   if (lock) lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     requirePermission_(token, 'vendors', 'edit');
+    // Financial mutations cannot proceed with an unresolved stock/refund journal.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
     var row = getAllRows_('VENDOR_RETURNS').filter(function (r) { return r['Return ID'] === returnId; })[0];
     if (!row) return fail_('Return not found.');
@@ -1523,6 +1555,8 @@ function deleteVendorReturn(token, returnId, reason) {
     if (isDeleted_(row)) return fail_('This return is already deleted.');
 
     var user = requireDeletePermission_(token, 'vendors', row['Date']);
+    // Financial mutations cannot proceed with an unresolved stock/refund journal.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
     var now = new Date();
 
@@ -1578,6 +1612,8 @@ function updateVendorSourcingInternal_(token, sourcingId, payload, options) {
   if (lock) lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     requirePermission_(token, 'vendors', 'edit');
+    // Financial mutations cannot proceed with an unresolved stock/refund journal.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
     var row = getAllRows_('VENDOR_SOURCING').filter(function (s) { return s['Sourcing ID'] === sourcingId; })[0];
     if (!row) return fail_('Sourcing transaction not found.');
@@ -1649,6 +1685,8 @@ function deleteVendorSourcing(token, sourcingId, reason) {
     if (hasReturn) return fail_('This transaction has Return records against it. Delete those first.');
 
     var user = requireDeletePermission_(token, 'vendors', row['Date']);
+    // Financial mutations cannot proceed with an unresolved stock/refund journal.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
     var now = new Date();
     var totalCost = Number(row['Total Cost']) || 0;
@@ -1763,6 +1801,8 @@ function updateVendorIssueInternal_(token, issueId, payload, options) {
   if (lock) lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     requirePermission_(token, 'vendors', 'edit');
+    // Financial mutations cannot proceed with an unresolved stock/refund journal.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
     var row = getAllRows_('VENDOR_ISSUES').filter(function (s) { return s['Issue ID'] === issueId; })[0];
     if (!row) return fail_('Issue transaction not found.');
@@ -1864,6 +1904,8 @@ function deleteVendorIssue(token, issueId, reason) {
     if (hasReturn) return fail_('This transaction has Return Received records against it. Delete those first.');
 
     var user = requireDeletePermission_(token, 'vendors', row['Date']);
+    // Financial mutations cannot proceed with an unresolved stock/refund journal.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
     var now = new Date();
 
@@ -1894,6 +1936,8 @@ function updateVendorIssueMemo(token, memoId, payload) {
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     requirePermission_(token, 'vendors', 'edit');
+    // Financial mutations cannot proceed with an unresolved stock/refund journal.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
     payload = payload || {};
     memoId = String(memoId || '').trim();
@@ -1987,6 +2031,8 @@ function deleteVendorIssueMemo(token, memoId, reason) {
     var user = null;
     rows.forEach(function (row) {
       var checkedUser = requireDeletePermission_(token, 'vendors', row['Date']);
+      // Financial mutations cannot proceed with an unresolved stock/refund journal.
+      if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
       if (!user) user = checkedUser;
     });
     requireActiveCashSession_();
@@ -2047,6 +2093,8 @@ function updateVendorReceiptInternal_(token, ledgerId, payload, options) {
   if (lock) lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     requirePermission_(token, 'vendors', 'edit');
+    // Financial mutations cannot proceed with an unresolved stock/refund journal.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
     var row = getAllRows_('VENDOR_LEDGER').filter(function (l) { return l['Ledger ID'] === ledgerId; })[0];
     if (!row) return fail_('Receipt not found.');
@@ -2112,6 +2160,8 @@ function deleteVendorReceipt(token, ledgerId, reason) {
     if (row['Type'] !== 'Receipt') return fail_('Only receipt rows can be deleted here.');
 
     var user = requireDeletePermission_(token, 'vendors', row['Date']);
+    // Financial mutations cannot proceed with an unresolved stock/refund journal.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
     var now = new Date();
     var amount = Number(row['Credit']) || 0;
@@ -2181,6 +2231,8 @@ function updateVendorReturnReceivedInternal_(token, returnId, payload, options) 
   if (lock) lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     requirePermission_(token, 'vendors', 'edit');
+    // Financial mutations cannot proceed with an unresolved stock/refund journal.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
     var row = getAllRows_('VENDOR_RETURNS_RECEIVED').filter(function (r) { return r['Return ID'] === returnId; })[0];
     if (!row) return fail_('Return not found.');
@@ -2276,6 +2328,8 @@ function deleteVendorReturnReceived(token, returnId, reason) {
     if (isDeleted_(row)) return fail_('This return is already deleted.');
 
     var user = requireDeletePermission_(token, 'vendors', row['Date']);
+    // Financial mutations cannot proceed with an unresolved stock/refund journal.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
     var now = new Date();
 

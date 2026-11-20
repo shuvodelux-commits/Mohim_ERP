@@ -359,6 +359,8 @@ function payVendor(token, vendorId, amount, method, bankAccountId, notes, date, 
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     const actingUser = requirePermission_(token, 'vendors', 'edit');
+    // Financial mutations cannot proceed with an unresolved stock/refund journal.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
     if (!isValidNonNegativeNumber_(amount) || Number(amount) <= 0) return fail_('Enter a valid payment amount.');
 
@@ -421,6 +423,8 @@ function returnProductsToVendor(token, payload) {
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     const actingUser = requirePermission_(token, 'vendors', 'edit');
+    // Financial mutations cannot proceed with an unresolved stock/refund journal.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
     payload = payload || {};
 
@@ -507,6 +511,8 @@ function giveProductsToVendor(token, payload) {
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     const actingUser = requirePermission_(token, 'vendors', 'edit');
+    // Financial mutations cannot proceed with an unresolved stock/refund journal.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
     payload = payload || {};
 
@@ -639,6 +645,8 @@ function receiveVendorPayment(token, vendorId, amount, method, bankAccountId, no
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     const actingUser = requirePermission_(token, 'vendors', 'edit');
+    // Financial mutations cannot proceed with an unresolved stock/refund journal.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
     if (!isValidNonNegativeNumber_(amount) || Number(amount) <= 0) return fail_('Enter a valid amount.');
 
@@ -696,6 +704,8 @@ function receiveProductsFromVendor(token, payload) {
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     const actingUser = requirePermission_(token, 'vendors', 'edit');
+    // Financial mutations cannot proceed with an unresolved stock/refund journal.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
     payload = payload || {};
 

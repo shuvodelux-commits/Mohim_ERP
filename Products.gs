@@ -334,6 +334,8 @@ function adjustStock(token, productId, deltaQty, note) {
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     requirePermission_(token, "products", "edit");
+    // Financial mutations cannot proceed with an unresolved stock/refund journal.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
     const rowIndex = findRowIndex_("PRODUCTS", "Product ID", productId);
     if (rowIndex === -1) return fail_("Product not found.");
