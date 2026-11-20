@@ -49,10 +49,27 @@ test('POS cost and FIFO tiers never appear on the wire without permission',()=>{
   }
  }
 });
-test('mismatched cached stock does not expose guessed master cost',()=>{
+test('mismatched cached stock never claims master price as a verified cost',()=>{
  const data=bootstrap({stock:11});const item=data.products[0];
- assert.equal(Object.hasOwn(item,'purchasePrice'),false);
  assert.equal(item.fifoCostStatus,'NEEDS_REVIEW');
+ assert.equal(item.fifoCostIsProvisional,true);
+ assert.equal(item.purchasePrice,64.75,'cost must come from the lot, not master 68');
+ assert.notEqual(item.purchasePrice,product['Purchase Price']);
+});
+test('authorized POS can reveal a clearly flagged provisional FIFO cost for mismatched stock',()=>{
+ const data=bootstrap({stock:11}); const item=data.products[0];
+ assert.equal(data.showPurchasePrice,true);
+ assert.equal(item.fifoCostStatus,'NEEDS_REVIEW');
+ assert.equal(item.fifoCostIsProvisional,true);
+ assert.equal(item.purchasePrice,64.75);
+ assert.deepEqual(item.fifoCostTiers,[{qty:9,unitCost:64.75}]);
+});
+test('unprivileged POS gets neither verified nor provisional cost in the response',()=>{
+ const data=bootstrap({costPermission:false,stock:11});
+ const item=data.products[0];
+ for(const key of ['purchasePrice','fifoCostTiers','fifoCostIsProvisional','fifoCostStatus']){
+  assert.equal(Object.hasOwn(item,key),false);
+ }
 });
 test('POS uses first FIFO lot cost and tiers across multiple costs',()=>{
  const data=bootstrap({stock:6,productLots:[
@@ -91,4 +108,14 @@ test('POS cost reveal continues using original eye-button, never embeds hidden c
  assert.match(html,/posCostMarkerHtml_/);
  assert.match(html,/productCostTiersById/);
  assert.match(html,/POS_COST_REVEAL_MS/);
+});
+
+test('authorized POS eye remains present with no verified cost, while cost stays out of HTML markup',()=>{
+ const html=raw('pos.html');
+ const eye=extractPos('posCostMarkerHtml_');
+ assert.match(eye,/posState\.showCost/);
+ assert.match(eye,/posProductById_/);
+ assert.doesNotMatch(eye,/productCostById/);
+ assert.match(html,/productCostProvisionalById/);
+ assert.match(html,/est\. · Review/);
 });

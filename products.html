@@ -655,13 +655,30 @@
         : '<span class="badge badge-danger">Inactive</span>';
 
       var costStatus = p['Lot Cost Status'];
+      var issue = String(p['Lot Cost Issue'] || '');
+      var lotDifference = Number(p['Lot Quantity Difference']);
+      var lotQty = Number(p['Provisional Lot Quantity']);
+      var hasLotDifference = p['Lot Quantity Difference'] !== null &&
+        p['Lot Quantity Difference'] !== undefined && Number.isFinite(lotDifference) &&
+        Math.abs(lotDifference) > 0.0000001;
+      var reviewDetails = 'Unverified lot estimate. No stock or ledger correction posted.' +
+        (issue ? ' Issue: ' + issue + '.' : '') +
+        (hasLotDifference ? ' Lot net: ' + (lotQty || 0) +
+          ', product stock: ' + qty + ', difference: ' + lotDifference + ' ' + stockUnit + '.' : '');
+      var reviewTitle = escapeHtml(reviewDetails);
+      var projectedCost = p['Provisional FIFO Cost'];
+      var projectedValue = p['Provisional Stock Value'];
       var displayedCost = isBundle ? '—' :
         (p['Next FIFO Cost'] !== null && p['Next FIFO Cost'] !== undefined
-          ? formatMoney(p['Next FIFO Cost']) + (costStatus === 'UNSETTLED' ? ' <span title="Estimated FIFO cost; old oversold lots still require reconciliation">est.</span>' : '')
-          : (costStatus === 'NEEDS_REVIEW' ? '<span title="Stock lots require review">Needs Review</span>' : '—'));
+          ? formatMoney(p['Next FIFO Cost']) + (costStatus === 'UNSETTLED' ? ' <span title="Unposted FIFO cost; old oversold lots still require reconciliation">est.</span>' : '')
+          : (projectedCost !== null && projectedCost !== undefined
+            ? '<span title="' + reviewTitle + '">≈' + formatMoney(projectedCost) + ' est. · Review</span>'
+            : (costStatus === 'NEEDS_REVIEW' ? '<span title="' + reviewTitle + '">Needs Review</span>' : '—')));
       var displayedValue = isBundle ? '—' :
         (p['Stock Value'] === null || p['Stock Value'] === undefined
-          ? '<span title="Unsettled or inconsistent lots must be reconciled before reporting stock value">Needs Reconcile</span>'
+          ? (projectedValue !== null && projectedValue !== undefined
+            ? '<span title="' + reviewTitle + '">≈' + formatMoney(projectedValue) + ' est. · Reconcile</span>'
+            : '<span title="' + reviewTitle + '">Needs Reconcile</span>')
           : formatMoney(p['Stock Value']));
 
       var tr = document.createElement('tr');

@@ -45,6 +45,32 @@ test('229 debt and verified stock 11 projects 11 @ 64.75, not 9',()=>{
  assert.equal(v.status,'UNSETTLED');
  assert.equal(v.projectedStockValue,712.25);assert.equal(v.nextUnitCost,64.75);
 });
+test('mismatched pipe stock exposes only a clearly unverified source-lot projection',()=>{
+ const lots=[
+  lot('OLD',2,64.68,'2026-10-07','PUR-000036'),
+  lot('NEG',-404,64.68,'2026-11-20','OVERSOLD','Oversold'),
+  lot('NEW',800,70,'2026-11-20','PUR-000040')
+ ];
+ const old=structuredClone(lots);
+ const v=plain(api()('PIPE',lots,p(396,64.68)));
+ assert.equal(v.status,'NEEDS_REVIEW');
+ assert.equal(v.issue,'STOCK_MISMATCH');
+ assert.equal(v.netQty,398);
+ assert.equal(v.qtyDifference,2);
+ assert.equal(v.nextUnitCost,null,'verified FIFO cost must stay blocked');
+ assert.equal(v.projectedStockValue,null,'booked asset value must stay blocked');
+ assert.equal(v.provisionalNextUnitCost,70);
+ assert.equal(v.provisionalStockValue,27860);
+ assert.equal(v.provisionalQty,398);
+ assert.deepEqual(v.provisionalTiers,[{qty:398,unitCost:70,lotId:'NEW'}]);
+ assert.deepEqual(lots,old,'no stock data writes');
+});
+test('invalid stock lot evidence never creates a fake provisional cost',()=>{
+ const v=plain(api()('PIPE',[lot('X',4,'invalid')],p(3)));
+ assert.equal(v.provisionalNextUnitCost,null);
+ assert.equal(v.provisionalStockValue,null);
+ assert.deepEqual(v.provisionalTiers,[]);
+});
 test('ordinary multi-supplier FIFO preserves lot price and quantity tiers',()=>{
  const lots=[lot('L-2',4,66,'2026-11-07'),lot('L-1',2,60,'2026-11-02')];
  const v=plain(api()('PIPE',lots,p(6)));
