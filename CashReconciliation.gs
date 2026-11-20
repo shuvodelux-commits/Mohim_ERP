@@ -494,6 +494,8 @@ function saveCashReconciliationExplanation(token, sessionId, phase, entryIds) {
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     requirePermission_(token, 'cashReconciliation', 'edit');
+    // Financial mutations cannot proceed with an unresolved stock/refund journal.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     phase = String(phase || '').toLowerCase();
     if (phase !== 'opening' && phase !== 'closing') return fail_('Choose opening or closing reconciliation.');
 

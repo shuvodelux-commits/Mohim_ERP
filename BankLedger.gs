@@ -267,6 +267,8 @@ function addBankManualEntry(token, payload) {
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     const user = requirePermission_(token, 'bank', 'add');
+    // Financial mutations cannot proceed with an unresolved stock/refund journal.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
     payload = payload || {};
 
@@ -353,6 +355,8 @@ function reverseBankEntry(token, entryId, reason) {
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     const user = requirePermission_(token, 'bank', 'edit');
+    // Financial mutations cannot proceed with an unresolved stock/refund journal.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
 
     const id = sanitizeInput_(entryId);
