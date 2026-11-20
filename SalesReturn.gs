@@ -1161,7 +1161,10 @@ function prepareSalesReturnChange_(token, returnId, requested, mode) {
       });
       stockUndo.lotDeltas.forEach(function(g){
         const row=vLots.filter(function(r){return r._rowIndex===g.rowIndex;})[0];
-        if (row) row['Remaining Quantity']=g.newRemaining;
+        if (row) {
+          row['Remaining Quantity']=g.newRemaining;
+          if (g.directOversold) row['Status']=g.newStatus;
+        }
       });
       stockUndo.saleConsumptionDeltas.forEach(function(g){
         const row=vConsumptions.filter(function(r){return r._rowIndex===g.rowIndex;})[0];

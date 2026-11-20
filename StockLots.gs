@@ -301,16 +301,68 @@ function planStockConsumption_(productId, qty, allLots, productRow, asOfSaleDate
   };
   if (need <= 0) return plan;
 
-  const lots = (allLots || getAllRows_('STOCK_LOTS'))
-    .filter(function (l) {
-      return l['Product ID'] === productId && (Number(l['Remaining Quantity']) || 0) > 0;
-    })
+  const sourceLots = allLots || getAllRows_('STOCK_LOTS');
+  const productLots = sourceLots.filter(function (lot) {
+    return lot['Product ID'] === productId;
+  });
+  const lots = productLots
+    .filter(function (l) { return (Number(l['Remaining Quantity']) || 0) > 0; })
     .sort(compareLotsFifo_);
+
+  // While earlier OVERSOLD lots are still negative, replenished positive
+  // lots may include units already needed to fund those older sales. Those
+  // units are NOT available to sell again. Reserve the old debt against
+  // positive lots in FIFO order for this read-only plan only. The actual
+  // lot rows are NOT rewritten by a sale; the native purchase settlement
+  // writer will separately record auditable exact source allocations.
+  let unfundedDebt = 0;
+  productLots.forEach(function (lot) {
+    const raw = lot['Remaining Quantity'];
+    const remaining = Number(raw);
+    if (raw === '' || raw === undefined || raw === null ||
+        !Number.isFinite(remaining)) {
+      throw new Error('Stock lots contain invalid quantity. Needs Review.');
+    }
+    if (remaining < 0) {
+      if (String(lot['Purchase ID']) !== 'OVERSOLD' ||
+          String(lot['Status']) !== 'Oversold') {
+        throw new Error('Negative stock lot source is ambiguous. Needs Review.');
+      }
+      unfundedDebt += -remaining;
+    }
+  });
+  if (unfundedDebt > 0) {
+    // A positive lot that is deleted, inactive or missing an auditable
+    // purchase price must never become spendable simply because it offsets
+    // an old negative lot in the signed stock sum.
+    lots.forEach(function (lot) {
+      const rawCost = lot['Purchase Price'];
+      if (lot['Status'] !== 'Active' || lot['Is Deleted'] === true ||
+          String(lot['Is Deleted']).toUpperCase() === 'TRUE') {
+        throw new Error('Deleted or inactive positive stock lot. Needs Review.');
+      }
+      if (rawCost === '' || rawCost === null || rawCost === undefined ||
+          !Number.isFinite(Number(rawCost)) || Number(rawCost) < 0) {
+        throw new Error('Unpriced positive stock lot cannot support OVERSOLD sale. Needs Review.');
+      }
+    });
+    const net = productLots.reduce(function (total, l) {
+      return total + Number(l['Remaining Quantity']);
+    }, 0);
+    const cached = Number(product && product['Current Stock']);
+    if (!Number.isFinite(net) || !Number.isFinite(cached) ||
+        Math.abs(net - cached) > 0.0000001) {
+      throw new Error('Stock lots and Current Stock mismatch; reconcile before sale. Needs Review.');
+    }
+  }
 
   for (let i = 0; i < lots.length && need > 0; i++) {
     const lot = lots[i];
     const available = Number(lot['Remaining Quantity']) || 0;
-    const take = Math.min(available, need);
+    const reserved = Math.min(available, unfundedDebt);
+    unfundedDebt -= reserved;
+    const availableToSell = available - reserved;
+    const take = Math.min(availableToSell, need);
     if (take <= 0) continue;
     plan.draws.push({
       lotId: lot['Lot ID'],
@@ -475,6 +527,17 @@ function planSaleReturnRestoration_(invoiceId, productId, productName, qty, opti
     if (give <= 0) continue;
 
     const lot = lotsById[row['Lot ID']];
+    // Even a malformed legacy OVERSOLD row must not bypass a committed or
+    // interrupted settlement. Preserve its existing fallback return only
+    // when NO source-linked replenishment exists.
+    if (lot && lot['Purchase ID'] === 'OVERSOLD') {
+      const history = opts.settlementHistory || getAllRows_('STOCK_LOT_SETTLEMENTS');
+      if (history.some(function (event) {
+        return String(event['Oversold Lot ID'] || event.oversoldLotId || '') === String(lot['Lot ID']);
+      })) {
+        throw new Error('OVERSOLD source has a settlement; linked return reversal is required. Needs Review.');
+      }
+    }
     const saleItemLotQtyAfter = outstanding - give;
     saleQtyByRow[row._rowIndex] = saleItemLotQtyAfter;
 
@@ -490,6 +553,34 @@ function planSaleReturnRestoration_(invoiceId, productId, productName, qty, opti
         saleItemLotQtyAfter: saleItemLotQtyAfter,
         lotRowIndex: lot._rowIndex,
         lotRemainingAfter: lotRemainingAfter,
+        lotId: row['Lot ID'],
+        qty: give,
+        consumptionLinkId: row['Return Consumption Link ID'] || '',
+        supplierId: row['Supplier ID'] || ''
+      });
+    } else if (lot && lot['Purchase ID'] === 'OVERSOLD' &&
+               !(lot['Status'] === 'Active' && Number(lot['Remaining Quantity']) === 0)) {
+      // Genuine OVERSOLD source: reduce the SAME negative lot as the sale
+      // return restores inventory. A historic malformed Active/zero lot
+      // remains on the original fallback path for return edit/delete
+      // compatibility; it must have no settlement events (checked above).
+      if (!Object.prototype.hasOwnProperty.call(lotRemainingByRow, lot._rowIndex)) {
+        lotRemainingByRow[lot._rowIndex] = Number(lot['Remaining Quantity']);
+      }
+      const stillNegative = Number(lotRemainingByRow[lot._rowIndex]);
+      if (!Number.isFinite(stillNegative) || lot['Status'] !== 'Oversold' ||
+          stillNegative >= 0 || stillNegative + give > 0.0000001) {
+        throw new Error('OVERSOLD source already funded or inconsistent; linked return requires Needs Review.');
+      }
+      const lotRemainingAfter = Math.min(0, stillNegative + give);
+      lotRemainingByRow[lot._rowIndex] = lotRemainingAfter;
+      plan.draws.push({
+        sourceKind: 'OVERSOLD_REVERSE',
+        saleItemLotRowIndex: row._rowIndex,
+        saleItemLotQtyAfter: saleItemLotQtyAfter,
+        lotRowIndex: lot._rowIndex,
+        lotRemainingAfter: lotRemainingAfter,
+        lotStatusAfter: lotRemainingAfter === 0 ? 'Consumed' : 'Oversold',
         lotId: row['Lot ID'],
         qty: give,
         consumptionLinkId: row['Return Consumption Link ID'] || '',
@@ -531,8 +622,10 @@ function applySaleReturnRestorationPlan_(plan, fallbackReference) {
   const restored = [];
   (plan && plan.draws || []).forEach(function (draw) {
     let lotId = draw.lotId;
-    if (draw.sourceKind === 'LOT') {
-      updateRowFields_('STOCK_LOTS', draw.lotRowIndex, { 'Remaining Quantity': draw.lotRemainingAfter });
+    if (draw.sourceKind === 'LOT' || draw.sourceKind === 'OVERSOLD_REVERSE') {
+      const fields = { 'Remaining Quantity': draw.lotRemainingAfter };
+      if (draw.sourceKind === 'OVERSOLD_REVERSE') fields['Status'] = draw.lotStatusAfter;
+      updateRowFields_('STOCK_LOTS', draw.lotRowIndex, fields);
     } else {
       lotId = createLot_(
         plan.productId,
@@ -1248,9 +1341,35 @@ function planSalesReturnStockUndo_(returnId, context) {
       throw new Error('Ambiguous original sale consumption evidence. Needs Review.');
     else if (String(lot['Purchase ID'] || '') !== id)
       throw new Error('Original sale consumption evidence missing. Needs Review.');
-    if (!productGroups[productId]) productGroups[productId] = {productId:productId,rowIndex:product._rowIndex,newStock:Number(product['Current Stock'])||0,qty:0};
+    // An exact unfunded OVERSOLD sale return physically reduced the same
+    // negative lot rather than creating free positive stock. Its correction
+    // must be able to restore that ORIGINAL debt, but never touch a source
+    // already funded by purchase settlement events.
+    const directOversold = String(lot['Purchase ID']) === 'OVERSOLD';
+    if (directOversold) {
+      const sourceQty = Number(lot['Original Quantity']);
+      const currentRemaining = Number(lot['Remaining Quantity']);
+      if (!sourceRow || String(sourceRow['Lot ID']) !== lotId ||
+          !Number.isFinite(sourceQty) || sourceQty <= 0 ||
+          !Number.isFinite(currentRemaining) || currentRemaining > 0 ||
+          !['Oversold','Consumed'].includes(String(lot['Status']))) {
+        throw new Error('OVERSOLD return source is not an exact unfunded negative lot. Needs Review.');
+      }
+      const linked = (opts.settlementHistory || getAllRows_('STOCK_LOT_SETTLEMENTS')).some(function (e) {
+        return String(e['Oversold Lot ID'] || e.oversoldLotId || '') === lotId;
+      });
+      if (linked) throw new Error('OVERSOLD return has funded settlement history; linked reversal required. Needs Review.');
+    }
+    if (!productGroups[productId]) productGroups[productId] = {
+      productId:productId,rowIndex:product._rowIndex,
+      newStock:Number(product['Current Stock'])||0,qty:0,oversoldOnly:true
+    };
     productGroups[productId].qty += qty;
-    if (!lotGroups[lotId]) lotGroups[lotId] = {lotId:lotId,rowIndex:lot._rowIndex,newRemaining:Number(lot['Remaining Quantity'])||0,qty:0};
+    if (!directOversold) productGroups[productId].oversoldOnly=false;
+    if (!lotGroups[lotId]) lotGroups[lotId] = {
+      lotId:lotId,rowIndex:lot._rowIndex,newRemaining:Number(lot['Remaining Quantity'])||0,
+      qty:0,directOversold:directOversold,originalQty:Number(lot['Original Quantity'])
+    };
     lotGroups[lotId].qty += qty;
     if (sourceRow) {
       const rowKey = String(sourceRow._rowIndex);
@@ -1269,12 +1388,21 @@ function planSalesReturnStockUndo_(returnId, context) {
 
   const productDeltas = Object.keys(productGroups).map(function(k){
     const g=productGroups[k];g.newStock-=g.qty;
-    if (g.newStock < -1e-8) throw new Error('Insufficient current product stock to reverse this return.');
+    if (g.newStock < -1e-8 && !g.oversoldOnly)
+      throw new Error('Insufficient current product stock to reverse this return.');
     return g;
   });
   const lotDeltas = Object.keys(lotGroups).map(function(k){
     const g=lotGroups[k];g.newRemaining-=g.qty;
-    if (g.newRemaining < -1e-8) throw new Error('Returned lot has already been consumed; stock reversal blocked.');
+    if (g.directOversold) {
+      if (!Number.isFinite(g.originalQty) || g.originalQty<=0 ||
+          g.newRemaining < -g.originalQty - 1e-8 || g.newRemaining > 1e-8) {
+        throw new Error('OVERSOLD return correction exceeds original negative source. Needs Review.');
+      }
+      g.newStatus=g.newRemaining < -1e-8 ? 'Oversold' : 'Consumed';
+    } else if (g.newRemaining < -1e-8) {
+      throw new Error('Returned lot has already been consumed; stock reversal blocked.');
+    }
     return g;
   });
   const saleConsumptionDeltas = Object.keys(consumptionGroups).map(function(k){
@@ -1291,7 +1419,9 @@ function applySalesReturnStockUndo_(plan, operationId, operationType) {
     updateRowFields_('PRODUCTS',g.rowIndex,{'Current Stock':g.newStock,'Updated At':now});
   });
   (plan.lotDeltas || []).forEach(function(g){
-    updateRowFields_('STOCK_LOTS',g.rowIndex,{'Remaining Quantity':g.newRemaining});
+    const fields={'Remaining Quantity':g.newRemaining};
+    if (g.directOversold) fields['Status']=g.newStatus;
+    updateRowFields_('STOCK_LOTS',g.rowIndex,fields);
   });
   (plan.saleConsumptionDeltas || []).forEach(function(g){
     updateRowFields_('SALE_ITEM_LOTS',g.rowIndex,{'Quantity':g.newQuantity});

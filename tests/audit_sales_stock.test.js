@@ -545,3 +545,154 @@ test('oversold sale with no real historical purchase cost fails before first mut
   assert.match(response.message,/Needs Review/i);
   assert.deepEqual(w.writes,[]);
 });
+
+function unsettledOversoldSeed(netStock=9) {
+  return {
+    PRODUCTS: [product(netStock)],
+    STOCK_LOTS: [
+      lot('NEG-A', -229, '2026-09-01', {
+        'Purchase ID':'OVERSOLD','Status':'Oversold','Original Quantity':229,
+        'Purchase Price':68
+      }),
+      lot('NEG-B', -2, '2026-09-02', {
+        'Purchase ID':'OVERSOLD','Status':'Oversold','Original Quantity':2,
+        'Purchase Price':68
+      }),
+      lot('NEW-PUR',240,'2026-09-04',{
+        'Purchase ID':'PUR-NEW','Status':'Active','Original Quantity':240,
+        'Purchase Price':64.75
+      })
+    ]
+  };
+}
+
+test('unsettled -231 +240 only exposes 9 own feet to FIFO, never gross 240',()=>{
+  const w=workbook(unsettledOversoldSeed());
+  const before=structuredClone(w.tables);
+  const p=w.ctx.planStockConsumption_('P1',10,w.ctx.getAllRows_('STOCK_LOTS'),w.ctx.getAllRows_('PRODUCTS')[0],'2026-09-05');
+  assert.equal(p.draws.length,1);
+  assert.equal(p.draws[0].lotId,'NEW-PUR');
+  assert.equal(p.draws[0].take,9);
+  assert.equal(p.draws[0].remainingAfter,231);
+  assert.equal(p.shortfall,1);
+  assert.equal(p.fallbackPrice,64.75);
+  assert.deepEqual(w.tables,before);
+  assert.deepEqual(w.writes,[]);
+});
+test('a real 10-foot sale with only 9 net own creates 9 own+1 negative, and posts one cash receipt',()=>{
+  const w=workbook(unsettledOversoldSeed());
+  const result=w.ctx.completeSale('token',payload(10));
+  assert.equal(result.success,true,result.message);
+  assert.equal(w.rows('PRODUCTS')[0]['Current Stock'],-1);
+  assert.equal(w.rows('CASH_BOOK').length,1);
+  assert.equal(w.rows('CASH_BOOK')[0].Credit,1000);
+  const own=w.rows('STOCK_LOTS').find(x=>x['Lot ID']==='NEW-PUR');
+  assert.equal(own['Remaining Quantity'],231);
+  const newDebt=w.rows('STOCK_LOTS').find(x=>x['Purchase ID']==='OVERSOLD'&&x['Lot ID']!=='NEG-A'&&x['Lot ID']!=='NEG-B');
+  assert.ok(newDebt);
+  assert.equal(newDebt['Remaining Quantity'],-1);
+  assert.equal(newDebt['Purchase Price'],64.75);
+  assert.equal(w.rows('STOCK_LOTS').reduce((sum,x)=>sum+Number(x['Remaining Quantity']||0),0),-1);
+  assert.deepEqual(
+    w.rows('SALE_ITEM_LOTS').map(x=>[x['Lot ID'],x.Quantity,x['Unit Cost']]),
+    [['NEW-PUR',9,64.75],[newDebt['Lot ID'],1,64.75]]
+  );
+});
+test('unsettled -231 +240, selling exactly 9 consumes only genuinely unallocated stock',()=>{
+  const w=workbook(unsettledOversoldSeed());
+  const p=w.ctx.planStockConsumption_('P1',9,w.ctx.getAllRows_('STOCK_LOTS'),w.ctx.getAllRows_('PRODUCTS')[0],'2026-09-05');
+  assert.equal(p.shortfall,0);
+  assert.equal(p.draws[0].take,9);
+  assert.equal(p.draws[0].remainingAfter,231);
+});
+test('vendor sourcing recognizes 9 own and 1 external, without creating a new oversold lot',()=>{
+  const w=workbook(unsettledOversoldSeed());
+  const p=w.ctx.planSaleVendorConsumption_('P1',10,w.ctx.getAllRows_('STOCK_LOTS'),w.ctx.getAllRows_('PRODUCTS')[0]);
+  assert.equal(p.draws.reduce((sum,x)=>sum+x.take,0),9);
+  assert.equal(p.shortfall,1);
+  assert.equal(p.draws[0].remainingAfter,231);
+  assert.deepEqual(w.writes,[]);
+});
+test('negative lot stock mismatch fails closed before any sale or payment row is written',()=>{
+  const w=workbook(unsettledOversoldSeed(8));
+  const result=w.ctx.completeSale('token',payload(1));
+  assert.equal(result.success,false);
+  assert.match(result.message,/reconcile|mismatch|Needs Review/i);
+  assert.deepEqual(w.writes,[]);
+});
+test('negative quantity exceeding gross positive lot yields only new shortfall, not spendable stock',()=>{
+  const seed=unsettledOversoldSeed(-20);
+  seed.STOCK_LOTS[2]['Remaining Quantity']=211;
+  seed.STOCK_LOTS[2]['Original Quantity']=211;
+  const w=workbook(seed);
+  const p=w.ctx.planStockConsumption_('P1',3,w.ctx.getAllRows_('STOCK_LOTS'),w.ctx.getAllRows_('PRODUCTS')[0],'2026-09-05');
+  assert.equal(p.draws.length,0);
+  assert.equal(p.shortfall,3);
+});
+
+test('returning a newly oversold mixed sale restores exact own and new negative lots without rewriting older debt',()=>{
+  const w=workbook(unsettledOversoldSeed());
+  const sold=w.ctx.completeSale('token',payload(10));
+  assert.equal(sold.success,true,sold.message);
+  const invoiceId=w.rows('SALES')[0]['Invoice ID'];
+  const returned=w.ctx.completeReturn('token',returnPayload(10,{invoiceId}));
+  assert.equal(returned.success,true,returned.message);
+  assert.equal(w.rows('PRODUCTS')[0]['Current Stock'],9);
+  assert.equal(w.rows('STOCK_LOTS').find(x=>x['Lot ID']==='NEW-PUR')['Remaining Quantity'],240);
+  assert.equal(w.rows('STOCK_LOTS').find(x=>x['Lot ID']==='NEG-A')['Remaining Quantity'],-229);
+  assert.equal(w.rows('STOCK_LOTS').find(x=>x['Lot ID']==='NEG-B')['Remaining Quantity'],-2);
+  const added=w.rows('STOCK_LOTS').find(x=>x['Purchase ID']==='OVERSOLD'&&x['Lot ID']!=='NEG-A'&&x['Lot ID']!=='NEG-B');
+  assert.ok(added);
+  assert.equal(added['Remaining Quantity'],0);
+  assert.equal(added['Status'],'Consumed');
+  assert.equal(w.rows('CASH_BOOK').filter(x=>Number(x.Credit)===1000).length,1);
+  assert.equal(w.rows('CASH_BOOK').filter(x=>Number(x.Debit)===1000).length,1);
+  assert.equal(w.rows('SALE_ITEM_LOTS').reduce((sum,x)=>sum+Number(x.Quantity),0),0);
+});
+
+test('a fully funded historical OVERSOLD source cannot be returned until linked settlement reversal exists',()=>{
+ const w=workbook({
+  PRODUCTS:[product(0)],
+  STOCK_LOTS:[lot('OV-FUNDED',0,'2026-09-01',{'Purchase ID':'OVERSOLD','Status':'Consumed','Original Quantity':1,'Purchase Price':68})],
+  SALES:[sale({Subtotal:100,'Grand Total':100,'Paid Amount':100,'Due Amount':0})],
+  SALE_ITEMS:[item(1)],
+  SALE_ITEM_LOTS:[{'Invoice ID':'INV1','Product ID':'P1','Lot ID':'OV-FUNDED',Quantity:1,'Unit Cost':68}]
+ });
+ const result=w.ctx.completeReturn('token',returnPayload(1));
+ assert.equal(result.success,false);
+ assert.match(result.message,/settle|funded|Needs Review/i);
+ assert.deepEqual(w.writes,[]);
+});
+test('OVERSOLD return requires unsettled link: any committed settlement event blocks guessed reversal',()=>{
+ const w=workbook({
+  PRODUCTS:[product(-1)],
+  STOCK_LOTS:[lot('OV-OLD',-1,'2026-09-01',{'Purchase ID':'OVERSOLD','Status':'Oversold','Original Quantity':2,'Purchase Price':68})],
+  SALES:[sale({Subtotal:100,'Grand Total':100,'Paid Amount':100,'Due Amount':0})],
+  SALE_ITEMS:[item(1)],
+  SALE_ITEM_LOTS:[{'Invoice ID':'INV1','Product ID':'P1','Lot ID':'OV-OLD',Quantity:1,'Unit Cost':68}],
+  STOCK_LOT_SETTLEMENTS:[{'Settlement ID':'STL-1','Oversold Lot ID':'OV-OLD','State':'Committed','Quantity Ticks':1}]
+ });
+ const result=w.ctx.completeReturn('token',returnPayload(1));
+ assert.equal(result.success,false);
+ assert.match(result.message,/settlement|Needs Review/i);
+ assert.deepEqual(w.writes,[]);
+});
+
+test('unsettled debt with deleted positive purchase lot cannot create a sale',()=>{
+  const seed=unsettledOversoldSeed();
+  seed.STOCK_LOTS[2].Status='Deleted';
+  const w=workbook(seed);
+  const result=w.ctx.completeSale('token',payload(1));
+  assert.equal(result.success,false);
+  assert.match(result.message,/deleted|Needs Review|lot/i);
+  assert.deepEqual(w.writes,[]);
+});
+test('unsettled debt with unpriced positive lot cannot silently book zero COGS',()=>{
+  const seed=unsettledOversoldSeed();
+  seed.STOCK_LOTS[2]['Purchase Price']='';
+  const w=workbook(seed);
+  const result=w.ctx.completeSale('token',payload(1));
+  assert.equal(result.success,false);
+  assert.match(result.message,/cost|Needs Review/i);
+  assert.deepEqual(w.writes,[]);
+});

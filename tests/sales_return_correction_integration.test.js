@@ -694,3 +694,80 @@ test('partial-write fault during Return Delete is journaled Needs Review and nev
  assert.match(another.message,/review|interrupted/i);
  assert.equal(w.writes.length,writes);
 });
+
+test('genuine unfunded OVERSOLD return edit/delete reverses original negative lot exactly',()=>{
+ const w=workbook();
+ const original=w.rows('STOCK_LOTS')[0];
+ original['Purchase ID']='OVERSOLD';
+ original['Status']='Oversold';
+ original['Original Quantity']=5;
+ original['Remaining Quantity']=-5;
+ w.rows('PRODUCTS')[0]['Current Stock']=-5;
+ const create=w.ctx.completeReturn('t',{invoiceId:'INV1',
+   items:[{productId:'P1',qty:2,price:100}],refundMethod:'Cash',date:'2026-09-21'});
+ assert.equal(create.success,true,create.message);
+ const id=create.data.returnId;
+ assert.equal(w.rows('PRODUCTS')[0]['Current Stock'],-3);
+ assert.equal(original['Remaining Quantity'],-3);
+ assert.equal(w.rows('SALE_ITEM_LOTS')[0].Quantity,3);
+ const change=w.ctx.updateSalesReturn('t',{
+   returnId:id,expectedVersion:0,operationId:'return-edit-oversold-123',
+   items:[{productId:'P1',qty:1,price:100}],refundMethod:'Cash',
+   reason:'Correction',notes:'Reviewed',date:'2026-09-21',editReason:'Return quantity correction'});
+ assert.equal(change.success,true,change.message);
+ assert.equal(w.rows('PRODUCTS')[0]['Current Stock'],-4);
+ assert.equal(original['Remaining Quantity'],-4);
+ assert.equal(w.rows('SALE_ITEM_LOTS')[0].Quantity,4);
+ const del=w.ctx.deleteSalesReturn('t',id,'Mistake','return-delete-oversold-123',1);
+ assert.equal(del.success,true,del.message);
+ assert.equal(w.rows('PRODUCTS')[0]['Current Stock'],-5);
+ assert.equal(original['Remaining Quantity'],-5);
+ assert.equal(w.rows('SALE_ITEM_LOTS')[0].Quantity,5);
+ assert.equal(w.rows('CASH_BOOK').filter(r=>!r['Is Deleted']).length,0);
+});
+
+test('full OVERSOLD sale return can be corrected, reopening only its original negative source',()=>{
+ const w=workbook(),lot=w.rows('STOCK_LOTS')[0];
+ lot['Purchase ID']='OVERSOLD';lot['Status']='Oversold';
+ lot['Original Quantity']=5;lot['Remaining Quantity']=-5;
+ w.rows('PRODUCTS')[0]['Current Stock']=-5;
+ const created=w.ctx.completeReturn('t',{invoiceId:'INV1',
+   items:[{productId:'P1',qty:5,price:100}],refundMethod:'Cash',date:'2026-09-21'});
+ assert.equal(created.success,true,created.message);
+ const id=created.data.returnId;
+ assert.equal(lot['Remaining Quantity'],0);
+ assert.equal(lot.Status,'Consumed');
+ const edited=w.ctx.updateSalesReturn('t',{
+   returnId:id,expectedVersion:0,operationId:'return-edit-oversold-full-123',
+   items:[{productId:'P1',qty:4,price:100}],refundMethod:'Cash',
+   reason:'Correction',date:'2026-09-21',editReason:'Correct returned quantity'});
+ assert.equal(edited.success,true,edited.message);
+ assert.equal(lot['Remaining Quantity'],-1);
+ assert.equal(lot.Status,'Oversold');
+ assert.equal(w.rows('PRODUCTS')[0]['Current Stock'],-1);
+ const deleted=w.ctx.deleteSalesReturn('t',id,'Mistake','return-delete-oversold-full-123',1);
+ assert.equal(deleted.success,true,deleted.message);
+ assert.equal(lot['Remaining Quantity'],-5);
+ assert.equal(lot.Status,'Oversold');
+ assert.equal(w.rows('PRODUCTS')[0]['Current Stock'],-5);
+ assert.equal(w.rows('CASH_BOOK').filter(x=>!x['Is Deleted']).length,0);
+});
+test('return correction refuses any newly linked OVERSOLD funding evidence before a journal or money write',()=>{
+ const w=workbook(),lot=w.rows('STOCK_LOTS')[0];
+ lot['Purchase ID']='OVERSOLD';lot['Status']='Oversold';
+ lot['Original Quantity']=5;lot['Remaining Quantity']=-5;
+ w.rows('PRODUCTS')[0]['Current Stock']=-5;
+ const made=w.ctx.completeReturn('t',{invoiceId:'INV1',
+   items:[{productId:'P1',qty:2,price:100}],refundMethod:'Cash',date:'2026-09-21'});
+ assert.equal(made.success,true,made.message);
+ const id=made.data.returnId;
+ const before=w.writes.length;
+ w.rows('STOCK_LOT_SETTLEMENTS').push({'Settlement ID':'STL-1','Oversold Lot ID':'L1','State':'Committed'});
+ const edit=w.ctx.updateSalesReturn('t',{
+   returnId:id,expectedVersion:0,operationId:'return-blocked-oversold-123',
+   items:[{productId:'P1',qty:1,price:100}],refundMethod:'Cash',
+   reason:'Correction',date:'2026-09-21',editReason:'Wrong amount'});
+ assert.equal(edit.success,false);
+ assert.match(edit.message,/settlement|Needs Review/i);
+ assert.equal(w.writes.length,before);
+});
