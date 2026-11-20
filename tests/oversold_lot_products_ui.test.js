@@ -66,9 +66,9 @@ test('Products HTML renders FIFO Cost rather than stale Purchase Price, with exp
  assert.match(html,/>FIFO Cost/);
  assert.match(html,/p\['Next FIFO Cost'\]/);
  assert.match(html,/p\['Lot Cost Status'\]/);
- assert.match(html,/Needs Reconcile|Needs Review/);
+ assert.match(html,/Check|Stock checks/);
  assert.match(html,/p\['Provisional FIFO Cost'\]/);
  assert.match(html,/p\['Provisional Stock Value'\]/);
- assert.match(html,/est\. · Reconcile/);
+ assert.doesNotMatch(html,/est\. · Reconcile/);
  assert.match(html,/purchasePrice:\s*'Next FIFO Cost'/);
 });

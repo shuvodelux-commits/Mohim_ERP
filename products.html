@@ -10,6 +10,7 @@
     <option value="">All brands</option>
   </select>
   <div class="toolbar-spacer"></div>
+  <button type="button" class="btn" id="prodStockIssuesBtn" aria-pressed="false" title="Show only products whose stock-lot data needs checking">Stock checks</button>
   <button class="btn" id="prodUnpricedLotsBtn">Unpriced Stock Lots</button>
   <button class="btn btn-primary" id="prodAddBtn">+ Add Product</button>
 </div>
@@ -148,7 +149,8 @@
       <button class="modal-close" onclick="closeModal('prodLotsModal')">&#10005;</button>
     </div>
     <div class="modal-body">
-      <p style="color:var(--color-text-muted); font-size:13px;">Total remaining: <strong id="prodLotsTotalQty"></strong> &mdash; Total stock value: <strong id="prodLotsTotalValue"></strong></p>
+      <p style="color:var(--color-text-muted); font-size:13px;">Lot quantities total: <strong id="prodLotsTotalQty"></strong> &mdash; Raw lot value: <strong id="prodLotsTotalValue"></strong></p>
+      <p id="prodLotsBalanceHint" style="font-size:13px; color:var(--color-warning, #a46b08);" hidden></p>
       <table class="mobile-card-table">
         <thead><tr><th>Lot ID</th><th>Source</th><th>Supplier</th><th>Date</th><th class="num">Purchase Price</th><th class="num">Original Qty</th><th class="num">Remaining Qty</th><th class="num">Value</th><th>Status</th><th>Action</th></tr></thead>
         <tbody id="prodLotsBody"></tbody>
@@ -266,7 +268,7 @@
 
 
 <script>
-  var prodState = { bundleItems: [], products: [], categories: [], units: [], lowStockThreshold: 5, editingId: null, addSource: '', stockEditingId: null, stockEditingName: '', stockEditingCurrent: 0, sortKey: '', sortDir: 'asc', currentLotsProduct: null, currentLots: [], lotCostSelected: null, unpricedLots: [] };
+  var prodState = { bundleItems: [], products: [], categories: [], units: [], lowStockThreshold: 5, editingId: null, addSource: '', stockEditingId: null, stockEditingName: '', stockEditingCurrent: 0, sortKey: '', sortDir: 'asc', showStockChecks: false, currentLotsProduct: null, currentLots: [], lotCostSelected: null, unpricedLots: [] };
   var prodManageListMode_ = null; // 'category' | 'unit' — which list the shared Manage modal is currently showing
 
    /** Product delete. The server refuses if stock is non-zero or it is in use. */
@@ -612,13 +614,28 @@
     return displayNames[raw.toLowerCase()] || raw;
   }
 
+  /** A review issue is different from an unposted, ordinary cost estimate. */
+  function prodHasStockIssue_(product) {
+    if (!product || product['Product Type'] === 'Bundle') return false;
+    return !!String(product['Lot Cost Issue'] || '').trim() ||
+      product['Lot Cost Status'] === 'NEEDS_REVIEW';
+  }
+
   function prodRender() {
     prodCloseActionMenu_();
     var q = document.getElementById('prodSearch').value || '';
     var cat = document.getElementById('prodCategoryFilter').value;
     var brand = document.getElementById('prodBrandFilter').value;
+    var issuesButton = document.getElementById('prodStockIssuesBtn');
+    if (issuesButton) {
+      var issueCount = prodState.products.filter(prodHasStockIssue_).length;
+      issuesButton.textContent = 'Stock checks' + (issueCount ? ' (' + issueCount + ')' : '');
+      issuesButton.setAttribute('aria-pressed', prodState.showStockChecks ? 'true' : 'false');
+      issuesButton.classList.toggle('btn-primary', !!prodState.showStockChecks);
+    }
     var filtered = prodState.products.filter(function (p) {
-      return (!cat || p['Category'] === cat) && (!brand || p['Brand'] === brand);
+      return (!cat || p['Category'] === cat) && (!brand || p['Brand'] === brand) &&
+        (!prodState.showStockChecks || prodHasStockIssue_(p));
     });
     var rows = smartSearchProducts_(filtered, q);
     rows = prodSortRows_(rows);
@@ -661,25 +678,45 @@
       var hasLotDifference = p['Lot Quantity Difference'] !== null &&
         p['Lot Quantity Difference'] !== undefined && Number.isFinite(lotDifference) &&
         Math.abs(lotDifference) > 0.0000001;
-      var reviewDetails = 'Unverified lot estimate. No stock or ledger correction posted.' +
-        (issue ? ' Issue: ' + issue + '.' : '') +
-        (hasLotDifference ? ' Lot net: ' + (lotQty || 0) +
-          ', product stock: ' + qty + ', difference: ' + lotDifference + ' ' + stockUnit + '.' : '');
-      var reviewTitle = escapeHtml(reviewDetails);
+      var issueSummary = {
+        STOCK_MISMATCH: 'Stock quantity differs from the combined lot quantities.',
+        ELIGIBLE_STOCK_MISMATCH: 'Available FIFO quantities do not match recorded stock.',
+        BACKDATED_OR_AMBIGUOUS_LOT: 'A past purchase overlaps an older negative-stock sale.',
+        UNPRICED_INTERNAL_LOT: 'Opening/adjustment stock is missing a reliable cost.',
+        NO_STOCK_LOTS: 'This product has stock without stock-lot history.',
+        INVALID_OR_DUPLICATE_LOT_ID: 'Stock-lot IDs are missing or repeated.',
+        INVALID_LOT_QUANTITY_OR_COST: 'A stock lot has an invalid quantity or purchase cost.',
+        INVALID_ACTIVE_LOT_STATUS: 'Stock-lot quantities and statuses disagree.',
+        INVALID_OVERSOLD_LOT: 'A negative-stock lot has an invalid source or status.'
+      };
+      var reviewDetails = (issueSummary[issue] || 'Stock history requires a check.') +
+        (hasLotDifference ? ' Lot total: ' + lotQty + ' ' + stockUnit +
+          '; product stock: ' + qty + ' ' + stockUnit + '; difference: ' + lotDifference + '.' : '') +
+        ' Open Actions menu: View Lots. No stock or ledger corrections have been posted.';
+      var reviewTitle = escapeHtml(reviewDetails)
+        .split(String.fromCharCode(34)).join('&quot;')
+        .split(String.fromCharCode(39)).join('&#39;');
+      var issueIcon = prodHasStockIssue_(p)
+        ? ' <span role="img" aria-label="Stock check required" title="' + reviewTitle + '">ⓘ</span>'
+        : '';
+      var estimateTitle = escapeHtml('Approximate cost from purchase lots; not a booked inventory value. ' +
+        'Open Actions menu: View Lots for details.');
       var projectedCost = p['Provisional FIFO Cost'];
       var projectedValue = p['Provisional Stock Value'];
+      var nextCost = p['Next FIFO Cost'];
+      var trueValue = p['Stock Value'];
       var displayedCost = isBundle ? '—' :
-        (p['Next FIFO Cost'] !== null && p['Next FIFO Cost'] !== undefined
-          ? formatMoney(p['Next FIFO Cost']) + (costStatus === 'UNSETTLED' ? ' <span title="Unposted FIFO cost; old oversold lots still require reconciliation">est.</span>' : '')
+        (nextCost !== null && nextCost !== undefined
+          ? (costStatus === 'UNSETTLED' ? '<span title="' + estimateTitle + '">≈' + formatMoney(nextCost) + '</span>' : formatMoney(nextCost))
           : (projectedCost !== null && projectedCost !== undefined
-            ? '<span title="' + reviewTitle + '">≈' + formatMoney(projectedCost) + ' est. · Review</span>'
-            : (costStatus === 'NEEDS_REVIEW' ? '<span title="' + reviewTitle + '">Needs Review</span>' : '—')));
+            ? '<span title="' + estimateTitle + '">≈' + formatMoney(projectedCost) + '</span>' + issueIcon
+            : (prodHasStockIssue_(p) ? '<span title="' + reviewTitle + '">Check</span>' : '—')));
       var displayedValue = isBundle ? '—' :
-        (p['Stock Value'] === null || p['Stock Value'] === undefined
+        (trueValue === null || trueValue === undefined
           ? (projectedValue !== null && projectedValue !== undefined
-            ? '<span title="' + reviewTitle + '">≈' + formatMoney(projectedValue) + ' est. · Reconcile</span>'
-            : '<span title="' + reviewTitle + '">Needs Reconcile</span>')
-          : formatMoney(p['Stock Value']));
+            ? '<span title="' + estimateTitle + '">≈' + formatMoney(projectedValue) + '</span>' + issueIcon
+            : (prodHasStockIssue_(p) && qty !== 0 ? '<span title="' + reviewTitle + '">Check</span>' : '—'))
+          : formatMoney(trueValue));
 
       var tr = document.createElement('tr');
       tr.innerHTML =
@@ -700,7 +737,11 @@
       body.appendChild(tr);
     });
 
-    document.getElementById('prodEmptyState').hidden = rows.length > 0;
+    var emptyState = document.getElementById('prodEmptyState');
+    emptyState.hidden = rows.length > 0;
+    emptyState.textContent = prodState.showStockChecks
+      ? 'No stock issues match these filters.'
+      : 'No products yet. Click Add Product or load demo data from the Sheet menu.';
     prodSyncSearchClear_();
     prodUpdateSortHeaders_();
     if (window.requestAnimationFrame) requestAnimationFrame(function () { prodSyncTopScrollbar_(); });
@@ -726,6 +767,10 @@
   prodSyncSearchClear_();
   document.getElementById('prodCategoryFilter').addEventListener('change', prodRender);
   document.getElementById('prodBrandFilter').addEventListener('change', prodRender);
+  document.getElementById('prodStockIssuesBtn').addEventListener('click', function () {
+    prodState.showStockChecks = !prodState.showStockChecks;
+    prodRender();
+  });
 
   document.getElementById('prodTableBody').addEventListener('click', function (e) {
     var btn = e.target.closest('button[data-act]');
@@ -1203,6 +1248,14 @@ function prodOpenLots_(product) {
     });
     document.getElementById('prodLotsTotalQty').textContent = totalQty;
     document.getElementById('prodLotsTotalValue').textContent = formatMoney(totalValue);
+    var stockQty = Number(product['Current Stock']);
+    var balanceHint = document.getElementById('prodLotsBalanceHint');
+    var difference = Math.round((totalQty - stockQty) * 1000000) / 1000000;
+    balanceHint.hidden = !Number.isFinite(difference) || Math.abs(difference) < 0.0000001;
+    balanceHint.textContent = balanceHint.hidden ? '' :
+      'Stock check: Products shows ' + stockQty + ', but lots total ' + totalQty +
+      ' (difference ' + (difference > 0 ? '+' : '') + difference +
+      '). Review purchase, sale, return and adjustment history before correcting any source transaction.';
     document.getElementById('prodLotsEmpty').hidden = lots.length > 0;
     openModal('prodLotsModal');
     return lots;

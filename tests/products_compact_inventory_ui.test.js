@@ -9,22 +9,24 @@ const read = name => fs.readFileSync(path.join(__dirname, '..', name), 'utf8');
 const html = read('products.html');
 const css = read('style.html');
 
-function renderedRows(products) {
+function renderedRows(products, options = {}) {
   const rows = [];
   const body = { innerHTML: '', appendChild(row) { rows.push(row.innerHTML); } };
   const empty = { hidden: false };
   const el = id => {
     if (id === 'prodTableBody') return body;
     if (id === 'prodEmptyState') return empty;
+    if (id === 'prodStockIssuesBtn') return { textContent: '', setAttribute() {}, classList: { toggle() {} } };
     return { value: '' };
   };
   const helper = html.match(/  function prodUnitLabel_\(unit\) \{[\s\S]*?\n  \}/);
   assert.ok(helper, 'unit display helper must not mutate saved product units');
+  const stockIssues = html.match(/  function prodHasStockIssue_\(product\) \{[\s\S]*?\n  \}/);
   const start = html.indexOf('  function prodRender() {');
   const end = html.indexOf('\n  var prodSearchInput_', start);
   assert.ok(start >= 0 && end > start);
   const ctx = {
-    prodState: { products }, document: { getElementById: el, createElement: () => ({ innerHTML: '' }) },
+    prodState: { products, showStockChecks: !!options.onlyIssues }, document: { getElementById: el, createElement: () => ({ innerHTML: '' }) },
     window: { requestAnimationFrame: null },
     prodCloseActionMenu_() {}, prodSortRows_: v => v, smartSearchProducts_: v => v,
     prodSyncSearchClear_() {}, prodUpdateSortHeaders_() {},
@@ -32,7 +34,7 @@ function renderedRows(products) {
     formatMoney: v => '৳' + v,
     rowActionTriggerHtml_: () => '<button data-act="menu">⋯</button>'
   };
-  vm.runInNewContext(helper[0] + '\n' + html.slice(start, end) + '\nprodRender();', ctx);
+  vm.runInNewContext(helper[0] + '\n' + (stockIssues ? stockIssues[0] : '') + '\n' + html.slice(start, end) + '\nprodRender();', ctx);
   return rows;
 }
 function cells(row) {
@@ -139,4 +141,46 @@ test('Mirrored Products heading uses the same padding as the real heading on tab
   assert.match(css, /#page-sales #smTableScroll td,\s*#page-products #prodTable td\s*\{\s*padding:\s*8px 12px;\s*line-height:\s*1\.35;/s);
   assert.match(css, /\.sm-pinned-sales-header th,\s*\.prod-pinned-header th\s*\{[^}]*padding:\s*9px 12px;/s);
   assert.doesNotMatch(css, /\.prod-pinned-header th\s*\{\s*padding:\s*6px 7px;/s);
+});
+
+test('estimated inventory values are concise, while genuine quantity mismatch stays inspectable', () => {
+ const [row] = renderedRows([{
+  'Product ID':'PIPE', 'Product Name':'4-inch Pipe', 'Product Type':'Standard',
+  Category:'Pipe',Unit:'Foot','Current Stock':396,'Minimum Stock':2,
+  'Selling Price':75,'Next FIFO Cost':null,'Stock Value':null,
+  'Provisional FIFO Cost':70,'Provisional Stock Value':27860,
+  'Provisional Lot Quantity':398,'Lot Quantity Difference':2,
+  'Lot Cost Status':'NEEDS_REVIEW','Lot Cost Issue':'STOCK_MISMATCH',Status:'Active'
+ }]);
+ const c=cells(row);
+ assert.equal(visibleText(c[2]), '≈৳70 ⓘ');
+ assert.equal(visibleText(c[5]), '≈৳27860 ⓘ');
+ assert.match(c[2], /Lot total.*398/);
+ assert.match(c[5], /product stock.*396/);
+ assert.doesNotMatch(c[2]+c[5], /est\. · Reconcile|est\. · Review/);
+});
+test('unsettled stock estimates show only compact numbers without a false data-error icon',()=>{
+ const [row] = renderedRows([{
+ 'Product ID':'P','Product Name':'Pipe','Current Stock':9,
+ 'Next FIFO Cost':64.75,'Lot Cost Status':'UNSETTLED','Lot Cost Issue':'',
+ 'Stock Value':null,'Provisional Stock Value':582.75,'Provisional FIFO Cost':64.75,
+ 'Selling Price':75, Status:'Active'
+ }]);
+ const c=cells(row);
+ assert.equal(visibleText(c[2]), '≈৳64.75');
+ assert.equal(visibleText(c[5]), '≈৳582.75');
+ assert.doesNotMatch(c[2]+c[5], /ⓘ/);
+});
+test('stock checks filter finds real issues, not every estimated inventory value',()=>{
+ const items=[
+ {'Product ID':'clean','Product Name':'Clean', 'Current Stock':5,'Stock Value':100,'Lot Cost Status':'OK'},
+ {'Product ID':'pending','Product Name':'Pending', 'Current Stock':4,'Lot Cost Status':'UNSETTLED'},
+ {'Product ID':'bad','Product Name':'Bad', 'Current Stock':8,'Lot Cost Status':'NEEDS_REVIEW','Lot Cost Issue':'STOCK_MISMATCH'},
+ {'Product ID':'bundle','Product Name':'Bundle', 'Product Type':'Bundle','Lot Cost Issue':'STOCK_MISMATCH'}
+ ];
+ const rows=renderedRows(items,{onlyIssues:true});
+ assert.equal(rows.length,1);
+ assert.match(rows[0], /Bad/);
+ assert.match(html,/id="prodStockIssuesBtn"/);
+ assert.match(html,/prodState\.showStockChecks\s*=\s*!prodState\.showStockChecks/);
 });
