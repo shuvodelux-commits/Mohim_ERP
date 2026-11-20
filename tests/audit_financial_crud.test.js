@@ -467,5 +467,156 @@ for (const party of ['customer', 'supplier']) test(party + ' replayed settlement
   assert.equal(replay().computedNetDue, storedDue(), 'deleted payment must reconcile');
 });
 
+
+// Snapshot source business records only; the in-memory Sheets repository
+// can lazily materialize EMPTY arrays during a read-only validation.
+function businessSnapshot(f){
+ const keys=['PRODUCTS','STOCK_LOTS','PURCHASES','PURCHASE_ITEMS','PURCHASE_RETURN','PURCHASE_RETURN_ITEMS',
+   'SUPPLIERS','SUPPLIER_LEDGER','CASH_BOOK','BANK_BOOK','STOCK_MOVEMENT'];
+ return JSON.stringify(keys.map(k=>[k,f.sheets[k]||[]]));
+}
+test('reserved older purchase cannot be returned; newer unreserved purchase can return safely',()=>{
+ const f=fixture(),c=f.ctx;
+ const older=success(c.createPurchase('T',purchase({items:[{productId:'P1',name:'Rice',qty:20,unitPrice:10,sellingPrice:15}],paidAmount:0}))).purchaseId;
+ const newer=success(c.createPurchase('T',purchase({items:[{productId:'P1',name:'Rice',qty:30,unitPrice:12,sellingPrice:18}],paidAmount:0}))).purchaseId;
+ const oldLot=f.sheets.STOCK_LOTS.find(x=>x['Purchase ID']===older);
+ const newLot=f.sheets.STOCK_LOTS.find(x=>x['Purchase ID']===newer);
+ f.rows('STOCK_LOTS').push({'Lot ID':'OV-OLDER','Product ID':'P1','Purchase ID':'OVERSOLD','Purchase Date':'2026-09-01',
+ 'Original Quantity':20,'Remaining Quantity':-20,'Purchase Price':10,Status:'Oversold'});
+ f.sheets.PRODUCTS[0]['Current Stock']=30;
+ const firstWrites=f.writes(),firstSnapshot=businessSnapshot(f);
+ const denied=c.completePurchaseReturn('T',{purchaseId:older,items:[{productId:'P1',qty:1}],refundMethod:'Supplier Credit'});
+ assert.equal(denied.success,false,'would return purchase lot reserved for older oversold sale');
+ assert.match(denied.message,/reserved|oversold|available/i);
+ assert.equal(f.writes(),firstWrites,'no supplier/stock/payment write on reserved return');
+ assert.equal(businessSnapshot(f),firstSnapshot);
+ const safe=success(c.completePurchaseReturn('T',{purchaseId:newer,items:[{productId:'P1',qty:10}],refundMethod:'Supplier Credit'}));
+ assert.equal(safe.totalReturnAmount,120);
+ assert.equal(newLot['Remaining Quantity'],20);
+ assert.equal(oldLot['Remaining Quantity'],20);
+ assert.equal(f.sheets.PRODUCTS[0]['Current Stock'],20);
+});
+test('purchase quantity edit cannot reduce source lot reserved for historic oversold',()=>{
+ const f=fixture(),c=f.ctx;
+ const older=success(c.createPurchase('T',purchase({items:[{productId:'P1',name:'Rice',qty:20,unitPrice:10,sellingPrice:15}],paidAmount:0}))).purchaseId;
+ success(c.createPurchase('T',purchase({items:[{productId:'P1',name:'Rice',qty:30,unitPrice:12,sellingPrice:18}],paidAmount:0})));
+ f.rows('STOCK_LOTS').push({'Lot ID':'OV-OLDER','Product ID':'P1','Purchase ID':'OVERSOLD',
+ 'Purchase Date':'2026-09-01','Original Quantity':20,'Remaining Quantity':-20,'Purchase Price':10,Status:'Oversold'});
+ f.sheets.PRODUCTS[0]['Current Stock']=30;
+ const before=f.writes(),original=businessSnapshot(f);
+ const res=c.updatePurchase('T',older,purchase({items:[{productId:'P1',name:'Rice',qty:19,unitPrice:10,sellingPrice:15}],paidAmount:0}));
+ assert.equal(res.success,false);assert.match(res.message,/reserved|oversold|available/i);
+ assert.equal(f.writes(),before);assert.equal(businessSnapshot(f),original);
+});
+test('purchase price-only edit cannot reprice a lot reserved for old oversold invoices',()=>{
+ const f=fixture(),c=f.ctx;
+ const id=success(c.createPurchase('T',purchase({items:[{productId:'P1',name:'Rice',qty:20,unitPrice:10,sellingPrice:15}],paidAmount:0}))).purchaseId;
+ success(c.createPurchase('T',purchase({items:[{productId:'P1',name:'Rice',qty:30,unitPrice:12,sellingPrice:18}],paidAmount:0})));
+ f.rows('STOCK_LOTS').push({'Lot ID':'OV-OLDER','Product ID':'P1','Purchase ID':'OVERSOLD','Original Quantity':20,'Remaining Quantity':-20,'Purchase Price':10,Status:'Oversold'});
+ f.sheets.PRODUCTS[0]['Current Stock']=30;
+ const before=f.writes();
+ const res=c.updatePurchase('T',id,purchase({items:[{productId:'P1',name:'Rice',qty:20,unitPrice:11,sellingPrice:15}],paidAmount:0}));
+ assert.equal(res.success,false);assert.match(res.message,/reserved|oversold|cost/i);
+ assert.equal(f.writes(),before);
+});
+test('deleting a wholly reserved purchase is blocked before any supplier, cash or stock write',()=>{
+ const f=fixture(),c=f.ctx;
+ const id=success(c.createPurchase('T',purchase({items:[{productId:'P1',name:'Rice',qty:20,unitPrice:10,sellingPrice:15}],paidAmount:0}))).purchaseId;
+ success(c.createPurchase('T',purchase({items:[{productId:'P1',name:'Rice',qty:30,unitPrice:12,sellingPrice:18}],paidAmount:0})));
+ f.rows('STOCK_LOTS').push({'Lot ID':'OV-OLDER','Product ID':'P1','Purchase ID':'OVERSOLD','Original Quantity':20,'Remaining Quantity':-20,'Purchase Price':10,Status:'Oversold'});
+ f.sheets.PRODUCTS[0]['Current Stock']=30;
+ const before=f.writes(),source=businessSnapshot(f);
+ const res=c.deletePurchase('T',id,'Purchase duplicate');
+ assert.equal(res.success,false);assert.match(res.message,/reserved|oversold|funded/i);
+ assert.equal(f.writes(),before);assert.equal(businessSnapshot(f),source);
+});
+
+
+test('purchase return form shows truly unreserved stock, not gross quantity already owed to oversold',()=>{
+ const f=fixture(),c=f.ctx;
+ const older=success(c.createPurchase('T',purchase({items:[{productId:'P1',name:'Rice',qty:20,unitPrice:10,sellingPrice:15}],paidAmount:0}))).purchaseId;
+ const newer=success(c.createPurchase('T',purchase({items:[{productId:'P1',name:'Rice',qty:30,unitPrice:12,sellingPrice:18}],paidAmount:0}))).purchaseId;
+ f.rows('STOCK_LOTS').push({'Lot ID':'OV-OLDER','Product ID':'P1','Purchase ID':'OVERSOLD',
+ 'Original Quantity':20,'Remaining Quantity':-20,'Purchase Price':10,Status:'Oversold'});
+ f.sheets.PRODUCTS[0]['Current Stock']=30;
+ const before=f.writes();
+ const a=success(c.getPurchaseForReturn('T',older)).items[0];
+ const b=success(c.getPurchaseForReturn('T',newer)).items[0];
+ assert.equal(a.availableQty,0,'all older stock reserved');
+ assert.equal(b.availableQty,30,'newer lot unreserved');
+ assert.equal(f.writes(),before);
+});
+test('changing purchase invoice discount for reserved older inventory is forbidden before any writes',()=>{
+ const f=fixture(),c=f.ctx;
+ const older=success(c.createPurchase('T',purchase({items:[{productId:'P1',name:'Rice',qty:20,unitPrice:10,sellingPrice:15}],paidAmount:0}))).purchaseId;
+ success(c.createPurchase('T',purchase({items:[{productId:'P1',name:'Rice',qty:30,unitPrice:12,sellingPrice:18}],paidAmount:0})));
+ f.rows('STOCK_LOTS').push({'Lot ID':'OV-OLDER','Product ID':'P1','Purchase ID':'OVERSOLD',
+ 'Original Quantity':20,'Remaining Quantity':-20,'Purchase Price':10,Status:'Oversold'});
+ f.sheets.PRODUCTS[0]['Current Stock']=30;
+ const before=f.writes();
+ const result=c.updatePurchase('T',older,purchase({items:[{productId:'P1',name:'Rice',qty:20,unitPrice:10,sellingPrice:15}],discount:20,paidAmount:0}));
+ assert.equal(result.success,false);
+ assert.match(result.message,/reserved|oversold|cost|discount/i);
+ assert.equal(f.writes(),before);
+});
+test('safe newer purchase can be deleted leaving reserved older lot and negative debt consistent',()=>{
+ const f=fixture(),c=f.ctx;
+ const older=success(c.createPurchase('T',purchase({items:[{productId:'P1',name:'Rice',qty:20,unitPrice:10,sellingPrice:15}],paidAmount:0}))).purchaseId;
+ const newer=success(c.createPurchase('T',purchase({items:[{productId:'P1',name:'Rice',qty:30,unitPrice:12,sellingPrice:18}],paidAmount:0}))).purchaseId;
+ f.rows('STOCK_LOTS').push({'Lot ID':'OV-OLDER','Product ID':'P1','Purchase ID':'OVERSOLD',
+ 'Original Quantity':20,'Remaining Quantity':-20,'Purchase Price':10,Status:'Oversold'});
+ f.sheets.PRODUCTS[0]['Current Stock']=30;
+ success(c.deletePurchase('T',newer,'Incorrect new purchase'));
+ assert.equal(f.sheets.PRODUCTS[0]['Current Stock'],0);
+ assert.equal(f.sheets.STOCK_LOTS.find(x=>x['Purchase ID']===older)['Remaining Quantity'],20);
+ assert.equal(f.sheets.STOCK_LOTS.find(x=>x['Lot ID']==='OV-OLDER')['Remaining Quantity'],-20);
+});
+
+
+test('discount edit cannot revalue already-consumed historical purchase lots even after negative debt is funded',()=>{
+ const f=fixture(),c=f.ctx;
+ const id=success(c.createPurchase('T',purchase({items:[{productId:'P1',name:'Rice',qty:20,unitPrice:10,sellingPrice:15}],paidAmount:0}))).purchaseId;
+ const lot=f.sheets.STOCK_LOTS.find(x=>x['Purchase ID']===id);
+ lot['Remaining Quantity']=9;
+ f.sheets.PRODUCTS[0]['Current Stock']=9;
+ const before=f.writes();
+ const res=c.updatePurchase('T',id,purchase({items:[{productId:'P1',name:'Rice',qty:20,unitPrice:10,sellingPrice:15}],discount:15,paidAmount:0}));
+ assert.equal(res.success,false);
+ assert.match(res.message,/consumed|sold|cost|discount|settlement|reserved/i);
+ assert.equal(f.writes(),before);
+});
+test('changing supplier for a purchase whose lots fund old OVERSOLD sales is blocked before money moves',()=>{
+ const f=fixture(),c=f.ctx;
+ const id=success(c.createPurchase('T',purchase({items:[{productId:'P1',name:'Rice',qty:20,unitPrice:10,sellingPrice:15}],paidAmount:0}))).purchaseId;
+ success(c.createPurchase('T',purchase({items:[{productId:'P1',name:'Rice',qty:30,unitPrice:12,sellingPrice:18}],paidAmount:0})));
+ f.rows('STOCK_LOTS').push({'Lot ID':'OV-OLDER','Product ID':'P1','Purchase ID':'OVERSOLD','Original Quantity':20,'Remaining Quantity':-20,'Purchase Price':10,Status:'Oversold'});
+ f.sheets.PRODUCTS[0]['Current Stock']=30;
+ const before=f.writes();
+ const r=c.updatePurchase('T',id,purchase({supplierId:'S2',items:[{productId:'P1',name:'Rice',qty:20,unitPrice:10,sellingPrice:15}],paidAmount:0}));
+ assert.equal(r.success,false);
+ assert.match(r.message,/reserved|OVERSOLD|linked/i);
+ assert.equal(f.writes(),before);
+});
+
+
+test('historical duplicate purchase lots cannot hide reserved stock behind the last unreserved lot during a price edit',()=>{
+ const f=fixture(),c=f.ctx;
+ const older=success(c.createPurchase('T',purchase({items:[{productId:'P1',name:'Rice',qty:10,unitPrice:10,sellingPrice:15}],paidAmount:0}))).purchaseId;
+ success(c.createPurchase('T',purchase({items:[{productId:'P1',name:'Rice',qty:30,unitPrice:12,sellingPrice:18}],paidAmount:0})));
+ f.sheets.STOCK_LOTS.find(x=>x['Purchase ID']===older)['Purchase Date']='2026-09-01';
+ // Historic duplicate product lot: the source purchase already has a valid
+ // 10-foot row, but another duplicate 10-foot row was added later.
+ f.rows('STOCK_LOTS').push({'Lot ID':'LOT-ZZZ','Product ID':'P1','Purchase ID':older,
+ 'Purchase Date':'2026-11-01','Original Quantity':10,'Remaining Quantity':10,'Purchase Price':10,Status:'Active'});
+ f.rows('STOCK_LOTS').push({'Lot ID':'OV-OLDER','Product ID':'P1','Purchase ID':'OVERSOLD',
+ 'Original Quantity':10,'Remaining Quantity':-10,'Purchase Price':10,Status:'Oversold'});
+ f.sheets.PRODUCTS[0]['Current Stock']=40;
+ const before=f.writes();
+ const r=c.updatePurchase('T',older,purchase({items:[{productId:'P1',name:'Rice',qty:10,unitPrice:11,sellingPrice:15}],paidAmount:0}));
+ assert.equal(r.success,false);
+ assert.match(r.message,/multiple|reserved|oversold|ambiguous/i);
+ assert.equal(f.writes(),before);
+});
+
 console.log(`\n${passed}/${passed + failed} financial CRUD scenarios passed`);
 if (failed) process.exitCode = 1;

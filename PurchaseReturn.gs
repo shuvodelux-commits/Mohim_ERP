@@ -123,6 +123,33 @@ function getPurchaseForReturn(token, purchaseId) {
       boughtByProduct[id].grossValue += qty * (Number(pi['Unit Price']) || 0);
     });
 
+    // Match the Purchase Return cart to real FIFO-unreserved source lots,
+    // rather than claiming the full bought-minus-returned quantity can
+    // still leave the shop after older OVERSOLD invoices were recorded.
+    const sourceLots = getAllRows_('STOCK_LOTS');
+    const sourceProductsById = {};
+    getAllRows_('PRODUCTS').forEach(function (p) {
+      sourceProductsById[p['Product ID']] = p;
+    });
+    const availableLotQtyByProduct = {};
+    Object.keys(boughtByProduct).forEach(function (id) {
+      const own = planPurchaseLotOwnAvailability_(id, sourceLots, sourceProductsById[id]);
+      const present = sourceLots.filter(function (lot) {
+        return lot['Product ID'] === id && lot['Purchase ID'] === purchaseId;
+      });
+      // No source purchase lot for old pre-FIFO purchases: retain existing
+      // legacy cart, unless a negative debt now makes its provenance unsafe.
+      if (!present.length) {
+        availableLotQtyByProduct[id] = own.outstandingOversoldQty > 0 ? 0 : null;
+        return;
+      }
+      const purchaseLotIds = {};
+      present.forEach(function (lot) { purchaseLotIds[String(lot['Lot ID'])] = true; });
+      availableLotQtyByProduct[id] = own.lots.reduce(function (sum, lot) {
+        return sum + (purchaseLotIds[lot.lotId] ? lot.freeQty : 0);
+      }, 0);
+    });
+
     const items = Object.keys(boughtByProduct).map(function (id) {
       const item = boughtByProduct[id];
       const already = returnedByProduct[id] || 0;
@@ -133,7 +160,8 @@ function getPurchaseForReturn(token, purchaseId) {
         unitPrice: roundMoney_(effectiveTransactionUnitPrice_(grossUnitPrice, subtotal, grandTotal)),
         boughtQty: item.boughtQty,
         previouslyReturnedQty: already,
-        availableQty: Math.max(0, item.boughtQty - already)
+        availableQty: Math.max(0, Math.min(item.boughtQty - already,
+          availableLotQtyByProduct[id] === null ? item.boughtQty - already : availableLotQtyByProduct[id]))
       };
     });
 
@@ -233,7 +261,7 @@ function completePurchaseReturn(token, payload) {
       const currentStock = Number(product['Current Stock']) || 0;
       const newStock = currentStock - v.qty;
       if (newStock < 0) throw new Error(v.name + ': only ' + currentStock + ' in stock — cannot return more than you have on hand.');
-      const lotPlan = planPurchaseReturnLotReduction_(payload.purchaseId, v.productId, v.qty, allLots);
+      const lotPlan = planPurchaseReturnLotReduction_(payload.purchaseId, v.productId, v.qty, allLots, product);
       return {
         productId: v.productId, name: v.name, rowIndex: product._rowIndex,
         qty: v.qty, newStock: newStock, lotPlan: lotPlan

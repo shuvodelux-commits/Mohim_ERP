@@ -114,6 +114,10 @@ test('Purchase Return search/detail use live supplier settlement state', () => {
   ctx.supplierSettlementState_ = () => ({ marker: 'supplier' });
   ctx.supplierPurchaseSettlementSnapshotFromState_ = () => ({ paidAmount: 100, dueAmount: 0, supplierCreditUsed: 0, paymentStatus: 'Paid' });
   ctx.supplierPurchaseSettlementSnapshot_ = () => ({ paidAmount: 100, dueAmount: 0, supplierCreditUsed: 0, paymentStatus: 'Paid' });
+  // This test isolates supplier payment state, not FIFO stock. The new
+  // Purchase Return availability read is independently covered with real
+  // StockLots.gs in audit_financial_crud.test.js.
+  ctx.planPurchaseLotOwnAvailability_ = () => ({ outstandingOversoldQty: 0, lots: [] });
   vm.createContext(ctx);
   vm.runInContext(read('PurchaseReturn.gs'), ctx, { filename: 'PurchaseReturn.gs' });
 

@@ -662,6 +662,73 @@ function restoreStockToLots_(invoiceId, productId, productName, qty, fallbackRef
 }
 
 /**
+ * Read-only reservation of old, still-unfunded OVERSOLD debt against the
+ * oldest positive purchase lots. The reserve is NOT a stock movement or
+ * a write; it prevents Purchase Return/Edit/Delete from consuming units
+ * already economically owed to an earlier oversold invoice.
+ *
+ * A future settlement writer must materialize the exact source-linked
+ * offsets and preserve the same availability invariant.
+ */
+function planPurchaseLotOwnAvailability_(productId, allLots, productRow) {
+  const productLots = (allLots || getAllRows_('STOCK_LOTS')).filter(function (l) {
+    return l['Product ID'] === productId;
+  });
+  const positive = productLots.filter(function (l) { return Number(l['Remaining Quantity']) > 0; })
+    .sort(compareLotsFifo_);
+  let negativeQty = 0, signedQty = 0;
+  productLots.forEach(function (lot) {
+    const rawQty = lot['Remaining Quantity'];
+    const qty = Number(rawQty);
+    if (rawQty === '' || rawQty === null || rawQty === undefined ||
+        !Number.isFinite(qty)) throw new Error('Invalid stock lot quantity. Needs Review.');
+    signedQty += qty;
+    if (!Number.isFinite(signedQty)) throw new Error('Stock lot quantity overflow. Needs Review.');
+    if (qty < 0) {
+      if (String(lot['Purchase ID']) !== 'OVERSOLD' || String(lot['Status']) !== 'Oversold') {
+        throw new Error('Invalid OVERSOLD source lot. Needs Review.');
+      }
+      negativeQty += -qty;
+    }
+  });
+  if (negativeQty > 0) {
+    if (productRow) {
+      const cached = Number(productRow['Current Stock']);
+      if (!Number.isFinite(cached) || Math.abs(cached - signedQty) > 0.0000001) {
+        throw new Error('Stock lot and product balance mismatch. Needs Review.');
+      }
+    }
+    const seen = {};
+    productLots.forEach(function (lot) {
+      const id = String(lot['Lot ID'] || '');
+      if (!id || seen[id]) throw new Error('Duplicate or missing stock lot identity. Needs Review.');
+      seen[id] = true;
+    });
+    positive.forEach(function (lot) {
+      const cost = lot['Purchase Price'];
+      const deleted = lot['Is Deleted'] === true || String(lot['Is Deleted']).toUpperCase() === 'TRUE';
+      if (String(lot['Status']) !== 'Active' || deleted) {
+        throw new Error('Deleted/inactive positive purchase lot. Needs Review.');
+      }
+      if (cost === '' || cost === null || cost === undefined ||
+          !Number.isFinite(Number(cost)) || Number(cost) < 0) {
+        throw new Error('Unpriced positive purchase lot. Needs Review.');
+      }
+    });
+  }
+  let reserve = negativeQty;
+  const entries = positive.map(function (lot) {
+    const qty = Number(lot['Remaining Quantity']);
+    const reserved = Math.min(qty, reserve);
+    reserve -= reserved;
+    return {lotId:String(lot['Lot ID']),purchaseId:String(lot['Purchase ID'] || ''),
+      rowIndex:lot._rowIndex,remainingQty:qty,reservedQty:reserved,freeQty:qty-reserved};
+  });
+  return {productId:productId,netQty:signedQty,outstandingOversoldQty:negativeQty,
+    unfundedAfterPositiveQty:reserve,lots:entries};
+}
+
+/**
  * Reduces the lot a specific purchase line created (Purchase Return —
  * goods physically leaving to go back to the supplier). Falls back to
  * FIFO across whatever lots exist if the purchase predates the lot
@@ -682,7 +749,7 @@ function reduceLotForPurchaseReturn_(purchaseId, productId, qty) {
  * product's available lots — but never allow a shortfall/OVERSOLD write from a
  * Purchase Return.
  */
-function planPurchaseReturnLotReduction_(purchaseId, productId, qty, allLots) {
+function planPurchaseReturnLotReduction_(purchaseId, productId, qty, allLots, productRow) {
   let need = Number(qty) || 0;
   const plan = { purchaseId: purchaseId, productId: productId, draws: [], legacyFallback: false };
   if (need <= 0) return plan;
@@ -691,6 +758,9 @@ function planPurchaseReturnLotReduction_(purchaseId, productId, qty, allLots) {
   const purchaseLotsAll = lots.filter(function (l) {
     return l['Purchase ID'] === purchaseId && l['Product ID'] === productId;
   });
+  const reservation = planPurchaseLotOwnAvailability_(productId, lots, productRow);
+  const freeByLot = {};
+  reservation.lots.forEach(function (item) {freeByLot[item.lotId]=item.freeQty;});
 
   if (purchaseLotsAll.length) {
     const availableLots = purchaseLotsAll
@@ -699,20 +769,21 @@ function planPurchaseReturnLotReduction_(purchaseId, productId, qty, allLots) {
 
     for (let i = 0; i < availableLots.length && need > 0; i++) {
       const lot = availableLots[i];
-      const available = Number(lot['Remaining Quantity']) || 0;
+      const available = freeByLot[String(lot['Lot ID'])] || 0;
       const take = Math.min(available, need);
       if (take <= 0) continue;
       plan.draws.push({
         lotId: lot['Lot ID'], rowIndex: lot._rowIndex, take: take,
         unitCost: Number(lot['Purchase Price']) || 0,
-        remainingAfter: available - take
+        remainingAfter: Number(lot['Remaining Quantity']) - take
       });
       need -= take;
     }
 
     if (need > 0) {
       const remaining = plan.draws.reduce(function (sum, d) { return sum + d.take; }, 0);
-      throw new Error('Lots for this purchase only have ' + remaining + ' remaining \u2014 cannot return ' + qty + '.');
+      throw new Error('Lots for this purchase only have ' + remaining +
+        ' remaining unreserved units available (older OVERSOLD stock is reserved) — cannot return ' + qty + '.');
     }
     return plan;
   }
