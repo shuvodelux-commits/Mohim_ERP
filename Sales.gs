@@ -156,6 +156,14 @@ function getPosBootstrap(token) {
             out.fifoCostTiers = costSnapshot.costTiers.map(function (t) {
               return { qty: t.qty, unitCost: t.unitCost };
             });
+          } else if (costSnapshot.provisionalNextUnitCost !== null) {
+            // Only owner/authorized POS staff receive the unposted estimate.
+            // Never publish it as a verified purchase cost or use it to post.
+            out.purchasePrice = costSnapshot.provisionalNextUnitCost;
+            out.fifoCostTiers = costSnapshot.provisionalTiers.map(function (t) {
+              return { qty: t.qty, unitCost: t.unitCost };
+            });
+            out.fifoCostIsProvisional = true;
           }
         }
         return out;

@@ -122,6 +122,11 @@ function getProductsBootstrap(token) {
         "Lot Cost Status": fifoCost ? fifoCost.status : 'BUNDLE',
         "Lot Cost Issue": fifoCost ? fifoCost.issue : '',
         "Projected Stock Value": fifoCost ? fifoCost.projectedStockValue : null,
+        // Do not silently treat these unposted quantities as an asset.
+        "Provisional FIFO Cost": fifoCost ? fifoCost.provisionalNextUnitCost : null,
+        "Provisional Stock Value": fifoCost ? fifoCost.provisionalStockValue : null,
+        "Provisional Lot Quantity": fifoCost ? fifoCost.provisionalQty : null,
+        "Lot Quantity Difference": fifoCost ? fifoCost.qtyDifference : null,
         "Oversold Remaining Qty": fifoCost ? fifoCost.unresolvedOversold : 0,
         "Unpriced Lot Count": stats ? (stats.unpricedInternalLotCount || 0) : 0,
         "Unpriced Remaining Quantity": stats ? (stats.unpricedInternalQty || 0) : 0

@@ -40,6 +40,15 @@ test('Products refuses false stock value if cached 9 but visible lots add to 11'
  assert.equal(p['Stock Value'],null);assert.equal(p['Next FIFO Cost'],null);
  assert.equal(p['Lot Cost Issue'],'STOCK_MISMATCH');
 });
+test('Products delivers provisional lot-based value without changing its booked stock value',()=>{
+ const p=getBoot(9,stock(229));
+ assert.equal(p['Stock Value'],null);
+ assert.equal(p['Next FIFO Cost'],null);
+ assert.equal(p['Provisional FIFO Cost'],64.75);
+ assert.equal(p['Provisional Stock Value'],712.25);
+ assert.equal(p['Lot Quantity Difference'],2);
+ assert.equal(p['Lot Cost Issue'],'STOCK_MISMATCH');
+});
 test('Products clean FIFO lot uses the actual cost for both column and stock value',()=>{
  const p=getBoot(2,[lot('PUR',2,64.75,'2026-11-19')]);
  assert.equal(p['Next FIFO Cost'],64.75);
@@ -58,5 +67,8 @@ test('Products HTML renders FIFO Cost rather than stale Purchase Price, with exp
  assert.match(html,/p\['Next FIFO Cost'\]/);
  assert.match(html,/p\['Lot Cost Status'\]/);
  assert.match(html,/Needs Reconcile|Needs Review/);
+ assert.match(html,/p\['Provisional FIFO Cost'\]/);
+ assert.match(html,/p\['Provisional Stock Value'\]/);
+ assert.match(html,/est\. · Reconcile/);
  assert.match(html,/purchasePrice:\s*'Next FIFO Cost'/);
 });

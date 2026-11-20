@@ -215,7 +215,7 @@
 </div>
 
 <script>
-  var posState = { products: [], productStockById: {}, productCostById: {}, productCostTiersById: {}, showCost: false, canViewProfit: false, customers: [], bankAccounts: [], vendors: [], vendorsAll: [], cart: [], cartEditIndex: null, cartEntryIndex: null, activeSession: null, openingCashMismatch: null, dismissedCashMismatchKey: '', closeSessionSummary: null, updateInvoiceId: null, updateReason: null, draftId: null, draftNo: '', draftVersion: null, recentDrafts: [], saleNotes: '', searchResults: [], searchActiveIndex: -1, multiPaymentEnabled: false, paymentModeLegacy: false, paymentSnapshotSplit: false, paymentRows: [{id:'pm-1',method:'Cash',amount:'',accountId:''}], paymentRowSeq: 1, paymentOperationId: '', paymentAttemptFingerprint: '', copyMode: false };
+  var posState = { products: [], productStockById: {}, productCostById: {}, productCostTiersById: {}, productCostProvisionalById: {}, showCost: false, canViewProfit: false, customers: [], bankAccounts: [], vendors: [], vendorsAll: [], cart: [], cartEditIndex: null, cartEntryIndex: null, activeSession: null, openingCashMismatch: null, dismissedCashMismatchKey: '', closeSessionSummary: null, updateInvoiceId: null, updateReason: null, draftId: null, draftNo: '', draftVersion: null, recentDrafts: [], saleNotes: '', searchResults: [], searchActiveIndex: -1, multiPaymentEnabled: false, paymentModeLegacy: false, paymentSnapshotSplit: false, paymentRows: [{id:'pm-1',method:'Cash',amount:'',accountId:''}], paymentRowSeq: 1, paymentOperationId: '', paymentAttemptFingerprint: '', copyMode: false };
 
 
   // POS uses the shared touch-select presentation layer. The native select
@@ -245,11 +245,13 @@
       posState.canViewProfit = !!data.canViewCurrentInvoiceProfit;
       posState.productCostById = {};
       posState.productCostTiersById = {};
+      posState.productCostProvisionalById = {};
       posState.products.forEach(function (p) {
         posState.productStockById[p.id] = Number(p.stock) || 0;
         if (posState.showCost && p.purchasePrice !== undefined) {
           posState.productCostById[p.id] = Number(p.purchasePrice);
           posState.productCostTiersById[p.id] = p.fifoCostTiers || [];
+          posState.productCostProvisionalById[p.id] = !!p.fifoCostIsProvisional;
         }
       });
       posState.customers = data.customers;
@@ -1319,8 +1321,11 @@
 
   function posCostMarkerHtml_(line, i) {
     if (!posState.showCost) return '';
-    if (posState.productCostById[line.productId] === undefined) return '';
-    return ' <button type="button" class="c-cost" data-cost-i="' + i + '" aria-label="Show purchase price">' + posCostEyeSvg_() + '</button>';
+    var product = posProductById_(line.productId);
+    if (!product || product.productType === 'Bundle') return '';
+    // Even if no verified lot price exists, keep the eye visible to
+    // authorized staff so they can see that this product needs review.
+    return ' <button type="button" class="c-cost" data-cost-i="' + i + '" aria-label="Show FIFO purchase cost status">' + posCostEyeSvg_() + '</button>';
   }
 
   // escapeHtml() protects text nodes but deliberately leaves quotes untouched.
@@ -1526,11 +1531,12 @@
       if (costBtn.classList.contains('is-revealed')) { posHideCost_(costBtn); return; }
       var costLine = posState.cart[Number(costBtn.dataset.costI)];
       var cost = costLine ? posState.productCostById[costLine.productId] : undefined;
-      if (cost === undefined) return;   // feature off, or no verified lot cost
-      var estimate = posFifoCartCostEstimate_(costLine);
-      costBtn.textContent = estimate.complete
-        ? formatMoney(estimate.averageCost) + ' est.'
-        : (estimate.pricedQty > 0 ? String(estimate.pricedQty) + '/' + String(costLine.qty) + ' priced' : 'Needs Review');
+      var estimate = cost !== undefined ? posFifoCartCostEstimate_(costLine) : null;
+      var provisional = costLine && posState.productCostProvisionalById[costLine.productId];
+      costBtn.textContent = !estimate ? 'Needs Review' :
+        (estimate.complete
+          ? formatMoney(estimate.averageCost) + (provisional ? ' est. · Review' : ' est.')
+          : (estimate.pricedQty > 0 ? String(estimate.pricedQty) + '/' + String(costLine.qty) + ' priced' : 'Needs Review'));
       costBtn.classList.add('is-revealed');
       costBtn._costTimer = setTimeout(function () { posHideCost_(costBtn); }, POS_COST_REVEAL_MS);
       return;

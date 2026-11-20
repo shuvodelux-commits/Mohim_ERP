@@ -1561,7 +1561,14 @@ function buildLotCostSnapshot_(productId, allLots, productRow) {
     originalStockValue: null,
     projectedStockValue: null,
     nextUnitCost: null,
-    costTiers: []
+    costTiers: [],
+    // Diagnostics ONLY: unposted valuation based on source-lot quantities.
+    // It is never a verified FIFO cost or booked inventory asset.
+    provisionalNextUnitCost: null,
+    provisionalStockValue: null,
+    provisionalQty: null,
+    provisionalTiers: [],
+    qtyDifference: null
   };
   if (!pid || !productRow || productRow['Product ID'] !== pid ||
       !Array.isArray(allLots) || !Number.isFinite(stock)) {
@@ -1605,6 +1612,38 @@ function buildLotCostSnapshot_(productId, allLots, productRow) {
   output.originalStockValue = Math.round(rawValue * 100) / 100;
   output.unresolvedOversold = Math.round(oversoldQty * 1000000) / 1000000;
   if (fault) { output.issue = fault; return output; }
+  output.qtyDifference = Math.round((netQty - stock) * 1000000) / 1000000;
+  // Expose only a clearly labelled, read-only projection if every lot has
+  // a valid quantity, cost, unique ID, active source and date evidence.
+  // Reserve previous OVERSOLD debt FIFO first; never use the editable product
+  // master purchase price to fill missing or disputed cost evidence.
+  const datedLots = positive.concat(negative).every(function (lot) {
+    return !!(safeDateOnly_(lot['Purchase Date']) || safeDateOnly_(lot['Created At']));
+  });
+  if (datedLots && positive.length) {
+    let provisionalDebt = oversoldQty;
+    const provisional = [];
+    positive.slice().sort(compareLotsFifo_).forEach(function (lot) {
+      const available = Number(lot['Remaining Quantity']);
+      const used = Math.min(available, provisionalDebt);
+      provisionalDebt -= used;
+      const free = available - used;
+      if (free > 0.0000001) {
+        provisional.push({qty:Math.round(free * 1000000) / 1000000,
+          unitCost:Number(lot['Purchase Price']),lotId:String(lot['Lot ID'])});
+      }
+    });
+    if (provisionalDebt <= 0.0000001 && provisional.length) {
+      const qty = provisional.reduce(function (n,t) {return n+t.qty;}, 0);
+      const value = provisional.reduce(function (n,t) {return n+t.qty*t.unitCost;}, 0);
+      if (Number.isFinite(value) && Number.isFinite(qty) && qty >= 0) {
+        output.provisionalTiers = provisional;
+        output.provisionalQty = Math.round(qty * 1000000) / 1000000;
+        output.provisionalNextUnitCost = provisional[0].unitCost;
+        output.provisionalStockValue = Math.round(value * 100) / 100;
+      }
+    }
+  }
   if (Math.abs(netQty - stock) > 0.0000001) {
     output.issue = 'STOCK_MISMATCH';
     return output;
