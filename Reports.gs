@@ -596,7 +596,7 @@ function computeProfit_(range) {
     try { return CacheService.getScriptCache().get('db:v2:derived:generation:profit') || '0'; }
     catch (e) { return '0'; }
   })();
-  const cacheKey = 'db:v2:derived:profit:' + generation + ':' + String(range.from) + ':' + String(range.to);
+  const cacheKey = 'db:v3:derived:profit:settlement-v1:' + generation + ':' + String(range.from) + ':' + String(range.to);
   try {
     const cached = CacheService.getScriptCache().get(cacheKey);
     if (cached) return JSON.parse(cached);
@@ -691,7 +691,40 @@ function computeProfit_(range) {
     addInvoiceProductQty_(costQtyByInvoiceProduct, id, v['Product ID'], qty);
   });
 
+  // Original SALE_ITEM_LOTS.Unit Cost is the auditable provisional cost.
+  // After a verified committed OVERSOLD replenishment, apply ONLY the
+  // immutable per-source actual-minus-provisional cost difference. Attribute
+  // it to the original SALE invoice's period (as revenue/returns already
+  // are). Reject ambiguous/partially written source evidence rather than
+  // reporting a misleading finalized profit.
+  let costReconciliation = null;
+  if (typeof loadCommittedOversoldCostOverlay_ === 'function') {
+    const overlay = loadCommittedOversoldCostOverlay_();
+    if (!overlay || overlay.status === 'NEEDS_REVIEW') {
+      throw new Error('Oversold effective purchase cost needs review; profit is withheld (' +
+        (overlay && overlay.issues || []).join(',') + ').');
+    }
+    let appliedDeltaMinor = 0;
+    (overlay.adjustments || []).forEach(function (change) {
+      if (!inScope[change.invoiceId]) return;
+      const delta = change.deltaMinor;
+      if (!Number.isSafeInteger(delta) || !Number.isSafeInteger(appliedDeltaMinor + delta)) {
+        throw new Error('Oversold effective purchase cost overflow. Needs Review.');
+      }
+      appliedDeltaMinor += delta;
+      bucket_(change.sourceSaleProductId,'').cost += delta / 100;
+    });
+    cogs = roundMoney_(cogs + appliedDeltaMinor / 100);
+    costReconciliation = {
+      status: overlay.status,
+      provisionalSourceCount: overlay.provisionalSourceCount || 0,
+      cogsDeltaMinor: appliedDeltaMinor,
+      cogsDelta: appliedDeltaMinor / 100
+    };
+  }
+
   Object.keys(byProduct).forEach(function (pid) {
+    byProduct[pid].cost = roundMoney_(byProduct[pid].cost);
     byProduct[pid].profit = byProduct[pid].revenue - byProduct[pid].cost;
   });
 
@@ -776,6 +809,7 @@ function computeProfit_(range) {
     byProduct: sortedByDesc_(byProduct, 'profit'),
     expenseByCategory: sortedByDesc_(expenseByCategory, 'amount')
   };
+  if (costReconciliation) result.costReconciliation = costReconciliation;
 
   try {
     const raw = JSON.stringify(result);

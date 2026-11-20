@@ -182,7 +182,7 @@ function invalidateDerivedCachesForSheet_(sheetKey) {
   const cache = CacheService.getScriptCache();
   try {
     // Profit depends on these transaction sources.
-    if ({SALES:true, SALE_ITEMS:true, SALE_ITEM_LOTS:true, VENDOR_SOURCING:true, SALES_RETURN:true, SALES_RETURN_ITEMS:true, EXPENSES:true, CUSTOMER_LEDGER:true, SUPPLIER_LEDGER:true}[sheetKey]) {
+    if ({SALES:true, SALE_ITEMS:true, SALE_ITEM_LOTS:true, STOCK_LOT_SETTLEMENTS:true, PURCHASE_SETTLEMENT_JOURNAL:true, VENDOR_SOURCING:true, SALES_RETURN:true, SALES_RETURN_ITEMS:true, EXPENSES:true, CUSTOMER_LEDGER:true, SUPPLIER_LEDGER:true}[sheetKey]) {
       // We cannot enumerate unknown date keys efficiently, so invalidate the
       // small fixed set of report ranges used by the dashboard plus any
       // caller-specific ranges through a generation token.
