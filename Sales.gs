@@ -380,6 +380,8 @@ function completeSale(token, payload) {
           }
           readSalePaymentBreakdown_(alreadyPosted, getAllRows_('SALE_PAYMENTS'));
         }
+        // The authorized replay may clean up a stranded draft, which is a write.
+        if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
         removeSalesDraftAfterPost_(sourceDraftId, sourceDraftVersion, alreadyPosted['Invoice ID'], actingUser, true);
         return ok_(buildInvoicePayload_(alreadyPosted['Invoice ID']));
       }
@@ -612,6 +614,9 @@ function completeSale(token, payload) {
     // Business date was validated before the stock/COGS read-only plan.
 
     // ======================== WRITE PHASE ========================
+    // Perform the authoritative journal check AFTER original draft/cart
+    // permissions, BEFORE reserving or posting even one stock or money row.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     // Nothing below here raises a validation error. Apps Script has no
     // transactions, so this ordering is what stops a rejected sale from
     // leaving half-written records behind.

@@ -678,6 +678,8 @@ function completeReturn(token, payload) {
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     const actingUser = requirePermission_(token, 'returns', 'add');
+    // Block stock and money writes if any prior purchase/refund result is uncertain.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     const requestedInvoiceId = sanitizeInput_(payload && payload.invoiceId);
     // Resolve idempotent replay BEFORE return-quantity validation: a
     // successful first attempt has already consumed the available quantity.
@@ -722,6 +724,15 @@ function completeReturn(token, payload) {
 
     requireActiveCashSession_();
     const txDate = resolveTransactionDate_(token, 'returns', payload && payload.date, payload && payload.backdatedReason, 'Return');
+    // Only the reviewed, explicit double-gated source-specific writer may
+    // handle a funded OVERSOLD return. Legacy paths retain their safe block.
+    if (typeof maybeCompleteFundedOversoldReturn_ === 'function') {
+      const funded = maybeCompleteFundedOversoldReturn_(payload, {
+        actingUser:actingUser,originalSale:originalSale,isSplitReturn:isSplitReturn,
+        txDate:txDate
+      });
+      if (funded !== null) return funded;
+    }
     const prepared = prepareSalesReturn_(payload, { txDate: txDate });
     if (isSplitReturn) {
       const now = new Date();
@@ -784,6 +795,8 @@ function completeReturnBatch(token, payload) {
   const completedReturnIds = [];
   try {
     const actingUser = requirePermission_(token, 'returns', 'add');
+    // Block stock and money writes if any prior purchase/refund result is uncertain.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
 
     const invoiceReturns = payload && Array.isArray(payload.invoiceReturns) ? payload.invoiceReturns : [];
@@ -1262,7 +1275,11 @@ function updateSalesReturn(token, payload) {
   try {
     // Public RPC authorization must precede even the first payload check.
     requirePermission_(token,'returns','edit');
+    // Block stock and money writes if any prior purchase/refund result is uncertain.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     const id=sanitizeInput_(payload && payload.returnId);
+    if (typeof assertSourceLinkedReturnNotCorrected_ === 'function')
+      assertSourceLinkedReturnNotCorrected_(id);
     const operationId=sanitizeInput_(payload && payload.operationId);
     if (!id || !/^[A-Za-z0-9_-]{12,100}$/.test(operationId))
       throw new Error('Return ID and stable correction operation ID are required.');
@@ -1387,7 +1404,11 @@ function deleteSalesReturn(token, returnId, reason, operationId, expectedVersion
   try {
     // Always authenticate a public RPC before inspecting untrusted input.
     requirePermission_(token,'returns','view');
+    // Block stock and money writes if any prior purchase/refund result is uncertain.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     const id=sanitizeInput_(returnId);
+    if (typeof assertSourceLinkedReturnNotCorrected_ === 'function')
+      assertSourceLinkedReturnNotCorrected_(id);
     const why=sanitizeInput_(reason);
     if (!id) throw new Error('Return ID is required.');
     if (!why) throw new Error('Delete reason is required.');

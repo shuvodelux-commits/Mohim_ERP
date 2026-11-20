@@ -103,5 +103,5 @@ test('report cache generation must be invalidated by a newly committed settlemen
 
 test('new effective COGS implementation uses a versioned profit cache key, not legacy cached provisional profit',()=>{
  const source=fs.readFileSync(path.join(root,'Reports.gs'),'utf8');
- assert.match(source,/db:v3:derived:profit:settlement-v1:/);
+ assert.match(source,/db:v4:derived:profit:funded-return-v1:/);
 });

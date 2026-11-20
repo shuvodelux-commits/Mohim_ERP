@@ -596,7 +596,7 @@ function computeProfit_(range) {
     try { return CacheService.getScriptCache().get('db:v2:derived:generation:profit') || '0'; }
     catch (e) { return '0'; }
   })();
-  const cacheKey = 'db:v3:derived:profit:settlement-v1:' + generation + ':' + String(range.from) + ':' + String(range.to);
+  const cacheKey = 'db:v4:derived:profit:funded-return-v1:' + generation + ':' + String(range.from) + ':' + String(range.to);
   try {
     const cached = CacheService.getScriptCache().get(cacheKey);
     if (cached) return JSON.parse(cached);

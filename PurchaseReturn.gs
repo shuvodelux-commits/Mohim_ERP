@@ -196,8 +196,12 @@ function completePurchaseReturn(token, payload) {
   lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     const actingUser = requirePermission_(token, 'purchase', 'add');
+    // Block stock and money writes if any prior purchase/refund result is uncertain.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
     if (!payload.purchaseId) return fail_('No purchase selected.');
+    if (typeof assertSourceLinkedPurchaseNotModified_ === 'function')
+      assertSourceLinkedPurchaseNotModified_(payload.purchaseId);
     if (!payload.items || !payload.items.length) return fail_('Select at least one product to return.');
     if (payload.refundMethod !== 'Cash' && payload.refundMethod !== 'Supplier Credit') return fail_('Choose a refund method.');
 

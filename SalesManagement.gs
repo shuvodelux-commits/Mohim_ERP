@@ -474,6 +474,8 @@ function updateSaleInternal_(token, invoiceId, payload, options) {
   if (lock) lock.waitLock(CONFIG.LOCK_TIMEOUT_MS);
   try {
     const user = requirePermission_(token, 'sales', 'edit');
+    // Refuse new accounting writes under an unresolved purchase or funded return.
+    if (typeof assertNoUncertainTransactionWrites_ === 'function') assertNoUncertainTransactionWrites_();
     requireActiveCashSession_();
     if (!payload.items || !payload.items.length) return fail_('Cart is empty.');
     if (!sanitizeInput_(payload.reason)) return fail_('Enter a reason for this update.');
