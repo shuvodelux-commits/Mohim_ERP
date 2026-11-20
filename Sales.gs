@@ -104,14 +104,22 @@ function getPosBootstrap(token) {
     // not sent-and-hidden, not sent-and-obfuscated. A user without the
     // right cannot recover it by reading the network response or poking at
     // posState in the console, because it was never in the payload.
-    // Deliberately kept to the product's own on-file Purchase Price: it is
-    // the same number the Products page shows and the same one FIFO falls
-    // back to (planStockConsumption_), and reading it costs nothing extra
-    // since PRODUCTS is already loaded above.
+    // The cost returned to authorized staff must be the applicable FIFO
+    // purchase lot cost, never the product master/default Purchase Price.
+    // A disputed lot history is marked Needs Review instead of leaking a
+    // plausible-looking but unverified master cost.
     // isSettingEnabled_ rather than === 'true': the sheet hands this back
     // as a real boolean, not the string that was written. See Utils.gs.
     const showPurchasePrice = isSettingEnabled_(settings['POS Show Purchase Price']) &&
       hasPermission_(actingUser, 'posCost', 'view');
+    // Group costs once per bootstrap; do not re-scan every stock lot for
+    // every product, and do not prepare sensitive costs for unauthorized staff.
+    const costLotsByProduct = {};
+    if (showPurchasePrice) allLots.forEach(function (lot) {
+      const id = lot['Product ID'];
+      if (!costLotsByProduct[id]) costLotsByProduct[id] = [];
+      costLotsByProduct[id].push(lot);
+    });
 
     return ok_({
       products: products.filter(function (p) { return !bundleUnavailableById[p['Product ID']]; }).map(function (p) {
@@ -131,7 +139,16 @@ function getPosBootstrap(token) {
           category: p['Category'], productType: bundle ? 'Bundle' : 'Standard',
           bundleRevision: bundle ? definition.revision : 0
         };
-        if (showPurchasePrice) out.purchasePrice = Number(p['Purchase Price']) || 0;
+        if (showPurchasePrice && !bundle) {
+          const costSnapshot = buildLotCostSnapshot_(p['Product ID'], costLotsByProduct[p['Product ID']] || [], p);
+          out.fifoCostStatus = costSnapshot.status;
+          if (costSnapshot.nextUnitCost !== null) {
+            out.purchasePrice = costSnapshot.nextUnitCost;
+            out.fifoCostTiers = costSnapshot.costTiers.map(function (t) {
+              return { qty: t.qty, unitCost: t.unitCost };
+            });
+          }
+        }
         return out;
       }),
       // Lets POS tell "feature is off / not mine to see" (render nothing at

@@ -24,7 +24,7 @@
         <tr>
           <th aria-sort="none"><button type="button" class="prod-sort-button" data-sort-key="name">Product <span class="prod-sort-indicator" aria-hidden="true">↕</span></button></th>
           <th aria-sort="none"><button type="button" class="prod-sort-button" data-sort-key="category">Category <span class="prod-sort-indicator" aria-hidden="true">↕</span></button></th>
-          <th class="num prod-sort-th" aria-sort="none"><button type="button" class="prod-sort-button" data-sort-key="purchasePrice">Purchase <span class="prod-sort-indicator" aria-hidden="true">↕</span></button></th>
+          <th class="num prod-sort-th" aria-sort="none"><button type="button" class="prod-sort-button" data-sort-key="purchasePrice">FIFO Cost <span class="prod-sort-indicator" aria-hidden="true">↕</span></button></th>
           <th class="num prod-sort-th" aria-sort="none"><button type="button" class="prod-sort-button" data-sort-key="sellingPrice">Selling <span class="prod-sort-indicator" aria-hidden="true">↕</span></button></th>
           <th class="num prod-sort-th" aria-sort="none"><button type="button" class="prod-sort-button" data-sort-key="stockQty">Stock <span class="prod-sort-indicator" aria-hidden="true">↕</span></button></th>
           <th class="num prod-sort-th" aria-sort="none"><button type="button" class="prod-sort-button" data-sort-key="stockValue">Stock Value <span class="prod-sort-indicator" aria-hidden="true">↕</span></button></th>
@@ -392,7 +392,7 @@
     var fieldByKey = {
       name: 'Product Name',
       category: 'Category',
-      purchasePrice: 'Purchase Price',
+      purchasePrice: 'Next FIFO Cost',
       sellingPrice: 'Selling Price',
       stockQty: 'Current Stock',
       stockValue: 'Stock Value',
@@ -654,15 +654,25 @@
         ? '<span class="badge badge-success">Active</span>'
         : '<span class="badge badge-danger">Inactive</span>';
 
+      var costStatus = p['Lot Cost Status'];
+      var displayedCost = isBundle ? '—' :
+        (p['Next FIFO Cost'] !== null && p['Next FIFO Cost'] !== undefined
+          ? formatMoney(p['Next FIFO Cost']) + (costStatus === 'UNSETTLED' ? ' <span title="Estimated FIFO cost; old oversold lots still require reconciliation">est.</span>' : '')
+          : (costStatus === 'NEEDS_REVIEW' ? '<span title="Stock lots require review">Needs Review</span>' : '—'));
+      var displayedValue = isBundle ? '—' :
+        (p['Stock Value'] === null || p['Stock Value'] === undefined
+          ? '<span title="Unsettled or inconsistent lots must be reconciled before reporting stock value">Needs Reconcile</span>'
+          : formatMoney(p['Stock Value']));
+
       var tr = document.createElement('tr');
       tr.innerHTML =
         '<td><div class="prod-item-name" title="' + escapeHtml(p['Product Name']) + '">' +
           escapeHtml(p['Product Name']) + '</div></td>' +
         '<td>' + escapeHtml(p['Category'] || '') + '</td>' +
-        '<td class="num">' + (isBundle ? '—' : formatMoney(p['Purchase Price'])) + '</td>' +
+        '<td class="num">' + displayedCost + '</td>' +
         '<td class="num"><span class="prod-price-main">' + formatMoney(p['Selling Price']) + '</span></td>' +
         '<td class="num">' + stockCell + '</td>' +
-        '<td class="num">' + (isBundle ? '—' : formatMoney(p['Stock Value'])) + '</td>' +
+        '<td class="num">' + displayedValue + '</td>' +
         '<td>' + statusBadge + '</td>' +
         '<td class="erp-sticky-action-col">' +
           rowActionTriggerHtml_(

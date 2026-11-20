@@ -215,7 +215,7 @@
 </div>
 
 <script>
-  var posState = { products: [], productStockById: {}, productCostById: {}, showCost: false, canViewProfit: false, customers: [], bankAccounts: [], vendors: [], vendorsAll: [], cart: [], cartEditIndex: null, cartEntryIndex: null, activeSession: null, openingCashMismatch: null, dismissedCashMismatchKey: '', closeSessionSummary: null, updateInvoiceId: null, updateReason: null, draftId: null, draftNo: '', draftVersion: null, recentDrafts: [], saleNotes: '', searchResults: [], searchActiveIndex: -1, multiPaymentEnabled: false, paymentModeLegacy: false, paymentSnapshotSplit: false, paymentRows: [{id:'pm-1',method:'Cash',amount:'',accountId:''}], paymentRowSeq: 1, paymentOperationId: '', paymentAttemptFingerprint: '', copyMode: false };
+  var posState = { products: [], productStockById: {}, productCostById: {}, productCostTiersById: {}, showCost: false, canViewProfit: false, customers: [], bankAccounts: [], vendors: [], vendorsAll: [], cart: [], cartEditIndex: null, cartEntryIndex: null, activeSession: null, openingCashMismatch: null, dismissedCashMismatchKey: '', closeSessionSummary: null, updateInvoiceId: null, updateReason: null, draftId: null, draftNo: '', draftVersion: null, recentDrafts: [], saleNotes: '', searchResults: [], searchActiveIndex: -1, multiPaymentEnabled: false, paymentModeLegacy: false, paymentSnapshotSplit: false, paymentRows: [{id:'pm-1',method:'Cash',amount:'',accountId:''}], paymentRowSeq: 1, paymentOperationId: '', paymentAttemptFingerprint: '', copyMode: false };
 
 
   // POS uses the shared touch-select presentation layer. The native select
@@ -244,9 +244,13 @@
       posState.showCost = !!data.showPurchasePrice;
       posState.canViewProfit = !!data.canViewCurrentInvoiceProfit;
       posState.productCostById = {};
+      posState.productCostTiersById = {};
       posState.products.forEach(function (p) {
         posState.productStockById[p.id] = Number(p.stock) || 0;
-        if (posState.showCost && p.purchasePrice !== undefined) posState.productCostById[p.id] = Number(p.purchasePrice) || 0;
+        if (posState.showCost && p.purchasePrice !== undefined) {
+          posState.productCostById[p.id] = Number(p.purchasePrice);
+          posState.productCostTiersById[p.id] = p.fifoCostTiers || [];
+        }
       });
       posState.customers = data.customers;
       posState.bankAccounts = data.bankAccounts;
@@ -1276,6 +1280,32 @@
     return '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"></path><circle cx="12" cy="12" r="2.5"></circle></svg>';
   }
 
+  /** Purchase cost for the requested cart quantity, using server-authorized
+   * FIFO tiers only. Never substitutes product master Purchase Price for a
+   * shortage. All displayed totals are estimates until the sale is posted.
+   */
+  function posFifoCartCostEstimate_(line) {
+    var tiers = posState.productCostTiersById[line.productId] || [];
+    var need = Number(line.qty) || 0;
+    var priced = 0, total = 0;
+    if (!Number.isFinite(need) || need <= 0) {
+      return { complete: false, pricedQty: 0, totalCost: 0, averageCost: null };
+    }
+    tiers.forEach(function (tier) {
+      var take = Math.min(Math.max(0, Number(tier.qty) || 0), Math.max(0, need - priced));
+      if (take > 0) {
+        total += take * Number(tier.unitCost);
+        priced += take;
+      }
+    });
+    return {
+      complete: Math.abs(priced - need) < 0.0000001,
+      pricedQty: Math.round(priced * 1000000) / 1000000,
+      totalCost: Math.round(total * 100) / 100,
+      averageCost: priced > 0 ? Math.round(total / priced * 100) / 100 : null
+    };
+  }
+
   function posCostMarkerHtml_(line, i) {
     if (!posState.showCost) return '';
     if (posState.productCostById[line.productId] === undefined) return '';
@@ -1485,8 +1515,11 @@
       if (costBtn.classList.contains('is-revealed')) { posHideCost_(costBtn); return; }
       var costLine = posState.cart[Number(costBtn.dataset.costI)];
       var cost = costLine ? posState.productCostById[costLine.productId] : undefined;
-      if (cost === undefined) return;   // feature off, or no cost for this product
-      costBtn.textContent = formatMoney(cost);
+      if (cost === undefined) return;   // feature off, or no verified lot cost
+      var estimate = posFifoCartCostEstimate_(costLine);
+      costBtn.textContent = estimate.complete
+        ? formatMoney(estimate.averageCost) + ' est.'
+        : (estimate.pricedQty > 0 ? String(estimate.pricedQty) + '/' + String(costLine.qty) + ' priced' : 'Needs Review');
       costBtn.classList.add('is-revealed');
       costBtn._costTimer = setTimeout(function () { posHideCost_(costBtn); }, POS_COST_REVEAL_MS);
       return;
