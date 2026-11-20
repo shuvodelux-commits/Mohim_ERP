@@ -278,9 +278,34 @@ function updatePurchaseInternal_(token, purchaseId, payload, options) {
     });
 
     const lotByProduct = {};
-    getAllRows_('STOCK_LOTS').forEach(function (l) {
+    const allStockLots = getAllRows_('STOCK_LOTS');
+    allStockLots.forEach(function (l) {
       if (l['Purchase ID'] === purchaseId) lotByProduct[l['Product ID']] = l;
     });
+    const reservationsByProduct = {};
+    function purchaseReservationFor_(productId) {
+      if (!Object.prototype.hasOwnProperty.call(reservationsByProduct, productId)) {
+        reservationsByProduct[productId] = planPurchaseLotOwnAvailability_(
+          productId, allStockLots, productsById[productId]
+        );
+      }
+      return reservationsByProduct[productId];
+    }
+    function reservedQtyForLot_(productId, lot) {
+      // Purchase Edit still updates one source lot per product. Historical
+      // duplicate source lots must not let the last (unreserved) row hide
+      // an older (reserved) row and silently reprice owed inventory.
+      const matchingSourceLots = allStockLots.filter(function (source) {
+        return source['Product ID'] === productId && source['Purchase ID'] === purchaseId;
+      });
+      if (matchingSourceLots.length !== 1) {
+        throw new Error('Multiple or missing source purchase lots; purchase edit is ambiguous. Needs Review.');
+      }
+      const entry = purchaseReservationFor_(productId).lots.filter(function (r) {
+        return r.lotId === String(lot['Lot ID']);
+      })[0];
+      return entry ? entry.reservedQty : 0;
+    }
 
     // Cost changes affect future FIFO COGS. Once any unit from a purchase lot
     // has been sold, silently changing its unit cost would make the Purchase
@@ -296,6 +321,9 @@ function updatePurchaseInternal_(token, purchaseId, payload, options) {
       const original = Number(lot['Original Quantity']) || 0;
       const remaining = Number(lot['Remaining Quantity']) || 0;
       const consumed = Math.max(0, original - remaining);
+      if (reservedQtyForLot_(productId, lot) > 0.0000001) {
+        throw new Error('Purchase price cannot change: stock from this purchase is reserved for older OVERSOLD sales. Needs Review.');
+      }
       if (consumed > 0) {
         throw new Error('Purchase price cannot be changed after stock from this lot has already been sold. Use a cost adjustment/correction instead.');
       }
@@ -330,10 +358,13 @@ function updatePurchaseInternal_(token, purchaseId, payload, options) {
           throw new Error(product['Product Name'] + ': this purchase has no stock lot on file, so its quantity cannot be reduced. Use Purchase Return instead.');
         }
         const remaining = Number(lot['Remaining Quantity']) || 0;
-        if (remaining < Math.abs(delta)) {
+        const reserved = reservedQtyForLot_(productId, lot);
+        const free = Math.max(0, remaining - reserved);
+        if (free + 0.0000001 < Math.abs(delta)) {
           throw new Error(
-            product['Product Name'] + ': only ' + remaining + ' of the ' + (Number(lot['Original Quantity']) || 0) +
-            ' bought on this purchase is still unsold, so the quantity cannot be reduced by ' + Math.abs(delta) + '.'
+            product['Product Name'] + ': only ' + free + ' unreserved of the ' +
+            (Number(lot['Original Quantity']) || 0) +
+            ' bought on this purchase remain available; older OVERSOLD stock is reserved. Cannot reduce by ' + Math.abs(delta) + '.'
           );
         }
       }
@@ -358,6 +389,21 @@ function updatePurchaseInternal_(token, purchaseId, payload, options) {
     });
 
     const discount = isValidNonNegativeNumber_(payload.discount) ? Number(payload.discount) : 0;
+    // Invoice discount affects effective per-unit purchase cost. A prior
+    // OVERSOLD sale economically reserves this source lot, so changing its
+    // cost basis would silently revalue the older sale without audit links.
+    if (Math.abs(discount - (Number(purchase['Discount']) || 0)) > 0.0000001) {
+      Object.keys(oldQtyByProduct).forEach(function (productId) {
+        const lot = lotByProduct[productId];
+        if (lot) {
+          const consumed = Math.max(0,
+            (Number(lot['Original Quantity']) || 0) - (Number(lot['Remaining Quantity']) || 0));
+          if (reservedQtyForLot_(productId, lot) > 0.0000001 || consumed > 0.0000001) {
+            throw new Error('Purchase discount cannot change: the source purchase cost already belongs to sold or reserved OVERSOLD stock. Needs Review.');
+          }
+        }
+      });
+    }
     const grandTotal = Math.max(0, subtotal - discount);
     let paidAmount = isValidNonNegativeNumber_(payload.paidAmount) ? Number(payload.paidAmount) : 0;
     if (paidAmount > grandTotal) paidAmount = grandTotal;
@@ -383,6 +429,14 @@ function updatePurchaseInternal_(token, purchaseId, payload, options) {
     if (!supplierRow) return fail_('Selected supplier was not found or is inactive.');
     const supplierName = String(supplierRow['Supplier Name'] || '');
     const supplierChanged = oldSupplierId !== supplierId;
+    if (supplierChanged) {
+      Object.keys(oldQtyByProduct).forEach(function (productId) {
+        const lot = lotByProduct[productId];
+        if (lot && reservedQtyForLot_(productId, lot) > 0.0000001) {
+          throw new Error('Cannot move supplier: purchase stock is reserved for older OVERSOLD sales. Needs Review.');
+        }
+      });
+    }
 
     // Moving a purchase to another supplier after a later supplier payment or
     // supplier credit has already settled this purchase would require moving

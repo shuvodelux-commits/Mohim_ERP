@@ -250,6 +250,7 @@ test('purchase return lot planner spans historical duplicate lots and rejects in
   };
   vm.createContext(ctx);
   vm.runInContext(fnSource(stock, 'compareLotsFifo_'), ctx);
+  vm.runInContext(fnSource(stock, 'planPurchaseLotOwnAvailability_'), ctx);
   vm.runInContext(fnSource(stock, 'planPurchaseReturnLotReduction_'), ctx);
   const lots = [
     {'Purchase ID':'PO-1','Product ID':'P1','Lot ID':'L1','Purchase Date':'2026-01-01','Remaining Quantity':2,'Purchase Price':10,_rowIndex:2},

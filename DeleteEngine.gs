@@ -424,7 +424,10 @@ function deletePurchase(token, purchaseId, reason) {
     if (!items.length) return fail_('This purchase has no item lines to reverse.');
 
     // ---- BLOCK PHASE: refuse before touching anything ----
-    var lots = getAllRows_('STOCK_LOTS').filter(function (l) { return l['Purchase ID'] === purchaseId; });
+    var allStockLots = getAllRows_('STOCK_LOTS');
+    var lots = allStockLots.filter(function (l) { return l['Purchase ID'] === purchaseId; });
+    var productsById = {};
+    getAllRows_('PRODUCTS').forEach(function (p) { productsById[p['Product ID']] = p; });
     var lotsByProduct = {};
     lots.forEach(function (l) {
       var pid = l['Product ID'];
@@ -439,7 +442,20 @@ function deletePurchase(token, purchaseId, reason) {
       if (checkedProducts[pid]) return;
       checkedProducts[pid] = true;
       var productLots = lotsByProduct[pid] || [];
-      if (!productLots.length) return; // predates the lot system; the stock check below still guards it
+      var reservation = planPurchaseLotOwnAvailability_(pid, allStockLots, productsById[pid]);
+      if (!productLots.length && reservation.outstandingOversoldQty > 0) {
+        sold.push(line['Product Name'] + ' (missing purchase lot provenance while older OVERSOLD debt exists)');
+        return;
+      }
+      if (!productLots.length) return; // normal legacy purchase; stock check below still guards it
+      var reserved = productLots.reduce(function (sum, lot) {
+        var match = reservation.lots.filter(function (r) { return r.lotId === String(lot['Lot ID']); })[0];
+        return sum + (match ? match.reservedQty : 0);
+      }, 0);
+      if (reserved > 0.0000001) {
+        sold.push(line['Product Name'] + ' (' + reserved + ' reserved for older OVERSOLD stock)');
+        return;
+      }
       var original = productLots.reduce(function (sum, lot) { return sum + (Number(lot['Original Quantity']) || 0); }, 0);
       var remaining = productLots.reduce(function (sum, lot) { return sum + (Number(lot['Remaining Quantity']) || 0); }, 0);
       var consumed = original - remaining;
@@ -454,8 +470,6 @@ function deletePurchase(token, purchaseId, reason) {
       );
     }
 
-    var productsById = {};
-    getAllRows_('PRODUCTS').forEach(function (p) { productsById[p['Product ID']] = p; });
     var shortfall = [];
     var wanted = {};
     items.forEach(function (line) {
