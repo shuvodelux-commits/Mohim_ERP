@@ -1189,3 +1189,13 @@ movement from the same invoice/payment, and never silently re-seed old records.
 - **Not changed:** return quantity / original sale price ceilings, FIFO stock lineage, duplicate/product validation, active Cash Session, permissions, debit/credit posting and correction audit, one child Return ID per participating invoice, and the existing split-payment batch safety restriction (multi-invoice split-payment journals require a separately verified extension).
 - Tests cover fully-due cash batch + single returns, return correction from Credit to Cash, sparse invoice payloads, zero-price returns, and browser visibility of Cash on unpaid invoices.
 - Code is reviewed via GitHub PR on a test branch; no automatic Apps Script deployment.
+
+## 2026-11-20 — OVERSOLD purchase-settlement preflight (non-postable)
+
+This branch adds `StockLots.gs:planOversoldPurchaseSettlement_` as a pure source-linked calculator. It validates net lot quantity, sale-item-lot provenance, outstanding negative lots, purchase chronology, committed previous allocations, exact per-unit integer quantities and paisa cost differences. Proposed new purchase funding is oldest original sale first, never gross-positive resale of stock owed to historical sales. Repeated or interrupted purchase operations fail closed. All results set `postable:false` and perform no stock, finance or Sheets write.
+
+Two new **reserved, additive** schemas in Config.gs (`STOCK_LOT_SETTLEMENTS`, `PURCHASE_SETTLEMENT_JOURNAL`) allow a future native GAS purchase writer to retain exact immutable allocation and write-stage evidence. Config declaration alone does not deploy, activate posting, run setup or modify a workbook.
+
+The existing native `Purchase.gs:createPurchase` continues to create new purchase lots without funding OVERSOLD debt until a separately reviewed and fault-injection-tested integration is implemented. A future writer must use ScriptLock, verify the entire supplier/payment/cart purchase before any write, preserve just one Current Stock +Q movement, journal every mutation stage for crash recovery, and block any unresolved partial write. Original sale income and Customer/Supplier/Cash/Bank transactions are never rewritten merely because unit purchase cost changes. Replenishment's final COGS/profit, date/variance recognition, and exact return reversal semantics require separate accounting sign-off.
+
+Review contract and full limitations: `docs/reviews/2026-11-20-gas-purchase-oversold-settlement-preflight.md`. No live GAS/Sheets deployment or historical repair authorized.
